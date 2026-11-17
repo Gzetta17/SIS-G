@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hockey | CDM Pro Suite</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-deporte="Hockey">
+
+<div class="app-shell">
+        <aside class="app-sidebar">
+        <a href="index.html" class="sidebar-brand">
+            <img src="/img/logo.png" alt="CDM" onerror="this.onerror=null; this.src='logo.png';">
+            <div class="sidebar-brand-text">
+                <h1>CDM ADELIA MARÍA</h1>
+                <span>Plataforma Oficial</span>
+            </div>
+        </a>
+
+        <div class="sidebar-group-label">Menú Principal</div>
+        <nav class="sidebar-nav">
+            <a href="index.html" class="side-link" data-nav="index"><i class="ri-home-5-line"></i><span>Inicio</span></a>
+            <a href="futbol.html" class="side-link" data-nav="futbol"><i class="ri-football-line"></i><span>Fútbol</span></a>
+            <a href="hockey.html" class="side-link active" data-nav="hockey"><i class="ri-award-fill"></i><span>Hockey de Piso</span></a>
+            <a href="gym.html" class="side-link" data-nav="gym"><i class="ri-heart-pulse-line"></i><span>Gimnasio</span></a>
+        </nav>
+
+        <div class="sidebar-demo-box">
+            <small><i class="ri-database-2-line"></i> Sistema y Backup</small>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">
+                <button type="button" class="btn btn-primary btn-sm" style="grid-column:1/-1;" onclick="cargarDatosDemoCDM()">
+                    <i class="ri-sparkling-fill"></i> Cargar Demo
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="exportarBackupJSON()" title="Descargar copia JSON">
+                    <i class="ri-download-2-line"></i> Backup
+                </button>
+                <label class="btn btn-ghost btn-sm" style="cursor:pointer; color:#e2e8f0; border-color:rgba(255,255,255,0.14); background:rgba(255,255,255,0.06);" title="Restaurar archivo JSON">
+                    <i class="ri-upload-2-line"></i> Subir
+                    <input type="file" accept=".json" onchange="importarBackupJSON(event)" style="display:none;">
+                </label>
+                <button type="button" class="btn btn-danger btn-sm" style="grid-column:1/-1; margin-top:2px;" onclick="limpiarTodoElSistema()">
+                    <i class="ri-delete-bin-line"></i> Vaciar Datos
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-main">
+                <header class="app-topbar">
+            <div class="topbar-left">
+                <div class="topbar-title">
+                    <h2>🏑 Hockey de Piso <span class="cat-active-pill lbl-cat-activa">Sub 13</span></h2>
+                    <span class="topbar-subtitle">Gestión de plantel, pista sintética 4C, plan semanal y ranking</span>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <button type="button" id="btnToggleTemaCDM" class="btn btn-ghost btn-sm btn-theme-toggle" onclick="alternarTemaVisualCDM()" title="Cambiar entre Modo Día y Modo Noche"><i class="ri-moon-clear-fill"></i><span>Modo Noche</span></button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalPersona()">
+                    <i class="ri-user-add-line"></i> + Nueva Jugadora
+                </button>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <div class="category-bar-panel">
+                <div class="category-bar-label">
+                    <i class="ri-stack-line"></i>
+                    <span>Categoría Activa:</span>
+                </div>
+                <div class="segmented-bar" id="barraCategorias">
+                    <button type="button" class="seg-btn active" onclick="seleccionarCategoriaDeporte('Sub 13')">Sub 13</button>
+                    <button type="button" class="seg-btn" onclick="seleccionarCategoriaDeporte('Sub 15')">Sub 15</button>
+                    <button type="button" class="seg-btn" onclick="seleccionarCategoriaDeporte('Sub 17')">Sub 17</button>
+                    <button type="button" class="seg-btn" onclick="seleccionarCategoriaDeporte('Reserva')">Reserva</button>
+                    <button type="button" class="seg-btn" onclick="seleccionarCategoriaDeporte('Primera')">Primera</button>
+                </div>
+            </div>
+
+            <section class="bento-kpis">
+                <div class="bento-kpi">
+                    <div class="kpi-icon"><i class="ri-group-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>Plantel Categoría</span>
+                        <strong id="depKpiTotal">0</strong>
+                    </div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon ok"><i class="ri-checkbox-circle-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>Presentes Hoy (✓)</span>
+                        <strong id="depKpiPresentes">0 / 0</strong>
+                    </div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon purple"><i class="ri-medal-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>Score Promedio</span>
+                        <strong id="depKpiScore">0 pts</strong>
+                    </div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon warn"><i class="ri-heart-add-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>Aptas / Lesionadas</span>
+                        <strong id="depKpiSalud">0 / 0</strong>
+                    </div>
+                </div>
+            </section>
+
+            <div class="module-tabs">
+                <button class="mod-tab active" onclick="cambiarSeccionDeporte('plantel', this)"><i class="ri-group-line"></i><span>Plantel</span></button>
+                <button class="mod-tab" onclick="cambiarSeccionDeporte('partido', this)"><i class="ri-compass-3-line"></i><span>Cancha Hockey</span></button>
+                <button class="mod-tab" onclick="cambiarSeccionDeporte('rutinas', this)"><i class="ri-whatsapp-line"></i><span>Rutinas WhatsApp</span></button>
+                <button class="mod-tab" onclick="cambiarSeccionDeporte('ranking', this)"><i class="ri-trophy-line"></i><span>Ranking 4 Pilares</span></button>
+            </div>
+
+            <!-- 1. PLANTEL -->
+            <section id="dep-sec-plantel" class="dep-seccion animate-in">
+                <div class="filter-strip" style="grid-template-columns: 1fr auto;">
+                    <div class="search-box">
+                        <i class="ri-search-line"></i>
+                        <input type="text" id="inputBuscar" placeholder="Buscar jugadora/or por nombre, DNI o puesto..." oninput="renderizarPaginaDeporte()">
+                    </div>
+                    <select id="filtroEstado" onchange="renderizarPaginaDeporte()" style="max-width:220px;">
+                        <option value="activos">Activas/os</option>
+                        <option value="alerta_frecuencia">⚠️ Baja Asistencia (7d)</option>
+                        <option value="lesionados">🏥 Lesionadas/os</option>
+                        <option value="pagos_pendientes">💳 Cuota Pendiente</option>
+                        <option value="todos">Ver Todos</option>
+                    </select>
+                </div>
+
+                <div id="gridJugadoresDeporte" class="athletes-grid"></div>
+            </section>
+
+            <!-- 2. CANCHA SINTÉTICA DE HOCKEY (CON 4 CUARTOS REGLAMENTARIOS) -->
+            <section id="dep-sec-partido" class="dep-seccion hidden">
+                <div class="app-panel">
+                    <div class="panel-head">
+                        <div>
+                            <h3><i class="ri-award-line"></i> Cancha Sintética de Hockey — <span class="lbl-cat-activa">Sub 13</span></h3>
+                            <small style="color:var(--ink-500)">Tocá <b>cualquier círculo de posición</b> (Wings, Interiores, Cinco, Halfs, Stoppers, Líbero o Arquera) para ubicar jugadoras o hacer cambios.</small>
+                        </div>
+
+                        <div class="match-clock-toolbar">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="autoArmarAlineacionCancha()">⚡ Auto 11</button>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="vaciarAlineacionCancha()">🧹 Vaciar Cancha</button>
+
+                            <select id="matchPeriodo" class="clock-select-half" onchange="cambiarPeriodoPartido(this.value)">
+                                <option value="1C">1° Cuarto (0' a 15')</option>
+                                <option value="2C">2° Cuarto (15' a 30')</option>
+                                <option value="3C">3° Cuarto (30' a 45')</option>
+                                <option value="4C">4° Cuarto (45' a 60')</option>
+                                <option value="1T">1° Tiempo (0' a 35')</option>
+                                <option value="2T">2° Tiempo (35' a 70')</option>
+                            </select>
+
+                            <div class="timer-pill">
+                                <i class="ri-timer-line"></i>
+                                <span id="cronometroMinutoTexto">1°C • 00'</span>
+                            </div>
+
+                            <button type="button" class="btn btn-primary btn-sm" id="btnToggleCronometro" onclick="toggleCronometroPartido()">▶ Iniciar</button>
+
+                            <select id="selectSumarMinutos" class="clock-select-add" onchange="sumarMinutosDesdeSelect(this)">
+                                <option value="">+ Adicionar / Ajustar min...</option>
+                                <option value="1">+1 minuto</option>
+                                <option value="2">+2 minutos</option>
+                                <option value="3">+3 minutos</option>
+                                <option value="5">+5 minutos</option>
+                                <option value="10">+10 minutos</option>
+                                <option value="-1">-1 minuto (Corregir)</option>
+                                <option value="-5">-5 minutos (Corregir)</option>
+                            </select>
+
+                            <button type="button" class="btn btn-danger btn-sm" onclick="reiniciarCronometroPartido()">↺ Reiniciar</button>
+                        </div>
+                    </div>
+
+                    <div class="grid-4" style="margin-bottom:1rem;">
+                        <div class="field"><label>Rival / Fecha</label><input type="text" id="matchRival" placeholder="Ej: vs. Urú Curé"></div>
+                        <div class="field">
+                            <label>Sistema de Hockey</label>
+                            <select id="matchFormacion" onchange="renderizarCanchaInteractiva()">
+                                <option value="3-4-3">3-4-3 Línea de Halfs (Clásico Hockey)</option>
+                                <option value="4-3-3">4-3-3 Bloque de 4 Defensoras + 3 Volantes</option>
+                                <option value="3-3-3-1">3-3-3-1 Rombo / Diamante con Líbero</option>
+                            </select>
+                        </div>
+                        <div class="field"><label>Resultado</label><input type="text" id="matchResultado" placeholder="Ej: 3 - 1"></div>
+                        <div class="field"><label>Guardar Partido</label><button type="button" class="btn btn-primary" onclick="finalizarYGuardarPartido()"><i class="ri-flag-2-fill"></i> Cerrar y Evaluar</button></div>
+                    </div>
+
+                    <div class="split-view">
+                        <div class="tactical-pitch pitch-hockey" id="contenedorCanchaTactica"></div>
+                        <div class="app-panel" style="background:var(--surface-subtle); margin-bottom:0;">
+                            <div class="panel-head">
+                                <h3><i class="ri-file-list-3-line"></i> Acciones, Córner Corto y Cambios</h3>
+                                <span class="badge badge-celeste" id="contadorEventosPartido">0</span>
+                            </div>
+                            <div id="listaEventosPartidoEnVivo" style="max-height:420px; overflow-y:auto;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="app-panel">
+                    <div class="panel-head"><h3><i class="ri-history-line"></i> Historial de Partidos (<span class="lbl-cat-activa">Sub 13</span>)</h3></div>
+                    <div id="contenedorHistorialPartidos"></div>
+                </div>
+            </section>
+
+            <!-- 3. RUTINAS -->
+            <section id="dep-sec-rutinas" class="dep-seccion hidden">
+                <div class="split-view">
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <h3><i class="ri-add-box-line"></i> Crear Rutina</h3>
+                            <div style="display:flex; gap:0.3rem;">
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaAdminGym('piernas')">Piernas</button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaAdminGym('hipertrofia')">Superior</button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaAdminGym('rehab')">Rehab</button>
+                            </div>
+                        </div>
+
+                        <form id="formRutinaAdminGym" onsubmit="guardarRutinaDesdeAdminGym(event)">
+                            <div class="field" style="margin-bottom:0.65rem;"><label>Destinatario *</label><select id="adminRutinaPersonaSelect" required></select></div>
+                            <div class="grid-2" style="margin-bottom:0.65rem;">
+                                <div class="field">
+                                    <label>Enfoque *</label>
+                                    <select id="adminRutinaObjetivo">
+                                        <option value="Potencia y Transferencia">🟣 Potencia</option>
+                                        <option value="Fuerza Máxima">🔵 Fuerza</option>
+                                        <option value="Hipertrofia Estructural">🔴 Hipertrofia</option>
+                                        <option value="Funcional y Core">🟢 Funcional</option>
+                                        <option value="Movilidad y Recuperación">🟡 Movilidad</option>
+                                        <option value="Rehabilitación / Lesión">🏥 Rehabilitación</option>
+                                    </select>
+                                </div>
+                                <div class="field"><label>Días</label><input type="text" id="adminRutinaDias" placeholder="Lunes y Miércoles"></div>
+                            </div>
+                            <div class="field" style="margin-bottom:0.75rem;"><label>Nombre de la Rutina *</label><input type="text" id="adminRutinaNombre" required placeholder="Ej: Potencia y Agilidad"></div>
+
+                            <div id="contenedorFilasAdminGym"></div>
+
+                            <button type="button" class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:0.75rem;" onclick="agregarFilaRutinaAdminGym()">+ Añadir Ejercicio</button>
+                            <div class="field" style="margin-bottom:0.85rem;"><label>Nota Técnica</label><input type="text" id="adminRutinaNotas" placeholder="Opcional..."></div>
+                            <button type="submit" class="btn btn-primary" style="width:100%;">Guardar Rutina</button>
+                        </form>
+                    </div>
+
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <h3><i class="ri-whatsapp-line"></i> Rutinas Activas</h3>
+                            <select id="filtroPersonaRutinasAdmin" onchange="renderizarListaRutinasAdminGym()" style="max-width:210px;">
+                                <option value="TODAS">Todas las rutinas</option>
+                            </select>
+                        </div>
+                        <div id="contenedorTarjetasRutinasAdminGym" class="athletes-grid"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. RANKING 4 PILARES -->
+            <section id="dep-sec-ranking" class="dep-seccion hidden">
+                <div class="split-view">
+                    <div class="app-panel">
+                        <div class="panel-head"><h3><i class="ri-scales-3-line"></i> Evaluar por Pilar</h3></div>
+                        <form onsubmit="guardarPuntosRankingDeporte(event)">
+                            <div class="field" style="margin-bottom:0.65rem;"><label>Deportista (<span class="lbl-cat-activa">Sub 13</span>) *</label><select id="selectJugadorRanking" required></select></div>
+                            <div class="field" style="margin-bottom:0.65rem;">
+                                <label>Pilar *</label>
+                                <select id="selectPilarRanking">
+                                    <option value="tecnico">🏑 Técnico / Táctico (25%)</option>
+                                    <option value="fisico">🏃 Condición Física (30%)</option>
+                                    <option value="gym">🏋️ Fuerza en Gimnasio (25%)</option>
+                                    <option value="actitud">🔥 Compromiso y Actitud (20%)</option>
+                                    <option value="bonus">⭐ Bonus Directo Profe (+/-)</option>
+                                </select>
+                            </div>
+                            <div class="grid-2" style="margin-bottom:0.65rem;">
+                                <div class="field">
+                                    <label>Modo</label>
+                                    <select id="selectModoRanking">
+                                        <option value="sumar">Sumar / Restar (+/-)</option>
+                                        <option value="fijar">Fijar Nota (0 a 100)</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Puntos *</label>
+                                    <input type="number" step="0.5" id="inputPuntosDelta" required placeholder="Ej: +5 o 85">
+                                </div>
+                            </div>
+                            <div class="field" style="margin-bottom:0.9rem;"><label>Motivo *</label><input type="text" id="inputPuntosMotivo" required placeholder="Ej: Gran efectividad en córner corto"></div>
+                            <button type="submit" class="btn btn-primary" style="width:100%;">Actualizar Puntaje</button>
+                        </form>
+                    </div>
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3><i class="ri-trophy-line"></i> Ranking Oficial — <span class="lbl-cat-activa">Sub 13</span></h3>
+                                <small style="color:var(--ink-500)">Fórmula: 30% Físico + 25% Gym + 25% Técnico + 20% Actitud + Bonus</small>
+                            </div>
+                        </div>
+                        <div id="contenedorRankingDeporte"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="creator-footer-right">
+            <div class="creator-badge-pill">
+                <i class="ri-code-s-slash-line"></i>
+                <span>Creado y desarrollado por <b>Gonzalo Adanchú</b></span>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<div id="modalPersona" class="modal-backdrop hidden"></div>
+<div id="modalEventoCancha" class="modal-backdrop hidden"></div>
+
+<script src="app.js"></script>
+</body>
+<!-- hockey.html • Versión Completa Multi-Deporte -->
+</html>

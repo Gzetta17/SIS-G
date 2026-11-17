@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Panel de Atleta | CDM Adelia María</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body data-page="mi-ficha">
+
+<div class="app-shell" style="margin-left:0;">
+    <div class="app-main" style="margin-left:0;">
+        <!-- Topbar Público -->
+        <header class="app-topbar">
+            <div class="topbar-left">
+                <div class="topbar-title">
+                    <h2>💙🤍 Club Deportivo Municipal • Portal del Deportista</h2>
+                    <span class="topbar-subtitle">Consultá tus rutinas, evolución de cargas, asistencia y el ranking oficial</span>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <a href="index.html" class="btn btn-secondary btn-sm"><i class="ri-home-4-line"></i> Ir al Inicio / Admin</a>
+            </div>
+        </header>
+
+        <main class="app-content animate-in">
+            <!-- Pantalla de Login por DNI (Si no hay sesión activa) -->
+            <section id="panelLoginSocio" class="app-panel" style="max-width:520px; margin: 3rem auto; text-align:center;">
+                <div class="panel-head" style="justify-content:center; border:none; margin-bottom:0.5rem;">
+                    <h3><i class="ri-user-shared-line"></i> Ingresá con tu DNI</h3>
+                </div>
+                <p style="color:var(--ink-500); font-size:0.85rem; margin-bottom:1.5rem;">Escribí tu número de documento para acceder a tu historial, rutinas en video y posición en el ranking.</p>
+                
+                <form onsubmit="autenticarSocioPorDni(event)" style="display:flex; flex-direction:column; gap:1rem;">
+                    <div class="field">
+                        <label>Número de DNI</label>
+                        <input type="text" id="inputDniSocioLogin" required placeholder="Ej: 48111222" style="text-align:center; font-size:1.1rem; font-weight:800;">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">Ingresar a mi Panel</button>
+                </form>
+            </section>
+
+            <!-- Panel Privado del Socio (Oculto hasta que ingresa su DNI) -->
+            <section id="panelDashboardSocio" class="hidden">
+                <!-- Cabecera de Identidad -->
+                <div id="socioCabeceraInfo" class="app-panel"></div>
+
+                <!-- Pestañas de Navegación del Socio -->
+                <div class="module-tabs tabs-3">
+                    <button class="mod-tab active" onclick="cambiarTabSocio('rutinas', this)"><i class="ri-vidicon-line"></i><span>Mis Rutinas & Videos</span></button>
+                    <button class="mod-tab" onclick="cambiarTabSocio('progreso', this)"><i class="ri-line-chart-line"></i><span>Mi Progreso & 1RM</span></button>
+                    <button class="mod-tab" onclick="cambiarTabSocio('ranking', this)"><i class="ri-trophy-line"></i><span>Ranking de Categoría</span></button>
+                </div>
+
+                <!-- 1. RUTINAS Y VIDEOTECA -->
+                <div id="socio-sec-rutinas" class="socio-seccion animate-in">
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <h3><i class="ri-whatsapp-line"></i> Mis Rutinas Asignadas (Con Guía en Video)</h3>
+                            <small style="color:var(--ink-500)">Tocá cualquier ejercicio para ver su técnica biomecánica.</small>
+                        </div>
+                        <div id="socioListaRutinas" class="athletes-grid"></div>
+                    </div>
+                </div>
+
+                <!-- 2. PROGRESO Y GRÁFICOS -->
+                <div id="socio-sec-progreso" class="socio-seccion hidden">
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <h3><i class="ri-line-chart-line"></i> Evolución Histórica de Marcas y Cargas</h3>
+                            <select id="socioSelectEjercicio" onchange="renderizarGraficoSocio()" style="max-width:240px; font-weight:800;"></select>
+                        </div>
+                        <div class="chart-canvas-box" style="height:320px;"><canvas id="canvasSocioProgreso"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- 3. RANKING DE CATEGORÍA -->
+                <div id="socio-sec-ranking" class="socio-seccion hidden">
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3><i class="ri-trophy-fill"></i> Tabla de Posiciones y Ranking Oficial</h3>
+                                <small style="color:var(--ink-500)">Comparativa transparente del rendimiento dentro de tu división.</small>
+                            </div>
+                        </div>
+                        <div id="socioTablaRankingDiv"></div>
+                    </div>
+                </div>
+
+                <div style="text-align:center; margin-top:1.5rem;">
+                    <button class="btn btn-ghost btn-sm" onclick="cerrarSesionSocio()">Cerrar Sesión / Cambiar DNI</button>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+<!-- mi-ficha.html • Versión Completa Multi-Deporte -->
+</html>

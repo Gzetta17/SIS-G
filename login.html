@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Acceso Oficial | Plataforma Deportiva & Gym</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body.login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem 1rem;
+            margin: 0;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background:
+                radial-gradient(circle at 18% 18%, rgba(2, 132, 199, 0.32) 0%, transparent 45%),
+                radial-gradient(circle at 82% 82%, rgba(16, 185, 129, 0.18) 0%, transparent 45%),
+                linear-gradient(145deg, #030912 0%, #07192e 60%, #051221 100%);
+        }
+        .login-card {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 26px;
+            width: 100%;
+            max-width: 440px;
+            padding: 2.35rem 2rem;
+            box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.65);
+            text-align: center;
+            box-sizing: border-box;
+            transition: max-width 0.28s ease;
+        }
+        .login-card.hub-mode {
+            max-width: 880px;
+            text-align: left;
+        }
+        .login-generic-emblem {
+            width: 68px;
+            height: 68px;
+            margin: 0 auto 0.85rem;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #0284c7 0%, #0f172a 100%);
+            color: #38bdf8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            box-shadow: 0 12px 26px rgba(2, 132, 199, 0.32);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+        }
+        .login-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: #f1f5f9;
+            padding: 0.32rem;
+            border-radius: 14px;
+            margin: 1.4rem 0;
+            gap: 0.3rem;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+        }
+        .login-tab {
+            border: none;
+            background: transparent;
+            padding: 0.65rem 0.5rem;
+            border-radius: 11px;
+            font-weight: 700;
+            font-size: 0.82rem;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+        .login-tab.active {
+            background: #071526;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(7, 21, 38, 0.22);
+        }
+        .input-codigo-acceso {
+            text-align: center;
+            font-family: 'Poppins', sans-serif !important;
+            font-size: 1.32rem !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            border: 2px solid #0284c7 !important;
+            background: #f0f9ff !important;
+            height: 54px;
+            color: #071526 !important;
+            width: 100%;
+            border-radius: 12px;
+            box-sizing: border-box;
+        }
+        .login-input-std {
+            width: 100%;
+            background: #f8fafc;
+            border: 1.5px solid rgba(15, 23, 42, 0.15);
+            color: #0f172a;
+            padding: 0.65rem 0.9rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            min-height: 44px;
+            box-sizing: border-box;
+        }
+        .login-input-std:focus, .input-codigo-acceso:focus {
+            outline: none;
+            border-color: #0284c7;
+            box-shadow: 0 0 0 3.5px rgba(2, 132, 199, 0.18);
+        }
+        .login-error-box {
+            background: rgba(244, 63, 94, 0.12);
+            border: 1px solid rgba(225, 29, 72, 0.28);
+            color: #e11d48;
+            padding: 0.65rem 0.85rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+            max-height: 440px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .hub-comercio-card {
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 18px;
+            padding: 1.15rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            transition: all 0.2s ease;
+        }
+        .hub-comercio-card:hover {
+            border-color: #0284c7;
+            background: #ffffff;
+            box-shadow: 0 12px 24px -8px rgba(2, 132, 199, 0.18);
+            transform: translateY(-2px);
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body class="login-page">
+
+    <div class="login-card animate-in" id="contenedorTarjetaLogin">
+        <!-- ===============================================================
+             VISTA 1: LOGIN GENÉRICO NEUTRO (PARA SOCIOS, COMERCIOS Y SUPERADMIN)
+             =============================================================== -->
+        <div id="vistaLoginGenerico">
+            <div class="login-generic-emblem">
+                <i class="ri-shield-star-fill"></i>
+            </div>
+            <div>
+                <span style="margin-bottom:0.45rem; display:inline-block; background:#f0f9ff; color:#0369a1; border:1px solid rgba(2,132,199,0.26); padding:0.26rem 0.75rem; border-radius:999px; font-size:0.68rem; font-weight:700; letter-spacing:0.04em;">PLATAFORMA MULTI-SEDE</span>
+                <h1 style="font-size:1.48rem; font-weight:800; color:#0f172a; letter-spacing:-0.025em; margin:0;">Portal de Acceso Oficial</h1>
+                <p style="font-size:0.82rem; color:#64748b; margin-top:4px; font-weight:500;">Clubes Deportivos, Gimnasios y Centros de Entrenamiento</p>
+            </div>
+
+            <div class="login-tabs">
+                <button type="button" class="login-tab active" id="btnTabUsuario" onclick="cambiarPestanaLogin('usuario')">
+                    👤 Deportista / Socio
+                </button>
+                <button type="button" class="login-tab" id="btnTabAdmin" onclick="cambiarPestanaLogin('admin')">
+                    👑 Admin / Comercio
+                </button>
+            </div>
+
+            <div id="cajaErrorLogin" class="login-error-box hidden"></div>
+
+            <!-- 1. FORMULARIO PARA DEPORTISTA / SOCIO (POR CÓDIGO PERSONAL) -->
+            <form id="formLoginUsuario" onsubmit="iniciarSesionConCodigo(event)">
+                <div class="field" style="text-align:left; margin-bottom:1.15rem;">
+                    <label style="color:#334155; font-size:0.7rem; font-weight:700; text-transform:uppercase; display:block; margin-bottom:0.35rem;">Tu Código Personal de Acceso *</label>
+                    <input type="text" id="inputCodigoUsuario" class="input-codigo-acceso" placeholder="CÓDIGO-XXXX" required autocomplete="off">
+                    <small style="color:#64748b; font-size:0.75rem; margin-top:6px; display:block; text-align:center; line-height:1.45;">
+                        Ingresá el código que te brindó tu Club o Gimnasio para acceder a tus rutinas, videos y evolución.
+                    </small>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; min-height:46px; font-size:0.9rem; background:linear-gradient(135deg,#0284c7,#0369a1); color:#fff; border:none; border-radius:12px; font-weight:700; cursor:pointer;">
+                    <i class="ri-login-circle-line"></i> Ingresar a mi Ficha
+                </button>
+            </form>
+
+            <!-- 2. FORMULARIO PARA COMERCIO / CLUB / ADMIN PRINCIPAL -->
+            <form id="formLoginAdmin" class="hidden" onsubmit="iniciarSesionComoAdmin(event)">
+                <div class="field" style="text-align:left; margin-bottom:0.85rem;">
+                    <label style="color:#334155; font-size:0.7rem; font-weight:700; text-transform:uppercase; display:block; margin-bottom:0.35rem;">Usuario de Administración *</label>
+                    <input type="text" id="inputAdminUser" class="login-input-std" placeholder="Usuario del comercio o Admin General" required autocomplete="username">
+                </div>
+                <div class="field" style="text-align:left; margin-bottom:1.2rem;">
+                    <label style="color:#334155; font-size:0.7rem; font-weight:700; text-transform:uppercase; display:block; margin-bottom:0.35rem;">Contraseña *</label>
+                    <input type="password" id="inputAdminPass" class="login-input-std" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; min-height:46px; font-size:0.9rem; background:linear-gradient(135deg,#071526,#0284c7); color:#fff; border:none; border-radius:12px; font-weight:700; cursor:pointer;">
+                    <i class="ri-shield-keyhole-line"></i> Ingresar al Sistema
+                </button>
+            </form>
+        </div>
+
+        <!-- ===============================================================
+             VISTA 2: HUB CENTRAL DEL ADMIN PRINCIPAL (SELECTOR DE COMERCIOS)
+             (Solo se muestra cuando ingresa el Admin Principal de todos los comercios)
+             =============================================================== -->
+        <div id="vistaHubSuperAdmin" class="hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; padding-bottom:1rem; border-bottom:1px solid #e2e8f0;">
+                <div>
+                    <span class="badge badge-purple" style="font-size:0.68rem;">👑 ADMINISTRADOR GENERAL DE COMERCIOS</span>
+                    <h2 style="font-size:1.35rem; font-weight:800; color:#0f172a; margin-top:3px;">Seleccioná a qué Club o Gimnasio entrar</h2>
+                    <small style="color:#64748b; font-size:0.78rem;">Cada comercio tiene su propio usuario, logo y módulos independientes.</small>
+                </div>
+                <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalCrearOEditarComercio(null)">
+                        <i class="ri-add-circle-line"></i> + Nuevo Club / Gimnasio
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="salirDelHubAlLoginGenerico()">
+                        <i class="ri-logout-box-r-line"></i> Cerrar Sesión
+                    </button>
+                </div>
+            </div>
+
+            <div id="gridTarjetasComerciosHub" class="hub-grid"></div>
+        </div>
+
+        <div style="margin-top:1.45rem; padding-top:1rem; border-top:1px solid #e2e8f0; font-size:0.75rem; color:#64748b; text-align:center;">
+            <i class="ri-code-s-slash-line" style="color:#0284c7;"></i> Creado y desarrollado por <b>Gonzalo Adanchú</b>
+        </div>
+    </div>
+
+    <script src="login.js"></script>
+</body>
+<!-- login.html • Versión Completa Multi-Deporte -->
+</html>

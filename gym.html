@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gimnasio Oficial | CDM Pro Suite</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body data-deporte="Gimnasio">
+
+<div class="app-shell">
+        <aside class="app-sidebar">
+        <a href="index.html" class="sidebar-brand">
+            <img src="/img/logo.png" alt="CDM" onerror="this.onerror=null; this.src='logo.png';">
+            <div class="sidebar-brand-text">
+                <h1>CDM ADELIA MARÍA</h1>
+                <span>Plataforma Oficial</span>
+            </div>
+        </a>
+
+        <div class="sidebar-group-label">Menú Principal</div>
+        <nav class="sidebar-nav">
+            <a href="index.html" class="side-link" data-nav="index"><i class="ri-home-5-line"></i><span>Inicio</span></a>
+            <a href="futbol.html" class="side-link" data-nav="futbol"><i class="ri-football-line"></i><span>Fútbol</span></a>
+            <a href="hockey.html" class="side-link" data-nav="hockey"><i class="ri-award-line"></i><span>Hockey de Piso</span></a>
+            <a href="gym.html" class="side-link active" data-nav="gym"><i class="ri-heart-pulse-fill"></i><span>Gimnasio</span></a>
+        </nav>
+
+        <div class="sidebar-demo-box">
+            <small><i class="ri-database-2-line"></i> Sistema y Backup</small>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">
+                <button type="button" class="btn btn-primary btn-sm" style="grid-column:1/-1;" onclick="cargarDatosDemoCDM()">
+                    <i class="ri-sparkling-fill"></i> Cargar Demo
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="exportarBackupJSON()" title="Descargar copia JSON">
+                    <i class="ri-download-2-line"></i> Backup
+                </button>
+                <label class="btn btn-ghost btn-sm" style="cursor:pointer; color:#e2e8f0; border-color:rgba(255,255,255,0.14); background:rgba(255,255,255,0.06);" title="Restaurar archivo JSON">
+                    <i class="ri-upload-2-line"></i> Subir
+                    <input type="file" accept=".json" onchange="importarBackupJSON(event)" style="display:none;">
+                </label>
+                <button type="button" class="btn btn-danger btn-sm" style="grid-column:1/-1; margin-top:2px;" onclick="limpiarTodoElSistema()">
+                    <i class="ri-delete-bin-line"></i> Vaciar Datos
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-main">
+                <header class="app-topbar">
+            <div class="topbar-left">
+                <div class="topbar-title">
+                    <h2>🏋️ Gimnasio & Salud <span class="cat-active-pill">Socios Activos</span></h2>
+                    <span class="topbar-subtitle">Control de asistencia, cuotas mensuales, videoteca técnica y rutinas WhatsApp</span>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <button type="button" id="btnToggleTemaCDM" class="btn btn-ghost btn-sm btn-theme-toggle" onclick="alternarTemaVisualCDM()" title="Cambiar entre Modo Día y Modo Noche"><i class="ri-moon-clear-fill"></i><span>Modo Noche</span></button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalNuevoVideoEjercicio()">
+                    <i class="ri-video-add-line"></i> + Subir Video
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalPersona()">
+                    <i class="ri-user-add-line"></i> + Inscribir Socio
+                </button>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <!-- BENTO KPIS EXCLUSIVOS DEL GIMNASIO -->
+            <section class="bento-kpis">
+                <div class="bento-kpi">
+                    <div class="kpi-icon"><i class="ri-user-star-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>Socios Activos Gym</span>
+                        <strong id="gymKpiActivos">0</strong>
+                    </div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon ok"><i class="ri-checkbox-circle-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>Presentes en Fecha (✓)</span>
+                        <strong id="gymKpiPresentesHoy">0 / 0</strong>
+                    </div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon purple"><i class="ri-calendar-check-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>Adherencia Semanal</span>
+                        <strong id="gymKpiPromedioSemanal">0%</strong>
+                    </div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon warn"><i class="ri-money-dollar-circle-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>Recaudación Mensual</span>
+                        <strong id="gymKpiRecaudacion">$0</strong>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5 PESTAÑAS DEL GIMNASIO -->
+            <div class="module-tabs tabs-5">
+                <button class="mod-tab active" onclick="cambiarTabGym('usuarios', this)"><i class="ri-checkbox-multiple-line"></i><span>Socios y Check-in</span></button>
+                <button class="mod-tab" onclick="cambiarTabGym('asistencias', this)"><i class="ri-calendar-todo-line"></i><span>Planilla y Cuotas</span></button>
+                <button class="mod-tab" onclick="cambiarTabGym('videoteca', this)"><i class="ri-vidicon-line"></i><span>Videoteca Ejercicios</span></button>
+                <button class="mod-tab" onclick="cambiarTabGym('rutinas', this)"><i class="ri-whatsapp-line"></i><span>Rutinas WhatsApp</span></button>
+                <button class="mod-tab" onclick="cambiarTabGym('records', this)"><i class="ri-medal-line"></i><span>Récords & Caja</span></button>
+            </div>
+
+            <!-- 1. PADRÓN EXCLUSIVO DE SOCIOS DEL GIMNASIO -->
+            <section id="gym-sec-usuarios" class="gym-seccion animate-in">
+                <div class="filter-strip">
+                    <div class="search-box">
+                        <i class="ri-search-line"></i>
+                        <input type="text" id="inputBuscar" placeholder="Buscar socio por nombre, apellido, DNI o programa..." oninput="renderizarPaginaDeporte()">
+                    </div>
+                    <select id="filtroTipoGym" onchange="renderizarPaginaDeporte()" style="max-width:250px;">
+                        <option value="todos_gym">🏋️ Todos los Programas</option>
+                        <option value="musculacion">💪 Musculación e Hipertrofia</option>
+                        <option value="funcional">🔥 Funcional & Cardio</option>
+                        <option value="fuerza">⚡ Fuerza & Powerlifting</option>
+                        <option value="salud">🏥 Salud y Readaptación</option>
+                    </select>
+                    <select id="filtroEstado" onchange="renderizarPaginaDeporte()" style="max-width:240px;">
+                        <option value="activos">Estado: Socios Activos</option>
+                        <option value="alerta_frecuencia">⚠️ Baja Asistencia Semanal</option>
+                        <option value="pagos_pendientes">💳 Cuota Pendiente (Debe)</option>
+                        <option value="lesionados">🏥 Con Indicación Médica</option>
+                        <option value="todos">Ver Todos</option>
+                    </select>
+                </div>
+
+                <div id="gridJugadoresDeporte" class="athletes-grid"></div>
+            </section>
+
+            <!-- 2. PLANILLA DIARIA Y ADMINISTRACIÓN DE CUOTAS -->
+            <section id="gym-sec-asistencias" class="gym-seccion hidden">
+                <div class="split-equal" style="margin-bottom:1.25rem;">
+                    <div class="app-panel" style="margin-bottom:0;">
+                        <div class="panel-head"><h3><i class="ri-pulse-line"></i> Flujo Diario de Socios (Últimos 10 días)</h3></div>
+                        <div class="chart-canvas-box"><canvas id="canvasAsistenciasGym"></canvas></div>
+                    </div>
+                    <div class="app-panel" style="margin-bottom:0;">
+                        <div class="panel-head"><h3><i class="ri-bank-card-line"></i> Estado de Cuotas vs. Asistencia</h3></div>
+                        <div class="chart-canvas-box"><canvas id="canvasPagosAsistenciaGym"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="app-panel">
+                    <div class="panel-head">
+                        <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                            <h3><i class="ri-calendar-todo-line"></i> Planilla Diaria de Ingreso y Cobro de Cuotas</h3>
+                            <input type="date" id="fechaAsistenciaGym" onchange="actualizarDashboardGym()" style="max-width:165px; font-weight:800;">
+                        </div>
+                        <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                            <button class="btn btn-ghost btn-sm" onclick="window.print()"><i class="ri-printer-line"></i> Imprimir Planilla PDF</button>
+                            <button class="btn btn-primary btn-sm" onclick="marcarTodosPresentesGym()">✓ Tildar Todos Presentes</button>
+                        </div>
+                    </div>
+
+                    <div class="filter-strip" style="grid-template-columns: 1fr auto; margin-bottom:1rem;">
+                        <div class="search-box">
+                            <i class="ri-search-line"></i>
+                            <input type="text" id="inputBuscarPlanillaGym" placeholder="🔍 Buscar socio en la planilla por nombre, apellido, DNI o programa..." oninput="filtrarPlanillaAsistenciasEnVivo()">
+                        </div>
+                        <select id="filtroEstadoPlanillaGym" onchange="filtrarPlanillaAsistenciasEnVivo()" style="max-width:250px;">
+                            <option value="todos">Mostrar: Todos los Socios</option>
+                            <option value="presentes">✓ Solo Presentes en la Fecha</option>
+                            <option value="ausentes">✕ Solo Ausentes en la Fecha</option>
+                            <option value="al_dia">💳 Cuota Al Día</option>
+                            <option value="debe">⚠️ Cuota Pendiente (Morosos)</option>
+                            <option value="baja_frecuencia">📉 Baja Frecuencia Semanal</option>
+                        </select>
+                    </div>
+
+                    <div id="contenedorTablaAsistenciasGym"></div>
+                </div>
+            </section>
+
+            <!-- 3. VIDEOTECA DE EJERCICIOS Y BIOMECÁNICA -->
+            <section id="gym-sec-videoteca" class="gym-seccion hidden">
+                <div class="app-panel">
+                    <div class="panel-head">
+                        <div>
+                            <h3><i class="ri-movie-2-line"></i> Videoteca Oficial de Ejercicios y Técnica Biomecánica</h3>
+                            <small style="color:var(--ink-500)">Consultá la técnica correcta en video, mostrásela al socio en pantalla o tocá <b>"➕ Sumar a Rutina"</b> para incluir el ejercicio con su video en WhatsApp.</small>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalNuevoVideoEjercicio()">
+                            <i class="ri-video-add-line"></i> + Agregar Ejercicio con Video
+                        </button>
+                    </div>
+
+                    <div class="filter-strip" style="grid-template-columns: 1fr auto; margin-bottom:1.15rem;">
+                        <div class="search-box">
+                            <i class="ri-search-line"></i>
+                            <input type="text" id="inputBuscarVideoteca" placeholder="Buscar ejercicio por nombre, músculo (ej: Cuádriceps, Pectoral, Glúteos) o equipo..." oninput="renderizarVideotecaGym()">
+                        </div>
+                        <select id="filtroMusculoVideoteca" onchange="renderizarVideotecaGym()" style="max-width:260px;">
+                            <option value="TODOS">💪 Todos los Grupos Musculares</option>
+                            <option value="Tren Inferior">🦵 Tren Inferior (Piernas y Glúteos)</option>
+                            <option value="Empuje / Torso">💪 Empuje (Pectoral, Hombros y Tríceps)</option>
+                            <option value="Tracción / Espalda">🏋️ Tracción (Espalda, Dorsales y Bíceps)</option>
+                            <option value="Core y Funcional">🔥 Zona Media (Core y Funcional)</option>
+                            <option value="Potencia y Pliometría">⚡ Potencia y Pliometría</option>
+                            <option value="Movilidad y Rehab">🏥 Movilidad y Rehabilitación</option>
+                        </select>
+                    </div>
+
+                    <div id="contenedorGridVideotecaGym" class="athletes-grid"></div>
+                </div>
+            </section>
+
+            <!-- 4. CENTRAL DE RUTINAS Y WHATSAPP -->
+            <section id="gym-sec-rutinas" class="gym-seccion hidden">
+                <div class="split-view">
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <h3><i class="ri-file-edit-line"></i> Diseñar Rutina (Con Links de Video)</h3>
+                            <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaAdminGym('hipertrofia')">Hipertrofia</button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaAdminGym('piernas')">Fuerza Piernas</button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaAdminGym('funcional')">Funcional</button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaAdminGym('rehab')">Rehab</button>
+                            </div>
+                        </div>
+
+                        <form id="formRutinaAdminGym" onsubmit="guardarRutinaDesdeAdminGym(event)">
+                            <div class="field" style="margin-bottom:0.65rem;"><label>Socio Destinatario *</label><select id="adminRutinaPersonaSelect" required></select></div>
+                            <div class="grid-2" style="margin-bottom:0.65rem;">
+                                <div class="field">
+                                    <label>Enfoque del Programa *</label>
+                                    <select id="adminRutinaObjetivo">
+                                        <option value="Hipertrofia Estructural">🔴 Hipertrofia / Musculación</option>
+                                        <option value="Fuerza Máxima">🔵 Fuerza Máxima</option>
+                                        <option value="Funcional y Core">🟢 Funcional / Salud</option>
+                                        <option value="Movilidad y Recuperación">🟡 Movilidad / Preventivo</option>
+                                        <option value="Rehabilitación / Lesión">🏥 Rehabilitación / Readaptación</option>
+                                    </select>
+                                </div>
+                                <div class="field"><label>Días Asignados</label><input type="text" id="adminRutinaDias" placeholder="Lun, Mié y Vie"></div>
+                            </div>
+                            <div class="field" style="margin-bottom:0.75rem;"><label>Título de la Rutina *</label><input type="text" id="adminRutinaNombre" required placeholder="Ej: Día 1 - Tren Superior / Hipertrofia"></div>
+
+                            <datalist id="listaEjerciciosGymAdmin"></datalist>
+
+                            <div id="contenedorFilasAdminGym"></div>
+
+                            <button type="button" class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:0.75rem;" onclick="agregarFilaRutinaAdminGym()">+ Añadir Ejercicio</button>
+                            <div class="field" style="margin-bottom:0.85rem;"><label>Indicaciones del Entrenador</label><input type="text" id="adminRutinaNotas" placeholder="Opcional..."></div>
+                            <button type="submit" class="btn btn-primary" style="width:100%;">Guardar Rutina</button>
+                        </form>
+                    </div>
+
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <h3><i class="ri-whatsapp-line"></i> Rutinas de Socios y Envío por WhatsApp</h3>
+                            <select id="filtroPersonaRutinasAdmin" onchange="renderizarListaRutinasAdminGym()" style="max-width:230px;">
+                                <option value="TODAS">Ver Todas las Rutinas</option>
+                            </select>
+                        </div>
+                        <div id="contenedorTarjetasRutinasAdminGym" class="athletes-grid"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. RÉCORDS PR Y CAJA EXCLUSIVA DEL GIMNASIO -->
+            <section id="gym-sec-records" class="gym-seccion hidden">
+                <div id="contenedorResumenCajaGym" class="bento-kpis"></div>
+                <div class="split-equal">
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3><i class="ri-trophy-fill"></i> Muro de Récords Exclusivo del Gimnasio (PRs)</h3>
+                                <small style="color:var(--ink-500)">Mejor marca histórica por socio y ejercicio (Fuerza 1RM y Potencia).</small>
+                            </div>
+                        </div>
+                        <div id="contenedorMuroRecordsGym"></div>
+                    </div>
+
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <div>
+                                <h3><i class="ri-alarm-warning-fill"></i> Radar de Retención y Cobranzas</h3>
+                                <small style="color:var(--ink-500)">Socios del gimnasio con baja asistencia semanal o cuota pendiente.</small>
+                            </div>
+                        </div>
+                        <div id="contenedorRadarRetencionGym"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="creator-footer-right">
+            <div class="creator-badge-pill">
+                <i class="ri-code-s-slash-line"></i>
+                <span>Creado y desarrollado por <b>Gonzalo Adanchú</b></span>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<div id="modalPersona" class="modal-backdrop hidden"></div>
+<div id="modalVideoEjercicio" class="modal-backdrop hidden"></div>
+
+<script src="app.js"></script>
+</body>
+<!-- gym.html • Versión Completa Multi-Deporte -->
+</html>

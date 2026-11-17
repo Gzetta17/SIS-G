@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMS Elite Pro | Gestión Deportiva Profesional</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app-layout">
+        <!-- BARRA LATERAL DE NAVEGACIÓN (INTUITIVA Y LIMPIA) -->
+        <aside class="sidebar">
+            <div class="sidebar-brand" onclick="irAPagina('home')">
+                <div class="logo-icon">⚡</div>
+                <div>
+                    <h2>AMS ELITE</h2>
+                    <span>Panel del Profesor</span>
+                </div>
+            </div>
+
+            <!-- Indicador de Categoría Seleccionada -->
+            <div class="active-cat-box">
+                <span class="small-label">CATEGORÍA DE TRABAJO</span>
+                <select id="globalCategorySelect" onchange="cambiarCategoriaGlobal(this.value)">
+                    <option value="Sub 13">Sub 13</option>
+                    <option value="Sub 15">Sub 15</option>
+                    <option value="Sub 17">Sub 17</option>
+                    <option value="Reserva">Reserva</option>
+                    <option value="Primera">Primera</option>
+                </select>
+            </div>
+
+            <nav class="sidebar-menu">
+                <span class="menu-section-title">NAVEGACIÓN PRINCIPAL</span>
+                
+                <!-- PONELO ACÁ ADENTRO (Al principio o al final de los botones) -->
+                <a href="index.html" class="menu-item" style="text-decoration:none; border: 1px dashed var(--accent); color: var(--accent); margin-bottom: 0.35rem;">
+                    <span class="icon">🏋️</span> Rutinas & Gym
+                </a>
+
+                <button class="menu-item active" data-page="home" onclick="irAPagina('home')">
+                    <span class="icon">🏠</span> Inicio / Categorías
+                </button>
+                <button class="menu-item" data-page="plantel" onclick="irAPagina('plantel')">
+                    <span class="icon">👥</span> Altas, Bajas y Plantel
+                </button>
+                <button class="menu-item" data-page="ranking" onclick="irAPagina('ranking')">
+                    <span class="icon">🏆</span> Ranking de Categoría
+                </button>
+                <button class="menu-item" data-page="gimnasio" onclick="irAPagina('gimnasio')">
+                    <span class="icon">🏋️</span> Gimnasio y Campo
+                </button>
+                <button class="menu-item" data-page="laboratorio" onclick="irAPagina('laboratorio')">
+                    <span class="icon">🩸</span> Sangre y Antropometría
+                </button>
+                <button class="menu-item" data-page="ficha360" onclick="irAPagina('ficha360')">
+                    <span class="icon">🧠</span> Ficha 360° Detallada
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="btn btn-primary btn-block" onclick="abrirModalJugador()">
+                    + Dar de Alta Jugador
+                </button>
+            </div>
+        </aside>
+
+        <!-- CONTENEDOR DE PÁGINAS -->
+        <div class="main-wrapper">
+            <!-- Barra Superior Minimalista -->
+            <header class="topbar">
+                <div>
+                    <h1 id="pageTitle">Bienvenido, Profesor</h1>
+                    <p id="pageSubtitle">Selecciona una categoría o sección para comenzar a trabajar.</p>
+                </div>
+                <div class="topbar-actions">
+                    <button type="button" id="btnToggleTemaCDM" class="btn btn-ghost btn-sm btn-theme-toggle" onclick="alternarTemaVisualCDM()" title="Cambiar entre Modo Día y Modo Noche"><i class="ri-moon-clear-fill"></i><span>Modo Noche</span></button>
+                    <span class="cat-pill" id="topCatBadge">Categoría: Sub 13</span>
+                    <button class="btn btn-outline" onclick="abrirModalJugador()">+ Nuevo Jugador</button>
+                </div>
+            </header>
+
+            <main class="content-area">
+
+                <!-- =========================================================
+                     PÁGINA 1: INICIO LIMPIO (PORTADA Y TARJETAS DE CATEGORÍA)
+                     ========================================================= -->
+                <section id="page-home" class="page-view active">
+                    <div class="hero-welcome">
+                        <div>
+                            <h2>Centro de Control Deportivo por Categorías</h2>
+                            <p>El sistema se encuentra limpio y listo. Elige una división para gestionar su plantel, cargar evaluaciones de gimnasio, revisar análisis clínicos o actualizar el ranking.</p>
+                        </div>
+                        <button class="btn btn-primary btn-lg" onclick="abrirModalJugador()">+ Cargar Primer Jugador</button>
+                    </div>
+
+                    <h3 class="section-heading">Selecciona una Categoría para Entrar</h3>
+                    <div class="category-cards-grid" id="homeCategoryGrid">
+                        <!-- Renderizado dinámico de las 5 tarjetas de categoría -->
+                    </div>
+
+                    <h3 class="section-heading" style="margin-top: 2rem;">Accesos Directos de Trabajo</h3>
+                    <div class="quick-modules-grid">
+                        <div class="module-card" onclick="irAPagina('plantel')">
+                            <div class="mod-icon">👥</div>
+                            <h4>Gestión de Altas y Bajas</h4>
+                            <p>Inscribe jugadores con DNI, grupo sanguíneo y contacto. Edita o da de baja cuando lo necesites.</p>
+                        </div>
+                        <div class="module-card" onclick="irAPagina('gimnasio')">
+                            <div class="mod-icon">🏋️</div>
+                            <h4>Evaluación de Gimnasio y Campo</h4>
+                            <p>Registra Press Banca, Sentadilla, Dominadas, Salto al cajón o tests unilaterales (pierna débil/hábil).</p>
+                        </div>
+                        <div class="module-card" onclick="irAPagina('laboratorio')">
+                            <div class="mod-icon">🩸</div>
+                            <h4>Laboratorio y Peso Corporal</h4>
+                            <p>Controla Hemoglobina, Ferritina, Creatina Quinasa (CK) y variaciones de peso del jugador.</p>
+                        </div>
+                        <div class="module-card" onclick="irAPagina('ranking')">
+                            <div class="mod-icon">🏆</div>
+                            <h4>Ranking Oficial por Categoría</h4>
+                            <p>Califica a cada jugador dentro de su división y visualiza la tabla de posiciones actualizada.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =========================================================
+                     PÁGINA 2: ALTAS, BAJAS Y PLANTEL DE LA CATEGORÍA
+                     ========================================================= -->
+                <section id="page-plantel" class="page-view">
+                    <div class="toolbar-card">
+                        <div class="toolbar-left">
+                            <input type="text" id="buscarJugadorInput" placeholder="🔍 Buscar por nombre, apellido o DNI..." oninput="renderizarPaginaPlantel()">
+                            <select id="filtroEstadoPlantel" onchange="renderizarPaginaPlantel()">
+                                <option value="activos">Mostrar Solo Activos (Alta)</option>
+                                <option value="bajas">Mostrar Dados de Baja / Inactivos</option>
+                                <option value="todos">Mostrar Todos</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="abrirModalJugador()">+ Dar de Alta Jugador en <span class="lbl-cat">Sub 13</span></button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Nómina de Jugadores — <span class="lbl-cat">Sub 13</span></h3>
+                            <span id="contadorPlantel" class="text-muted">0 jugadores</span>
+                        </div>
+                        <div id="contenedorTablaPlantel"></div>
+                    </div>
+                </section>
+
+                <!-- =========================================================
+                     PÁGINA 3: RANKING EXCLUSIVO DE LA CATEGORÍA
+                     ========================================================= -->
+                <section id="page-ranking" class="page-view">
+                    <div class="grid-sidebar-right">
+                        <!-- Tabla de Posiciones -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>🏆 Tabla de Posiciones Oficial — <span class="lbl-cat">Sub 13</span></h3>
+                                <small class="text-muted">Puntuación exclusiva dentro de esta categoría</small>
+                            </div>
+                            <div id="contenedorTablaRanking"></div>
+                        </div>
+
+                        <!-- Panel lateral para asignar puntos -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>⚖️ Asignar / Modificar Puntos</h3>
+                            </div>
+                            <form id="formPuntosCategoria" onsubmit="guardarPuntosRanking(event)">
+                                <div class="form-group">
+                                    <label>Jugador Activo (<span class="lbl-cat">Sub 13</span>)</label>
+                                    <select id="selectJugadorRanking" required></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Pilar a Calificar</label>
+                                    <select id="selectPilarRanking">
+                                        <option value="bonus">⭐ Puntos Directos del Profe (Suma/Resta)</option>
+                                        <option value="fisico">🏃 Condición Física (0 a 100)</option>
+                                        <option value="gym">🏋️ Fuerza en Gimnasio (0 a 100)</option>
+                                        <option value="tecnico">⚽ Destreza Técnica/Táctica (0 a 100)</option>
+                                        <option value="actitud">🔥 Compromiso y Actitud (0 a 100)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Acción</label>
+                                    <select id="selectModoRanking">
+                                        <option value="sumar">Sumar o Restar (+/-)</option>
+                                        <option value="fijar">Fijar Nota Exacta</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Puntos</label>
+                                    <input type="number" step="0.5" id="inputValorRanking" placeholder="Ej: 5 o -3" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Motivo / Observación del Profe</label>
+                                    <input type="text" id="inputMotivoRanking" placeholder="Ej: Gran evolución en gimnasio..." required>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">Actualizar Ranking</button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =========================================================
+                     PÁGINA 4: GIMNASIO, CAMPO Y DETECTOR DE ASIMETRÍAS
+                     ========================================================= -->
+                <section id="page-gimnasio" class="page-view">
+                    <div class="grid-sidebar-right">
+                        <div>
+                            <div class="card" style="margin-bottom: 1.5rem;">
+                                <div class="card-header">
+                                    <h3>🏋️ Registrar Evaluación Física / Gimnasio (<span class="lbl-cat">Sub 13</span>)</h3>
+                                </div>
+                                <form id="formEvaluacionGym" onsubmit="registrarTestGimnasio(event)">
+                                    <div class="form-row-2">
+                                        <div class="form-group">
+                                            <label>Seleccionar Jugador</label>
+                                            <select id="selectJugadorGym" required></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Ejercicio o Test a Evaluar</label>
+                                            <select id="selectEjercicioGym" onchange="actualizarCamposEjercicio()" required></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Campos Bilaterales -->
+                                    <div id="bloqueBilateral" class="form-row-3">
+                                        <div class="form-group">
+                                            <label id="labelValorGym">Peso Levantado (kg)</label>
+                                            <input type="number" step="0.01" id="inputValorGym" placeholder="Ej: 80">
+                                        </div>
+                                        <div class="form-group" id="grupoRepsGym">
+                                            <label>Repeticiones</label>
+                                            <input type="number" id="inputRepsGym" value="5" min="1">
+                                        </div>
+                                        <div class="form-group hidden" id="grupoLastreGym">
+                                            <label>Lastre Extra (kg)</label>
+                                            <input type="number" step="0.5" id="inputLastreGym" value="0">
+                                        </div>
+                                    </div>
+
+                                    <!-- Campos Unilaterales (Pierna/Brazo Izq vs Der) -->
+                                    <div id="bloqueUnilateral" class="form-row-2 hidden">
+                                        <div class="form-group">
+                                            <label>Lado IZQUIERDO (kg / cm / reps)</label>
+                                            <input type="number" step="0.1" id="inputIzqGym" placeholder="Ej: 40">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Lado DERECHO (kg / cm / reps)</label>
+                                            <input type="number" step="0.1" id="inputDerGym" placeholder="Ej: 48">
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary">Procesar Datos y Cotejar Evolución</button>
+                                </form>
+
+                                <!-- Caja de Diagnóstico Automático -->
+                                <div id="diagnosticoGymBox" class="alert-box hidden"></div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>📊 Resumen de Marcas Físicas del Plantel — <span class="lbl-cat">Sub 13</span></h3>
+                                </div>
+                                <div id="contenedorTablaGym"></div>
+                            </div>
+                        </div>
+
+                        <!-- Crear nuevo ejercicio -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>➕ Nuevo Ejercicio al Catálogo</h3>
+                            </div>
+                            <form onsubmit="agregarEjercicioCatalogo(event)">
+                                <div class="form-group">
+                                    <label>Nombre del Ejercicio / Prueba</label>
+                                    <input type="text" id="nuevoEjNombre" placeholder="Ej: Salto al Cajón / Dominadas" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Tipo de Medición</label>
+                                    <select id="nuevoEjTipo">
+                                        <option value="fuerza_1rm">Fuerza Bilateral (Calcula 1RM y Fuerza Relativa)</option>
+                                        <option value="unilateral_asimetria">Unilateral Izq/Der (Calcula % Asimetría)</option>
+                                        <option value="peso_corporal_lastre">Dominadas / Fondos (Peso Corp. + Lastre)</option>
+                                        <option value="salto_watts">Salto en cm (Calcula Potencia en Watts)</option>
+                                        <option value="tiempo_sprint">Velocidad / Sprint en seg (Menor tiempo es mejor)</option>
+                                        <option value="resistencia_yoyo">Resistencia en metros / nivel</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-outline btn-block">Guardar en Catálogo</button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =========================================================
+                     PÁGINA 5: LABORATORIO, ANÁLISIS DE SANGRE Y PESO
+                     ========================================================= -->
+                <section id="page-laboratorio" class="page-view">
+                    <div class="grid-sidebar-right">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>🏥 Control Clínico y Bioquímico — <span class="lbl-cat">Sub 13</span></h3>
+                            </div>
+                            <div id="contenedorTablaLaboratorio"></div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>🩸 Cargar Laboratorio y Peso</h3>
+                            </div>
+                            <form onsubmit="guardarDatosLaboratorio(event)">
+                                <div class="form-group">
+                                    <label>Seleccionar Jugador</label>
+                                    <select id="selectJugadorLab" required></select>
+                                </div>
+                                <div class="form-row-2">
+                                    <div class="form-group">
+                                        <label>Peso Actual (kg)</label>
+                                        <input type="number" step="0.1" id="labPeso" required placeholder="75.0">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>% Grasa Corporal</label>
+                                        <input type="number" step="0.1" id="labGrasa" placeholder="11.0">
+                                    </div>
+                                </div>
+                                <div class="form-row-2">
+                                    <div class="form-group">
+                                        <label>Hemoglobina (g/dL)</label>
+                                        <input type="number" step="0.1" id="labHemo" required placeholder="Normal: 13.5-17.5">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Ferritina (ng/mL)</label>
+                                        <input type="number" id="labFerri" required placeholder="Normal: >35">
+                                    </div>
+                                </div>
+                                <div class="form-row-2">
+                                    <div class="form-group">
+                                        <label>Creatina Quinasa CK (U/L)</label>
+                                        <input type="number" id="labCK" required placeholder="Normal: <350">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Glucemia (mg/dL)</label>
+                                        <input type="number" id="labGlucosa" value="88">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">Analizar y Guardar</button>
+                            </form>
+                            <div id="diagnosticoLabBox" class="alert-box hidden"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =========================================================
+                     PÁGINA 6: FICHA CIENTÍFICA 360° INDIVIDUAL
+                     ========================================================= -->
+                <section id="page-ficha360" class="page-view">
+                    <div class="toolbar-card">
+                        <div class="toolbar-left">
+                            <label style="font-weight: 700;">Jugador a Inspeccionar:</label>
+                            <select id="selectJugador360" onchange="renderizarPagina360()" style="min-width: 280px;"></select>
+                        </div>
+                    </div>
+                    <div id="contenedorFicha360"></div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         VENTANA MODAL LIMPIA PARA DAR DE ALTA / EDITAR JUGADOR
+         ========================================================= -->
+    <div id="modalJugador" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalJugadorTitulo">Dar de Alta Nuevo Jugador</h3>
+                <button class="modal-close" onclick="cerrarModalJugador()">✕</button>
+            </div>
+            <form id="formModalJugador" onsubmit="guardarFichaJugador(event)">
+                <input type="hidden" id="editJugadorId">
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Nombre *</label>
+                        <input type="text" id="jugNombre" required placeholder="Ej: Julián">
+                    </div>
+                    <div class="form-group">
+                        <label>Apellido *</label>
+                        <input type="text" id="jugApellido" required placeholder="Ej: Álvarez">
+                    </div>
+                    <div class="form-group">
+                        <label>DNI / Documento *</label>
+                        <input type="text" id="jugDni" required placeholder="Sin puntos">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Categoría *</label>
+                        <select id="jugCategoria" required>
+                            <option value="Sub 13">Sub 13</option>
+                            <option value="Sub 15">Sub 15</option>
+                            <option value="Sub 17">Sub 17</option>
+                            <option value="Reserva">Reserva</option>
+                            <option value="Primera">Primera</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Puesto / Posición *</label>
+                        <input type="text" id="jugPosicion" required placeholder="Ej: Delantero / Wing">
+                    </div>
+                    <div class="form-group">
+                        <label>Edad *</label>
+                        <input type="number" id="jugEdad" required min="8" max="45" placeholder="Ej: 19">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Grupo Sanguíneo *</label>
+                        <select id="jugSangre" required>
+                            <option value="0+">0+</option><option value="0-">0-</option>
+                            <option value="A+">A+</option><option value="A-">A-</option>
+                            <option value="B+">B+</option><option value="B-">B-</option>
+                            <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono / Emergencia *</label>
+                        <input type="text" id="jugContacto" required placeholder="+54 9 ...">
+                    </div>
+                    <div class="form-group">
+                        <label>Obra Social / Cobertura</label>
+                        <input type="text" id="jugObraSocial" placeholder="Opcional">
+                    </div>
+                </div>
+
+                <div class="form-row-4">
+                    <div class="form-group">
+                        <label>Peso Inicial (kg) *</label>
+                        <input type="number" step="0.1" id="jugPeso" required placeholder="72.5">
+                    </div>
+                    <div class="form-group">
+                        <label>Altura (cm) *</label>
+                        <input type="number" id="jugAltura" required placeholder="175">
+                    </div>
+                    <div class="form-group">
+                        <label>Pierna Hábil</label>
+                        <select id="jugPierna">
+                            <option value="Derecha">Derecha</option>
+                            <option value="Izquierda">Izquierda</option>
+                            <option value="Ambidiestro">Ambidiestro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Brazo Hábil</label>
+                        <select id="jugBrazo">
+                            <option value="Derecho">Derecho</option>
+                            <option value="Izquierdo">Izquierdo</option>
+                            <option value="Ambidiestro">Ambidiestro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="cerrarModalJugador()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Jugador</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+<!-- analisisjugadores.html • Versión Completa Multi-Deporte -->
+</html>

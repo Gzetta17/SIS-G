@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club Deportivo Municipal Adelia María | Panel Principal</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+        <aside class="app-sidebar">
+        <a href="index.html" class="sidebar-brand">
+            <img src="/img/logo.png" alt="CDM" onerror="this.onerror=null; this.src='logo.png';">
+            <div class="sidebar-brand-text">
+                <h1>CDM ADELIA MARÍA</h1>
+                <span>Plataforma Oficial</span>
+            </div>
+        </a>
+
+        <div class="sidebar-group-label">Menú Principal</div>
+        <nav class="sidebar-nav">
+            <a href="index.html" class="side-link active" data-nav="index"><i class="ri-home-5-fill"></i><span>Inicio</span></a>
+            <a href="futbol.html" class="side-link" data-nav="futbol"><i class="ri-football-line"></i><span>Fútbol</span></a>
+            <a href="hockey.html" class="side-link" data-nav="hockey"><i class="ri-award-line"></i><span>Hockey de Piso</span></a>
+            <a href="gym.html" class="side-link" data-nav="gym"><i class="ri-heart-pulse-line"></i><span>Gimnasio</span></a>
+        </nav>
+
+        <div class="sidebar-demo-box">
+            <small><i class="ri-database-2-line"></i> Sistema y Backup</small>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">
+                <button type="button" class="btn btn-primary btn-sm" style="grid-column:1/-1;" onclick="cargarDatosDemoCDM()">
+                    <i class="ri-sparkling-fill"></i> Cargar Demo
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="exportarBackupJSON()" title="Descargar copia JSON">
+                    <i class="ri-download-2-line"></i> Backup
+                </button>
+                <label class="btn btn-ghost btn-sm" style="cursor:pointer; color:#e2e8f0; border-color:rgba(255,255,255,0.14); background:rgba(255,255,255,0.06);" title="Restaurar archivo JSON">
+                    <i class="ri-upload-2-line"></i> Subir
+                    <input type="file" accept=".json" onchange="importarBackupJSON(event)" style="display:none;">
+                </label>
+                <button type="button" class="btn btn-danger btn-sm" style="grid-column:1/-1; margin-top:2px;" onclick="limpiarTodoElSistema()">
+                    <i class="ri-delete-bin-line"></i> Vaciar Datos
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-main">
+                <header class="app-topbar">
+            <div class="topbar-left">
+                <div class="topbar-title">
+                    <h2>Club Deportivo Municipal <span class="cat-active-pill">Adelia María</span></h2>
+                    <span class="topbar-subtitle">Panel general de planteles, gimnasio, asistencia diaria y cuotas</span>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <button type="button" id="btnToggleTemaCDM" class="btn btn-ghost btn-sm btn-theme-toggle" onclick="alternarTemaVisualCDM()" title="Cambiar entre Modo Día y Modo Noche"><i class="ri-moon-clear-fill"></i><span>Modo Noche</span></button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalPersona()">
+                    <i class="ri-user-add-line"></i> + Nueva Persona
+                </button>
+            </div>
+        </header>
+
+        <main class="app-content animate-in">
+            <!-- 1. KPIS EN VIVO -->
+            <section id="indexExecutiveStrip" class="bento-kpis"></section>
+
+            <!-- 2. TARJETAS MODERNAS Y CLARAS DE DISCIPLINAS -->
+            <div class="index-section-head">
+                <h3>Disciplinas y Áreas del Club</h3>
+                <span>Seleccioná un módulo para gestionar planteles, pizarras, rutinas o cuotas</span>
+            </div>
+
+            <section class="sports-showcase-grid">
+                <!-- TARJETA 1: FÚTBOL -->
+                <a href="futbol.html" class="sport-showcase-card">
+                    <div class="sport-card-visual">
+                        <div class="sport-card-bg bg-futbol-modern"></div>
+                        <svg class="sport-card-vector" viewBox="0 0 200 130" fill="none">
+                            <rect x="10" y="10" width="180" height="110" rx="8" stroke="currentColor" stroke-width="2.2"/>
+                            <line x1="100" y1="10" x2="100" y2="120" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="100" cy="65" r="22" stroke="currentColor" stroke-width="2"/>
+                            <rect x="10" y="38" width="26" height="54" stroke="currentColor" stroke-width="2"/>
+                            <rect x="164" y="38" width="26" height="54" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <div class="sport-card-top">
+                            <span class="sport-chip-glass">⚽ FÚTBOL</span>
+                            <span class="showcase-live-count" id="countFutbol">0 activos</span>
+                        </div>
+                        <div class="sport-card-visual-title">
+                            <h3>Fútbol Oficial</h3>
+                        </div>
+                    </div>
+                    <div class="sport-card-content">
+                        
+                        <div class="sport-card-pills">
+                            <span class="sport-mini-pill">Sub 13</span>
+                            <span class="sport-mini-pill">Sub 15</span>
+                            <span class="sport-mini-pill">Sub 17</span>
+                            <span class="sport-mini-pill">Reserva</span>
+                            <span class="sport-mini-pill">Primera</span>
+                        </div>
+                        <div class="sport-card-footer">
+                            <span>Abrir panel de Fútbol</span>
+                            <i class="ri-arrow-right-line"></i>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- TARJETA 2: HOCKEY DE PISO -->
+                <a href="hockey.html" class="sport-showcase-card">
+                    <div class="sport-card-visual">
+                        <div class="sport-card-bg bg-hockey-piso-modern"></div>
+                        <svg class="sport-card-vector" viewBox="0 0 220 140" fill="none">
+                            <rect x="12" y="12" width="196" height="116" rx="10" stroke="currentColor" stroke-width="2.2"/>
+                            <line x1="110" y1="12" x2="110" y2="128" stroke="currentColor" stroke-width="2"/>
+                            <path d="M12 36 C46 36, 46 104, 12 104" stroke="currentColor" stroke-width="2.2"/>
+                            <path d="M208 36 C174 36, 174 104, 208 104" stroke="currentColor" stroke-width="2.2"/>
+                            <path d="M142 22 L102 98 C97 107, 85 110, 79 104 C74 99, 77 89, 84 87 L91 86" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round"/>
+                            <circle cx="115" cy="103" r="6" fill="#38bdf8"/>
+                        </svg>
+                        <div class="sport-card-top">
+                            <span class="sport-chip-glass">🏑 HOCKEY DE PISO</span>
+                            <span class="showcase-live-count" id="countHockey">0 activos</span>
+                        </div>
+                        <div class="sport-card-visual-title">
+                            <h3>Hockey de Piso</h3>
+                        </div>
+                    </div>
+                    <div class="sport-card-content">
+                        
+                        <div class="sport-card-pills">
+                            <span class="sport-mini-pill">Sub 13</span>
+                            <span class="sport-mini-pill">Sub 15</span>
+                            <span class="sport-mini-pill">Sub 17</span>
+                            <span class="sport-mini-pill">Reserva</span>
+                            <span class="sport-mini-pill">Primera</span>
+                        </div>
+                        <div class="sport-card-footer">
+                            <span>Abrir panel de Hockey</span>
+                            <i class="ri-arrow-right-line"></i>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- TARJETA 3: GIMNASIO -->
+                <a href="gym.html" class="sport-showcase-card">
+                    <div class="sport-card-visual">
+                        <div class="sport-card-bg bg-gym-modern"></div>
+                        <svg class="sport-card-vector" viewBox="0 0 200 130" fill="none">
+                            <line x1="25" y1="65" x2="175" y2="65" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                            <rect x="38" y="35" width="12" height="60" rx="4" stroke="currentColor" stroke-width="2.5"/>
+                            <rect x="22" y="45" width="10" height="40" rx="3" stroke="currentColor" stroke-width="2.5"/>
+                            <rect x="150" y="35" width="12" height="60" rx="4" stroke="currentColor" stroke-width="2.5"/>
+                            <rect x="168" y="45" width="10" height="40" rx="3" stroke="currentColor" stroke-width="2.5"/>
+                        </svg>
+                        <div class="sport-card-top">
+                            <span class="sport-chip-glass">🏋️ GIMNASIO</span>
+                            <span class="showcase-live-count" id="countGym">0 socios</span>
+                        </div>
+                        <div class="sport-card-visual-title">
+                            <h3>Gimnasio & Salud</h3>
+                        </div>
+                    </div>
+                    <div class="sport-card-content">
+                        
+                        <div class="sport-card-pills">
+                            <span class="sport-mini-pill">Musculación</span>
+                            <span class="sport-mini-pill">Fuerza</span>
+                            <span class="sport-mini-pill">Funcional</span>
+                            <span class="sport-mini-pill">Videoteca</span>
+                            <span class="sport-mini-pill">Cuotas</span>
+                        </div>
+                        <div class="sport-card-footer">
+                            <span>Abrir panel de Gimnasio</span>
+                            <i class="ri-arrow-right-line"></i>
+                        </div>
+                    </div>
+                </a>
+            </section>
+
+            <!-- 3. RECEPCIÓN RÁPIDA Y CENTRO DE ALERTAS -->
+            <section id="indexExecutiveHub" class="split-equal"></section>
+        </main>
+
+        <footer class="creator-footer-right">
+            <div class="creator-badge-pill">
+                <i class="ri-code-s-slash-line"></i>
+                <span>Creado y desarrollado por <b>Gonzalo Adanchú</b></span>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<div id="modalPersona" class="modal-backdrop hidden"></div>
+
+<script src="app.js"></script>
+</body>
+<!-- index.html • Versión Completa Multi-Deporte -->
+</html>

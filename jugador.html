@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expediente Individual | CDM Pro Suite</title>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body data-page="perfil-individual">
+
+<div class="app-shell">
+        <aside class="app-sidebar">
+        <a href="index.html" class="sidebar-brand">
+            <img src="/img/logo.png" alt="CDM" onerror="this.onerror=null; this.src='logo.png';">
+            <div class="sidebar-brand-text">
+                <h1>CDM ADELIA MARÍA</h1>
+                <span>Plataforma Oficial</span>
+            </div>
+        </a>
+
+        <div class="sidebar-group-label">Menú Principal</div>
+        <nav class="sidebar-nav">
+            <a href="index.html" class="side-link" data-nav="index"><i class="ri-home-5-line"></i><span>Inicio</span></a>
+            <a href="futbol.html" class="side-link" data-nav="futbol"><i class="ri-football-line"></i><span>Fútbol</span></a>
+            <a href="hockey.html" class="side-link" data-nav="hockey"><i class="ri-award-line"></i><span>Hockey de Piso</span></a>
+            <a href="gym.html" class="side-link" data-nav="gym"><i class="ri-heart-pulse-line"></i><span>Gimnasio</span></a>
+        </nav>
+
+        <div class="sidebar-demo-box">
+            <small><i class="ri-database-2-line"></i> Sistema y Backup</small>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem;">
+                <button type="button" class="btn btn-primary btn-sm" style="grid-column:1/-1;" onclick="cargarDatosDemoCDM()">
+                    <i class="ri-sparkling-fill"></i> Cargar Demo
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="exportarBackupJSON()" title="Descargar copia JSON">
+                    <i class="ri-download-2-line"></i> Backup
+                </button>
+                <label class="btn btn-ghost btn-sm" style="cursor:pointer; color:#e2e8f0; border-color:rgba(255,255,255,0.14); background:rgba(255,255,255,0.06);" title="Restaurar archivo JSON">
+                    <i class="ri-upload-2-line"></i> Subir
+                    <input type="file" accept=".json" onchange="importarBackupJSON(event)" style="display:none;">
+                </label>
+                <button type="button" class="btn btn-danger btn-sm" style="grid-column:1/-1; margin-top:2px;" onclick="limpiarTodoElSistema()">
+                    <i class="ri-delete-bin-line"></i> Vaciar Datos
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-main">
+                <header class="app-topbar">
+            <div class="topbar-left">
+                <a href="index.html" class="btn btn-ghost btn-sm" id="btnVolverDeporte"><i class="ri-arrow-left-line"></i> Volver</a>
+                <div class="topbar-title">
+                    <h2 id="subtituloHeaderJugador">Expediente Individual</h2>
+                    <span class="topbar-subtitle">Seguimiento integral de evolución física, radar 360°, rutinas y salud</span>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <button type="button" id="btnToggleTemaCDM" class="btn btn-ghost btn-sm btn-theme-toggle" onclick="alternarTemaVisualCDM()" title="Cambiar entre Modo Día y Modo Noche"><i class="ri-moon-clear-fill"></i><span>Modo Noche</span></button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="window.print()">
+                    <i class="ri-printer-line"></i> Exportar PDF
+                </button>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <!-- CABECERA DEL DEPORTISTA / SOCIO -->
+            <div id="fichaCabeceraJugador" class="app-panel animate-in"></div>
+
+            <!-- 3 PESTAÑAS INTERNAS PERFECTAMENTE ALINEADAS (TABS-3) -->
+            <div class="module-tabs tabs-3">
+                <button class="mod-tab active" onclick="cambiarTabFichaJugador('graficos', this)"><i class="ri-radar-line"></i><span>Evolución y Radar 360°</span></button>
+                <button class="mod-tab" onclick="cambiarTabFichaJugador('rutinas', this)"><i class="ri-whatsapp-line"></i><span>Rutinas y WhatsApp</span></button>
+                <button class="mod-tab" onclick="cambiarTabFichaJugador('clinica', this)"><i class="ri-heart-pulse-line"></i><span>Antropometría, Fatiga y Lesiones</span></button>
+            </div>
+
+            <!-- 1. GRÁFICOS Y MARCAS -->
+            <section id="jug-sec-graficos" class="jug-seccion animate-in">
+                <div class="split-view">
+                    <div class="app-panel">
+                        <div class="panel-head"><h3><i class="ri-add-circle-line"></i> Registrar Test / Marca</h3></div>
+                        <form id="formNuevoAvance" onsubmit="registrarAvanceJugador(event)">
+                            <div class="field" style="margin-bottom:0.65rem;"><label>Fecha *</label><input type="date" id="evFecha" required></div>
+                            <div class="field" style="margin-bottom:0.65rem;">
+                                <label>Ejercicio o Prueba *</label>
+                                <input type="text" id="evEjercicio" list="listaEjerciciosSugeridos" required placeholder="Ej: Sentadilla / Press Banca">
+                            </div>
+                            <datalist id="listaEjerciciosSugeridos">
+                                <option value="Sentadilla Trasera">
+                                <option value="Press de Banca">
+                                <option value="Peso Muerto Rumano">
+                                <option value="Dominadas">
+                                <option value="Salto al Cajón / CMJ">
+                                <option value="Sentadilla Búlgara Unilateral">
+                                <option value="Sprint 20 metros">
+                            </datalist>
+
+                            <div class="grid-2" style="margin-bottom:0.65rem;">
+                                <div class="field">
+                                    <label>Medición *</label>
+                                    <select id="evTipo" onchange="cambiarTipoMedicion()">
+                                        <option value="fuerza_kg">Fuerza (Kg + Reps -> 1RM)</option>
+                                        <option value="unilateral">Unilateral Izq/Der (Asimetría)</option>
+                                        <option value="salto_cm">Salto (cm -> Watts)</option>
+                                        <option value="tiempo_seg">Sprint (segundos)</option>
+                                        <option value="reps_puntos">Repeticiones / Puntos</option>
+                                    </select>
+                                </div>
+                                <div class="field" id="bloqueValorSimple">
+                                    <label id="lblEvValor">Valor (kg) *</label>
+                                    <input type="number" step="0.01" id="evValor" placeholder="80">
+                                </div>
+                            </div>
+
+                            <div class="field" id="bloqueReps" style="margin-bottom:0.65rem;">
+                                <label>Repeticiones</label>
+                                <input type="number" id="evReps" value="5" min="1">
+                            </div>
+
+                            <div class="grid-2 hidden" id="bloqueUnilateral" style="margin-bottom:0.65rem;">
+                                <div class="field"><label>Izquierda</label><input type="number" step="0.1" id="evIzq" placeholder="40"></div>
+                                <div class="field"><label>Derecha</label><input type="number" step="0.1" id="evDer" placeholder="45"></div>
+                            </div>
+
+                            <div class="field" style="margin-bottom:0.85rem;">
+                                <label>Observación</label>
+                                <input type="text" id="evNota" placeholder="Opcional...">
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" style="width:100%;">Guardar y Graficar</button>
+                        </form>
+                    </div>
+
+                    <div>
+                        <div class="app-panel">
+                            <div class="panel-head">
+                                <h3><i class="ri-line-chart-line"></i> Curva de Progreso por Fecha y Radar 360°</h3>
+                                <select id="selectFiltroEjercicioGrafico" onchange="dibujarGraficoEvolucion()" style="max-width:230px; font-weight:800;"></select>
+                            </div>
+
+                            <div id="kpisEvolucionEjercicio" class="bento-kpis"></div>
+
+                            <div class="split-equal">
+                                <div class="chart-canvas-box"><canvas id="canvasEvolucionJugador"></canvas></div>
+                                <div class="chart-canvas-box"><canvas id="canvasRadarJugador"></canvas></div>
+                            </div>
+                        </div>
+
+                        <div class="app-panel">
+                            <div class="panel-head"><h3><i class="ri-history-line"></i> Historial de Evaluaciones</h3></div>
+                            <div id="contenedorHistorialJugador"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. RUTINAS -->
+            <section id="jug-sec-rutinas" class="jug-seccion hidden">
+                <div class="split-view">
+                    <div class="app-panel">
+                        <div class="panel-head">
+                            <h3><i class="ri-add-box-line"></i> Asignar Rutina Individual</h3>
+                            <div style="display:flex; gap:0.3rem;">
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaIndividual('superior')">Superior</button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaIndividual('inferior')">Piernas</button>
+                                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaIndividual('rehab')">Rehab</button>
+                            </div>
+                        </div>
+
+                        <form id="formRutinaIndividual" onsubmit="guardarRutinaIndividual(event)">
+                            <div class="field" style="margin-bottom:0.65rem;"><label>Nombre de la Rutina *</label><input type="text" id="rutNombre" required placeholder="Ej: Día 1 - Fuerza"></div>
+                            <div class="grid-2" style="margin-bottom:0.65rem;">
+                                <div class="field">
+                                    <label>Enfoque *</label>
+                                    <select id="rutObjetivo">
+                                        <option value="Hipertrofia Estructural">🔴 Hipertrofia</option>
+                                        <option value="Fuerza Máxima">🔵 Fuerza Máxima</option>
+                                        <option value="Potencia y Transferencia">🟣 Potencia</option>
+                                        <option value="Funcional y Core">🟢 Funcional</option>
+                                        <option value="Movilidad y Recuperación">🟡 Movilidad</option>
+                                        <option value="Rehabilitación / Lesión">🏥 Rehabilitación</option>
+                                    </select>
+                                </div>
+                                <div class="field"><label>Días</label><input type="text" id="rutDias" placeholder="Martes y Jueves"></div>
+                            </div>
+
+                            <div id="contenedorFilasRutinaIndividual"></div>
+
+                            <button type="button" class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:0.75rem;" onclick="agregarFilaEjercicioIndividual()">+ Añadir Ejercicio</button>
+                            <div class="field" style="margin-bottom:0.85rem;"><label>Nota del Profe</label><input type="text" id="rutNotas" placeholder="Opcional..."></div>
+                            <button type="submit" class="btn btn-primary" style="width:100%;">Guardar Rutina</button>
+                        </form>
+                    </div>
+
+                    <div class="app-panel">
+                        <div class="panel-head"><h3><i class="ri-whatsapp-line"></i> Rutinas de la Persona (Individuales y de su Categoría)</h3></div>
+                        <div id="listaRutinasGuardadasJugador" class="athletes-grid"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. ANTROPOMETRÍA, WELLNESS Y PARTE MÉDICO DE LESIONES -->
+            <section id="jug-sec-clinica" class="jug-seccion hidden">
+                <div class="split-view">
+                    <div class="app-panel">
+                        <div class="panel-head"><h3><i class="ri-Stethoscope-line"></i> Control de Peso, Wellness y Lesiones</h3></div>
+                        <form onsubmit="guardarClinicoJugador(event)">
+                            <div class="grid-2" style="margin-bottom:0.65rem;">
+                                <div class="field"><label>Fecha *</label><input type="date" id="medFecha" required></div>
+                                <div class="field"><label>Peso Corporal (kg) *</label><input type="number" step="0.1" id="medPeso" required placeholder="74.0"></div>
+                            </div>
+                            <div class="grid-2" style="margin-bottom:0.65rem;">
+                                <div class="field">
+                                    <label>Descanso / Sueño (1-5)</label>
+                                    <select id="medSueno">
+                                        <option value="5">5/5 - Excelente descanso</option>
+                                        <option value="4">4/5 - Buen descanso</option>
+                                        <option value="3">3/5 - Regular</option>
+                                        <option value="2">2/5 - Poco sueño / Cansado</option>
+                                        <option value="1">1/5 - Fatiga / Insomnio</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Fatiga / RPE Semanal (1-10)</label>
+                                    <input type="number" id="medRPE" min="1" max="10" value="6" placeholder="Ej: 7">
+                                </div>
+                            </div>
+                            <div class="field" style="margin-bottom:0.65rem;">
+                                <label>Actualizar Estado Médico / Disponibilidad</label>
+                                <select id="medEstadoGeneral">
+                                    <option value="Óptimo">🟢 Óptimo (Alta Deportiva / Entrena Normal)</option>
+                                    <option value="Sobrecarga / Precaución">🟡 Sobrecarga / Precaución (Cuidar cargas)</option>
+                                    <option value="Lesionado (Rehabilitación)">🔴 Lesionado / En Rehabilitación</option>
+                                </select>
+                            </div>
+                            <div class="field" style="margin-bottom:0.85rem;">
+                                <label>Zona Afectada / Indicación para Gimnasio</label>
+                                <input type="text" id="medDolor" placeholder="Ej: Sin molestias / Cuidar isquiotibial derecho (sin impacto)">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width:100%;">Guardar Control y Actualizar Estado</button>
+                        </form>
+                    </div>
+
+                    <div class="app-panel">
+                        <div class="panel-head"><h3><i class="ri-dossier-line"></i> Historial de Peso, IMC, Fatiga y Parte Médico</h3></div>
+                        <div id="contenedorClinicoJugador"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="creator-footer-right">
+            <div class="creator-badge-pill">
+                <i class="ri-code-s-slash-line"></i>
+                <span>Creado y desarrollado por <b>Gonzalo Adanchú</b></span>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<div id="modalPersona" class="modal-backdrop hidden"></div>
+
+<script src="app.js"></script>
+</body>
+<!-- jugador.html • Versión Completa Multi-Deporte -->
+</html>
