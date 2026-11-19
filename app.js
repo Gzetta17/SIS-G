@@ -23098,3 +23098,3915 @@ document.addEventListener("click", () => {
     setTimeout(inyectarBotonesSuiteSalud30, 90);
 });
 window.abrirModalMapaCorporalPro28 = window.abrirModalAtlasRealista29;
+
+// =========================================================================
+// 31. CANCHA SIN CIERRE AUTOMÁTICO AL MARCAR + EVALUACIÓN 360° DETALLADA
+//     - Pre-marca / acumula Gol, Asistencia, Quites, etc. sin cerrar el modal
+//     - Solo cierra al tocar Guardar (o Cerrar)
+//     - Visor de Evaluación completo por puesto de Ranking (Profe + Partidos + Gym + Clínico)
+// =========================================================================
+
+(function () {
+    const _borradorPorSlot31 = {};
+
+    function obtenerBorradorSlot31(slotIdx) {
+        if (!_borradorPorSlot31[slotIdx]) {
+            _borradorPorSlot31[slotIdx] = {
+                tipo: "",
+                impacto: 0.2,
+                etiqueta: "",
+                detalle: "",
+                pendientes: []
+            };
+        }
+        return _borradorPorSlot31[slotIdx];
+    }
+
+    function refrescarResumenBorrador31(slotIdx) {
+        const b = obtenerBorradorSlot31(slotIdx);
+        const box = document.getElementById("borradorPendientesCancha31");
+        if (!box) return;
+
+        if (!b.pendientes.length && !b.tipo) {
+            box.innerHTML = `<small style="color:var(--ink-500);">Tocá una situación (Gol, Asistencia, etc.) para marcarla. No se cerrará hasta que aprietes <b>Guardar</b>.</small>`;
+            return;
+        }
+
+        const listaHtml = b.pendientes.map((item, idx) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.35rem 0.6rem; background:var(--surface-solid); border:1px solid var(--line); border-radius:8px; font-size:0.78rem;">
+                <span><b>${idx + 1}.</b> ${item.tipo} (${item.impacto >= 0 ? "+" : ""}${item.impacto} pts)${item.detalle ? ` — <i>${item.detalle}</i>` : ""}</span>
+                <button type="button" class="btn btn-danger btn-sm" style="min-height:22px; padding:0 6px;" onclick="quitarPendienteBorrador31(${slotIdx}, ${idx})">✕</button>
+            </div>
+        `).join("");
+
+        box.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                <strong style="font-size:0.78rem; color:var(--cdm-700);">📌 Marcadas en este modal (${b.pendientes.length}):</strong>
+                <span class="badge badge-celeste">${b.tipo ? `Seleccionada: ${b.tipo}` : "Lista para guardar"}</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.3rem;">${listaHtml}</div>
+        `;
+    }
+
+    window.marcarSituacionSinCerrar31 = function (slotIdx, tipo, impactoDefecto) {
+        const b = obtenerBorradorSlot31(slotIdx);
+        const inpMin = document.getElementById("evCanchaMinuto");
+        const selImp = document.getElementById("evCanchaImpacto");
+        const inpDet = document.getElementById("evCanchaDetalle");
+
+        const minTxt = inpMin?.value?.trim() || `${typeof periodoPartidoActual !== "undefined" ? periodoPartidoActual : "1T"} • ${typeof minutoPartidoActual !== "undefined" ? minutoPartidoActual : 0}'`;
+        const impVal = selImp && selImp.value !== "" ? (parseFloat(selImp.value) || impactoDefecto || 0) : (impactoDefecto || 0);
+        const detVal = (inpDet?.value || "").trim() || b.etiqueta || "";
+
+        b.tipo = tipo;
+        b.impacto = impVal;
+        if (selImp && String(impVal) !== "") selImp.value = String(impVal);
+
+        b.pendientes.push({
+            minutoDisplay: minTxt,
+            tipo,
+            impacto: impVal,
+            detalle: detVal
+        });
+
+        if (inpDet) inpDet.value = "";
+        b.etiqueta = "";
+        refrescarResumenBorrador31(slotIdx);
+    };
+
+    window.quitarPendienteBorrador31 = function (slotIdx, idx) {
+        const b = obtenerBorradorSlot31(slotIdx);
+        b.pendientes.splice(idx, 1);
+        refrescarResumenBorrador31(slotIdx);
+    };
+
+    window.guardarAccionesMarcadasCancha31 = function (e, slotIdx) {
+        if (e && e.preventDefault) e.preventDefault();
+        const b = obtenerBorradorSlot31(slotIdx);
+        const mapa = typeof obtenerMapaAlineacionActual === "function" ? obtenerMapaAlineacionActual() : {};
+        const j = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => x.id == mapa[slotIdx]);
+        if (!j) return;
+
+        const info = (typeof obtenerCatalogoFormacionActual === "function" ? obtenerCatalogoFormacionActual()[slotIdx] : null) || { num: slotIdx + 1, sigla: "POS" };
+        const inpMin = document.getElementById("evCanchaMinuto");
+        const selImp = document.getElementById("evCanchaImpacto");
+        const inpDet = document.getElementById("evCanchaDetalle");
+
+        const minTxt = inpMin?.value?.trim() || `${periodoPartidoActual} • ${minutoPartidoActual}'`;
+        const impActual = selImp ? (parseFloat(selImp.value) || 0) : (b.impacto || 0);
+        const detActual = (inpDet?.value || "").trim() || b.etiqueta || "";
+
+        // Si el usuario eligió una situación o escribió detalle sin haber tocado un botón previo, lo suma también
+        if (b.pendientes.length === 0 && (b.tipo || detActual)) {
+            b.pendientes.push({
+                minutoDisplay: minTxt,
+                tipo: b.tipo || "📝 Observación Táctica",
+                impacto: impActual,
+                detalle: detActual || "Acción registrada"
+            });
+        } else if (b.pendientes.length > 0 && detActual) {
+            const ultimo = b.pendientes[b.pendientes.length - 1];
+            if (!ultimo.detalle) ultimo.detalle = detActual;
+        }
+
+        if (!b.pendientes.length) {
+            alert("Marcá al menos una situación (Gol, Asistencia, etc.) o escribí un detalle antes de Guardar.");
+            return;
+        }
+
+        b.pendientes.forEach(item => {
+            if (String(item.tipo).includes("Gol") && typeof golesLocalActual !== "undefined") {
+                golesLocalActual++;
+                const inpRes = document.getElementById("matchResultado");
+                if (inpRes && typeof golesVisitaActual !== "undefined") {
+                    inpRes.value = `${golesLocalActual} - ${golesVisitaActual}`;
+                }
+            }
+            if (typeof eventosPartidoActual !== "undefined") {
+                eventosPartidoActual.push({
+                    id: Date.now() + Math.random(),
+                    minuto: typeof minutoPartidoActual !== "undefined" ? minutoPartidoActual : 0,
+                    minutoDisplay: item.minutoDisplay || minTxt,
+                    jugadorId: j.id,
+                    jugadorNombre: `${j.apellido}, ${j.nombre}`,
+                    puestoEnCancha: `#${info.num} ${info.sigla}`,
+                    tipo: item.tipo,
+                    detalle: item.detalle || "Registrado en cancha",
+                    impactoPuntos: item.impacto
+                });
+            }
+        });
+
+        if (typeof eventosPartidoActual !== "undefined") {
+            eventosPartidoActual.sort((a, bEv) => a.minuto - bEv.minuto);
+        }
+
+        _borradorPorSlot31[slotIdx] = { tipo: "", impacto: 0.2, etiqueta: "", detalle: "", pendientes: [] };
+        document.getElementById("modalEventoCancha")?.classList.add("hidden");
+        if (typeof mostrarToast === "function") mostrarToast(`✓ Acciones guardadas para ${j.apellido}`);
+        if (typeof renderizarCanchaInteractiva === "function") renderizarCanchaInteractiva();
+    };
+
+    // Interceptar botones de situación dentro del modal de cancha para que NO cierren automáticamente
+    function adaptarModalCanchaSinCierreAutomatico31() {
+        const modal = document.getElementById("modalEventoCancha");
+        if (!modal || modal.classList.contains("hidden")) return;
+        const form = modal.querySelector("form");
+        if (!form) return;
+
+        const slotIdx = typeof slotCanchaSeleccionadoIndex !== "undefined" ? slotCanchaSeleccionadoIndex : 0;
+        form.setAttribute("onsubmit", `guardarAccionesMarcadasCancha31(event, ${slotIdx})`);
+
+        if (!document.getElementById("borradorPendientesCancha31")) {
+            const box = document.createElement("div");
+            box.id = "borradorPendientesCancha31";
+            box.style = "margin:0.65rem 0; padding:0.65rem 0.75rem; background:var(--surface-subtle); border:1.5px solid var(--line-celeste); border-radius:12px;";
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.innerText = "💾 Guardar Acciones y Cerrar";
+                form.insertBefore(box, submitBtn);
+            } else {
+                form.appendChild(box);
+            }
+        }
+
+        // Enganchar botones rápidos o tarjetas de situación (Gol, Asistencia, etc.)
+        modal.querySelectorAll("button").forEach(btn => {
+            if (btn.type === "submit") return;
+            const txt = (btn.innerText || "").trim();
+            const low = txt.toLowerCase();
+            if (
+                low.includes("gol") || low.includes("asistencia") || low.includes("quite") ||
+                low.includes("pase") || low.includes("atajada") || low.includes("remate") ||
+                low.includes("tarjeta") || low.includes("pérdida") || low.includes("perdida")
+            ) {
+                const linea1 = txt.split("\n")[0].trim() || txt;
+                let imp = 0.2;
+                if (low.includes("gol")) imp = 0.5;
+                else if (low.includes("asistencia") || low.includes("atajada")) imp = 0.3;
+                else if (low.includes("roja") || low.includes("pérdida") || low.includes("perdida") || low.includes("amarilla")) imp = -0.2;
+
+                btn.type = "button";
+                btn.onclick = function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    window.marcarSituacionSinCerrar31(slotIdx, linea1, imp);
+                };
+            } else if (txt.startsWith("+ ")) {
+                btn.type = "button";
+                btn.onclick = function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    const b = obtenerBorradorSlot31(slotIdx);
+                    const tag = txt.replace(/^\+\s*/, "");
+                    b.etiqueta = b.etiqueta ? `${b.etiqueta}, ${tag}` : tag;
+                    const inpDet = document.getElementById("evCanchaDetalle");
+                    if (inpDet) inpDet.value = b.etiqueta;
+                };
+            }
+        });
+
+        refrescarResumenBorrador31(slotIdx);
+    }
+
+    if (typeof abrirModalPuestoCancha === "function" && !window.__cancha31Wrapped) {
+        window.__cancha31Wrapped = true;
+        const _origAbrirPuesto31 = abrirModalPuestoCancha;
+        abrirModalPuestoCancha = function (slotIdx) {
+            _origAbrirPuesto31(slotIdx);
+            setTimeout(adaptarModalCanchaSinCierreAutomatico31, 30);
+        };
+    }
+
+    // =========================================================================
+    // EVALUACIÓN COMPLETA POR PUESTO DE RANKING + 360° DETALLADO
+    // =========================================================================
+
+    window.abrirDetalleEvaluacionCompleta31 = function (idPersona, puestoRanking = null) {
+        const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(idPersona));
+        if (!p) return;
+        if (typeof asegurarPilaresPersona === "function") asegurarPilaresPersona(p);
+
+        const partidosJug = (typeof basePartidos !== "undefined" ? basePartidos : []).filter(m => {
+            const enEventos = (m.eventos || []).some(ev => Number(ev.jugadorId) === Number(p.id));
+            const enResumen = (m.resumenJugadores || []).some(rj => Number(rj.id) === Number(p.id));
+            return enEventos || enResumen;
+        });
+
+        const rutinasPer = (typeof baseRutinas !== "undefined" ? baseRutinas : []).filter(r =>
+            Number(r.personaId) === Number(p.id) || (r.esGrupal && r.deporteDestino === p.deporte && r.categoriaDestino === p.categoria)
+        );
+
+        const evalsFisicas = Array.isArray(p.evaluaciones) ? p.evaluaciones : [];
+        const controlesClin = Array.isArray(p.clinico) ? p.clinico : [];
+        const asistCount = Array.isArray(p.asistencias) ? p.asistencias.length : 0;
+        const semCount = typeof contarAsistenciasUltimos7Dias === "function" ? contarAsistenciasUltimos7Dias(p) : 0;
+
+        let modal = document.getElementById("modalDetalleEvaluacion31");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "modalDetalleEvaluacion31";
+            modal.className = "modal-backdrop";
+            document.body.appendChild(modal);
+        }
+
+        const pil = p.pilares || { fisico: 7, gym: 7, tecnico: 7, actitud: 7, bonus: 0 };
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:860px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">📋 EVALUACIÓN INTEGRAL Y FUNDAMENTO DE RANKING</span>
+                        <h3 style="color:var(--ink-900); margin-top:4px;">
+                            ${p.apellido}, ${p.nombre} ${puestoRanking ? `<span class="badge badge-ok">Puesto #${puestoRanking}</span>` : ""} ${p.puntosCategoria !== null && p.puntosCategoria !== undefined ? `<span class="badge badge-celeste">⭐ Score ${p.puntosCategoria}/10</span>` : ""}
+                        </h3>
+                    </div>
+                    <div style="display:flex; gap:0.4rem;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="irAPaginaIndividual(${p.id})">Abrir Ficha 360°</button>
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalDetalleEvaluacion31').classList.add('hidden')">✕</button>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="gap:0.85rem; margin-bottom:0.85rem;">
+                    <div style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem;">
+                        <strong style="display:block; font-size:0.86rem; color:var(--ink-900); margin-bottom:0.45rem;">👨‍🏫 Evaluación del Profesor / Admin</strong>
+                        ${p.puntosCategoria !== null && p.puntosCategoria !== undefined ? `
+                            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:0.4rem; font-size:0.78rem; margin-bottom:0.5rem;">
+                                <div>Físico (30%): <b>${pil.fisico}/10</b></div>
+                                <div>Gym (25%): <b>${pil.gym}/10</b></div>
+                                <div>Técnico (25%): <b>${pil.tecnico}/10</b></div>
+                                <div>Actitud (20%): <b>${pil.actitud}/10</b></div>
+                            </div>
+                            <div style="font-size:0.78rem;"><b>Bonus / Ajuste:</b> ${pil.bonus >= 0 ? "+" : ""}${pil.bonus}</div>
+                        ` : `<small style="color:var(--ink-500);">Área Gimnasio: seguimiento físico y de asistencia sin score competitivo.</small>`}
+                        <div style="margin-top:0.4rem; font-size:0.78rem;"><b>Motivo / Observación:</b> ${p.motivoPuntos || "Sin motivo registrado"}</div>
+                    </div>
+
+                    <div style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem;">
+                        <strong style="display:block; font-size:0.86rem; color:var(--ink-900); margin-bottom:0.45rem;">🏥 Asistencia y Estado Clínico</strong>
+                        <div style="font-size:0.78rem; display:flex; flex-direction:column; gap:0.3rem;">
+                            <div><b>Asistencia 7 días:</b> ${semCount} / ${p.frecuenciaSemanal || 3} días (Total: ${asistCount})</div>
+                            <div><b>Estado Médico:</b> ${p.estadoMedico || "Óptimo"}</div>
+                            <div><b>Controles Clínicos:</b> ${controlesClin.length ? `${controlesClin.length} reg. (Últ: ${controlesClin[controlesClin.length - 1].fecha} • ${controlesClin[controlesClin.length - 1].dolor || "Sin molestias"})` : "Sin registros"}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="gap:0.85rem;">
+                    <div style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem;">
+                        <strong style="display:block; font-size:0.86rem; color:var(--ink-900); margin-bottom:0.45rem;">⚽ Partidos y Resultados (${partidosJug.length})</strong>
+                        ${partidosJug.length === 0
+                            ? `<small style="color:var(--ink-500);">Sin participaciones registradas en partidos.</small>`
+                            : partidosJug.map(m => {
+                                const evs = (m.eventos || []).filter(ev => Number(ev.jugadorId) === Number(p.id));
+                                const resJ = (m.resumenJugadores || []).find(rj => Number(rj.id) === Number(p.id));
+                                return `
+                                    <div style="padding:0.45rem 0.6rem; background:var(--surface-solid); border:1px solid var(--line); border-radius:10px; margin-bottom:0.4rem; font-size:0.76rem;">
+                                        <b>${m.fecha} vs ${m.rival}</b> (${m.resultado || "S/D"})
+                                        ${resJ ? `<span class="badge badge-celeste" style="margin-left:4px;">${resJ.puntosSugeridos >= 0 ? "+" : ""}${resJ.puntosSugeridos} pts</span>` : ""}
+                                        <div style="color:var(--ink-500); margin-top:2px;">
+                                            ${evs.length ? evs.map(e => `${e.minutoDisplay} ${e.tipo}${e.detalle ? ` (${e.detalle})` : ""}`).join(" • ") : "Participación registrada"}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join("")}
+                    </div>
+
+                    <div style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem;">
+                        <strong style="display:block; font-size:0.86rem; color:var(--ink-900); margin-bottom:0.45rem;">🏋️ Gimnasio, Tests y Rutinas (${evalsFisicas.length} marcas • ${rutinasPer.length} rutinas)</strong>
+                        ${evalsFisicas.length === 0 && rutinasPer.length === 0
+                            ? `<small style="color:var(--ink-500);">Sin evaluaciones físicas ni rutinas cargadas.</small>`
+                            : `
+                                ${evalsFisicas.slice(-5).reverse().map(ev => `
+                                    <div style="padding:0.4rem 0.6rem; background:var(--surface-solid); border:1px solid var(--line); border-radius:10px; margin-bottom:0.35rem; font-size:0.76rem;">
+                                        <b>${ev.fecha} — ${ev.ejercicio}:</b> ${ev.detalle}
+                                        ${ev.nota ? `<div style="color:var(--ink-500); font-size:0.7rem;">${ev.nota}</div>` : ""}
+                                    </div>
+                                `).join("")}
+                                ${rutinasPer.slice(0, 3).map(r => `
+                                    <div style="font-size:0.74rem; color:var(--ink-700); margin-top:0.25rem;">• Rutina: <b>${r.nombre}</b> (${r.objetivo})</div>
+                                `).join("")}
+                            `}
+                    </div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    // Agregar botón "🔍 Ver Evaluación" en las filas del ranking sin romper su clic a la ficha
+    function inyectarBotonesDetalleRanking31() {
+        const cont = document.getElementById("contenedorRankingDeporte");
+        if (!cont) return;
+        const filas = cont.querySelectorAll("tbody tr");
+        filas.forEach((tr, idx) => {
+            const celdaControl = tr.querySelector(".col-admin-control > div") || tr.querySelector("td:last-child > div") || tr.querySelector("td:last-child");
+            if (!celdaControl || celdaControl.querySelector(".btn-ver-eval-31")) return;
+
+            const onclickTr = tr.getAttribute("onclick") || "";
+            const m = onclickTr.match(/irAPaginaIndividual\((\d+)\)/);
+            if (!m) return;
+            const idPer = Number(m[1]);
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn-secondary btn-sm btn-ver-eval-31";
+            btn.title = "Ver evaluación completa (Profe, Partidos, Gimnasio y Clínico)";
+            btn.innerHTML = "🔍 Ver Evaluación";
+            btn.onclick = function (ev) {
+                ev.stopPropagation();
+                window.abrirDetalleEvaluacionCompleta31(idPer, idx + 1);
+            };
+            celdaControl.prepend(btn);
+        });
+    }
+
+    if (typeof renderizarRankingDeporte === "function" && !window.__ranking31Wrapped) {
+        window.__ranking31Wrapped = true;
+        const _origRanking31 = renderizarRankingDeporte;
+        renderizarRankingDeporte = function () {
+            _origRanking31();
+            setTimeout(inyectarBotonesDetalleRanking31, 25);
+        };
+    }
+
+    // Mejorar vista 360° en analisisjugadores.html (si existe) para mostrar todo el desglose
+    if (typeof renderizarPagina360 === "function" && !window.__pagina360_31Wrapped) {
+        window.__pagina360_31Wrapped = true;
+        const _orig360 = renderizarPagina360;
+        renderizarPagina360 = function () {
+            _orig360();
+            const sel = document.getElementById("selectJugador360");
+            const cont = document.getElementById("contenedorFicha360");
+            const idSel = sel ? parseInt(sel.value) : null;
+            if (idSel && cont && !cont.querySelector("#btn360DetalleCompleto31")) {
+                const wrap = document.createElement("div");
+                wrap.style = "margin-top:0.75rem; display:flex; justify-content:flex-end;";
+                wrap.innerHTML = `<button type="button" id="btn360DetalleCompleto31" class="btn btn-primary btn-sm" onclick="abrirDetalleEvaluacionCompleta31(${idSel})">📋 Ver Desglose Completo (Profe + Partidos + Gym)</button>`;
+                cont.appendChild(wrap);
+            }
+        };
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(inyectarBotonesDetalleRanking31, 300);
+    });
+})();
+// =========================================================================
+// 32. RADIOGRAFÍA ADMIN 360° (JUSTIFICACIÓN DE PUNTAJE + ACTIVIDAD TOTAL
+//     + RESUMEN AUTOMÁTICO DE MEJORAS PARA ENVIAR AL JUGADOR POR WHATSAPP)
+// Pegar al final de app.js (debajo del Apartado 31)
+// =========================================================================
+
+(function inyectarCSSRadiografiaAdmin32() {
+    if (document.getElementById("cdmCssAdmin360_32")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssAdmin360_32";
+    st.textContent = `
+        body[data-rol="usuario"] .solo-admin-32,
+        body[data-rol="usuario"] #panelAdminRadiografia32 {
+            display: none !important;
+        }
+        .rad32-panel {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.03) 0%, rgba(2, 132, 199, 0.05) 100%);
+            border: 1.5px solid var(--line-celeste, #bae6fd);
+            border-radius: 18px;
+            padding: 1.05rem 1.15rem;
+            margin-bottom: 1.1rem;
+        }
+        .rad32-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 0.9rem;
+        }
+        .rad32-card {
+            background: var(--surface-solid, #ffffff);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            border-radius: 14px;
+            padding: 0.9rem;
+        }
+        .rad32-pilar-row {
+            margin-bottom: 0.55rem;
+        }
+        .rad32-pilar-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.77rem;
+            margin-bottom: 3px;
+        }
+        .rad32-bar-track {
+            height: 7px;
+            background: var(--line, #e2e8f0);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        .rad32-bar-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 0.25s ease;
+        }
+        .rad32-timeline {
+            max-height: 290px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+            padding-right: 4px;
+        }
+        .rad32-tl-item {
+            display: flex;
+            gap: 0.6rem;
+            align-items: flex-start;
+            background: var(--surface-subtle, #f8fafc);
+            border: 1px solid var(--line, #e2e8f0);
+            border-left: 3.5px solid #0284c7;
+            border-radius: 10px;
+            padding: 0.5rem 0.7rem;
+            font-size: 0.77rem;
+        }
+        .rad32-tl-item.tl-partido { border-left-color: #10b981; }
+        .rad32-tl-item.tl-gym { border-left-color: #6366f1; }
+        .rad32-tl-item.tl-clinico { border-left-color: #f59e0b; }
+        .rad32-tl-item.tl-score { border-left-color: #ec4899; }
+        .rad32-pill-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            font-size: 0.79rem;
+        }
+        .rad32-diag-item {
+            padding: 0.45rem 0.65rem;
+            border-radius: 10px;
+            line-height: 1.35;
+        }
+        .rad32-diag-item.ok {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--ink-800, #1e293b);
+        }
+        .rad32-diag-item.warn {
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.38);
+            color: var(--ink-800, #1e293b);
+        }
+        .rad32-tabs {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.85rem;
+        }
+    `;
+    document.head.appendChild(st);
+})();
+
+// =========================================================================
+// 32.1 REGISTRO AUTOMÁTICO DEL HISTORIAL DE CAMBIOS DE SCORE (AUDITORÍA)
+// =========================================================================
+
+function registrarEventoScore32(p, anterior, nuevo, origen, motivo) {
+    if (!p || p.deporte === "Gimnasio") return;
+    if (!Array.isArray(p.historialScore)) p.historialScore = [];
+    const diff = Math.round((Number(nuevo || 0) - Number(anterior || 0)) * 10) / 10;
+    p.historialScore.unshift({
+        id: Date.now() + Math.random(),
+        fecha: typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0],
+        anterior: Number(anterior || 0),
+        nuevo: Number(nuevo || 0),
+        delta: diff,
+        origen: origen || "Evaluación Admin",
+        motivo: motivo || p.motivoPuntos || "Ajuste del profesor"
+    });
+    if (p.historialScore.length > 40) p.historialScore = p.historialScore.slice(0, 40);
+}
+
+(function envolverFuncionesScoreParaAuditoria32() {
+    if (window.__auditoriaScore32Activa) return;
+    window.__auditoriaScore32Activa = true;
+
+    if (typeof guardarPuntosRankingDeporte === "function") {
+        const _origGuardar = guardarPuntosRankingDeporte;
+        guardarPuntosRankingDeporte = function (e) {
+            const idSel = parseInt(document.getElementById("selectJugadorRanking")?.value);
+            const p = (basePersonas || []).find(x => x.id === idSel);
+            const ant = p ? p.puntosCategoria : null;
+            const pilar = document.getElementById("selectPilarRanking")?.value || "general";
+            const mot = (document.getElementById("inputPuntosMotivo")?.value || "").trim();
+            _origGuardar.apply(this, arguments);
+            if (p && ant !== null) {
+                registrarEventoScore32(p, ant, p.puntosCategoria, `Pilar ${pilar.toUpperCase()}`, mot);
+                if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+            }
+        };
+    }
+
+    if (typeof sumarPuntoRapido === "function") {
+        const _origRapido = sumarPuntoRapido;
+        sumarPuntoRapido = function (id, delta) {
+            const p = (basePersonas || []).find(x => x.id === id);
+            const ant = p ? p.puntosCategoria : null;
+            _origRapido.apply(this, arguments);
+            if (p && ant !== null) {
+                registrarEventoScore32(p, ant, p.puntosCategoria, "Ajuste Rápido", delta > 0 ? `Suba rápida (+${delta})` : `Baja rápida (${delta})`);
+                if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+            }
+        };
+    }
+
+    if (typeof calificarJugadorRapidoPrompt === "function") {
+        const _origPrompt = calificarJugadorRapidoPrompt;
+        calificarJugadorRapidoPrompt = function (id) {
+            const p = (basePersonas || []).find(x => x.id === id);
+            const ant = p ? p.puntosCategoria : null;
+            _origPrompt.apply(this, arguments);
+            if (p && ant !== null && p.puntosCategoria !== ant) {
+                registrarEventoScore32(p, ant, p.puntosCategoria, "Nota Directa", p.motivoPuntos);
+                if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+            }
+        };
+    }
+
+    if (typeof aplicarPuntosPartidoAlRanking === "function") {
+        const _origPart = aplicarPuntosPartidoAlRanking;
+        aplicarPuntosPartidoAlRanking = function (idPartido) {
+            const m = (basePartidos || []).find(x => x.id === idPartido);
+            const snap = {};
+            if (m && Array.isArray(m.resumenJugadores)) {
+                m.resumenJugadores.forEach(rj => {
+                    const p = (basePersonas || []).find(x => x.id === rj.id);
+                    if (p) snap[p.id] = p.puntosCategoria;
+                });
+            }
+            _origPart.apply(this, arguments);
+            if (m && Array.isArray(m.resumenJugadores)) {
+                m.resumenJugadores.forEach(rj => {
+                    const p = (basePersonas || []).find(x => x.id === rj.id);
+                    if (p && snap[p.id] !== undefined && p.puntosCategoria !== snap[p.id]) {
+                        registrarEventoScore32(p, snap[p.id], p.puntosCategoria, `Partido ${m.rival}`, `Impacto de partido (${m.resultado || "S/D"})`);
+                    }
+                });
+                if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+            }
+        };
+    }
+})();
+
+// =========================================================================
+// 32.2 MOTOR DE ANÁLISIS INTEGRAL + DIAGNÓSTICO AUTOMÁTICO DE MEJORAS
+// =========================================================================
+
+function analizarJugador360Admin32(p) {
+    if (typeof asegurarPilaresPersona === "function") asegurarPilaresPersona(p);
+
+    const esGym = p.deporte === "Gimnasio";
+    const pares = (basePersonas || []).filter(x => x && x.activo && x.deporte === p.deporte && (esGym || x.categoria === p.categoria));
+    pares.forEach(x => { if (typeof asegurarPilaresPersona === "function") asegurarPilaresPersona(x); });
+
+    // Puesto actual en el ranking de su categoría
+    let puestoRanking = null;
+    if (!esGym) {
+        const ordenados = [...pares].sort((a, b) => (b.puntosCategoria || 0) - (a.puntosCategoria || 0));
+        const idx = ordenados.findIndex(x => Number(x.id) === Number(p.id));
+        if (idx >= 0) puestoRanking = idx + 1;
+    }
+
+    // Promedios de la categoría para comparar
+    const nPares = Math.max(1, pares.length);
+    const promCat = esGym ? null : {
+        fisico: Math.round((pares.reduce((a, x) => a + (x.pilares?.fisico || 7), 0) / nPares) * 10) / 10,
+        gym: Math.round((pares.reduce((a, x) => a + (x.pilares?.gym || 7), 0) / nPares) * 10) / 10,
+        tecnico: Math.round((pares.reduce((a, x) => a + (x.pilares?.tecnico || 7), 0) / nPares) * 10) / 10,
+        actitud: Math.round((pares.reduce((a, x) => a + (x.pilares?.actitud || 7), 0) / nPares) * 10) / 10,
+        score: Math.round((pares.reduce((a, x) => a + (x.puntosCategoria || 7), 0) / nPares) * 10) / 10
+    };
+
+    // Partidos y acciones acumuladas
+    const partidosStats = { pj: 0, goles: 0, asistencias: 0, quites: 0, errores: 0, tarjetas: 0, puntosPartidos: 0, detallePartidos: [] };
+    (basePartidos || []).forEach(m => {
+        const evs = (m.eventos || []).filter(e => Number(e.jugadorId) === Number(p.id));
+        const resJ = (m.resumenJugadores || []).find(r => Number(r.id) === Number(p.id));
+        if (evs.length > 0 || resJ) {
+            partidosStats.pj++;
+            if (resJ) partidosStats.puntosPartidos = Math.round((partidosStats.puntosPartidos + Number(resJ.puntosSugeridos || 0)) * 10) / 10;
+            evs.forEach(ev => {
+                const t = String(ev.tipo || "").toLowerCase();
+                if (t.includes("gol") || t.includes("try") || t.includes("triple") || t.includes("doble") || t.includes("punto") || t.includes("winner")) partidosStats.goles++;
+                else if (t.includes("asistencia") || t.includes("armado")) partidosStats.asistencias++;
+                else if (t.includes("quite") || t.includes("barrida") || t.includes("atajada") || t.includes("recuperaci") || t.includes("bloqueo")) partidosStats.quites++;
+                else if (t.includes("pérdida") || t.includes("perdida") || t.includes("error")) partidosStats.errores++;
+                else if (t.includes("tarjeta") || t.includes("exclusi")) partidosStats.tarjetas++;
+            });
+            partidosStats.detallePartidos.push({ partido: m, evs, resJ });
+        }
+    });
+
+    // Gimnasio, progresos y asimetrías
+    const evals = Array.isArray(p.evaluaciones) ? [...p.evaluaciones] : [];
+    const rutinas = (baseRutinas || []).filter(r =>
+        Number(r.personaId) === Number(p.id) ||
+        (r.esGrupal && r.deporteDestino === p.deporte && r.categoriaDestino === p.categoria)
+    );
+    const porEj = {};
+    evals.forEach(ev => {
+        if (!porEj[ev.ejercicio]) porEj[ev.ejercicio] = [];
+        porEj[ev.ejercicio].push(ev);
+    });
+    const progresosGym = [];
+    const alertasAsimetria = [];
+    Object.entries(porEj).forEach(([nomEj, lista]) => {
+        const ord = [...lista].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        const ult = ord[ord.length - 1];
+        if (ord.length >= 2) {
+            const ini = ord[0].valor;
+            const fin = ult.valor;
+            const esTiempo = ord[0].tipo === "tiempo_seg";
+            const pct = ini > 0 ? (esTiempo ? ((ini - fin) / ini) * 100 : ((fin - ini) / ini) * 100) : 0;
+            progresosGym.push({ ejercicio: nomEj, ini, fin, unidad: ult.unidad, pct: Math.round(pct * 10) / 10 });
+        }
+        const mAsim = String(ult.detalle || "").match(/Asimetría:\s*([\d.]+)%/i);
+        if (mAsim && parseFloat(mAsim[1]) > 12) {
+            alertasAsimetria.push({ ejercicio: nomEj, pct: parseFloat(mAsim[1]), detalle: ult.detalle });
+        }
+    });
+
+    // Asistencia y Clínico
+    const asist7d = typeof contarAsistenciasUltimos7Dias === "function" ? contarAsistenciasUltimos7Dias(p) : 0;
+    const pactado = p.frecuenciaSemanal || 3;
+    const clinicos = Array.isArray(p.clinico) ? [...p.clinico] : [];
+    const ultClin = clinicos.length ? clinicos[clinicos.length - 1] : null;
+
+    // Línea de tiempo unificada (todo lo que se movió alrededor del jugador)
+    const timeline = [];
+    (p.historialScore || []).forEach(h => {
+        timeline.push({
+            fecha: h.fecha,
+            tipo: "score",
+            icono: "⭐",
+            titulo: `Score: ${h.anterior} ➔ ${h.nuevo}/10 (${h.delta >= 0 ? "+" : ""}${h.delta})`,
+            detalle: `${h.origen} • ${h.motivo}`
+        });
+    });
+    partidosStats.detallePartidos.forEach(({ partido, evs, resJ }) => {
+        const resumenEvs = evs.map(e => `${e.minutoDisplay} ${e.tipo}`).join(" • ") || "Convocado/Participación";
+        timeline.push({
+            fecha: partido.fecha,
+            tipo: "partido",
+            icono: "⚽",
+            titulo: `Partido vs ${partido.rival} (${partido.resultado || "S/D"})${resJ ? ` [${resJ.puntosSugeridos >= 0 ? "+" : ""}${resJ.puntosSugeridos} pts]` : ""}`,
+            detalle: resumenEvs
+        });
+    });
+    evals.forEach(ev => {
+        timeline.push({
+            fecha: ev.fecha,
+            tipo: "gym",
+            icono: "🏋️",
+            titulo: `Test Físico: ${ev.ejercicio}`,
+            detalle: `${ev.detalle}${ev.nota ? ` — ${ev.nota}` : ""}`
+        });
+    });
+    clinicos.forEach(c => {
+        timeline.push({
+            fecha: c.fecha,
+            tipo: "clinico",
+            icono: "🏥",
+            titulo: `Control Clínico / Wellness (${c.peso} kg • RPE ${c.rpe || 5}/10)`,
+            detalle: `Sueño ${c.sueno || 5}/5 • ${c.dolor || "Sin molestias"}`
+        });
+    });
+    (p.devolucionesProfe || []).forEach(d => {
+        timeline.push({
+            fecha: d.fecha,
+            tipo: "score",
+            icono: "📩",
+            titulo: `Devolución enviada al jugador`,
+            detalle: d.resumenCorto || "Plan de mejora compartido por WhatsApp"
+        });
+    });
+    timeline.sort((a, b) => new Date(b.fecha || "2000-01-01") - new Date(a.fecha || "2000-01-01"));
+
+    // Diagnóstico automático: Fortalezas y Qué debe mejorar
+    const fortalezas = [];
+    const mejoras = [];
+
+    if (!esGym && p.pilares) {
+        const listaPilares = [
+            { k: "fisico", nom: "Condición Física", val: p.pilares.fisico, prom: promCat.fisico, tip: "reforzar trabajos aeróbicos, velocidad y resistencia intermitente" },
+            { k: "gym", nom: "Fuerza en Gimnasio", val: p.pilares.gym, prom: promCat.gym, tip: "cumplir las progresiones de fuerza y registrar cargas/1RM en sala" },
+            { k: "tecnico", nom: "Técnico / Táctico", val: p.pilares.tecnico, prom: promCat.tecnico, tip: "pulir controles orientados, perfilación y toma de decisiones en juego" },
+            { k: "actitud", nom: "Compromiso y Actitud", val: p.pilares.actitud, prom: promCat.actitud, tip: "sostener puntualidad, concentración e intensidad en toda la práctica" }
+        ];
+        const ordPil = [...listaPilares].sort((a, b) => b.val - a.val);
+
+        ordPil.forEach(pl => {
+            if (pl.val >= 8.2 || pl.val >= pl.prom + 0.5) {
+                fortalezas.push(`Destaca en ${pl.nom} (${pl.val}/10 vs promedio ${pl.prom} de ${p.categoria}).`);
+            }
+        });
+        const masDebil = ordPil[ordPil.length - 1];
+        if (masDebil.val < 8.0 || masDebil.val < masDebil.prom) {
+            mejoras.push(`Foco principal en ${masDebil.nom} (${masDebil.val}/10, prom. categoría ${masDebil.prom}): ${masDebil.tip}.`);
+        }
+        const segundoDebil = ordPil[ordPil.length - 2];
+        if (segundoDebil && segundoDebil.val < 7.5) {
+            mejoras.push(`Reforzar también ${segundoDebil.nom} (${segundoDebil.val}/10): ${segundoDebil.tip}.`);
+        }
+        if ((p.pilares.bonus || 0) < 0) {
+            mejoras.push(`Presenta descuento en Bonus (${p.pilares.bonus} pts): ${p.motivoPuntos || "revisar conducta/rendimiento reciente"}.`);
+        }
+    }
+
+    if (asist7d >= pactado) {
+        fortalezas.push(`Excelente constancia semanal: asistió ${asist7d} de ${pactado} días pactados.`);
+    } else {
+        mejoras.push(`Subir asistencia semanal: entrenó ${asist7d} de ${pactado} días pactados en los últimos 7 días.`);
+    }
+
+    if (partidosStats.goles > 0 || partidosStats.asistencias > 0 || partidosStats.quites > 0) {
+        fortalezas.push(`Aporte en partidos (${partidosStats.pj} PJ): ${partidosStats.goles} gol(es), ${partidosStats.asistencias} asistencia(s) y ${partidosStats.quites} recuperación(es).`);
+    }
+    if (partidosStats.errores > 0 || partidosStats.tarjetas > 0) {
+        mejoras.push(`En competencia: reducir errores/pérdidas (${partidosStats.errores}) y controlar faltas/tarjetas (${partidosStats.tarjetas}).`);
+    }
+
+    progresosGym.forEach(pr => {
+        if (pr.pct >= 5) fortalezas.push(`Progreso físico en ${pr.ejercicio}: +${pr.pct}% (de ${pr.ini} a ${pr.fin} ${pr.unidad}).`);
+        else if (pr.pct < 0) mejoras.push(`Retroceso en ${pr.ejercicio} (${pr.pct}%): revisar técnica, carga y descanso.`);
+    });
+    if (evals.length === 0) {
+        mejoras.push("Realizar evaluaciones base de fuerza/velocidad en gimnasio para medir evolución objetiva.");
+    }
+    alertasAsimetria.forEach(a => {
+        mejoras.push(`Corregir asimetría unilateral en ${a.ejercicio} (${a.pct}%): trabajar fuerza compensatoria en el lado más débil.`);
+    });
+
+    if (p.estadoMedico && p.estadoMedico !== "Óptimo") {
+        mejoras.push(`Priorizar readaptación médica (${p.estadoMedico}) respetando cargas sin dolor.`);
+    }
+    if (ultClin && Number(ultClin.rpe || 0) >= 8) {
+        mejoras.push(`Atención a fatiga alta (último RPE ${ultClin.rpe}/10): mejorar hidratación, movilidad y horas de sueño.`);
+    } else if (ultClin && Number(ultClin.sueno || 5) <= 2) {
+        mejoras.push(`Descanso bajo (${ultClin.sueno}/5): priorizar 8 hs de sueño para recuperar mejor.`);
+    }
+
+    if (fortalezas.length === 0) fortalezas.push("Mantiene base estable de trabajo; sostener el ritmo de entrenamientos.");
+    if (mejoras.length === 0) mejoras.push("Sostener el nivel actual y buscar nuevos récords personales (PR) en el próximo bloque.");
+
+    // Texto sugerido listo para WhatsApp
+    let licNombre = "el Club";
+    try {
+        const lic = JSON.parse(localStorage.getItem("cdm_licencia_config_v1") || "null");
+        if (lic && lic.nombreEntidad) licNombre = lic.nombreEntidad;
+    } catch {}
+
+    let msgWA = `📋 *DEVOLUCIÓN Y PLAN DE MEJORA — ${licNombre.toUpperCase()}*\n`;
+    msgWA += `👤 *Deportista:* ${p.nombre} ${p.apellido} (${esGym ? "Gimnasio" : `${p.deporte} ${p.categoria}`})\n`;
+    if (!esGym) {
+        msgWA += `⭐ *Score Actual:* ${p.puntosCategoria}/10${puestoRanking ? ` (Puesto #${puestoRanking}° de ${pares.length})` : ""}\n`;
+        msgWA += `📊 *Pilares:* Físico ${p.pilares.fisico} | Gym ${p.pilares.gym} | Técnico ${p.pilares.tecnico} | Actitud ${p.pilares.actitud}\n`;
+    }
+    msgWA += `📅 *Asistencia semanal:* ${asist7d}/${pactado} días\n`;
+    msgWA += `----------------------------------\n\n`;
+    msgWA += `✅ *LO QUE ESTÁS HACIENDO MUY BIEN:*\n`;
+    fortalezas.slice(0, 4).forEach(f => { msgWA += `• ${f}\n`; });
+    msgWA += `\n🎯 *EN QUÉ ENFOCARTE PARA MEJORAR:*\n`;
+    mejoras.slice(0, 4).forEach(m => { msgWA += `• ${m}\n`; });
+    msgWA += `\n💪 _¡Seguí metiéndole que se nota el trabajo! Cualquier duda lo charlamos en el próximo entrenamiento._`;
+
+    return {
+        esGym, pares, puestoRanking, promCat,
+        partidosStats, evals, rutinas, progresosGym, alertasAsimetria,
+        asist7d, pactado, ultClin, timeline, fortalezas, mejoras, msgWA
+    };
+}
+
+// =========================================================================
+// 32.3 MODAL COMPLETO PARA EL ADMIN (POR QUÉ EL PUNTAJE + ACTIVIDAD + WA)
+// =========================================================================
+
+window.abrirRadiografiaAdmin32 = function (idPersona, tabInicial = "resumen") {
+    if (document.body?.getAttribute("data-rol") === "usuario") return;
+    const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+    if (!p) return;
+
+    const an = analizarJugador360Admin32(p);
+    let modal = document.getElementById("modalRadiografiaAdmin32");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalRadiografiaAdmin32";
+        modal.className = "modal-backdrop";
+        document.body.appendChild(modal);
+    }
+
+    const pil = p.pilares || { fisico: 7, gym: 7, tecnico: 7, actitud: 7, bonus: 0 };
+    const filasPilares = an.esGym ? "" : [
+        { nom: "🏃 Condición Física (30%)", val: pil.fisico, peso: 0.30, prom: an.promCat.fisico, col: "#0284c7" },
+        { nom: "🏋️ Fuerza en Gimnasio (25%)", val: pil.gym, peso: 0.25, prom: an.promCat.gym, col: "#6366f1" },
+        { nom: "⚽ Técnico / Táctico (25%)", val: pil.tecnico, peso: 0.25, prom: an.promCat.tecnico, col: "#10b981" },
+        { nom: "🔥 Compromiso y Actitud (20%)", val: pil.actitud, peso: 0.20, prom: an.promCat.actitud, col: "#f59e0b" }
+    ].map(r => {
+        const aporte = (r.val * r.peso).toFixed(2);
+        const diff = Math.round((r.val - r.prom) * 10) / 10;
+        const diffTag = diff >= 0 ? `<span style="color:#059669;">+${diff} vs prom</span>` : `<span style="color:#dc2626;">${diff} vs prom</span>`;
+        return `
+            <div class="rad32-pilar-row">
+                <div class="rad32-pilar-head">
+                    <span><b>${r.nom}</b></span>
+                    <span><b>${r.val}/10</b> <small style="color:var(--ink-500);">(aporta ${aporte} pts • ${diffTag})</small></span>
+                </div>
+                <div class="rad32-bar-track">
+                    <div class="rad32-bar-fill" style="width:${Math.min(100, r.val * 10)}%; background:${r.col};"></div>
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:940px;">
+            <div class="modal-top">
+                <div>
+                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;">
+                        <span class="badge badge-purple">🧠 VISTA ADMIN / PROFE — RADIOGRAFÍA 360°</span>
+                        ${an.puestoRanking ? `<span class="badge badge-ok">🏆 Puesto #${an.puestoRanking}° de ${an.pares.length}</span>` : ""}
+                        ${!an.esGym ? `<span class="badge badge-celeste">⭐ Score ${p.puntosCategoria}/10</span>` : ""}
+                    </div>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">${p.apellido}, ${p.nombre} — ${p.puesto}</h3>
+                </div>
+                <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                    ${!an.esGym ? `<button type="button" class="btn btn-secondary btn-sm" onclick="calificarJugadorRapidoPrompt(${p.id}); setTimeout(()=>abrirRadiografiaAdmin32(${p.id}, '${tabInicial}'), 150);">⭐ Ajustar Score</button>` : ""}
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalRadiografiaAdmin32').classList.add('hidden')">✕</button>
+                </div>
+            </div>
+
+            <div class="rad32-tabs">
+                <button type="button" class="btn ${tabInicial === "resumen" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="abrirRadiografiaAdmin32(${p.id}, 'resumen')">📊 1. ¿Por qué este Puntaje?</button>
+                <button type="button" class="btn ${tabInicial === "movimientos" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="abrirRadiografiaAdmin32(${p.id}, 'movimientos')">🕒 2. Todo lo que se Movió (${an.timeline.length})</button>
+                <button type="button" class="btn ${tabInicial === "enviar" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="abrirRadiografiaAdmin32(${p.id}, 'enviar')">📲 3. Resumen y Mejoras para el Jugador</button>
+            </div>
+
+            ${tabInicial === "resumen" ? `
+                <div class="rad32-grid-2" style="margin-bottom:0.85rem;">
+                    <div class="rad32-card">
+                        <strong style="display:block; font-size:0.86rem; color:var(--ink-900); margin-bottom:0.65rem;">
+                            ${an.esGym ? "🏋️ Estado General del Socio" : "📐 Fórmula Exacta del Score (1 a 10)"}
+                        </strong>
+                        ${an.esGym ? `
+                            <div style="font-size:0.82rem; display:flex; flex-direction:column; gap:0.4rem;">
+                                <div>📅 <b>Asistencia 7 días:</b> ${an.asist7d}/${an.pactado} días (Total: ${p.asistencias.length})</div>
+                                <div>🏋️ <b>Tests registrados:</b> ${an.evals.length} marcas • <b>Rutinas activas:</b> ${an.rutinas.length}</div>
+                                <div>🏥 <b>Estado Médico:</b> ${p.estadoMedico || "Óptimo"}</div>
+                            </div>
+                        ` : `
+                            ${filasPilares}
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.45rem; border-top:1px dashed var(--line-strong); font-size:0.8rem;">
+                                <span><b>⭐ Bonus / Sanción Admin:</b></span>
+                                <span class="badge ${pil.bonus >= 0 ? "badge-ok" : "badge-danger"}">${pil.bonus >= 0 ? "+" : ""}${pil.bonus} pts</span>
+                            </div>
+                            <div style="margin-top:0.5rem; padding:0.5rem 0.65rem; background:var(--cdm-50); border-radius:10px; font-size:0.76rem; color:var(--ink-700);">
+                                <b>Último motivo cargado:</b> ${p.motivoPuntos || "Calificación inicial"}
+                            </div>
+                        `}
+                    </div>
+
+                    <div class="rad32-card">
+                        <strong style="display:block; font-size:0.86rem; color:var(--ink-900); margin-bottom:0.55rem;">🔍 Diagnóstico Automático del Rendimiento</strong>
+                        <div class="rad32-pill-list">
+                            ${an.fortalezas.slice(0, 3).map(f => `<div class="rad32-diag-item ok">✅ ${f}</div>`).join("")}
+                            ${an.mejoras.slice(0, 3).map(m => `<div class="rad32-diag-item warn">🎯 <b>A mejorar:</b> ${m}</div>`).join("")}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bento-kpis" style="margin-bottom:0.75rem;">
+                    <div class="bento-kpi"><div class="kpi-data"><span>⚽ Partidos / Goles / Asist.</span><strong>${an.partidosStats.pj} PJ • ${an.partidosStats.goles}G • ${an.partidosStats.asistencias}A</strong></div></div>
+                    <div class="bento-kpi"><div class="kpi-data"><span>🛡️ Quites / Errores / Tarj.</span><strong>${an.partidosStats.quites}Q • ${an.partidosStats.errores}E • ${an.partidosStats.tarjetas}T</strong></div></div>
+                    <div class="bento-kpi"><div class="kpi-data"><span>🏋️ Tests / Rutinas</span><strong>${an.evals.length} marcas • ${an.rutinas.length} rut.</strong></div></div>
+                    <div class="bento-kpi"><div class="kpi-data"><span>📅 Asist. 7d / Salud</span><strong>${an.asist7d}/${an.pactado}d • ${p.estadoMedico === "Óptimo" ? "🟢 Apto" : "⚠️ " + p.estadoMedico}</strong></div></div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end;">
+                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="abrirRadiografiaAdmin32(${p.id}, 'enviar')">
+                        <i class="ri-whatsapp-line"></i> Preparar y Enviar Resumen de Mejoras al Jugador →
+                    </button>
+                </div>
+            ` : tabInicial === "movimientos" ? `
+                <div class="rad32-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; flex-wrap:wrap; gap:0.4rem;">
+                        <strong style="font-size:0.86rem; color:var(--ink-900);">🕒 Historial Completo de Actividad (Score, Partidos, Gimnasio y Clínico)</strong>
+                        <small style="color:var(--ink-500);">Ordenado de lo más reciente a lo más antiguo</small>
+                    </div>
+                    <div class="rad32-timeline">
+                        ${an.timeline.length === 0
+                            ? `<div class="empty-box" style="padding:1.2rem;">Todavía no hay movimientos registrados para este jugador.</div>`
+                            : an.timeline.map(it => `
+                                <div class="rad32-tl-item tl-${it.tipo}">
+                                    <span style="font-size:1.1rem; line-height:1;">${it.icono}</span>
+                                    <div style="min-width:0; flex:1;">
+                                        <div style="display:flex; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
+                                            <strong style="color:var(--ink-900);">${it.titulo}</strong>
+                                            <small style="color:var(--ink-500); font-weight:700;">📅 ${it.fecha || "-"}</small>
+                                        </div>
+                                        <div style="color:var(--ink-600); margin-top:2px;">${it.detalle}</div>
+                                    </div>
+                                </div>
+                            `).join("")}
+                    </div>
+                </div>
+            ` : `
+                <div class="rad32-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.55rem; flex-wrap:wrap; gap:0.4rem;">
+                        <div>
+                            <strong style="font-size:0.88rem; color:var(--ink-900); display:block;">📲 Resumen Personalizado para ${p.nombre} ${p.apellido}</strong>
+                            <small style="color:var(--ink-500);">Armado automáticamente con sus datos reales. Podés editar cualquier línea antes de enviarlo.</small>
+                        </div>
+                        <span class="badge badge-celeste">📱 ${p.whatsapp || "Sin teléfono cargado"}</span>
+                    </div>
+
+                    <textarea id="txtResumenMejoraWA32" rows="12" style="width:100%; font-family:inherit; font-size:0.83rem; line-height:1.45; margin-bottom:0.75rem;">${an.msgWA}</textarea>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="copiarResumenMejora32(${p.id})">📋 Copiar Texto</button>
+                        <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="guardarDevolucionEnFicha32(${p.id}, false)">💾 Solo Guardar en Historial</button>
+                            <button type="button" class="btn btn-whatsapp btn-sm" onclick="guardarDevolucionEnFicha32(${p.id}, true)">
+                                <i class="ri-whatsapp-line"></i> Guardar y Enviar por WhatsApp
+                            </button>
+                        </div>
+                    </div>
+
+                    ${(p.devolucionesProfe || []).length > 0 ? `
+                        <div style="margin-top:0.85rem; padding-top:0.7rem; border-top:1px solid var(--line);">
+                            <strong style="font-size:0.78rem; color:var(--ink-700); display:block; margin-bottom:0.4rem;">📩 Devoluciones anteriores enviadas (${p.devolucionesProfe.length}):</strong>
+                            <div style="max-height:110px; overflow-y:auto; display:flex; flex-direction:column; gap:0.35rem;">
+                                ${p.devolucionesProfe.slice(0, 5).map(d => `
+                                    <div style="font-size:0.74rem; padding:0.4rem 0.6rem; background:var(--surface-subtle); border-radius:8px; border:1px solid var(--line);">
+                                        <b>📅 ${d.fecha}</b> (Score ${d.scoreMomento || "-"}/10) — ${d.resumenCorto}
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    ` : ""}
+                </div>
+            `}
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.copiarResumenMejora32 = function () {
+    const txt = document.getElementById("txtResumenMejoraWA32")?.value || "";
+    if (!txt) return;
+    navigator.clipboard.writeText(txt).then(() => {
+        if (typeof mostrarToast === "function") mostrarToast("📋 Resumen de mejora copiado.");
+    });
+};
+
+window.guardarDevolucionEnFicha32 = function (idPersona, abrirWA = true) {
+    const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+    const txt = (document.getElementById("txtResumenMejoraWA32")?.value || "").trim();
+    if (!p || !txt) return;
+
+    if (!Array.isArray(p.devolucionesProfe)) p.devolucionesProfe = [];
+    const lineaFoco = txt.split("\n").find(l => l.startsWith("• ")) || "Devolución integral enviada";
+    p.devolucionesProfe.unshift({
+        id: Date.now(),
+        fecha: typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0],
+        scoreMomento: p.puntosCategoria,
+        resumenCorto: lineaFoco.replace(/^•\s*/, "").slice(0, 120),
+        textoCompleto: txt
+    });
+    if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+
+    if (abrirWA) {
+        const tel = String(p.whatsapp || "").replace(/\D/g, "");
+        const url = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(txt)}` : `https://wa.me/?text=${encodeURIComponent(txt)}`;
+        window.open(url, "_blank");
+    }
+    if (typeof mostrarToast === "function") mostrarToast("📩 Devolución registrada en el historial del jugador.");
+    abrirRadiografiaAdmin32(p.id, "enviar");
+};
+
+// =========================================================================
+// 32.4 INYECCIÓN EN JUGADOR.HTML (PESTAÑA 360°) + CONEXIÓN AL RANKING
+// =========================================================================
+
+function inyectarPanelAdminEnJugador32() {
+    if (document.body?.dataset.page !== "perfil-individual") return;
+    if (document.body?.getAttribute("data-rol") === "usuario") return;
+    if (typeof obtenerJugadorActualPorURL !== "function") return;
+
+    const p = obtenerJugadorActualPorURL();
+    if (!p) return;
+
+    const an = analizarJugador360Admin32(p);
+    const primeraSec = document.querySelector(".jug-seccion");
+    if (!primeraSec) return;
+
+    let panel = document.getElementById("panelAdminRadiografia32");
+    if (!panel) {
+        panel = document.createElement("div");
+        panel.id = "panelAdminRadiografia32";
+        panel.className = "rad32-panel solo-admin-32";
+        primeraSec.prepend(panel);
+    }
+
+    panel.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.65rem; margin-bottom:0.75rem;">
+            <div>
+                <span class="badge badge-purple">🧠 PANEL DEL PROFE — POR QUÉ ESTE PUNTAJE Y QUÉ MEJORAR</span>
+                <h3 style="font-size:1.02rem; font-weight:800; color:var(--ink-900); margin:4px 0 0;">
+                    ${an.esGym
+                        ? `Seguimiento Integral Gym • Asistencia ${an.asist7d}/${an.pactado}d • ${an.evals.length} tests`
+                        : `Score ${p.puntosCategoria}/10 ${an.puestoRanking ? `(Puesto #${an.puestoRanking}° de ${an.pares.length})` : ""} • ${an.partidosStats.pj} PJ (${an.partidosStats.goles}G / ${an.partidosStats.asistencias}A) • ${an.evals.length} tests`}
+                </h3>
+            </div>
+            <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="abrirRadiografiaAdmin32(${p.id}, 'movimientos')">🕒 Ver Todo lo Movido (${an.timeline.length})</button>
+                <button type="button" class="btn btn-whatsapp btn-sm" onclick="abrirRadiografiaAdmin32(${p.id}, 'enviar')"><i class="ri-whatsapp-line"></i> Enviar Plan de Mejora</button>
+            </div>
+        </div>
+
+        <div class="rad32-grid-2">
+            <div class="rad32-card" style="padding:0.75rem;">
+                <strong style="font-size:0.79rem; color:#059669; display:block; margin-bottom:0.35rem;">✅ Fortalezas detectadas</strong>
+                <div class="rad32-pill-list">
+                    ${an.fortalezas.slice(0, 2).map(f => `<div class="rad32-diag-item ok">${f}</div>`).join("")}
+                </div>
+            </div>
+            <div class="rad32-card" style="padding:0.75rem;">
+                <strong style="font-size:0.79rem; color:#b45309; display:block; margin-bottom:0.35rem;">🎯 Qué debería mejorar (foco sugerido)</strong>
+                <div class="rad32-pill-list">
+                    ${an.mejoras.slice(0, 2).map(m => `<div class="rad32-diag-item warn">${m}</div>`).join("")}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Conectar el botón "🔍 Ver Evaluación" del Apartado 31 directo a la nueva Radiografía Admin 32
+window.abrirDetalleEvaluacionCompleta31 = function (idPersona) {
+    window.abrirRadiografiaAdmin32(idPersona, "resumen");
+};
+
+if (typeof inicializarPaginaJugadorIndividual === "function" && !window.__jugador32Wrapped) {
+    window.__jugador32Wrapped = true;
+    const _origInitJug32 = inicializarPaginaJugadorIndividual;
+    inicializarPaginaJugadorIndividual = function () {
+        _origInitJug32.apply(this, arguments);
+        setTimeout(inyectarPanelAdminEnJugador32, 35);
+    };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(inyectarPanelAdminEnJugador32, 220);
+});
+// =========================================================================
+// 33. REORGANIZACIÓN GLOBAL RESPONSIVE + MENÚ HAMBURGUESA UNIVERSAL (TODAS LAS PÁGINAS)
+//     + FICHA DEL JUGADOR UNIFICADA (SCORE + PROGRESIÓN FÍSICA + SALUD Y PESO)
+//     + JERARQUÍA LIMPIA DE CAPAS (MODALES SIEMPRE AL FRENTE)
+// Reemplaza al Apartado 33 y al Parche 33.6 anteriores al final de app.js
+// =========================================================================
+
+(function inyectarCSSGlobalResponsiveYReorg33() {
+    document.getElementById("cdmFixCapasMenu33")?.remove();
+    document.getElementById("cdmCssFichaLimpia33")?.remove();
+    if (document.getElementById("cdmCssReorgGlobal33")) return;
+
+    const st = document.createElement("style");
+    st.id = "cdmCssReorgGlobal33";
+    st.textContent = `
+        /* =================================================================
+           1. JERARQUÍA ESTRICTA DE CAPAS (MODALES SIEMPRE ARRIBA DE TODO)
+           ================================================================= */
+        .app-topbar {
+            position: sticky;
+            top: 0;
+            z-index: 90 !important;
+            overflow: visible !important;
+        }
+        #fichaCabeceraJugador {
+            position: relative !important;
+            z-index: 40 !important;
+            overflow: visible !important;
+        }
+        .module-tabs {
+            position: relative !important;
+            z-index: 15 !important;
+        }
+        .jug-seccion, .dep-seccion, .gym-seccion {
+            position: relative !important;
+            z-index: 1 !important;
+        }
+        .menu33-dropdown {
+            z-index: 500 !important;
+        }
+        #cdmFloatingDropletClock {
+            z-index: 1400 !important;
+        }
+        /* TODOS LOS MODALES POR ENCIMA DE TOPBAR, CABECERA, SIDEBAR Y MENÚS */
+        .modal-backdrop {
+            z-index: 10050 !important;
+            padding: 0.85rem !important;
+            overflow-y: auto !important;
+        }
+        .modal-window {
+            max-height: 92vh !important;
+            overflow-y: auto !important;
+            width: min(96vw, 680px);
+            margin: auto !important;
+        }
+        .toast-container {
+            z-index: 10200 !important;
+        }
+
+        /* =================================================================
+           2. RESPONSIVE REAL EN TODAS LAS PANTALLAS (PC, TABLET Y CELULAR)
+           ================================================================= */
+        html, body {
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
+        .app-main, .app-content, .app-panel, .split-view > *, .split-equal > * {
+            min-width: 0;
+        }
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .chart-canvas-box {
+            width: 100%;
+            max-width: 100%;
+            min-height: 240px;
+            position: relative;
+        }
+
+        /* Botón hamburguesa del menú lateral (solo visible en Tablet/Celular <= 1024px) */
+        #btnMobileSidebar33 {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            padding: 0 !important;
+            border-radius: 10px;
+            flex-shrink: 0;
+            font-size: 1.2rem;
+        }
+        #cdmSidebarBackdrop33 {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.56);
+            backdrop-filter: blur(3px);
+            z-index: 1990;
+        }
+        body.sidebar-mobile-open-33 #cdmSidebarBackdrop33 {
+            display: block;
+        }
+
+        @media (max-width: 1024px) {
+            #btnMobileSidebar33 {
+                display: inline-flex !important;
+            }
+            .app-sidebar {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                bottom: 0 !important;
+                width: min(275px, 84vw) !important;
+                z-index: 2000 !important;
+                transform: translateX(-105%) !important;
+                transition: transform 0.24s ease !important;
+                overflow-y: auto !important;
+            }
+            body.sidebar-mobile-open-33 .app-sidebar {
+                transform: translateX(0) !important;
+            }
+            .app-main {
+                margin-left: 0 !important;
+                width: 100% !important;
+            }
+            .split-view, .split-equal, .hub33-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .app-topbar {
+                padding: 0.65rem 0.85rem !important;
+                gap: 0.5rem !important;
+            }
+            .topbar-subtitle {
+                display: none !important;
+            }
+            .topbar-title h2 {
+                font-size: 1rem !important;
+            }
+            .app-content {
+                padding: 0.85rem !important;
+            }
+            .app-panel {
+                padding: 0.9rem !important;
+            }
+            .grid-2, .grid-3, .grid-4 {
+                grid-template-columns: 1fr !important;
+            }
+            .bento-kpis {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 0.6rem !important;
+            }
+            .module-tabs {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+                gap: 0.35rem !important;
+            }
+            .module-tabs .mod-tab {
+                padding: 0.55rem 0.45rem !important;
+                font-size: 0.76rem !important;
+            }
+            .cab33-row {
+                flex-direction: column;
+                align-items: stretch !important;
+            }
+            .cab33-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .modal-window {
+                padding: 1rem !important;
+            }
+        }
+
+        /* =================================================================
+           3. MENÚ HAMBURGUESA GLOBAL EN TOPBAR Y MENÚ ⋯ EN CABECERA
+           ================================================================= */
+        .menu33-wrap {
+            position: relative;
+            display: inline-flex;
+        }
+        .menu33-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: min(295px, 90vw);
+            max-height: 74vh;
+            overflow-y: auto;
+            background: var(--surface-solid, #ffffff);
+            color: var(--ink-900, #0f172a);
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            border-radius: 16px;
+            padding: 0.55rem;
+            box-shadow: 0 22px 50px rgba(2, 6, 23, 0.28);
+            display: none;
+            flex-direction: column;
+            gap: 0.3rem;
+            text-align: left;
+        }
+        .menu33-dropdown.open {
+            display: flex !important;
+        }
+        .menu33-section-lbl {
+            font-size: 0.64rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--ink-500, #64748b);
+            padding: 0.32rem 0.45rem 0.1rem;
+        }
+        .menu33-item {
+            width: 100%;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--ink-900, #0f172a);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.48rem 0.65rem;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            text-align: left;
+            transition: background 0.14s ease;
+        }
+        .menu33-item:hover {
+            background: var(--surface-subtle, #f1f5f9);
+            border-color: var(--line, #e2e8f0);
+        }
+        .menu33-divider {
+            height: 1px;
+            background: var(--line, #e2e8f0);
+            margin: 0.22rem 0;
+        }
+        .topbar-drop33 .btn {
+            width: 100% !important;
+            justify-content: flex-start !important;
+            border-radius: 10px !important;
+            margin: 0 !important;
+            min-height: 36px !important;
+        }
+        .menu33-dropdown select {
+            display: block !important;
+            width: 100% !important;
+            background: #f8fafc !important;
+            color: #0f172a !important;
+            border: 1.5px solid #cbd5e1 !important;
+            border-radius: 9px !important;
+            padding: 0.35rem 0.6rem !important;
+        }
+        body[data-theme="dark"] .menu33-dropdown {
+            background: #0f172a !important;
+            border-color: rgba(148, 163, 184, 0.32) !important;
+        }
+        body[data-theme="dark"] .menu33-dropdown .menu33-item {
+            color: #f1f5f9 !important;
+        }
+        body[data-theme="dark"] .menu33-dropdown select {
+            background: #1e293b !important;
+            color: #f8fafc !important;
+            border-color: rgba(148, 163, 184, 0.35) !important;
+        }
+
+        /* =================================================================
+           4. FICHA UNIFICADA DEL JUGADOR (CLEAN ADMIN HUB)
+           ================================================================= */
+        body.ficha-limpia-33 #adminBoxCodigoFicha,
+        body.ficha-limpia-33 #panelAdminRadiografia32,
+        body.ficha-limpia-33 #chipsEjerciciosActivosJugador,
+        body.ficha-limpia-33 #btnGuardarEjercicioNuevoLista,
+        body.ficha-limpia-33 #fichaCabeceraJugador button[onclick*="Story"],
+        body.ficha-limpia-33 #fichaCabeceraJugador button[onclick*="story"],
+        body.ficha-limpia-33 #fichaCabeceraJugador button[onclick*="Flyer"] {
+            display: none !important;
+        }
+
+        .cab33-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.9rem;
+            flex-wrap: wrap;
+        }
+        .cab33-id {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            min-width: 0;
+        }
+        .cab33-name {
+            font-size: 1.35rem;
+            font-weight: 900;
+            margin: 0;
+            line-height: 1.2;
+        }
+        .cab33-sub {
+            font-size: 0.81rem;
+            opacity: 0.88;
+            margin-top: 2px;
+            display: block;
+        }
+        .cab33-chips {
+            display: flex;
+            gap: 0.38rem;
+            flex-wrap: wrap;
+            margin-top: 0.42rem;
+            align-items: center;
+        }
+        .cab33-code-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #ffffff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 0.2rem 0.62rem;
+            border-radius: 999px;
+            cursor: pointer;
+        }
+        .cab33-actions {
+            display: flex;
+            gap: 0.42rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* Hub Unificado: Izquierda (Carga) + Derecha (Gráficos e Historial) */
+        .hub33-grid {
+            display: grid;
+            grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+            gap: 1.15rem;
+            align-items: start;
+        }
+        .hub33-subtabs {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.32rem;
+            background: var(--surface-subtle, #f1f5f9);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            border-radius: 13px;
+            padding: 4px;
+            margin-bottom: 0.9rem;
+        }
+        .hub33-subtab-btn {
+            border: none;
+            background: transparent;
+            color: var(--ink-700, #334155);
+            font-size: 0.74rem;
+            font-weight: 800;
+            padding: 0.5rem 0.35rem;
+            border-radius: 9px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .hub33-subtab-btn:hover {
+            background: rgba(2, 132, 199, 0.08);
+        }
+        .hub33-subtab-btn.active {
+            background: #0284c7;
+            color: #ffffff;
+            box-shadow: 0 3px 10px rgba(2, 132, 199, 0.32);
+        }
+
+        .eval33-score-hero {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.8rem;
+            background: linear-gradient(135deg, #0c192c 0%, #0369a1 100%);
+            color: #ffffff;
+            border-radius: 14px;
+            padding: 0.85rem 1rem;
+            margin-bottom: 0.8rem;
+        }
+        .eval33-score-num {
+            font-size: 1.9rem;
+            font-weight: 900;
+            color: #38bdf8;
+            line-height: 1;
+        }
+        .eval33-slider-box {
+            background: var(--surface-subtle, #f8fafc);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            border-radius: 12px;
+            padding: 0.55rem 0.78rem;
+            margin-bottom: 0.52rem;
+        }
+        .eval33-slider-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            margin-bottom: 0.25rem;
+        }
+        .eval33-slider-val {
+            font-weight: 900;
+            font-size: 0.88rem;
+            color: var(--cdm-700, #0369a1);
+        }
+        .eval33-range {
+            width: 100%;
+            min-height: 20px !important;
+            accent-color: #0284c7;
+            cursor: pointer;
+        }
+
+        .prog33-type-pills {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+            gap: 0.32rem;
+            margin-bottom: 0.7rem;
+        }
+        .prog33-type-btn {
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            background: var(--surface-subtle, #f8fafc);
+            color: var(--ink-800, #1e293b);
+            border-radius: 10px;
+            padding: 0.42rem 0.3rem;
+            font-size: 0.71rem;
+            font-weight: 800;
+            cursor: pointer;
+            text-align: center;
+        }
+        .prog33-type-btn.active {
+            background: #0284c7;
+            border-color: #0284c7;
+            color: #ffffff;
+        }
+        .prog33-last-badge {
+            background: rgba(2, 132, 199, 0.08);
+            border: 1px solid var(--line-celeste, #bae6fd);
+            border-radius: 10px;
+            padding: 0.45rem 0.65rem;
+            font-size: 0.74rem;
+            color: var(--ink-800, #1e293b);
+            margin-top: 0.4rem;
+        }
+    `;
+    document.head.appendChild(st);
+})();
+
+// =========================================================================
+// 33.1 MENÚ HAMBURGUESA GLOBAL (SIN BUCLE DOM) + DRAWER MÓVIL SIDEBAR
+//      - AFUERA DEL MENÚ: + Nueva Persona, Modo Noche, Notas, Cambiar Comercio, Módulos y Salir
+//      - ADENTRO DE ☰ MENÚ: Buscador Rápido (Ctrl+K), Códigos, Rutinas Club y Exportar PDF
+// =========================================================================
+
+document.addEventListener("click", (e) => {
+    if (!e.target.closest(".menu33-wrap") && !e.target.closest("#topbarMenuDrop33")) {
+        document.querySelectorAll(".menu33-dropdown.open").forEach(d => d.classList.remove("open"));
+    }
+});
+
+window.addEventListener("resize", () => {
+    document.querySelectorAll(".menu33-dropdown.open").forEach(d => d.classList.remove("open"));
+});
+
+window.alternarMenu33 = function (idDropdown, ev) {
+    if (ev) ev.stopPropagation();
+    const target = document.getElementById(idDropdown);
+    if (!target) return;
+
+    const estabaAbierto = target.classList.contains("open");
+    document.querySelectorAll(".menu33-dropdown.open").forEach(d => d.classList.remove("open"));
+
+    if (!estabaAbierto) {
+        // Si es el desplegable global de la topbar (montado en body), posicionarlo debajo del botón
+        if (idDropdown === "topbarMenuDrop33") {
+            const btn = document.getElementById("btnTopbarHamburguesa33");
+            if (btn) {
+                const r = btn.getBoundingClientRect();
+                target.style.position = "fixed";
+                target.style.top = `${Math.round(r.bottom + 8)}px`;
+                target.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
+                target.style.left = "auto";
+                target.style.zIndex = "99999";
+            }
+        }
+        target.classList.add("open");
+    }
+};
+
+window.alternarSidebarMovil33 = function (forzarCerrar = false) {
+    if (forzarCerrar) document.body.classList.remove("sidebar-mobile-open-33");
+    else document.body.classList.toggle("sidebar-mobile-open-33");
+};
+
+function configurarSidebarMovilGlobal33() {
+    if (document.body?.classList.contains("login-page") || document.body?.getAttribute("data-rol") === "usuario") return;
+    const sidebar = document.querySelector(".app-sidebar");
+    const topLeft = document.querySelector(".app-topbar .topbar-left");
+    if (!sidebar || !topLeft) return;
+
+    if (!document.getElementById("cdmSidebarBackdrop33")) {
+        const bd = document.createElement("div");
+        bd.id = "cdmSidebarBackdrop33";
+        bd.onclick = () => alternarSidebarMovil33(true);
+        document.body.appendChild(bd);
+    }
+
+    if (!document.getElementById("btnMobileSidebar33")) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "btnMobileSidebar33";
+        btn.className = "btn btn-ghost btn-sm";
+        btn.title = "Abrir menú de navegación";
+        btn.innerHTML = `<i class="ri-menu-2-line"></i>`;
+        btn.onclick = () => alternarSidebarMovil33(false);
+        topLeft.prepend(btn);
+    }
+
+    sidebar.querySelectorAll("a, button").forEach(el => {
+        if (!el.dataset.closeDrawer33) {
+            el.dataset.closeDrawer33 = "1";
+            el.addEventListener("click", () => alternarSidebarMovil33(true));
+        }
+    });
+}
+
+function esBotonVisibleAfueraTopbar33(btn) {
+    if (!btn) return true;
+    const id = (btn.id || "").toLowerCase();
+    const onclk = (btn.getAttribute("onclick") || "").toLowerCase();
+    const txt = (btn.innerText || "").toLowerCase();
+
+    return (
+        // + Nueva Persona / + Nuevo Jugador / + Nuevo Socio
+        onclk.includes("abrirmodalpersona") ||
+        onclk.includes("abrirmodaljugador") ||
+        // Modo Noche / Modo Día
+        id === "btntoggletemacdm" ||
+        btn.classList.contains("btn-theme-toggle") ||
+        onclk.includes("alternartemavisualcdm") ||
+        // Notas Rápidas
+        id.includes("notas") ||
+        onclk.includes("notasrapidas") ||
+        txt.includes("notas") ||
+        // Cambiar Comercio
+        onclk.includes("login.html?hub=1") ||
+        txt.includes("cambiar comercio") ||
+        // Módulos
+        onclk.includes("abrirmodalsuperadmincdm") ||
+        txt.includes("módulos") ||
+        txt.includes("modulos") ||
+        // Salir
+        onclk.includes("cerrarsesioncdm")
+    );
+}
+
+let _obsTopbar33 = null;
+
+function compactarTopbarGlobalEnHamburguesa33() {
+    if (document.body?.classList.contains("login-page") || document.body?.getAttribute("data-rol") === "usuario") return;
+    const topRight = document.querySelector(".app-topbar .topbar-right") || document.querySelector(".app-topbar .topbar-actions");
+    if (!topRight) return;
+
+    // Pausar el observador mientras acomodamos botones para evitar bucles
+    if (_obsTopbar33) _obsTopbar33.disconnect();
+
+    let wrap = document.getElementById("topbarMenuWrap33");
+    if (!wrap) {
+        wrap = document.createElement("div");
+        wrap.id = "topbarMenuWrap33";
+        wrap.className = "menu33-wrap";
+        wrap.innerHTML = `
+            <button type="button" id="btnTopbarHamburguesa33" class="btn btn-secondary btn-sm" onclick="alternarMenu33('topbarMenuDrop33', event)" title="Más herramientas del sistema">
+                <i class="ri-menu-line"></i><span>Más</span>
+            </button>
+        `;
+        topRight.appendChild(wrap);
+    }
+
+    // Montar el desplegable directo en <body> para que nada lo recorte ni tape
+    let drop = document.getElementById("topbarMenuDrop33");
+    if (!drop) {
+        drop = document.createElement("div");
+        drop.id = "topbarMenuDrop33";
+        drop.className = "menu33-dropdown topbar-drop33";
+        drop.innerHTML = `
+            <div class="menu33-section-lbl">Herramientas Técnicas</div>
+            <div id="topbarDropItems33" style="display:flex; flex-direction:column; gap:0.32rem;"></div>
+        `;
+        drop.addEventListener("click", (e) => {
+            if (e.target.closest("button")) {
+                setTimeout(() => drop.classList.remove("open"), 40);
+            }
+        });
+        document.body.appendChild(drop);
+    }
+
+    const bucket = document.getElementById("topbarDropItems33") || drop;
+
+    // Mover adentro del menú SOLO los botones secundarios (Códigos, Rutinas Club, Exportar PDF, etc.)
+    const botonesSecundarios = Array.from(topRight.querySelectorAll("button")).filter(btn => {
+        if (btn.closest("#topbarMenuWrap33")) return false;
+        return !esBotonVisibleAfueraTopbar33(btn);
+    });
+
+    botonesSecundarios.forEach(btn => {
+        if (btn.parentElement !== bucket) {
+            bucket.appendChild(btn);
+        }
+    });
+
+    // Sumar Buscador Rápido (Ctrl+K) dentro del menú
+    if (typeof abrirBuscadorUniversal27 === "function" && !document.getElementById("btnDropSpotlight33")) {
+        const bBusq = document.createElement("button");
+        bBusq.type = "button";
+        bBusq.id = "btnDropSpotlight33";
+        bBusq.className = "btn btn-ghost btn-sm";
+        bBusq.onclick = abrirBuscadorUniversal27;
+        bBusq.innerHTML = `<i class="ri-search-2-line"></i><span>Buscador Rápido (Ctrl+K)</span>`;
+        bucket.prepend(bBusq);
+    }
+
+    // Mantener visible #cdmBarraSesionActiva si tiene botones afuera (Modo Noche, Cambiar Comercio, Módulos, Salir)
+    const barraSes = document.getElementById("cdmBarraSesionActiva");
+    if (barraSes) {
+        barraSes.style.display = barraSes.querySelectorAll("button").length > 0 ? "flex" : "none";
+        // Ubicar el botón "☰ Más" justo antes de "Salir" para que quede ordenado
+        const btnSalir = barraSes.querySelector('button[onclick*="cerrarSesionCDM"]');
+        if (btnSalir && wrap.nextElementSibling !== btnSalir) {
+            barraSes.insertBefore(wrap, btnSalir);
+        }
+    }
+
+    // Reconectar observador limpio
+    if (_obsTopbar33) {
+        _obsTopbar33.observe(topRight, { childList: true, subtree: true });
+    }
+}
+
+function iniciarObservadorTopbar33() {
+    const topRight = document.querySelector(".app-topbar .topbar-right") || document.querySelector(".app-topbar .topbar-actions");
+    if (!topRight || _obsTopbar33) return;
+    let timer = null;
+    _obsTopbar33 = new MutationObserver(() => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(compactarTopbarGlobalEnHamburguesa33, 80);
+    });
+    _obsTopbar33.observe(topRight, { childList: true, subtree: true });
+}
+// =========================================================================
+// 33.2 FICHA DEL JUGADOR: CABECERA LIMPIA + CONTROL INTEGRAL UNIFICADO
+// =========================================================================
+
+function esAdminEnFichaJugador33() {
+    if (document.body?.dataset.page !== "perfil-individual") return false;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("modo") === "paciente" || params.get("pac")) return false;
+    if (document.body.getAttribute("data-rol") === "usuario") return false;
+    if (document.body.getAttribute("data-modo-portal") === "paciente") return false;
+    return true;
+}
+
+function renderizarCabeceraLimpia33(p) {
+    const contCab = document.getElementById("fichaCabeceraJugador");
+    if (!contCab || !p) return;
+
+    const hoy = obtenerHoyISO();
+    const presenteHoy = Array.isArray(p.asistencias) && p.asistencias.includes(hoy);
+    const fueSem = typeof contarAsistenciasUltimos7Dias === "function" ? contarAsistenciasUltimos7Dias(p) : 0;
+    const pactado = p.frecuenciaSemanal || 3;
+    const esGym = p.deporte === "Gimnasio";
+    const alDia = (p.pagoEstado || "Al Día") === "Al Día";
+    const modoVistaEf = typeof obtenerNivelVistaRutinaEfectivoCDM === "function" ? obtenerNivelVistaRutinaEfectivoCDM(p) : "simple";
+    const autoOn = Boolean(p.puedeCrearRutinas);
+
+    const companeros = (basePersonas || []).filter(x => x && x.activo && x.deporte === p.deporte && (esGym || x.categoria === p.categoria));
+    const opcComp = companeros.map(c => `<option value="${c.id}" ${c.id === p.id ? "selected" : ""}>${c.apellido}, ${c.nombre}</option>`).join("");
+
+    contCab.innerHTML = `
+        <div class="cab33-row">
+            <div class="cab33-id">
+                ${renderAvatarPersonaCDM(p, 58, "1.2rem", true)}
+                <div style="min-width:0;">
+                    <h2 class="cab33-name">${p.nombre} ${p.apellido}</h2>
+                    <span class="cab33-sub">
+                        ${esGym ? "🏋️ Gimnasio" : `${p.deporte} • ${p.categoria}`} • ${p.puesto} • ${p.peso} kg / ${p.altura} cm
+                    </span>
+                    <div class="cab33-chips">
+                        ${!esGym ? `<span id="cab33ScoreBadge" class="badge badge-purple" style="font-size:0.73rem;">⭐ Score ${p.puntosCategoria} / 10</span>` : ""}
+                        <span class="badge ${fueSem < pactado ? "badge-warn" : "badge-ok"}" style="font-size:0.71rem;">📅 ${fueSem}/${pactado} días</span>
+                        <span class="badge ${p.estadoMedico && p.estadoMedico !== "Óptimo" ? "badge-danger" : "badge-ok"}" style="font-size:0.71rem;">${p.estadoMedico && p.estadoMedico !== "Óptimo" ? "🏥 " + p.estadoMedico : "🟢 Apto"}</span>
+                        <span class="cab33-code-pill" onclick="copiarCodigoAlPortapapelesCDM('${p.codigoAcceso}')" title="Copiar código personal">
+                            🔑 ${p.codigoAcceso}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cab33-actions">
+                <button type="button" class="btn ${presenteHoy ? "btn-ok" : "btn-primary"} btn-sm" onclick="toggleAsistenciaEnFicha(${p.id}, '${hoy}')">
+                    ${presenteHoy ? "✓ Presente" : "✓ Marcar Presente"}
+                </button>
+                <button type="button" class="btn btn-whatsapp btn-sm" onclick="abrirRadiografiaAdmin32(${p.id}, 'enviar')">
+                    <i class="ri-whatsapp-line"></i> Enviar Mejora
+                </button>
+
+                <div class="menu33-wrap">
+                    <button type="button" class="btn btn-secondary btn-sm" style="min-width:40px; font-weight:900; font-size:1rem;" onclick="alternarMenu33('cab33DropMenu', event)" title="Más opciones del jugador">
+                        ⋯
+                    </button>
+                    <div id="cab33DropMenu" class="menu33-dropdown" onclick="event.stopPropagation();">
+                        <div class="menu33-section-lbl">Cambiar de Jugador (${esGym ? "Gym" : p.categoria})</div>
+                        <div style="padding:0 0.3rem 0.25rem;">
+                            <select onchange="irAPaginaIndividual(this.value)">${opcComp}</select>
+                        </div>
+
+                        <div class="menu33-divider"></div>
+                        <div class="menu33-section-lbl">Ficha y Acciones</div>
+                        <button type="button" class="menu33-item" onclick="document.getElementById('cab33DropMenu').classList.remove('open'); abrirModalPersona(${p.id});">
+                            <span>✏️ Editar Datos del Jugador</span><i class="ri-arrow-right-s-line"></i>
+                        </button>
+                        <button type="button" class="menu33-item" onclick="document.getElementById('cab33DropMenu').classList.remove('open'); abrirPanelFotoPerfilCDM(${p.id});">
+                            <span>📷 Cambiar / Subir Foto</span><i class="ri-arrow-right-s-line"></i>
+                        </button>
+                        <button type="button" class="menu33-item" onclick="document.getElementById('cab33DropMenu').classList.remove('open'); alternarEstadoPago(${p.id}); inicializarPaginaJugadorIndividual();">
+                            <span>💳 Cuota: ${alDia ? "Al Día" : "Pendiente"}</span>
+                            <span class="badge ${alDia ? "badge-ok" : "badge-danger"}" style="font-size:0.65rem;">${alDia ? "Al Día" : "Cobrar"}</span>
+                        </button>
+                        <button type="button" class="menu33-item" onclick="document.getElementById('cab33DropMenu').classList.remove('open'); enviarInformeEjecutivoJugadorWhatsApp();">
+                            <span>📲 Informe Completo WA</span><i class="ri-whatsapp-line"></i>
+                        </button>
+
+                        <div class="menu33-divider"></div>
+                        <div class="menu33-section-lbl">Permisos y Acceso del Usuario</div>
+                        <button type="button" class="menu33-item" onclick="enviarCodigoPorWhatsAppCDM(${p.id})">
+                            <span>🔑 Enviar Código (${p.codigoAcceso})</span><i class="ri-whatsapp-line"></i>
+                        </button>
+                        <button type="button" class="menu33-item" onclick="regenerarCodigoIndividualCDM(${p.id}); inicializarPaginaJugadorIndividual();">
+                            <span>🔄 Regenerar Código Personal</span><i class="ri-refresh-line"></i>
+                        </button>
+                        <button type="button" class="menu33-item" onclick="alternarVistaSimpleAvanzadaRapidaCardCDM(${p.id}); inicializarPaginaJugadorIndividual();">
+                            <span>🎚️ Vista Rutinas Usuario</span>
+                            <span class="badge ${modoVistaEf === "simple" ? "badge-ok" : "badge-purple"}" style="font-size:0.65rem;">${modoVistaEf === "simple" ? "Simple" : "Avanzada"}</span>
+                        </button>
+                        <button type="button" class="menu33-item" onclick="alternarPermisoAutogestionRutinaCDM(${p.id}); inicializarPaginaJugadorIndividual();">
+                            <span>${autoOn ? "🔓 Arma sus propias rutinas" : "🔒 Solo rutinas del Profe"}</span>
+                            <span class="badge ${autoOn ? "badge-ok" : "badge-warn"}" style="font-size:0.65rem;">${autoOn ? "SÍ" : "NO"}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// =========================================================================
+// 33.3 CENTRO UNIFICADO: SCORE + PROGRESIÓN FÍSICA + SALUD Y PESO
+// =========================================================================
+
+let _chartRadarUnif33 = null;
+window._tabPrincipal33 = "control33";
+window._subCarga33 = null;   // 'score' | 'marca' | 'salud'
+window._subVista33 = null;   // 'radar' | 'curva' | 'historial'
+
+function dibujarRadarUnificado33(p, pilaresOverride = null) {
+    const canvas = document.getElementById("canvasRadarUnif33");
+    if (!canvas || typeof Chart === "undefined") return;
+    if (_chartRadarUnif33) { _chartRadarUnif33.destroy(); _chartRadarUnif33 = null; }
+
+    const esGym = p.deporte === "Gimnasio";
+    const cumplSem10 = Math.min(10, Math.round((contarAsistenciasUltimos7Dias(p) / (p.frecuenciaSemanal || 3)) * 100) / 10);
+
+    if (esGym) {
+        const cantRut = Math.min(10, (baseRutinas || []).filter(r => r.personaId === p.id).length * 3.5);
+        const cantTests = Math.min(10, (p.evaluaciones?.length || 0) * 2.5);
+        const ultSueno = p.clinico?.length ? Number(p.clinico[p.clinico.length - 1].sueno || 4) * 2 : 8;
+        const constancia = Math.min(10, (p.asistencias?.length || 1) * 1.5);
+        _chartRadarUnif33 = new Chart(canvas.getContext("2d"), {
+            type: "radar",
+            data: {
+                labels: ["Asistencia 7d", "Constancia", "Tests", "Rutinas", "Descanso"],
+                datasets: [{
+                    label: `${p.nombre} (Hábitos)`,
+                    data: [cumplSem10, constancia, cantTests, cantRut, ultSueno],
+                    backgroundColor: "rgba(16, 185, 129, 0.24)",
+                    borderColor: "#10b981",
+                    borderWidth: 2.5
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 0, max: 10, ticks: { stepSize: 2, display: false } } } }
+        });
+        return;
+    }
+
+    const pil = pilaresOverride || p.pilares || { fisico: 7, gym: 7, tecnico: 7, actitud: 7, bonus: 0 };
+    const scoreCalc = Math.min(10, Math.max(1, Math.round(((pil.fisico * 0.30) + (pil.gym * 0.25) + (pil.tecnico * 0.25) + (pil.actitud * 0.20) + (pil.bonus || 0)) * 10) / 10));
+
+    const pares = (basePersonas || []).filter(x => x && x.activo && x.deporte === p.deporte && x.categoria === p.categoria);
+    const n = Math.max(1, pares.length);
+    const promCat = [
+        Math.round((pares.reduce((a, x) => a + (x.pilares?.fisico || 7), 0) / n) * 10) / 10,
+        Math.round((pares.reduce((a, x) => a + (x.pilares?.gym || 7), 0) / n) * 10) / 10,
+        Math.round((pares.reduce((a, x) => a + (x.pilares?.tecnico || 7), 0) / n) * 10) / 10,
+        Math.round((pares.reduce((a, x) => a + (x.pilares?.actitud || 7), 0) / n) * 10) / 10,
+        Math.round((pares.reduce((a, x) => a + Math.min(10, (contarAsistenciasUltimos7Dias(x) / (x.frecuenciaSemanal || 3)) * 10), 0) / n) * 10) / 10,
+        Math.round((pares.reduce((a, x) => a + (x.puntosCategoria || 7), 0) / n) * 10) / 10
+    ];
+
+    _chartRadarUnif33 = new Chart(canvas.getContext("2d"), {
+        type: "radar",
+        data: {
+            labels: ["Físico", "Gym", "Técnico", "Actitud", "Asist. 7d", "Score"],
+            datasets: [
+                {
+                    label: `${p.nombre} (${scoreCalc}/10)`,
+                    data: [pil.fisico, pil.gym, pil.tecnico, pil.actitud, cumplSem10, scoreCalc],
+                    backgroundColor: "rgba(2, 132, 199, 0.25)",
+                    borderColor: "#0284c7",
+                    pointBackgroundColor: "#0c192c",
+                    borderWidth: 2.5
+                },
+                {
+                    label: `Promedio ${p.categoria}`,
+                    data: promCat,
+                    backgroundColor: "rgba(16, 185, 129, 0.08)",
+                    borderColor: "#10b981",
+                    borderDash: [4, 4],
+                    pointRadius: 2,
+                    borderWidth: 1.8
+                }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 0, max: 10, ticks: { stepSize: 2, display: false } } } }
+    });
+}
+
+window.previsualizarScoreSliders33 = function (idPersona) {
+    const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+    if (!p) return;
+
+    const fis = parseFloat(document.getElementById("sl33Fisico")?.value) || 7;
+    const gym = parseFloat(document.getElementById("sl33Gym")?.value) || 7;
+    const tec = parseFloat(document.getElementById("sl33Tecnico")?.value) || 7;
+    const act = parseFloat(document.getElementById("sl33Actitud")?.value) || 7;
+    const bon = parseFloat(document.getElementById("sl33Bonus")?.value) || 0;
+
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt("val33Fisico", `${fis.toFixed(1)} / 10`);
+    setTxt("val33Gym", `${gym.toFixed(1)} / 10`);
+    setTxt("val33Tecnico", `${tec.toFixed(1)} / 10`);
+    setTxt("val33Actitud", `${act.toFixed(1)} / 10`);
+    setTxt("val33Bonus", `${bon >= 0 ? "+" : ""}${bon.toFixed(1)} pts`);
+
+    const total = Math.min(10, Math.max(1, Math.round(((fis * 0.30) + (gym * 0.25) + (tec * 0.25) + (act * 0.20) + bon) * 10) / 10));
+    setTxt("numScoreVivo33", `${total.toFixed(1)}`);
+
+    if (window._subVista33 !== "radar") cambiarSubVistaDerecha33("radar");
+    dibujarRadarUnificado33(p, { fisico: fis, gym, tecnico: tec, actitud: act, bonus: bon });
+};
+
+window.guardarEvaluacionSliders33 = function (e, idPersona) {
+    e.preventDefault();
+    const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+    if (!p || p.deporte === "Gimnasio") return;
+
+    const anterior = p.puntosCategoria;
+    const fis = normalizarNota1a10(document.getElementById("sl33Fisico")?.value, 7);
+    const gym = normalizarNota1a10(document.getElementById("sl33Gym")?.value, 7);
+    const tec = normalizarNota1a10(document.getElementById("sl33Tecnico")?.value, 7);
+    const act = normalizarNota1a10(document.getElementById("sl33Actitud")?.value, 7);
+    const bon = normalizarBonus1a10(document.getElementById("sl33Bonus")?.value);
+    const motivo = (document.getElementById("inp33MotivoScore")?.value || "").trim() || "Evaluación actualizada por el profesor";
+
+    p.pilares = { fisico: fis, gym, tecnico: tec, actitud: act, bonus: bon };
+    recalcularPuntajePonderado(p);
+    p.motivoPuntos = motivo;
+
+    if (typeof registrarEventoScore32 === "function") {
+        registrarEventoScore32(p, anterior, p.puntosCategoria, "Evaluación Directa", motivo);
+    }
+    guardarDatosCDM();
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`✅ Score guardado: ${p.nombre} ${p.apellido} (⭐ ${p.puntosCategoria}/10)`);
+    }
+    renderizarCabeceraLimpia33(p);
+    actualizarContenidoDinamicoHub33(p);
+};
+
+window.elegirTipoPruebaSimple33 = function (valorTipo) {
+    const sel = document.getElementById("evTipo");
+    if (sel) {
+        sel.value = valorTipo;
+        if (typeof cambiarTipoMedicion === "function") cambiarTipoMedicion();
+    }
+    document.querySelectorAll(".prog33-type-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.tipo === valorTipo);
+    });
+};
+
+function actualizarUltimaMarcaProgresion33() {
+    const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+    const inp = document.getElementById("evEjercicio");
+    const box = document.getElementById("prog33LastMarkBox");
+    if (!p || !inp || !box) return;
+
+    const val = (inp.value || "").trim().toLowerCase();
+    if (!val) {
+        box.innerHTML = `<span style="color:var(--ink-500);">Elegí o escribí un ejercicio para ver la marca anterior.</span>`;
+        return;
+    }
+    const matches = (p.evaluaciones || []).filter(e => String(e.ejercicio || "").toLowerCase() === val);
+    if (matches.length === 0) {
+        box.innerHTML = `✨ <b>Primer registro</b> en "${inp.value.trim()}".`;
+    } else {
+        const ult = matches[matches.length - 1];
+        box.innerHTML = `📌 <b>Última marca (${ult.fecha}):</b> ${ult.detalle}`;
+    }
+}
+
+window.cambiarSubCargaIzquierda33 = function (modo, sincronizarDerecha = true) {
+    window._subCarga33 = modo;
+    ["score", "marca", "salud"].forEach(k => {
+        document.getElementById(`panelCarga33_${k}`)?.classList.toggle("hidden", k !== modo);
+    });
+    document.querySelectorAll(".btn-subcarga-33").forEach(b => {
+        b.classList.toggle("active", b.dataset.carga === modo);
+    });
+    if (sincronizarDerecha) {
+        if (modo === "score") cambiarSubVistaDerecha33("radar");
+        else if (modo === "marca") cambiarSubVistaDerecha33("curva");
+        else if (modo === "salud") cambiarSubVistaDerecha33("historial");
+    }
+};
+
+window.cambiarSubVistaDerecha33 = function (vista) {
+    window._subVista33 = vista;
+    ["radar", "curva", "historial"].forEach(k => {
+        document.getElementById(`panelVista33_${k}`)?.classList.toggle("hidden", k !== vista);
+    });
+    document.querySelectorAll(".btn-subvista-33").forEach(b => {
+        b.classList.toggle("active", b.dataset.vista === vista);
+    });
+
+    const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+    if (vista === "radar" && p) {
+        setTimeout(() => dibujarRadarUnificado33(p), 30);
+    } else if (vista === "curva" && typeof dibujarGraficoEvolucion === "function") {
+        setTimeout(() => dibujarGraficoEvolucion(), 30);
+    }
+};
+
+function construirEsqueletoHubControlUnificado33() {
+    if (document.getElementById("jug-sec-control33")) return;
+    const main = document.querySelector(".app-content");
+    if (!main) return;
+
+    const sec = document.createElement("section");
+    sec.id = "jug-sec-control33";
+    sec.className = "jug-seccion animate-in";
+    sec.innerHTML = `
+        <div class="hub33-grid">
+            <!-- COLUMNA IZQUIERDA: 1 SOLO PANEL DE CARGA CON 3 MODOS -->
+            <div class="app-panel" style="margin-bottom:0;">
+                <div class="hub33-subtabs">
+                    <button type="button" class="hub33-subtab-btn btn-subcarga-33" data-carga="score" onclick="cambiarSubCargaIzquierda33('score', true)">⭐ Score</button>
+                    <button type="button" class="hub33-subtab-btn btn-subcarga-33" data-carga="marca" onclick="cambiarSubCargaIzquierda33('marca', true)">🏋️ Marca</button>
+                    <button type="button" class="hub33-subtab-btn btn-subcarga-33" data-carga="salud" onclick="cambiarSubCargaIzquierda33('salud', true)">🏥 Salud/Peso</button>
+                </div>
+
+                <div id="panelCarga33_score"></div>
+                <div id="panelCarga33_marca" class="hidden"></div>
+                <div id="panelCarga33_salud" class="hidden"></div>
+            </div>
+
+            <!-- COLUMNA DERECHA: TABLERO VISUAL E HISTORIAL UNIFICADO -->
+            <div class="app-panel" style="margin-bottom:0;">
+                <div class="hub33-subtabs">
+                    <button type="button" class="hub33-subtab-btn btn-subvista-33" data-vista="radar" onclick="cambiarSubVistaDerecha33('radar')">🕸️ Radar 360°</button>
+                    <button type="button" class="hub33-subtab-btn btn-subvista-33" data-vista="curva" onclick="cambiarSubVistaDerecha33('curva')">📈 Curva Progreso</button>
+                    <button type="button" class="hub33-subtab-btn btn-subvista-33" data-vista="historial" onclick="cambiarSubVistaDerecha33('historial')">📋 Historial Total</button>
+                </div>
+
+                <div id="panelVista33_radar"></div>
+
+                <div id="panelVista33_curva" class="hidden">
+                    <div id="slotCurvaHead33" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+                        <strong style="font-size:0.9rem; color:var(--ink-900);">📈 Evolución por Ejercicio</strong>
+                        <div id="slotSelectEjercicio33" style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;"></div>
+                    </div>
+                    <div id="slotCurvaKpis33"></div>
+                    <div id="slotCurvaCanvas33" style="margin-top:0.75rem;"></div>
+                </div>
+
+                <div id="panelVista33_historial" class="hidden">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.65rem;">
+                        <strong style="font-size:0.88rem; color:var(--ink-900);">🏋️ Marcas y Tests Físicos</strong>
+                        <button type="button" class="btn btn-secondary btn-sm" id="btnTimelineHistorial33">🕒 Ver Todo (Partidos + Score + Gym)</button>
+                    </div>
+                    <div id="slotHistMarcas33" style="margin-bottom:1.1rem;"></div>
+                    <strong style="font-size:0.88rem; color:var(--ink-900); display:block; margin-bottom:0.55rem;">🏥 Historial de Peso, IMC, Fatiga y Lesiones</strong>
+                    <div id="slotHistSalud33"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const refGraf = document.getElementById("jug-sec-graficos");
+    if (refGraf) main.insertBefore(sec, refGraf);
+    else main.appendChild(sec);
+
+    // Mover nodos nativos (UNA SOLA VEZ) para mantener intactos todos los IDs y eventos originales
+    const formMarca = document.getElementById("formNuevoAvance");
+    if (formMarca) {
+        document.getElementById("panelCarga33_marca")?.appendChild(formMarca);
+        const selTipo = document.getElementById("evTipo");
+        if (selTipo && !document.getElementById("prog33TypePills")) {
+            const pills = document.createElement("div");
+            pills.id = "prog33TypePills";
+            pills.className = "prog33-type-pills";
+            pills.innerHTML = `
+                <button type="button" class="prog33-type-btn active" data-tipo="fuerza_kg" onclick="elegirTipoPruebaSimple33('fuerza_kg')">🏋️ Kilos</button>
+                <button type="button" class="prog33-type-btn" data-tipo="salto_cm" onclick="elegirTipoPruebaSimple33('salto_cm')">🦘 Salto</button>
+                <button type="button" class="prog33-type-btn" data-tipo="tiempo_seg" onclick="elegirTipoPruebaSimple33('tiempo_seg')">⚡ Tiempo</button>
+                <button type="button" class="prog33-type-btn" data-tipo="unilateral" onclick="elegirTipoPruebaSimple33('unilateral')">⚖️ Izq/Der</button>
+                <button type="button" class="prog33-type-btn" data-tipo="reps_puntos" onclick="elegirTipoPruebaSimple33('reps_puntos')">🔁 Reps</button>
+            `;
+            formMarca.prepend(pills);
+            const campoTipo = selTipo.closest(".field");
+            if (campoTipo) campoTipo.style.display = "none";
+        }
+        const inpEj = document.getElementById("evEjercicio");
+        if (inpEj && !document.getElementById("prog33LastMarkBox")) {
+            const box = document.createElement("div");
+            box.id = "prog33LastMarkBox";
+            box.className = "prog33-last-badge";
+            inpEj.closest(".field")?.appendChild(box);
+            inpEj.addEventListener("input", actualizarUltimaMarcaProgresion33);
+            inpEj.addEventListener("change", actualizarUltimaMarcaProgresion33);
+        }
+    }
+
+    const formSalud = document.querySelector('#jug-sec-clinica form');
+    if (formSalud) {
+        document.getElementById("panelCarga33_salud")?.appendChild(formSalud);
+    }
+
+    const selGraf = document.getElementById("selectFiltroEjercicioGrafico");
+    if (selGraf) {
+        selGraf.style.maxWidth = "210px";
+        document.getElementById("slotSelectEjercicio33")?.appendChild(selGraf);
+    }
+    const kpisEv = document.getElementById("kpisEvolucionEjercicio");
+    if (kpisEv) document.getElementById("slotCurvaKpis33")?.appendChild(kpisEv);
+
+    const canvasBoxEv = document.getElementById("canvasEvolucionJugador")?.closest(".chart-canvas-box");
+    if (canvasBoxEv) document.getElementById("slotCurvaCanvas33")?.appendChild(canvasBoxEv);
+
+    const histMarcas = document.getElementById("contenedorHistorialJugador");
+    if (histMarcas) document.getElementById("slotHistMarcas33")?.appendChild(histMarcas);
+
+    const histSalud = document.getElementById("contenedorClinicoJugador");
+    if (histSalud) document.getElementById("slotHistSalud33")?.appendChild(histSalud);
+}
+
+function actualizarContenidoDinamicoHub33(p) {
+    if (!p) return;
+    const an = typeof analizarJugador360Admin32 === "function"
+        ? analizarJugador360Admin32(p)
+        : { esGym: p.deporte === "Gimnasio", puestoRanking: null, pares: [], partidosStats: { pj: 0, goles: 0, asistencias: 0 }, evals: p.evaluaciones || [], timeline: [], fortalezas: [], mejoras: [], asist7d: 0, pactado: 3 };
+
+    const pil = p.pilares || { fisico: 7, gym: 7, tecnico: 7, actitud: 7, bonus: 0 };
+
+    // 1. Panel de Carga Score (Izquierda)
+    const boxScore = document.getElementById("panelCarga33_score");
+    if (boxScore) {
+        boxScore.innerHTML = an.esGym ? `
+            <div class="eval33-score-hero">
+                <div>
+                    <span class="badge badge-ok" style="font-size:0.65rem;">🏋️ SOCIO GIMNASIO</span>
+                    <div style="font-size:0.84rem; color:#e0f2fe; margin-top:4px;">${p.puesto || "Plan General"}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="eval33-score-num">${an.asist7d}/${an.pactado}</div>
+                    <small style="color:#94a3b8; font-size:0.68rem;">días esta sem.</small>
+                </div>
+            </div>
+            <p style="font-size:0.8rem; color:var(--ink-600); margin-bottom:0.8rem;">
+                Los socios de Gimnasio no llevan Score competitivo. Usá las solapas de arriba para cargar <b>🏋️ Marca</b> o <b>🏥 Salud/Peso</b>.
+            </p>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                <button type="button" class="btn btn-primary btn-sm" style="flex:1;" onclick="cambiarSubCargaIzquierda33('marca', true)">🏋️ Cargar Marca</button>
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1;" onclick="cambiarSubCargaIzquierda33('salud', true)">🏥 Peso y Salud</button>
+            </div>
+        ` : `
+            <div class="eval33-score-hero">
+                <div>
+                    <span class="badge badge-celeste" style="font-size:0.64rem;">⭐ CALIFICACIÓN 1 A 10</span>
+                    <div style="font-size:0.8rem; color:#e0f2fe; margin-top:3px;">
+                        ${an.puestoRanking ? `Puesto <b>#${an.puestoRanking}°</b> de ${an.pares.length}` : p.categoria}
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div id="numScoreVivo33" class="eval33-score-num">${Number(p.puntosCategoria || 7).toFixed(1)}</div>
+                    <small style="color:#94a3b8; font-size:0.68rem;">de 10.0 pts</small>
+                </div>
+            </div>
+
+            <form onsubmit="guardarEvaluacionSliders33(event, ${p.id})">
+                <div class="eval33-slider-box">
+                    <div class="eval33-slider-head"><span>🏃 <b>Físico</b> <small>(30%)</small></span><span id="val33Fisico" class="eval33-slider-val">${pil.fisico.toFixed(1)} / 10</span></div>
+                    <input type="range" id="sl33Fisico" class="eval33-range" min="1" max="10" step="0.1" value="${pil.fisico}" oninput="previsualizarScoreSliders33(${p.id})">
+                </div>
+                <div class="eval33-slider-box">
+                    <div class="eval33-slider-head"><span>🏋️ <b>Gimnasio</b> <small>(25%)</small></span><span id="val33Gym" class="eval33-slider-val">${pil.gym.toFixed(1)} / 10</span></div>
+                    <input type="range" id="sl33Gym" class="eval33-range" min="1" max="10" step="0.1" value="${pil.gym}" oninput="previsualizarScoreSliders33(${p.id})">
+                </div>
+                <div class="eval33-slider-box">
+                    <div class="eval33-slider-head"><span>⚽ <b>Técnico</b> <small>(25%)</small></span><span id="val33Tecnico" class="eval33-slider-val">${pil.tecnico.toFixed(1)} / 10</span></div>
+                    <input type="range" id="sl33Tecnico" class="eval33-range" min="1" max="10" step="0.1" value="${pil.tecnico}" oninput="previsualizarScoreSliders33(${p.id})">
+                </div>
+                <div class="eval33-slider-box">
+                    <div class="eval33-slider-head"><span>🔥 <b>Actitud</b> <small>(20%)</small></span><span id="val33Actitud" class="eval33-slider-val">${pil.actitud.toFixed(1)} / 10</span></div>
+                    <input type="range" id="sl33Actitud" class="eval33-range" min="1" max="10" step="0.1" value="${pil.actitud}" oninput="previsualizarScoreSliders33(${p.id})">
+                </div>
+                <div class="eval33-slider-box" style="background:var(--cdm-50);">
+                    <div class="eval33-slider-head"><span>⭐ <b>Bonus / Ajuste</b></span><span id="val33Bonus" class="eval33-slider-val">${pil.bonus >= 0 ? "+" : ""}${Number(pil.bonus || 0).toFixed(1)} pts</span></div>
+                    <input type="range" id="sl33Bonus" class="eval33-range" min="-2" max="2" step="0.1" value="${pil.bonus || 0}" oninput="previsualizarScoreSliders33(${p.id})">
+                </div>
+                <div class="field" style="margin-bottom:0.65rem;">
+                    <label>Motivo / Observación del Profe</label>
+                    <input type="text" id="inp33MotivoScore" value="${(p.motivoPuntos || "").replace(/"/g, "&quot;")}" placeholder="Ej: Gran partido, mejorar resistencia...">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; min-height:40px;">💾 Guardar Evaluación</button>
+            </form>
+        `;
+    }
+
+    // 2. Panel Radar y Diagnóstico (Derecha)
+    const boxRadar = document.getElementById("panelVista33_radar");
+    if (boxRadar) {
+        boxRadar.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.45rem;">
+                <small style="color:var(--ink-500); font-weight:700;">
+                    ${an.partidosStats.pj} PJ (${an.partidosStats.goles}G / ${an.partidosStats.asistencias}A) • ${an.evals.length} tests • Asistencia ${an.asist7d}/${an.pactado}d
+                </small>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="abrirRadiografiaAdmin32(${p.id}, 'movimientos')">
+                    🕒 Movimientos (${an.timeline.length})
+                </button>
+            </div>
+            <div class="chart-canvas-box" style="height:255px; margin-bottom:0.85rem;">
+                <canvas id="canvasRadarUnif33"></canvas>
+            </div>
+            <div class="rad32-pill-list">
+                ${an.fortalezas.slice(0, 2).map(f => `<div class="rad32-diag-item ok">✅ ${f}</div>`).join("")}
+                ${an.mejoras.slice(0, 2).map(m => `<div class="rad32-diag-item warn">🎯 <b>A mejorar:</b> ${m}</div>`).join("")}
+            </div>
+        `;
+    }
+
+    const btnTL = document.getElementById("btnTimelineHistorial33");
+    if (btnTL) btnTL.onclick = () => abrirRadiografiaAdmin32(p.id, "movimientos");
+
+    const inpEj = document.getElementById("evEjercicio");
+    const selGraf = document.getElementById("selectFiltroEjercicioGrafico");
+    if (inpEj && !inpEj.value && selGraf && selGraf.value) inpEj.value = selGraf.value;
+    actualizarUltimaMarcaProgresion33();
+}
+
+window.activarTabLimpia33 = function (claveTab) {
+    window._tabPrincipal33 = claveTab;
+    document.querySelectorAll(".jug-seccion").forEach(s => {
+        s.classList.add("hidden");
+        s.classList.remove("animate-in");
+    });
+    const sec = document.getElementById(`jug-sec-${claveTab}`);
+    if (sec) {
+        sec.classList.remove("hidden");
+        sec.classList.add("animate-in");
+    }
+    document.querySelectorAll(".module-tabs .mod-tab").forEach(b => {
+        b.classList.toggle("active", b.dataset.tab33 === claveTab);
+    });
+
+    const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+    if (claveTab === "control33" && p) {
+        if (window._subVista33 === "radar") setTimeout(() => dibujarRadarUnificado33(p), 30);
+        else if (window._subVista33 === "curva" && typeof dibujarGraficoEvolucion === "function") setTimeout(() => dibujarGraficoEvolucion(), 30);
+    }
+};
+
+function construirTabsLimpias33() {
+    const tabsBar = document.querySelector(".module-tabs");
+    if (!tabsBar) return;
+    tabsBar.classList.remove("tabs-4", "tabs-5");
+    tabsBar.classList.add("tabs-3");
+    tabsBar.innerHTML = `
+        <button type="button" class="mod-tab" data-tab33="control33" onclick="activarTabLimpia33('control33')">
+            <i class="ri-dashboard-line"></i><span>Control Integral (Score, Marcas y Salud)</span>
+        </button>
+        <button type="button" class="mod-tab" data-tab33="rutinas" onclick="activarTabLimpia33('rutinas')">
+            <i class="ri-clipboard-line"></i><span>Rutinas</span>
+        </button>
+        <button type="button" class="mod-tab" data-tab33="calculadora" onclick="activarTabLimpia33('calculadora')">
+            <i class="ri-scales-3-line"></i><span>% 1RM y Comparador</span>
+        </button>
+    `;
+}
+
+function aplicarReorganizacionFicha33() {
+    if (!esAdminEnFichaJugador33()) return;
+    const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+    if (!p) return;
+
+    document.body.classList.add("ficha-limpia-33");
+    renderizarCabeceraLimpia33(p);
+    construirTabsLimpias33();
+    construirEsqueletoHubControlUnificado33();
+    actualizarContenidoDinamicoHub33(p);
+
+    if (!window._subCarga33) window._subCarga33 = p.deporte === "Gimnasio" ? "marca" : "score";
+    if (!window._subVista33) window._subVista33 = p.deporte === "Gimnasio" ? "curva" : "radar";
+
+    cambiarSubCargaIzquierda33(window._subCarga33, false);
+    cambiarSubVistaDerecha33(window._subVista33);
+    activarTabLimpia33(window._tabPrincipal33 || "control33");
+}
+
+if (typeof inicializarPaginaJugadorIndividual === "function" && !window.__fichaLimpia33V2Wrapped) {
+    window.__fichaLimpia33V2Wrapped = true;
+    const _origInit33 = inicializarPaginaJugadorIndividual;
+    inicializarPaginaJugadorIndividual = function () {
+        _origInit33.apply(this, arguments);
+        setTimeout(aplicarReorganizacionFicha33, 55);
+    };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        configurarSidebarMovilGlobal33();
+        compactarTopbarGlobalEnHamburguesa33();
+        iniciarObservadorTopbar33();
+        aplicarReorganizacionFicha33();
+    }, 150);
+    setTimeout(compactarTopbarGlobalEnHamburguesa33, 550);
+});
+// =========================================================================
+// 34. COMPARATIVA MENSUAL DE EVOLUCIÓN (ELEGIR MES A vs MES B)
+//     - INTEGRADA EN EL PANEL CONTROL INTEGRAL DE JUGADOR.HTML
+//     - COMPARA ASISTENCIAS, MARCAS/1RM, SCORE, PARTIDOS Y PESO/RPE
+//     - GRÁFICO DE BARRAS LADO A LADO + TABLA DE DELTAS + ENVÍO WHATSAPP
+// Pegar al final de app.js (debajo del Apartado 33)
+// =========================================================================
+
+(function inyectarCSSComparativaMeses34() {
+    if (document.getElementById("cdmCssCompMeses34")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssCompMeses34";
+    st.textContent = `
+        /* Adaptar la barra derecha de Control Integral a 4 pestañas responsive */
+        #jug-sec-control33 .hub33-grid > .app-panel:last-child .hub33-subtabs {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        }
+        @media (max-width: 680px) {
+            #jug-sec-control33 .hub33-grid > .app-panel:last-child .hub33-subtabs {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+        }
+
+        .comp34-controls {
+            background: var(--surface-subtle, #f8fafc);
+            border: 1.5px solid var(--line-celeste, #bae6fd);
+            border-radius: 14px;
+            padding: 0.75rem 0.85rem;
+            margin-bottom: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+        }
+        .comp34-selects-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        @media (max-width: 560px) {
+            .comp34-selects-row {
+                grid-template-columns: 1fr;
+            }
+            .comp34-vs-badge {
+                justify-self: center;
+            }
+        }
+        .comp34-vs-badge {
+            background: #0284c7;
+            color: #ffffff;
+            font-size: 0.7rem;
+            font-weight: 900;
+            padding: 0.25rem 0.55rem;
+            border-radius: 999px;
+            text-align: center;
+        }
+        .comp34-presets {
+            display: flex;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .comp34-preset-btn {
+            border: 1px solid var(--line-strong, #cbd5e1);
+            background: var(--surface-solid, #ffffff);
+            color: var(--ink-700, #334155);
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.24rem 0.58rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.14s ease;
+        }
+        .comp34-preset-btn:hover {
+            background: #0284c7;
+            border-color: #0284c7;
+            color: #ffffff;
+        }
+
+        .comp34-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+            gap: 0.6rem;
+            margin-bottom: 0.9rem;
+        }
+        .comp34-kpi-card {
+            background: var(--surface-subtle, #f8fafc);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            border-radius: 13px;
+            padding: 0.7rem 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .comp34-kpi-lbl {
+            font-size: 0.68rem;
+            font-weight: 800;
+            color: var(--ink-500, #64748b);
+            text-transform: uppercase;
+        }
+        .comp34-kpi-vals {
+            font-size: 0.92rem;
+            font-weight: 800;
+            color: var(--ink-900, #0f172a);
+        }
+        .comp34-delta {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 0.14rem 0.5rem;
+            border-radius: 999px;
+        }
+        .comp34-delta.up { background: rgba(16, 185, 129, 0.15); color: #047857; }
+        .comp34-delta.down { background: rgba(239, 68, 68, 0.14); color: #b91c1c; }
+        .comp34-delta.eq { background: rgba(100, 116, 139, 0.14); color: var(--ink-600, #475569); }
+        body[data-theme="dark"] .comp34-delta.up { color: #34d399; }
+        body[data-theme="dark"] .comp34-delta.down { color: #fca5a5; }
+    `;
+    document.head.appendChild(st);
+})();
+
+const NOMBRES_MESES_34 = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+let _chartCompMeses34 = null;
+window.__comp34State = window.__comp34State || { personaId: null, mesA: "", mesB: "" };
+
+function formatearMesCorto34(ym) {
+    if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return ym || "-";
+    const [anio, mes] = ym.split("-");
+    const idx = Math.max(0, Math.min(11, parseInt(mes, 10) - 1));
+    return `${NOMBRES_MESES_34[idx]} ${anio}`;
+}
+
+function restarMesesYM34(ymBase, cantMeses) {
+    const [anio, mes] = ymBase.split("-").map(Number);
+    const d = new Date(anio, (mes - 1) - cantMeses, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function obtenerMesesDisponiblesPersona34(p) {
+    const conDatos = new Set();
+    const agregarFecha = (f) => {
+        if (typeof f === "string" && /^\d{4}-\d{2}/.test(f)) conDatos.add(f.slice(0, 7));
+    };
+
+    (p.asistencias || []).forEach(agregarFecha);
+    (p.evaluaciones || []).forEach(e => agregarFecha(e.fecha));
+    (p.clinico || []).forEach(c => agregarFecha(c.fecha));
+    (p.historialScore || []).forEach(h => agregarFecha(h.fecha));
+    (typeof basePartidos !== "undefined" ? basePartidos : []).forEach(m => {
+        const estuvo = (m.eventos || []).some(ev => Number(ev.jugadorId) === Number(p.id)) ||
+                       (m.resumenJugadores || []).some(rj => Number(rj.id) === Number(p.id));
+        if (estuvo) agregarFecha(m.fecha);
+    });
+
+    const hoy = new Date();
+    const mesActualYM = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
+    const todos = new Set(conDatos);
+
+    // Agregar siempre los últimos 12 meses para poder elegir libremente
+    for (let i = 0; i < 12; i++) {
+        todos.add(restarMesesYM34(mesActualYM, i));
+    }
+
+    const listaOrdenada = Array.from(todos).sort().reverse().map(ym => ({
+        ym,
+        label: formatearMesCorto34(ym),
+        tieneDatos: conDatos.has(ym)
+    }));
+
+    return { listaOrdenada, mesesConDatosDesc: Array.from(conDatos).sort().reverse(), mesActualYM };
+}
+
+function calcularMetricasMes34(p, ym) {
+    const pref = String(ym || "");
+    const asistencias = (p.asistencias || []).filter(f => String(f || "").startsWith(pref)).length;
+
+    // Evaluaciones físicas del mes (mejor marca por ejercicio)
+    const evalsMes = (p.evaluaciones || []).filter(e => String(e.fecha || "").startsWith(pref));
+    const porEjercicio = {};
+    evalsMes.forEach(ev => {
+        const nom = ev.ejercicio || "Ejercicio";
+        const val = Number(ev.valor) || 0;
+        const esTiempo = ev.tipo === "tiempo_seg";
+        if (!porEjercicio[nom]) {
+            porEjercicio[nom] = { ejercicio: nom, tipo: ev.tipo, unidad: ev.unidad || "", mejor: val, detalle: ev.detalle, cant: 1 };
+        } else {
+            porEjercicio[nom].cant++;
+            if ((esTiempo && val < porEjercicio[nom].mejor) || (!esTiempo && val > porEjercicio[nom].mejor)) {
+                porEjercicio[nom].mejor = val;
+                porEjercicio[nom].detalle = ev.detalle;
+            }
+        }
+    });
+
+    // Salud y Peso del mes
+    const clinMes = (p.clinico || []).filter(c => String(c.fecha || "").startsWith(pref));
+    let peso = null, rpeProm = null, suenoProm = null;
+    if (clinMes.length > 0) {
+        const ult = clinMes[clinMes.length - 1];
+        peso = ult.peso !== undefined && ult.peso !== "" ? Number(ult.peso) : null;
+        rpeProm = Math.round((clinMes.reduce((a, c) => a + (Number(c.rpe) || 5), 0) / clinMes.length) * 10) / 10;
+        suenoProm = Math.round((clinMes.reduce((a, c) => a + (Number(c.sueno) || 4), 0) / clinMes.length) * 10) / 10;
+    }
+
+    // Score del mes (último registro guardado ese mes; si es el mes actual sin historial, usa el score vigente)
+    let score = null;
+    if (p.deporte !== "Gimnasio") {
+        const histMes = (p.historialScore || []).filter(h => String(h.fecha || "").startsWith(pref));
+        if (histMes.length > 0) {
+            score = Number(histMes[0].nuevo); // historialScore guarda lo más reciente primero
+        } else {
+            const hoyYM = new Date().toISOString().slice(0, 7);
+            if (pref === hoyYM && p.puntosCategoria !== null && p.puntosCategoria !== undefined) {
+                score = Number(p.puntosCategoria);
+            }
+        }
+    }
+
+    // Partidos del mes
+    const partidos = { pj: 0, goles: 0, asistencias: 0, quites: 0, tarjetas: 0 };
+    (typeof basePartidos !== "undefined" ? basePartidos : []).forEach(m => {
+        if (!String(m.fecha || "").startsWith(pref)) return;
+        const evs = (m.eventos || []).filter(e => Number(e.jugadorId) === Number(p.id));
+        const resJ = (m.resumenJugadores || []).find(r => Number(r.id) === Number(p.id));
+        if (evs.length > 0 || resJ) {
+            partidos.pj++;
+            evs.forEach(ev => {
+                const t = String(ev.tipo || "").toLowerCase();
+                if (t.includes("gol") || t.includes("try") || t.includes("triple") || t.includes("doble") || t.includes("punto") || t.includes("winner")) partidos.goles++;
+                else if (t.includes("asistencia") || t.includes("armado")) partidos.asistencias++;
+                else if (t.includes("quite") || t.includes("barrida") || t.includes("atajada") || t.includes("recuperaci") || t.includes("bloqueo")) partidos.quites++;
+                else if (t.includes("tarjeta") || t.includes("exclusi")) partidos.tarjetas++;
+            });
+        }
+    });
+
+    return { ym, asistencias, porEjercicio, cantTests: evalsMes.length, peso, rpeProm, suenoProm, score, partidos };
+}
+
+function formatearDeltaBadge34(valA, valB, sufijo = "", menorEsMejor = false, mostrarPct = false) {
+    if (valA === null || valA === undefined || valB === null || valB === undefined) {
+        return `<span class="comp34-delta eq">Sin base previa</span>`;
+    }
+    const diff = Math.round((valB - valA) * 10) / 10;
+    if (diff === 0) return `<span class="comp34-delta eq">= Sin cambios</span>`;
+
+    const mejoro = menorEsMejor ? diff < 0 : diff > 0;
+    const signo = diff > 0 ? "+" : "";
+    let extraPct = "";
+    if (mostrarPct && valA !== 0) {
+        const pct = Math.round(((valB - valA) / Math.abs(valA)) * 1000) / 10;
+        extraPct = ` (${pct > 0 ? "+" : ""}${pct}%)`;
+    }
+    return `<span class="comp34-delta ${mejoro ? "up" : "down"}">${mejoro ? "▲" : "▼"} ${signo}${diff}${sufijo}${extraPct}</span>`;
+}
+
+window.cambiarMesesComparativa34 = function () {
+    const selA = document.getElementById("selComp34MesA");
+    const selB = document.getElementById("selComp34MesB");
+    if (selA) window.__comp34State.mesA = selA.value;
+    if (selB) window.__comp34State.mesB = selB.value;
+    const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+    if (p) renderizarComparativaMeses34(p);
+};
+
+window.aplicarPresetMeses34 = function (mesesAtras) {
+    const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+    if (!p) return;
+    const { mesesConDatosDesc, mesActualYM } = obtenerMesesDisponiblesPersona34(p);
+    const refB = mesesConDatosDesc[0] || mesActualYM;
+    window.__comp34State.mesB = refB;
+    window.__comp34State.mesA = restarMesesYM34(refB, mesesAtras);
+    renderizarComparativaMeses34(p);
+};
+
+function dibujarGraficoComparativaMeses34(filasEj, labelA, labelB) {
+    const canvas = document.getElementById("canvasCompMeses34");
+    if (!canvas || typeof Chart === "undefined") return;
+    if (_chartCompMeses34) { _chartCompMeses34.destroy(); _chartCompMeses34 = null; }
+
+    if (!filasEj.length) return;
+
+    const labels = filasEj.map(f => f.ejercicio.length > 18 ? f.ejercicio.slice(0, 17) + "…" : f.ejercicio);
+    const dataA = filasEj.map(f => f.valA !== null ? f.valA : 0);
+    const dataB = filasEj.map(f => f.valB !== null ? f.valB : 0);
+
+    _chartCompMeses34 = new Chart(canvas.getContext("2d"), {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: labelA,
+                    data: dataA,
+                    backgroundColor: "rgba(100, 116, 139, 0.55)",
+                    borderColor: "#475569",
+                    borderWidth: 1.5,
+                    borderRadius: 7
+                },
+                {
+                    label: labelB,
+                    data: dataB,
+                    backgroundColor: "rgba(2, 132, 199, 0.85)",
+                    borderColor: "#0284c7",
+                    borderWidth: 1.5,
+                    borderRadius: 7
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "top" }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+window.enviarComparativaMensualWA34 = function (idPersona) {
+    const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(idPersona));
+    if (!p) return;
+
+    const { mesA, mesB } = window.__comp34State;
+    const mA = calcularMetricasMes34(p, mesA);
+    const mB = calcularMetricasMes34(p, mesB);
+    const nomA = formatearMesCorto34(mesA);
+    const nomB = formatearMesCorto34(mesB);
+    const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+
+    const todosEj = Array.from(new Set([...Object.keys(mA.porEjercicio), ...Object.keys(mB.porEjercicio)]));
+
+    let msg = `📊 *COMPARATIVA DE EVOLUCIÓN MENSUAL — ${(lic.nombreEntidad || "CLUB / GYM").toUpperCase()}*\n`;
+    msg += `👤 *Deportista:* ${p.nombre} ${p.apellido}\n`;
+    msg += `📅 *Período:* ${nomA} ➔ ${nomB}\n`;
+    msg += `----------------------------------\n`;
+    msg += `✅ *Asistencias:* ${mA.asistencias}d (${nomA}) ➔ *${mB.asistencias}d* (${nomB})\n`;
+    if (p.deporte !== "Gimnasio" && (mA.score !== null || mB.score !== null)) {
+        msg += `⭐ *Score:* ${mA.score ?? "-"}/10 ➔ *${mB.score ?? "-"}/10*\n`;
+    }
+    if (mA.peso !== null || mB.peso !== null) {
+        msg += `⚖️ *Peso Corporal:* ${mA.peso ?? "-"} kg ➔ *${mB.peso ?? "-"} kg*\n`;
+    }
+    if (p.deporte !== "Gimnasio" && (mA.partidos.pj > 0 || mB.partidos.pj > 0)) {
+        msg += `⚽ *Partidos:* ${mA.partidos.pj} PJ (${mA.partidos.goles}G/${mA.partidos.asistencias}A) ➔ *${mB.partidos.pj} PJ (${mB.partidos.goles}G/${mB.partidos.asistencias}A)*\n`;
+    }
+
+    if (todosEj.length > 0) {
+        msg += `\n🏋️ *PROGRESIÓN EN TESTS / MARCAS:*\n`;
+        todosEj.forEach(ej => {
+            const a = mA.porEjercicio[ej];
+            const b = mB.porEjercicio[ej];
+            const un = (b?.unidad || a?.unidad || "").trim();
+            const vA = a ? `${a.mejor} ${un}` : "s/reg";
+            const vB = b ? `${b.mejor} ${un}` : "s/reg";
+            let pctTxt = "";
+            if (a && b && a.mejor > 0) {
+                const esT = (b.tipo || a.tipo) === "tiempo_seg";
+                const pct = Math.round(((esT ? (a.mejor - b.mejor) : (b.mejor - a.mejor)) / a.mejor) * 1000) / 10;
+                pctTxt = ` (${pct > 0 ? "+" : ""}${pct}%)`;
+            }
+            msg += `• *${ej}:* ${vA} ➔ *${vB}*${pctTxt}\n`;
+        });
+    }
+
+    const tel = String(p.whatsapp || "").replace(/\D/g, "");
+    const url = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
+};
+
+window.renderizarComparativaMeses34 = function (p) {
+    const cont = document.getElementById("panelVista33_comparar");
+    if (!cont || !p) return;
+
+    const { listaOrdenada, mesesConDatosDesc, mesActualYM } = obtenerMesesDisponiblesPersona34(p);
+
+    // Inicializar meses inteligentes la primera vez que entra a este jugador
+    if (window.__comp34State.personaId !== p.id || !window.__comp34State.mesA || !window.__comp34State.mesB) {
+        const defB = mesesConDatosDesc[0] || mesActualYM;
+        const defA = mesesConDatosDesc[1] || restarMesesYM34(defB, 1);
+        window.__comp34State = { personaId: p.id, mesA: defA, mesB: defB };
+    }
+
+    const { mesA, mesB } = window.__comp34State;
+    const mA = calcularMetricasMes34(p, mesA);
+    const mB = calcularMetricasMes34(p, mesB);
+    const labelA = formatearMesCorto34(mesA);
+    const labelB = formatearMesCorto34(mesB);
+    const esGym = p.deporte === "Gimnasio";
+
+    const opcionesMes = (seleccionado) => listaOrdenada.map(it =>
+        `<option value="${it.ym}" ${it.ym === seleccionado ? "selected" : ""}>${it.label}${it.tieneDatos ? " • (con datos)" : ""}</option>`
+    ).join("");
+
+    // Armar lista unificada de ejercicios comparables entre Mes A y Mes B
+    const nombresEj = Array.from(new Set([...Object.keys(mA.porEjercicio), ...Object.keys(mB.porEjercicio)]));
+    const filasEj = nombresEj.map(nom => {
+        const a = mA.porEjercicio[nom] || null;
+        const b = mB.porEjercicio[nom] || null;
+        const tipo = b?.tipo || a?.tipo || "fuerza_kg";
+        return {
+            ejercicio: nom,
+            tipo,
+            unidad: b?.unidad || a?.unidad || "",
+            valA: a ? a.mejor : null,
+            valB: b ? b.mejor : null,
+            menorEsMejor: tipo === "tiempo_seg"
+        };
+    });
+
+    cont.innerHTML = `
+        <div class="comp34-controls">
+            <div class="comp34-selects-row">
+                <div class="field" style="margin:0;">
+                    <label style="font-size:0.68rem;">Mes Base (Anterior)</label>
+                    <select id="selComp34MesA" onchange="cambiarMesesComparativa34()" style="font-weight:700; min-height:36px;">
+                        ${opcionesMes(mesA)}
+                    </select>
+                </div>
+                <span class="comp34-vs-badge">VS</span>
+                <div class="field" style="margin:0;">
+                    <label style="font-size:0.68rem;">Mes a Comparar</label>
+                    <select id="selComp34MesB" onchange="cambiarMesesComparativa34()" style="font-weight:700; min-height:36px;">
+                        ${opcionesMes(mesB)}
+                    </select>
+                </div>
+            </div>
+
+            <div class="comp34-presets">
+                <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                    <button type="button" class="comp34-preset-btn" onclick="aplicarPresetMeses34(1)">Mes ant. vs Actual</button>
+                    <button type="button" class="comp34-preset-btn" onclick="aplicarPresetMeses34(3)">Últimos 3 meses</button>
+                    <button type="button" class="comp34-preset-btn" onclick="aplicarPresetMeses34(6)">Últimos 6 meses</button>
+                </div>
+                <button type="button" class="btn btn-whatsapp btn-sm" style="min-height:28px; padding:0.2rem 0.65rem; font-size:0.72rem;" onclick="enviarComparativaMensualWA34(${p.id})">
+                    <i class="ri-whatsapp-line"></i> Enviar Comparativa
+                </button>
+            </div>
+        </div>
+
+        <!-- KPIs DE EVOLUCIÓN MENSUAL -->
+        <div class="comp34-kpi-grid">
+            <div class="comp34-kpi-card">
+                <span class="comp34-kpi-lbl">📅 Asistencias</span>
+                <span class="comp34-kpi-vals">${mA.asistencias}d ➔ ${mB.asistencias}d</span>
+                ${formatearDeltaBadge34(mA.asistencias, mB.asistencias, " días", false, false)}
+            </div>
+
+            ${!esGym ? `
+                <div class="comp34-kpi-card">
+                    <span class="comp34-kpi-lbl">⭐ Score (1–10)</span>
+                    <span class="comp34-kpi-vals">${mA.score !== null ? mA.score : "-"} ➔ ${mB.score !== null ? mB.score : "-"}</span>
+                    ${formatearDeltaBadge34(mA.score, mB.score, " pts", false, false)}
+                </div>
+            ` : ""}
+
+            <div class="comp34-kpi-card">
+                <span class="comp34-kpi-lbl">⚖️ Peso Corporal</span>
+                <span class="comp34-kpi-vals">${mA.peso !== null ? mA.peso + " kg" : "-"} ➔ ${mB.peso !== null ? mB.peso + " kg" : "-"}</span>
+                ${mA.peso !== null && mB.peso !== null
+                    ? `<span class="comp34-delta eq">${mB.peso - mA.peso > 0 ? "+" : ""}${Math.round((mB.peso - mA.peso) * 10) / 10} kg</span>`
+                    : `<span class="comp34-delta eq">Sin control ambos meses</span>`}
+            </div>
+
+            ${!esGym ? `
+                <div class="comp34-kpi-card">
+                    <span class="comp34-kpi-lbl">⚽ Partidos / Goles</span>
+                    <span class="comp34-kpi-vals">${mA.partidos.pj}PJ (${mA.partidos.goles}G) ➔ ${mB.partidos.pj}PJ (${mB.partidos.goles}G)</span>
+                    ${formatearDeltaBadge34(mA.partidos.goles + mA.partidos.asistencias, mB.partidos.goles + mB.partidos.asistencias, " G+A", false, false)}
+                </div>
+            ` : `
+                <div class="comp34-kpi-card">
+                    <span class="comp34-kpi-lbl">🏋️ Tests Cargados</span>
+                    <span class="comp34-kpi-vals">${mA.cantTests} ➔ ${mB.cantTests}</span>
+                    ${formatearDeltaBadge34(mA.cantTests, mB.cantTests, " reg.", false, false)}
+                </div>
+            `}
+        </div>
+
+        <!-- GRÁFICO Y TABLA DE EVOLUCIÓN DE EJERCICIOS / PRUEBAS -->
+        ${filasEj.length === 0 ? `
+            <div class="empty-box" style="padding:1.25rem;">
+                No hay marcas o tests físicos registrados en <b>${labelA}</b> ni en <b>${labelB}</b>.<br>
+                <small style="color:var(--ink-500);">Elegí arriba un mes marcado como <b>"(con datos)"</b> o cargá una marca nueva desde el panel izquierdo.</small>
+            </div>
+        ` : `
+            <div class="chart-canvas-box" style="height:230px; margin-bottom:0.85rem;">
+                <canvas id="canvasCompMeses34"></canvas>
+            </div>
+
+            <div class="table-wrap">
+                <table class="app-table" style="font-size:0.8rem;">
+                    <thead>
+                        <tr>
+                            <th>Ejercicio / Prueba</th>
+                            <th>${labelA}</th>
+                            <th>${labelB}</th>
+                            <th>Evolución</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filasEj.map(f => `
+                            <tr>
+                                <td><strong>${f.ejercicio}</strong></td>
+                                <td>${f.valA !== null ? `${f.valA} ${f.unidad}` : `<span style="color:var(--ink-400);">Sin reg.</span>`}</td>
+                                <td><strong>${f.valB !== null ? `${f.valB} ${f.unidad}` : `<span style="color:var(--ink-400);">Sin reg.</span>`}</strong></td>
+                                <td>${formatearDeltaBadge34(f.valA, f.valB, f.unidad ? " " + f.unidad : "", f.menorEsMejor, true)}</td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `}
+    `;
+
+    if (filasEj.length > 0) {
+        setTimeout(() => dibujarGraficoComparativaMeses34(filasEj, labelA, labelB), 30);
+    }
+};
+
+// =========================================================================
+// 34.1 INTEGRACIÓN AUTOMÁTICA CON EL HUB UNIFICADO (APARTADO 33)
+// =========================================================================
+
+function inyectarTabComparativaEnHub34() {
+    const panelDer = document.querySelector("#jug-sec-control33 .hub33-grid > .app-panel:last-child");
+    if (!panelDer) return;
+
+    const barraSub = panelDer.querySelector(".hub33-subtabs");
+    if (barraSub && !barraSub.querySelector('[data-vista="comparar"]')) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "hub33-subtab-btn btn-subvista-33";
+        btn.dataset.vista = "comparar";
+        btn.onclick = () => cambiarSubVistaDerecha33("comparar");
+        btn.innerHTML = "📅 Comparar Meses";
+        barraSub.appendChild(btn);
+    }
+
+    if (!document.getElementById("panelVista33_comparar")) {
+        const div = document.createElement("div");
+        div.id = "panelVista33_comparar";
+        div.className = "hidden";
+        panelDer.appendChild(div);
+    }
+}
+
+// Envolver cambiarSubVistaDerecha33 para soportar la 4ª vista "comparar"
+if (typeof window.cambiarSubVistaDerecha33 === "function" && !window.__compMeses34Wrapped) {
+    window.__compMeses34Wrapped = true;
+    const _origSubVista34 = window.cambiarSubVistaDerecha33;
+    window.cambiarSubVistaDerecha33 = function (vista) {
+        inyectarTabComparativaEnHub34();
+        _origSubVista34(vista);
+        const divComp = document.getElementById("panelVista33_comparar");
+        if (divComp) divComp.classList.toggle("hidden", vista !== "comparar");
+        if (vista === "comparar") {
+            const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+            if (p) renderizarComparativaMeses34(p);
+        }
+    };
+}
+
+if (typeof aplicarReorganizacionFicha33 === "function" && !window.__compMeses34ReorgWrapped) {
+    window.__compMeses34ReorgWrapped = true;
+    const _origReorg34 = aplicarReorganizacionFicha33;
+    aplicarReorganizacionFicha33 = function () {
+        _origReorg34.apply(this, arguments);
+        inyectarTabComparativaEnHub34();
+        if (window._subVista33 === "comparar") {
+            const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+            if (p) renderizarComparativaMeses34(p);
+        }
+    };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(inyectarTabComparativaEnHub34, 240);
+});
+// =========================================================================
+// 35. MOTOR FINANCIERO UNIFICADO MULTI-RUBRO Y 100% RESPONSIVE
+//     - AISLAMIENTO REAL POR COMERCIO (claveClub) SIN MEZCLAR CLIENTES
+//     - UNIFICA "CONTABILIDAD Y CAJA" + "CIERRE DE CAJA 25" EN UN SOLO LIBRO
+//     - ADAPTABLE A CLUBES, GIMNASIOS, CONSULTORIOS PUROS O HÍBRIDOS
+//     - FILTRO HOY / MES / TODO + 4 CAJAS (CON TARJETA) + FECHA EDITABLE
+// Pegar al final de app.js (debajo del Apartado 34)
+// =========================================================================
+
+(function inyectarCSSFinanzasUnificadas35() {
+    if (document.getElementById("cdmCssFinanzas35")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssFinanzas35";
+    st.textContent = `
+        .fin35-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+            background: var(--surface-solid, #ffffff);
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            border-radius: 16px;
+            padding: 0.75rem 0.95rem;
+            margin-bottom: 1rem;
+        }
+        .fin35-kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+            gap: 0.7rem;
+            margin-bottom: 1rem;
+        }
+        .fin35-kpi {
+            background: var(--surface-solid, #ffffff);
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            border-top: 3.5px solid #0284c7;
+            border-radius: 15px;
+            padding: 0.8rem 0.95rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        .fin35-kpi.ok { border-top-color: #10b981; }
+        .fin35-kpi.err { border-top-color: #ef4444; }
+        .fin35-kpi.warn { border-top-color: #f59e0b; }
+        .fin35-kpi.purple { border-top-color: #6366f1; }
+        .fin35-kpi small { font-size: 0.7rem; font-weight: 700; color: var(--ink-500, #64748b); }
+        .fin35-kpi strong { font-size: 1.22rem; font-weight: 900; color: var(--ink-900, #0f172a); line-height: 1.15; }
+        .fin35-kpi span { font-size: 0.7rem; color: var(--ink-500, #64748b); }
+
+        .fin35-cajas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .fin35-caja-card {
+            background: var(--surface-solid, #ffffff);
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            border-radius: 15px;
+            padding: 0.85rem 0.95rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+        .fin35-quick-form {
+            display: grid;
+            grid-template-columns: 125px 135px 1fr 150px 145px 115px auto;
+            gap: 0.45rem;
+            align-items: end;
+        }
+        .grid-caja-rapida-25 {
+            display: grid !important;
+            grid-template-columns: 120px 130px 1fr 145px 110px auto !important;
+            gap: 0.45rem !important;
+            align-items: end !important;
+        }
+        @media (max-width: 1024px) {
+            .fin35-quick-form,
+            .grid-caja-rapida-25 {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+            .fin35-quick-form button[type="submit"],
+            .grid-caja-rapida-25 button[type="submit"] {
+                grid-column: 1 / -1;
+                width: 100%;
+            }
+        }
+        @media (max-width: 640px) {
+            .fin35-kpis {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .fin35-quick-form,
+            .grid-caja-rapida-25 {
+                grid-template-columns: 1fr !important;
+            }
+            #cdmSeccionContabilidadGlobal .filter-strip {
+                grid-template-columns: 1fr !important;
+            }
+        }
+    `;
+    document.head.appendChild(st);
+})();
+
+// =========================================================================
+// 35.1 ALMACENAMIENTO AISLADO POR COMERCIO + MIGRACIÓN AUTOMÁTICA SIN PÉRDIDAS
+// =========================================================================
+
+function obtenerClaveClubFin35() {
+    if (typeof obtenerClaveClubActivoCDM === "function") return obtenerClaveClubActivoCDM();
+    return localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal";
+}
+
+function esClubPrincipalCDM35() {
+    return obtenerClaveClubFin35() === "cdm_adelia_maria_principal";
+}
+
+function normalizarMedioUnificado35(raw = "") {
+    const m = String(raw || "").toLowerCase();
+    if (m.includes("mercado") || m.includes("mp")) return "MercadoPago";
+    if (m.includes("transf") || m.includes("banco") || m.includes("cbu")) return "Transferencia";
+    if (m.includes("tarj") || m.includes("deb") || m.includes("cred")) return "Tarjeta";
+    return "Efectivo";
+}
+
+function obtenerRubrosFinancierosPorComercio35() {
+    const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+    const tieneSalud = Boolean(lic?.modulos?.consultorio && (lic.profesionesHabilitadas || []).length > 0);
+    const tieneDep = Boolean(lic?.modulos?.futbol || lic?.modulos?.hockey || lic?.modulos?.gym || (lic.deportesExtra || []).length > 0);
+
+    const rubros = [];
+    if (tieneDep) {
+        rubros.push("Cuota Deportiva / Socio", "Inscripción / Matrícula", "Pase Diario / Mostrador", "Indumentaria / Cantina", "Alquiler de Cancha / Salón", "Sponsor / Publicidad");
+    }
+    if (tieneSalud) {
+        rubros.push("Consulta Particular / Coseguro", "Liquidación Obra Social / Mutual", "Insumos Clínicos / Consultorio");
+    }
+    rubros.push("Sueldos / Honorarios Profes", "Alquiler de Inmueble", "Luz / Gas / Agua / Internet", "Compra Equipamiento / Repuestos", "Mantenimiento y Limpieza", "Impuestos / Contaduría", "Ajuste / Transferencia de Caja");
+    return [...new Set(rubros)];
+}
+
+// Sobrescribir helpers de storage de Parte 4 para aislarlos 100% por claveClub
+obtenerSaldosInicialesCajasCDM = function () {
+    const club = obtenerClaveClubFin35();
+    const key = `cdm_saldos_iniciales_v35_${club}`;
+    try {
+        const g = JSON.parse(localStorage.getItem(key) || "null");
+        if (g && typeof g === "object") return { Efectivo: 0, Transferencia: 0, MercadoPago: 0, Tarjeta: 0, ...g };
+    } catch {}
+    if (esClubPrincipalCDM35()) {
+        try {
+            const leg = JSON.parse(localStorage.getItem("cdm_saldos_iniciales_caja_v1") || "null");
+            if (leg && typeof leg === "object") {
+                localStorage.setItem(key, JSON.stringify(leg));
+                return { Efectivo: 0, Transferencia: 0, MercadoPago: 0, Tarjeta: 0, ...leg };
+            }
+        } catch {}
+    }
+    return { Efectivo: 0, Transferencia: 0, MercadoPago: 0, Tarjeta: 0 };
+};
+
+guardarSaldosInicialesCajasCDM = function (m) {
+    const club = obtenerClaveClubFin35();
+    localStorage.setItem(`cdm_saldos_iniciales_v35_${club}`, JSON.stringify(m));
+    if (esClubPrincipalCDM35()) localStorage.setItem("cdm_saldos_iniciales_caja_v1", JSON.stringify(m));
+};
+
+obtenerArqueoRealDeclaradoIACDM = function () {
+    const club = obtenerClaveClubFin35();
+    const key = `cdm_arqueo_real_v35_${club}`;
+    try {
+        const g = JSON.parse(localStorage.getItem(key) || "null");
+        if (g && typeof g === "object") return g;
+    } catch {}
+    if (esClubPrincipalCDM35()) {
+        try {
+            const leg = JSON.parse(localStorage.getItem("cdm_arqueo_real_declarado_v1") || "null");
+            if (leg && typeof leg === "object") {
+                localStorage.setItem(key, JSON.stringify(leg));
+                return leg;
+            }
+        } catch {}
+    }
+    return {};
+};
+
+guardarArqueoRealDeclaradoIACDM = function (m) {
+    const club = obtenerClaveClubFin35();
+    localStorage.setItem(`cdm_arqueo_real_v35_${club}`, JSON.stringify(m));
+    if (esClubPrincipalCDM35()) localStorage.setItem("cdm_arqueo_real_declarado_v1", JSON.stringify(m));
+};
+
+obtenerCostosFijosPlantillaCDM = function () {
+    const club = obtenerClaveClubFin35();
+    const key = `cdm_costos_fijos_v35_${club}`;
+    try {
+        const g = JSON.parse(localStorage.getItem(key) || "null");
+        if (Array.isArray(g)) return g;
+    } catch {}
+    if (esClubPrincipalCDM35()) {
+        try {
+            const leg = JSON.parse(localStorage.getItem("cdm_costos_fijos_v1") || "null");
+            if (Array.isArray(leg)) {
+                localStorage.setItem(key, JSON.stringify(leg));
+                return leg;
+            }
+        } catch {}
+    }
+    localStorage.setItem(key, JSON.stringify([]));
+    return [];
+};
+
+guardarCostosFijosPlantillaCDM = function (l) {
+    const club = obtenerClaveClubFin35();
+    localStorage.setItem(`cdm_costos_fijos_v35_${club}`, JSON.stringify(l));
+    if (esClubPrincipalCDM35()) localStorage.setItem("cdm_costos_fijos_v1", JSON.stringify(l));
+};
+
+obtenerMovimientosContablesCDM = function () {
+    const club = obtenerClaveClubFin35();
+    const key = `cdm_contabilidad_movs_v35_${club}`;
+    let movs = null;
+    try { movs = JSON.parse(localStorage.getItem(key) || "null"); } catch {}
+
+    if (!Array.isArray(movs)) {
+        movs = [];
+        // 1. Si es el club CDM principal, migrar historial anterior de cdm_contabilidad_movs_v2
+        if (esClubPrincipalCDM35()) {
+            try {
+                const leg = JSON.parse(localStorage.getItem("cdm_contabilidad_movs_v2") || "null");
+                if (Array.isArray(leg)) movs = [...leg];
+            } catch {}
+        }
+        // 2. Migrar movimientos manuales que se hubieran cargado en Cierre de Caja 25 para este comercio
+        try {
+            const movs25 = JSON.parse(localStorage.getItem(`cdm_caja_movs_v25_${club}`) || "[]");
+            if (Array.isArray(movs25) && movs25.length > 0) {
+                movs25.forEach(m => {
+                    if (!movs.some(x => String(x.id) === String(m.id))) {
+                        movs.push({
+                            id: m.id || Date.now() + Math.random(),
+                            comprobante: `CAJ-${String(m.id || Date.now()).slice(-4)}`,
+                            fecha: m.fecha || obtenerHoyISO(),
+                            tipo: m.tipo === "egreso" ? "egreso" : "ingreso",
+                            origen: "Caja Rápida",
+                            rubro: m.rubro || (m.tipo === "egreso" ? "Mantenimiento y Limpieza" : "Consulta Particular / Coseguro"),
+                            concepto: m.concepto || "Movimiento de caja",
+                            medio: normalizarMedioUnificado35(m.medio),
+                            monto: Number(m.monto || 0),
+                            personaId: null,
+                            nota: ""
+                        });
+                    }
+                });
+            }
+        } catch {}
+
+        localStorage.setItem(key, JSON.stringify(movs));
+    }
+
+    // Normalizar medios para que nunca queden fuera de las 4 cajas
+    return movs.map(m => ({ ...m, medio: normalizarMedioUnificado35(m.medio) }));
+};
+
+guardarMovimientosContablesCDM = function (lista) {
+    const club = obtenerClaveClubFin35();
+    const normalizada = (lista || []).map(m => ({ ...m, medio: normalizarMedioUnificado35(m.medio) }));
+    localStorage.setItem(`cdm_contabilidad_movs_v35_${club}`, JSON.stringify(normalizada));
+    if (esClubPrincipalCDM35()) {
+        localStorage.setItem("cdm_contabilidad_movs_v2", JSON.stringify(normalizada));
+    }
+};
+
+// =========================================================================
+// 35.2 BALANCE UNIFICADO MULTI-RUBRO (DEPORTES + GYM + CONSULTORIO/MUTUALES)
+// =========================================================================
+
+window._fin35Estado = {
+    tab: "caja",          // 'caja' | 'cuotas' | 'mutuales' | 'balance'
+    periodoModo: "mes",   // 'hoy' | 'mes' | 'todos'
+    mesSel: new Date().toISOString().slice(0, 7),
+    areaSel: "TODAS"
+};
+
+function obtenerPerfilComercioFin35() {
+    const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+    const mod = lic?.modulos || { futbol: true, hockey: true, gym: true, consultorio: false };
+    const extras = Array.isArray(lic?.deportesExtra) ? lic.deportesExtra.map(d => String(d).replace(/^[^\wÁÉÍÓÚáéíóúÑñ]+/, "").trim()).filter(Boolean) : [];
+    const tieneSalud = Boolean(mod.consultorio && (lic.profesionesHabilitadas || []).length > 0);
+    const areasDeportivas = [];
+    if (mod.gym) areasDeportivas.push("Gimnasio");
+    if (mod.futbol) areasDeportivas.push("Futbol");
+    if (mod.hockey) areasDeportivas.push("Hockey");
+    extras.forEach(d => { if (!areasDeportivas.includes(d)) areasDeportivas.push(d); });
+
+    const tieneDeporte = areasDeportivas.length > 0;
+    return { lic, tieneSalud, tieneDeporte, areasDeportivas };
+}
+
+function calcularPendienteMutualesReal35(mesFiltro = "TODOS") {
+    let total = 0;
+    let cant = 0;
+    if (typeof obtenerOrdenesMutualPendientesCDM === "function") {
+        const ordenes = obtenerOrdenesMutualPendientesCDM().filter(o =>
+            o && o.estado !== "Liquidada" &&
+            !String(o.mutual || "").toLowerCase().includes("particular") &&
+            (mesFiltro === "TODOS" || String(o.fecha || "").startsWith(mesFiltro))
+        );
+        cant = ordenes.length;
+        total = ordenes.reduce((a, o) => a + (Number(o.montoMutual) || 0), 0);
+    }
+    return { total, cant };
+}
+
+calcularBalanceGeneralContableCDM = function (areaFiltro = "TODAS", periodoFiltro = "TODOS") {
+    const perfil = obtenerPerfilComercioFin35();
+    const activos = (typeof basePersonas !== "undefined" ? basePersonas : []).filter(p =>
+        p && p.activo && (areaFiltro === "TODAS" || p.deporte === areaFiltro)
+    );
+    activos.forEach(p => { if (typeof asegurarEstructuraFinancieraPersonaCDM === "function") asegurarEstructuraFinancieraPersonaCDM(p); });
+
+    const todosMovs = obtenerMovimientosContablesCDM();
+    const coincidePeriodo = (fecha) => {
+        if (!periodoFiltro || periodoFiltro === "TODOS") return true;
+        return String(fecha || "").startsWith(periodoFiltro);
+    };
+
+    const esMovimientoConsultorio = (m) => {
+        const ori = String(m.origen || "").toLowerCase();
+        const rub = String(m.rubro || "").toLowerCase();
+        return ori.includes("consultorio") || ori.includes("mutual") || rub.includes("consulta") || rub.includes("mutual");
+    };
+
+    const movsPeriodo = todosMovs.filter(m => {
+        if (!coincidePeriodo(m.fecha)) return false;
+        if (areaFiltro === "TODAS") return true;
+        if (areaFiltro === "Consultorio") return esMovimientoConsultorio(m);
+        if (esMovimientoConsultorio(m)) return false;
+        if (m.personaId) {
+            const per = (basePersonas || []).find(x => Number(x.id) === Number(m.personaId));
+            return per && per.deporte === areaFiltro;
+        }
+        return !m.areaDeporte || m.areaDeporte === areaFiltro;
+    });
+
+    // Cuotas y mora (solo si el comercio tiene área deportiva/gym)
+    let facturacionExigibleCuotas = 0, moraTotalPendiente = 0;
+    const alDiaList = [], parcialList = [], pendientesList = [];
+    const filtroCuotasMes = periodoFiltro && periodoFiltro.length >= 7 ? periodoFiltro.slice(0, 7) : "TODOS";
+
+    if (perfil.tieneDeporte && areaFiltro !== "Consultorio") {
+        activos.forEach(p => {
+            const cuotaNeta = calcularCuotaNetaExigibleSocioCDM(p);
+            facturacionExigibleCuotas += cuotaNeta;
+            const pagado = calcularPagadoEnPeriodoPorSocioCDM(p.id, filtroCuotasMes);
+            const deuda = Math.max(0, cuotaNeta - pagado);
+            p._cuotaNetaCalculada = cuotaNeta;
+            p._pagadoCalculado = pagado;
+            p._saldoPendienteCalculado = deuda;
+
+            if (deuda === 0 && cuotaNeta > 0) { p.pagoEstado = "Al Día"; alDiaList.push(p); }
+            else if (pagado > 0 && deuda > 0) { p.pagoEstado = "Parcial"; parcialList.push(p); moraTotalPendiente += deuda; }
+            else { p.pagoEstado = "Pendiente"; pendientesList.push(p); moraTotalPendiente += deuda; }
+        });
+    }
+
+    // Separar ingresos limpiamente (Consultorio vs Cuotas vs Extra)
+    let ingresosConsultorio = 0, ingresosCuotas = 0, otrosIngresos = 0, gastosTotales = 0;
+    movsPeriodo.forEach(m => {
+        const val = Number(m.monto || 0);
+        if (m.tipo === "egreso") {
+            gastosTotales += val;
+        } else if (esMovimientoConsultorio(m)) {
+            ingresosConsultorio += val;
+        } else if (m.origen === "Cuota Socio" || m.rubro === "Cuota Deportiva / Socio") {
+            ingresosCuotas += val;
+        } else {
+            otrosIngresos += val;
+        }
+    });
+
+    const ingresosBrutos = ingresosCuotas + ingresosConsultorio + otrosIngresos;
+    const utilidadNeta = ingresosBrutos - gastosTotales;
+    const margenPct = ingresosBrutos > 0 ? Math.round((utilidadNeta / ingresosBrutos) * 100) : 0;
+
+    // Arqueo real de las 4 cajas (Efectivo, Transferencia, MercadoPago, Tarjeta)
+    const saldosIniciales = obtenerSaldosInicialesCajasCDM();
+    const arqueoRealDeclarado = obtenerArqueoRealDeclaradoIACDM();
+    const arqueoCajas = {};
+    let diferenciaTotalConciliacion = 0;
+
+    CUENTAS_TESORERIA_CDM.forEach(c => {
+        const ini = Number(saldosIniciales[c.clave] || 0);
+        const ing = movsPeriodo.filter(m => m.tipo === "ingreso" && m.medio === c.clave).reduce((a, m) => a + Number(m.monto || 0), 0);
+        const egr = movsPeriodo.filter(m => m.tipo === "egreso" && m.medio === c.clave).reduce((a, m) => a + Number(m.monto || 0), 0);
+        const saldoContable = ini + ing - egr;
+        const saldoReal = arqueoRealDeclarado[c.clave] !== undefined ? Number(arqueoRealDeclarado[c.clave]) : saldoContable;
+        const diff = saldoReal - saldoContable;
+        diferenciaTotalConciliacion += Math.abs(diff);
+        arqueoCajas[c.clave] = { ...c, saldoInicial: ini, ingresos: ing, egresos: egr, saldoFinal: saldoContable, saldoRealDeclarado: saldoReal, diferenciaConciliacion: diff };
+    });
+
+    const mutPend = perfil.tieneSalud ? calcularPendienteMutualesReal35(periodoFiltro === "TODOS" ? "TODOS" : periodoFiltro.slice(0, 7)) : { total: 0, cant: 0 };
+    const plantillaFijos = obtenerCostosFijosPlantillaCDM();
+    const totalCostosFijosPlantilla = plantillaFijos.reduce((a, f) => a + Number(f.monto || 0), 0);
+    const cuotaPromedio = activos.length > 0 ? Math.round(facturacionExigibleCuotas / activos.length) : 25000;
+    const sociosEquilibrio = cuotaPromedio > 0 ? Math.ceil(totalCostosFijosPlantilla / cuotaPromedio) : 0;
+    const tasaCobroPct = facturacionExigibleCuotas > 0 ? Math.min(100, Math.round((ingresosCuotas / facturacionExigibleCuotas) * 100)) : 100;
+
+    return {
+        perfil, activos, alDiaList, parcialList, pendientesList,
+        facturacionExigibleCuotas, ingresosCuotas, ingresosConsultorio, otrosIngresos,
+        ingresosBrutos, gastosTotales, utilidadNeta, margenPct,
+        moraPendiente: moraTotalPendiente,
+        pendienteMutuales: mutPend.total, cantOrdenesPendientes: mutPend.cant,
+        arqueoCajas, diferenciaTotalConciliacion, tasaCobroPct,
+        movsPeriodo, todosMovs, plantillaFijos, totalCostosFijosPlantilla, cuotaPromedio, sociosEquilibrio
+    };
+};
+
+// =========================================================================
+// 35.3 INTERFAZ UNIFICADA DE CONTABILIDAD Y CAJA (4 PESTAÑAS ADAPTABLES)
+// =========================================================================
+
+window.cambiarTabFin35 = function (nuevaTab) {
+    window._fin35Estado.tab = nuevaTab;
+    renderizarModuloContabilidadCompletoCDM();
+};
+
+window.cambiarPeriodoFin35 = function (modo, mesOpt = null) {
+    window._fin35Estado.periodoModo = modo;
+    if (mesOpt) window._fin35Estado.mesSel = mesOpt;
+    renderizarModuloContabilidadCompletoCDM();
+};
+
+window.guardarMovimientoRapidoFin35 = function (e) {
+    e.preventDefault();
+    const movs = obtenerMovimientosContablesCDM();
+    const tipo = document.getElementById("fin35Tipo").value;
+    const fecha = document.getElementById("fin35Fecha").value || obtenerHoyISO();
+    const concepto = document.getElementById("fin35Concepto").value.trim();
+    const rubro = document.getElementById("fin35Rubro").value;
+    const medio = document.getElementById("fin35Medio").value;
+    const monto = parseFloat(document.getElementById("fin35Monto").value) || 0;
+    if (!concepto || monto <= 0) return;
+
+    const esCons = rubro.toLowerCase().includes("consulta") || rubro.toLowerCase().includes("mutual");
+    movs.unshift({
+        id: Date.now(),
+        comprobante: `${tipo === "egreso" ? "EGR" : "ING"}-${Math.floor(1000 + Math.random() * 8999)}`,
+        fecha,
+        tipo,
+        origen: esCons ? "Consultorio" : "Manual",
+        rubro,
+        concepto,
+        medio: normalizarMedioUnificado35(medio),
+        monto,
+        personaId: null,
+        nota: ""
+    });
+    guardarMovimientosContablesCDM(movs);
+    if (typeof mostrarToast === "function") mostrarToast(`${tipo === "egreso" ? "📉 Egreso" : "💵 Ingreso"} guardado ($${monto.toLocaleString("es-AR")}).`);
+    renderizarModuloContabilidadCompletoCDM();
+};
+
+renderizarModuloContabilidadCompletoCDM = function () {
+    const sec = document.getElementById("cdmSeccionContabilidadGlobal");
+    if (!sec) return;
+
+    const perfil = obtenerPerfilComercioFin35();
+    const st = window._fin35Estado;
+
+    // Validar que la pestaña activa corresponda a los módulos contratados
+    if (st.tab === "cuotas" && !perfil.tieneDeporte) st.tab = "caja";
+    if (st.tab === "mutuales" && !perfil.tieneSalud) st.tab = "caja";
+
+    const hoyISO = obtenerHoyISO();
+    const filtroPeriodo = st.periodoModo === "hoy" ? hoyISO : (st.periodoModo === "mes" ? st.mesSel : "TODOS");
+    const bal = calcularBalanceGeneralContableCDM(st.areaSel, filtroPeriodo);
+    const rubrosDisp = obtenerRubrosFinancierosPorComercio35();
+
+    const busqTexto = (document.getElementById("inputBuscarSocioContableCDM")?.value || "").toLowerCase().trim();
+    const estadoSel = document.getElementById("filtroEstadoCuotaContableCDM")?.value || "todos";
+    const tipoMovFiltro = document.getElementById("filtroTipoLibroMayorCDM")?.value || "todos";
+    const cajaMovFiltro = document.getElementById("filtroCajaLibroMayorCDM")?.value || "TODAS";
+    const busqLibro = (document.getElementById("inputBuscarLibroMayorCDM")?.value || "").toLowerCase().trim();
+
+    const opcionesArea = [
+        `<option value="TODAS" ${st.areaSel === "TODAS" ? "selected" : ""}>🏢 Todo el Comercio</option>`,
+        ...perfil.areasDeportivas.map(a => `<option value="${a}" ${st.areaSel === a ? "selected" : ""}>🏆 ${a}</option>`),
+        ...(perfil.tieneSalud ? [`<option value="Consultorio" ${st.areaSel === "Consultorio" ? "selected" : ""}>🩺 Consultorio / Salud</option>`] : [])
+    ].join("");
+
+    sec.innerHTML = `
+        <!-- BARRA DE CONTROL Y FILTROS DE PERÍODO -->
+        <div class="fin35-topbar">
+            <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                <button type="button" class="btn ${st.periodoModo === "hoy" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="cambiarPeriodoFin35('hoy')">📍 Hoy</button>
+                <button type="button" class="btn ${st.periodoModo === "mes" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="cambiarPeriodoFin35('mes')">📅 Mes</button>
+                <input type="month" value="${st.mesSel}" onchange="cambiarPeriodoFin35('mes', this.value)" style="width:auto; min-height:34px; font-weight:700; font-size:0.8rem;">
+                <button type="button" class="btn ${st.periodoModo === "todos" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="cambiarPeriodoFin35('todos')">🗓️ Todo</button>
+                ${(perfil.areasDeportivas.length + (perfil.tieneSalud ? 1 : 0)) > 1 ? `
+                    <select onchange="window._fin35Estado.areaSel=this.value; renderizarModuloContabilidadCompletoCDM();" style="width:auto; min-height:34px; font-weight:700; font-size:0.8rem;">
+                        ${opcionesArea}
+                    </select>
+                ` : ""}
+            </div>
+            <div style="display:flex; gap:0.38rem; flex-wrap:wrap;">
+                ${perfil.tieneDeporte ? `<button type="button" class="btn btn-secondary btn-sm btn-aumento-masivo-25" onclick="abrirModalAumentoMasivoYAlias25()">📈 Cuotas & Alias WA</button>` : ""}
+                ${perfil.tieneSalud ? `<button type="button" class="btn btn-secondary btn-sm btn-lote-mutual-25" onclick="abrirModalLoteMensualMutuales25('${st.mesSel}')">📊 Lote Mutuales</button>` : ""}
+                <button type="button" class="btn btn-ok btn-sm" onclick="exportarInformeContableCSV()">📥 Excel</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ PDF</button>
+            </div>
+        </div>
+
+        <!-- 4 KPIs CLAROS Y DIRECTOS -->
+        <div class="fin35-kpis">
+            <div class="fin35-kpi ok">
+                <small>📈 Ingresos Cobrados</small>
+                <strong style="color:var(--ok-ink);">+$${bal.ingresosBrutos.toLocaleString("es-AR")}</strong>
+                <span>${perfil.tieneSalud && bal.ingresosConsultorio > 0 ? `Salud: $${bal.ingresosConsultorio.toLocaleString("es-AR")}` : `Cuotas: $${bal.ingresosCuotas.toLocaleString("es-AR")}`} • Extra: $${bal.otrosIngresos.toLocaleString("es-AR")}</span>
+            </div>
+            <div class="fin35-kpi err">
+                <small>📉 Egresos y Gastos</small>
+                <strong style="color:var(--err-ink);">-$${bal.gastosTotales.toLocaleString("es-AR")}</strong>
+                <span>${bal.movsPeriodo.filter(m => m.tipo === "egreso").length} comprobante(s)</span>
+            </div>
+            <div class="fin35-kpi ${bal.utilidadNeta >= 0 ? "ok" : "err"}">
+                <small>💰 Balance Neto Real</small>
+                <strong style="color:${bal.utilidadNeta >= 0 ? "var(--ok-ink)" : "var(--err-ink)"};">$${bal.utilidadNeta.toLocaleString("es-AR")}</strong>
+                <span>Margen neto: ${bal.margenPct}%</span>
+            </div>
+            ${perfil.tieneDeporte ? `
+                <div class="fin35-kpi warn" style="cursor:pointer;" onclick="cambiarTabFin35('cuotas')">
+                    <small>⚠️ Morosidad Cuotas</small>
+                    <strong style="color:var(--warn-ink);">$${bal.moraPendiente.toLocaleString("es-AR")}</strong>
+                    <span>${bal.pendientesList.length} pend. • ${bal.parcialList.length} parc. (${bal.tasaCobroPct}% cobrado)</span>
+                </div>
+            ` : ""}
+            ${perfil.tieneSalud ? `
+                <div class="fin35-kpi purple" style="cursor:pointer;" onclick="cambiarTabFin35('mutuales')">
+                    <small>🏥 Pendiente Mutuales</small>
+                    <strong style="color:var(--purple-ink);">$${bal.pendienteMutuales.toLocaleString("es-AR")}</strong>
+                    <span>${bal.cantOrdenesPendientes} orden(es) por acreditar</span>
+                </div>
+            ` : ""}
+        </div>
+
+        <!-- PESTAÑAS LIMPIAS Y ADAPTADAS AL RUBRO -->
+        <div class="module-tabs" style="margin-bottom:1.1rem;">
+            <button type="button" class="mod-tab ${st.tab === "caja" ? "active" : ""}" onclick="cambiarTabFin35('caja')">
+                <i class="ri-safe-2-line"></i><span>Caja y Libro Mayor (${bal.movsPeriodo.length})</span>
+            </button>
+            ${perfil.tieneDeporte ? `
+                <button type="button" class="mod-tab ${st.tab === "cuotas" ? "active" : ""}" onclick="cambiarTabFin35('cuotas')">
+                    <i class="ri-user-follow-line"></i><span>Cuotas y Cta. Cte. (${bal.activos.length})</span>
+                </button>
+            ` : ""}
+            ${perfil.tieneSalud ? `
+                <button type="button" class="mod-tab ${st.tab === "mutuales" ? "active" : ""}" onclick="cambiarTabFin35('mutuales')">
+                    <i class="ri-hospital-line"></i><span>Mutuales y Lotes (${bal.cantOrdenesPendientes})</span>
+                </button>
+            ` : ""}
+            <button type="button" class="mod-tab ${st.tab === "balance" ? "active" : ""}" onclick="cambiarTabFin35('balance')">
+                <i class="ri-pie-chart-2-line"></i><span>Balance, Fijos y Arqueo</span>
+            </button>
+        </div>
+
+        <div id="contenedorCuerpoFin35"></div>
+    `;
+
+    const bodyCont = document.getElementById("contenedorCuerpoFin35");
+    if (!bodyCont) return;
+
+    // ---------------------------------------------------------------------
+    // TAB 1: CAJA (4 MEDIOS DE PAGO) + CARGA RÁPIDA + LIBRO MAYOR
+    // ---------------------------------------------------------------------
+    if (st.tab === "caja") {
+        let movsF = [...bal.movsPeriodo];
+        if (tipoMovFiltro === "ingresos") movsF = movsF.filter(m => m.tipo === "ingreso");
+        else if (tipoMovFiltro === "egresos") movsF = movsF.filter(m => m.tipo === "egreso");
+        if (cajaMovFiltro !== "TODAS") movsF = movsF.filter(m => m.medio === cajaMovFiltro);
+        if (busqLibro) movsF = movsF.filter(m => (m.concepto || "").toLowerCase().includes(busqLibro) || (m.rubro || "").toLowerCase().includes(busqLibro) || (m.comprobante || "").toLowerCase().includes(busqLibro));
+        movsF.sort((a, b) => new Date(b.fecha) - new Date(a.fecha) || b.id - a.id);
+
+        bodyCont.innerHTML = `
+            <!-- LAS 4 CAJAS SIEMPRE VISIBLES (EFECTIVO, TRANSFERENCIA, MP, TARJETA) -->
+            <div class="fin35-cajas-grid">
+                ${CUENTAS_TESORERIA_CDM.map(c => {
+                    const info = bal.arqueoCajas[c.clave];
+                    return `
+                        <div class="fin35-caja-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem;">
+                                <strong style="font-size:0.8rem; color:var(--ink-900);">${c.icono} ${c.clave}</strong>
+                                <button type="button" class="btn btn-ghost btn-sm" style="min-height:24px; padding:0 6px; font-size:0.68rem;" onclick="ajustarSaldoInicialCajaPromptCDM('${c.clave}')">Base: $${info.saldoInicial.toLocaleString("es-AR")}</button>
+                            </div>
+                            <div style="font-size:1.3rem; font-weight:900; color:var(--ink-900);">$${info.saldoFinal.toLocaleString("es-AR")}</div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.72rem;">
+                                <span style="color:var(--ok-ink); font-weight:700;">+$${info.ingresos.toLocaleString("es-AR")}</span>
+                                <span style="color:var(--err-ink); font-weight:700;">-$${info.egresos.toLocaleString("es-AR")}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+
+            <!-- CARGA RÁPIDA DE INGRESO O GASTO (CON FECHA VISIBLE Y RESPONSIVE) -->
+            <div class="app-panel" style="margin-bottom:1rem;">
+                <div class="panel-head" style="margin-bottom:0.65rem;">
+                    <h3><i class="ri-add-circle-line"></i> Carga Rápida en Caja</h3>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalEditarOCrearAsientoLibroCDM(null)">Asiento Detallado</button>
+                </div>
+                <form onsubmit="guardarMovimientoRapidoFin35(event)" class="fin35-quick-form">
+                    <div class="field"><label>Tipo</label>
+                        <select id="fin35Tipo" style="font-weight:700;">
+                            <option value="ingreso">🟢 Ingreso (+)</option>
+                            <option value="egreso">🔴 Gasto (-)</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>Fecha *</label><input type="date" id="fin35Fecha" required value="${hoyISO}"></div>
+                    <div class="field"><label>Concepto *</label><input type="text" id="fin35Concepto" required placeholder="Ej: Pase diario / Agua / Alquiler / Sesión..."></div>
+                    <div class="field"><label>Rubro</label>
+                        <select id="fin35Rubro">${rubrosDisp.map(r => `<option value="${r}">${r}</option>`).join("")}</select>
+                    </div>
+                    <div class="field"><label>Caja / Medio</label>
+                        <select id="fin35Medio">${CUENTAS_TESORERIA_CDM.map(c => `<option value="${c.clave}">${c.icono} ${c.clave}</option>`).join("")}</select>
+                    </div>
+                    <div class="field"><label>Monto ($) *</label><input type="number" id="fin35Monto" required min="1" placeholder="15000" style="font-weight:800;"></div>
+                    <button type="submit" class="btn btn-primary btn-sm" style="min-height:38px;">+ Guardar</button>
+                </form>
+            </div>
+
+            <!-- LIBRO MAYOR UNIFICADO -->
+            <div class="app-panel">
+                <div class="panel-head"><h3><i class="ri-book-open-line"></i> Movimientos del Período (${movsF.length})</h3></div>
+                <div class="filter-strip" style="grid-template-columns: 1fr auto auto; margin-bottom:0.9rem;">
+                    <div class="search-box"><i class="ri-search-line"></i><input type="text" id="inputBuscarLibroMayorCDM" placeholder="Buscar concepto, rubro o comprobante..." value="${busqLibro.replace(/"/g, "&quot;")}" oninput="renderizarModuloContabilidadCompletoCDM()"></div>
+                    <select id="filtroTipoLibroMayorCDM" onchange="renderizarModuloContabilidadCompletoCDM()" style="width:auto;">
+                        <option value="todos" ${tipoMovFiltro === "todos" ? "selected" : ""}>🔄 Todos</option>
+                        <option value="ingresos" ${tipoMovFiltro === "ingresos" ? "selected" : ""}>📈 Ingresos (+)</option>
+                        <option value="egresos" ${tipoMovFiltro === "egresos" ? "selected" : ""}>📉 Gastos (-)</option>
+                    </select>
+                    <select id="filtroCajaLibroMayorCDM" onchange="renderizarModuloContabilidadCompletoCDM()" style="width:auto;">
+                        <option value="TODAS" ${cajaMovFiltro === "TODAS" ? "selected" : ""}>🏦 Todas las Cajas</option>
+                        ${CUENTAS_TESORERIA_CDM.map(c => `<option value="${c.clave}" ${cajaMovFiltro === c.clave ? "selected" : ""}>${c.icono} ${c.clave}</option>`).join("")}
+                    </select>
+                </div>
+
+                ${movsF.length === 0 ? `<div class="empty-box">Sin movimientos registrados en este período.</div>` : `
+                    <div class="table-wrap">
+                        <table class="app-table">
+                            <thead><tr><th>Fecha</th><th>Concepto / Rubro</th><th>Caja</th><th>Monto</th><th style="text-align:right;">Acciones</th></tr></thead>
+                            <tbody>
+                                ${movsF.map(m => `
+                                    <tr>
+                                        <td><b>${m.fecha}</b><br><small style="color:var(--ink-400);">${m.comprobante || "-"}</small></td>
+                                        <td><strong>${m.concepto}</strong><br><small style="color:var(--ink-500);">${m.rubro}</small></td>
+                                        <td><span class="badge badge-celeste">${m.medio}</span></td>
+                                        <td><strong style="color:${m.tipo === "ingreso" ? "var(--ok-ink)" : "var(--err-ink)"};">${m.tipo === "ingreso" ? "+" : "-"}$${Number(m.monto || 0).toLocaleString("es-AR")}</strong></td>
+                                        <td style="text-align:right;">
+                                            <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalEditarOCrearAsientoLibroCDM(${m.id})">✏️</button>
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="eliminarAsientoContableCDM(${m.id})">🗑️</button>
+                                        </td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        `;
+    }
+
+    // ---------------------------------------------------------------------
+    // TAB 2: CUOTAS Y CUENTA CORRIENTE (DEPORTES / GIMNASIO)
+    // ---------------------------------------------------------------------
+    else if (st.tab === "cuotas") {
+        let sociosF = [...bal.activos];
+        if (estadoSel === "al_dia") sociosF = sociosF.filter(p => p.pagoEstado === "Al Día");
+        else if (estadoSel === "parcial") sociosF = sociosF.filter(p => p.pagoEstado === "Parcial");
+        else if (estadoSel === "pendientes") sociosF = sociosF.filter(p => p.pagoEstado !== "Al Día");
+        if (busqTexto) sociosF = sociosF.filter(p => `${p.nombre} ${p.apellido} ${p.dni || ""}`.toLowerCase().includes(busqTexto));
+
+        bodyCont.innerHTML = `
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div><h3><i class="ri-bank-card-2-line"></i> Cuentas Corrientes y Cobro de Cuotas</h3></div>
+                    <button type="button" class="btn btn-secondary btn-sm btn-aumento-masivo-25" onclick="abrirModalAumentoMasivoYAlias25()">📈 Aumento Masivo & Alias WA</button>
+                </div>
+                <div class="filter-strip" style="grid-template-columns: 1fr auto; margin-bottom:0.9rem;">
+                    <div class="search-box"><i class="ri-search-line"></i><input type="text" id="inputBuscarSocioContableCDM" placeholder="Buscar por nombre, apellido o DNI..." value="${busqTexto.replace(/"/g, "&quot;")}" oninput="renderizarModuloContabilidadCompletoCDM()"></div>
+                    <select id="filtroEstadoCuotaContableCDM" onchange="renderizarModuloContabilidadCompletoCDM()" style="width:auto;">
+                        <option value="todos" ${estadoSel === "todos" ? "selected" : ""}>📋 Todos (${bal.activos.length})</option>
+                        <option value="pendientes" ${estadoSel === "pendientes" ? "selected" : ""}>⚠️ Con Deuda (${bal.pendientesList.length + bal.parcialList.length})</option>
+                        <option value="parcial" ${estadoSel === "parcial" ? "selected" : ""}>🌓 Parcial (${bal.parcialList.length})</option>
+                        <option value="al_dia" ${estadoSel === "al_dia" ? "selected" : ""}>✓ Al Día (${bal.alDiaList.length})</option>
+                    </select>
+                </div>
+                <div class="table-wrap">
+                    <table class="app-table">
+                        <thead><tr><th>Persona</th><th>Sector</th><th>Exigible</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th style="text-align:right;">Acciones</th></tr></thead>
+                        <tbody>
+                            ${sociosF.map(p => {
+                                const est = p.pagoEstado || "Al Día";
+                                const bCls = est === "Al Día" ? "badge-ok" : (est === "Parcial" ? "badge-warn" : "badge-danger");
+                                return `
+                                    <tr>
+                                        <td><strong>${p.apellido}, ${p.nombre}</strong><br><small style="color:var(--ink-500);">DNI ${p.dni}</small></td>
+                                        <td><span class="badge badge-celeste">${p.deporte}</span></td>
+                                        <td><strong>$${Number(p._cuotaNetaCalculada || 0).toLocaleString("es-AR")}</strong>${p.becaPct ? ` <small>(-${p.becaPct}%)</small>` : ""}</td>
+                                        <td><strong style="color:var(--ok-ink);">$${Number(p._pagadoCalculado || 0).toLocaleString("es-AR")}</strong></td>
+                                        <td><strong style="color:${p._saldoPendienteCalculado > 0 ? "var(--err-ink)" : "var(--ink-400)"};">$${Number(p._saldoPendienteCalculado || 0).toLocaleString("es-AR")}</strong></td>
+                                        <td><span class="badge ${bCls}">${est}</span></td>
+                                        <td style="text-align:right;">
+                                            <div style="display:flex; gap:0.3rem; flex-wrap:wrap; justify-content:flex-end;">
+                                                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRegistrarCobroSocioERP(${p.id})">💵 Cobrar</button>
+                                                <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalConfigurarCuotaSocioERP(${p.id})" title="Editar Cuota / Beca">✏️</button>
+                                                <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarReciboPagoWhatsApp(${p.id})"><i class="ri-whatsapp-line"></i></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    // ---------------------------------------------------------------------
+    // TAB 3: MUTUALES Y LIQUIDACIONES (SOLO SI TIENE CONSULTORIO)
+    // ---------------------------------------------------------------------
+    else if (st.tab === "mutuales") {
+        const ordenes = typeof obtenerOrdenesMutualPendientesCDM === "function" ? obtenerOrdenesMutualPendientesCDM() : [];
+        const pend = ordenes.filter(o => o.estado !== "Liquidada");
+        bodyCont.innerHTML = `
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3><i class="ri-hospital-line"></i> Órdenes de Mutuales y Obras Sociales</h3>
+                        <small style="color:var(--ink-500);">Cuando te acreditan el lote mensual, liquidalo en 1 clic para que entre a Banco/Transferencia.</small>
+                    </div>
+                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalLoteMensualMutuales25('${st.mesSel}')">📊 Exportar Lote Excel / PDF</button>
+                        ${pend.length > 0 ? `<button type="button" class="btn btn-primary btn-sm" onclick="liquidarTodasLasOrdenesMutualesAlBancoCDM(); renderizarModuloContabilidadCompletoCDM();">🏦 Liquidar Pendientes ($${bal.pendienteMutuales.toLocaleString("es-AR")})</button>` : ""}
+                    </div>
+                </div>
+                ${ordenes.length === 0 ? `<div class="empty-box">No hay órdenes de mutuales registradas todavía.</div>` : `
+                    <div class="table-wrap">
+                        <table class="app-table">
+                            <thead><tr><th>Fecha</th><th>Mutual</th><th>Paciente</th><th>N° Orden</th><th>Monto Mutual</th><th>Estado</th><th style="text-align:right;">Acción</th></tr></thead>
+                            <tbody>
+                                ${ordenes.map(o => `
+                                    <tr>
+                                        <td><b>${o.fecha}</b></td>
+                                        <td><span class="badge badge-purple">${o.mutual}</span></td>
+                                        <td><strong>${o.pacienteNombre}</strong></td>
+                                        <td>${o.nroOrden || "-"}</td>
+                                        <td><strong>$${Number(o.montoMutual || 0).toLocaleString("es-AR")}</strong></td>
+                                        <td><span class="badge ${o.estado === "Liquidada" ? "badge-ok" : "badge-warn"}">${o.estado === "Liquidada" ? "✓ Cobrada" : "⏳ Pendiente"}</span></td>
+                                        <td style="text-align:right;">
+                                            ${o.estado !== "Liquidada" ? `<button type="button" class="btn btn-primary btn-sm" onclick="liquidarOrdenIndividualMutualABancoCDM(${o.id}); renderizarModuloContabilidadCompletoCDM();">🏦 Acreditar</button>` : ""}
+                                        </td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        `;
+    }
+
+    // ---------------------------------------------------------------------
+    // TAB 4: BALANCE P&L + COSTOS FIJOS + ARQUEO / TRANSFERENCIAS ENTRE CAJAS
+    // ---------------------------------------------------------------------
+    else {
+        const mapaGastos = {};
+        bal.movsPeriodo.filter(m => m.tipo === "egreso").forEach(m => {
+            mapaGastos[m.rubro] = (mapaGastos[m.rubro] || 0) + Number(m.monto || 0);
+        });
+
+        bodyCont.innerHTML = `
+            <div class="split-equal" style="margin-bottom:1rem;">
+                <div class="app-panel">
+                    <div class="panel-head">
+                        <h3><i class="ri-pie-chart-2-line"></i> Estado de Resultados (P&L)</h3>
+                        <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarResumenContableWhatsAppCDM()"><i class="ri-whatsapp-line"></i> Enviar WA</button>
+                    </div>
+                    <div class="pnl-statement-box">
+                        ${perfil.tieneDeporte ? `<div class="pnl-line"><span>💳 Ingresos por Cuotas</span><strong style="color:var(--ok-ink);">+$${bal.ingresosCuotas.toLocaleString("es-AR")}</strong></div>` : ""}
+                        ${perfil.tieneSalud ? `<div class="pnl-line"><span>🩺 Ingresos Consultorio / Mutuales</span><strong style="color:var(--ok-ink);">+$${bal.ingresosConsultorio.toLocaleString("es-AR")}</strong></div>` : ""}
+                        <div class="pnl-line"><span>➕ Otros Ingresos / Mostrador</span><strong style="color:var(--ok-ink);">+$${bal.otrosIngresos.toLocaleString("es-AR")}</strong></div>
+                        <div class="pnl-line pnl-subtotal"><span>= TOTAL INGRESOS</span><span>$${bal.ingresosBrutos.toLocaleString("es-AR")}</span></div>
+                        ${Object.entries(mapaGastos).map(([r, t]) => `<div class="pnl-line"><span>➖ ${r}</span><strong style="color:var(--err-ink);">-$${t.toLocaleString("es-AR")}</strong></div>`).join("")}
+                        <div class="pnl-line pnl-subtotal"><span>= TOTAL EGRESOS</span><span style="color:var(--err-ink);">-$${bal.gastosTotales.toLocaleString("es-AR")}</span></div>
+                        <div class="pnl-line pnl-net"><span>🏦 RESULTADO NETO REAL</span><span style="color:${bal.utilidadNeta >= 0 ? "var(--ok-ink)" : "var(--err-ink)"};">$${bal.utilidadNeta.toLocaleString("es-AR")} (${bal.margenPct}%)</span></div>
+                    </div>
+                </div>
+                <div class="app-panel">
+                    <div class="panel-head"><h3><i class="ri-bar-chart-grouped-line"></i> Gráfico Financiero</h3></div>
+                    <div class="chart-canvas-box" style="height:260px;"><canvas id="canvasBalanceContableCDM"></canvas></div>
+                </div>
+            </div>
+
+            <div class="split-equal">
+                <!-- COSTOS FIJOS MENSUALES -->
+                <div class="app-panel">
+                    <div class="panel-head">
+                        <div><h3>🏢 Costos Fijos ($${bal.totalCostosFijosPlantilla.toLocaleString("es-AR")}/mes)</h3></div>
+                        ${bal.plantillaFijos.length > 0 ? `<button type="button" class="btn btn-primary btn-sm" onclick="impactarCostosFijosEnLibroMayorCDM()">⚡ Impactar Mes</button>` : ""}
+                    </div>
+                    <form onsubmit="guardarNuevoCostoFijoPlantillaCDM(event)" class="grid-2" style="margin-bottom:0.85rem;">
+                        <div class="field"><label>Concepto *</label><input type="text" id="cfConcepto" required placeholder="Ej: Alquiler / Luz / Profes..."></div>
+                        <div class="field"><label>Monto ($) *</label><input type="number" id="cfMonto" required min="1" placeholder="120000"></div>
+                        <div class="field"><label>Rubro</label><select id="cfRubro">${rubrosDisp.map(r => `<option value="${r}">${r}</option>`).join("")}</select></div>
+                        <div class="field"><label>Caja</label><select id="cfMedio">${CUENTAS_TESORERIA_CDM.map(c => `<option value="${c.clave}">${c.clave}</option>`).join("")}</select></div>
+                        <input type="hidden" id="cfDia" value="10">
+                        <button type="submit" class="btn btn-secondary btn-sm" style="grid-column:1/-1;">+ Agregar Costo Fijo</button>
+                    </form>
+                    ${bal.plantillaFijos.length === 0 ? `<div class="empty-box" style="padding:0.9rem;">Sin costos fijos cargados. Agregá alquiler, servicios u honorarios arriba.</div>` : `
+                        <div style="display:flex; flex-direction:column; gap:0.4rem;">
+                            ${bal.plantillaFijos.map(f => `
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.5rem 0.7rem; background:var(--surface-subtle); border-radius:10px; font-size:0.8rem;">
+                                    <div><strong>${f.concepto}</strong> <small style="color:var(--ink-500);">(${f.medio})</small></div>
+                                    <div style="display:flex; align-items:center; gap:0.35rem;">
+                                        <strong>$${Number(f.monto).toLocaleString("es-AR")}</strong>
+                                        <button type="button" class="btn btn-danger btn-sm" style="min-height:24px; padding:0 6px;" onclick="eliminarCostoFijoPlantillaCDM(${f.id})">🗑️</button>
+                                    </div>
+                                </div>
+                            `).join("")}
+                        </div>
+                    `}
+                </div>
+
+                <!-- TRANSFERENCIAS ENTRE CAJAS Y ARQUEO REAL -->
+                <div class="app-panel">
+                    <div class="panel-head"><h3><i class="ri-exchange-dollar-line"></i> Mover Plata entre Cajas y Arqueo</h3></div>
+                    <form onsubmit="registrarTransferenciaEntreCajasCDM(event)" class="grid-2" style="margin-bottom:0.9rem;">
+                        <div class="field"><label>Desde</label><select id="trCajaOrigen">${CUENTAS_TESORERIA_CDM.map(c => `<option value="${c.clave}">${c.icono} ${c.clave}</option>`).join("")}</select></div>
+                        <div class="field"><label>Hacia</label><select id="trCajaDestino">${CUENTAS_TESORERIA_CDM.map((c, i) => `<option value="${c.clave}" ${i === 1 ? "selected" : ""}>${c.icono} ${c.clave}</option>`).join("")}</select></div>
+                        <div class="field" style="grid-column:1/-1; display:flex; gap:0.45rem; align-items:end;">
+                            <div style="flex:1;"><label>Monto ($)</label><input type="number" id="trCajaMonto" required min="1" placeholder="50000"></div>
+                            <button type="submit" class="btn btn-primary btn-sm" style="min-height:38px;">Transferir</button>
+                        </div>
+                    </form>
+                    <strong style="font-size:0.78rem; color:var(--ink-700); display:block; margin-bottom:0.45rem;">🔍 Conciliación de Saldo Real (Contar Caja):</strong>
+                    <div style="display:flex; flex-direction:column; gap:0.38rem;">
+                        ${CUENTAS_TESORERIA_CDM.map(c => {
+                            const info = bal.arqueoCajas[c.clave];
+                            const ok = info.diferenciaConciliacion === 0;
+                            return `
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; padding:0.45rem 0.65rem; background:var(--surface-subtle); border-radius:10px; font-size:0.77rem;">
+                                    <span>${c.icono} <b>${c.clave}:</b> $${info.saldoFinal.toLocaleString("es-AR")}</span>
+                                    <div style="display:flex; gap:0.3rem; align-items:center;">
+                                        <span class="badge ${ok ? "badge-ok" : "badge-danger"}" style="font-size:0.65rem;">${ok ? "✓ OK" : `Diff $${info.diferenciaConciliacion.toLocaleString("es-AR")}`}</span>
+                                        <button type="button" class="btn btn-ghost btn-sm" style="min-height:24px; padding:0 6px; font-size:0.7rem;" onclick="declararSaldoRealExtractoPromptIA('${c.clave}')">Contar</button>
+                                        ${!ok ? `<button type="button" class="btn btn-primary btn-sm" style="min-height:24px; padding:0 6px; font-size:0.7rem;" onclick="conciliarAutomaticamenteDiferenciaCajaIA('${c.clave}')">Ajustar</button>` : ""}
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                </div>
+            </div>
+        `;
+        setTimeout(() => dibujarGraficoBalanceContableCDM(bal), 50);
+    }
+};
+
+// Conectar el botón viejo de "Ajuste Masivo Cuotas" al modal pro del Apartado 25
+if (typeof abrirModalAumentoMasivoYAlias25 === "function") {
+    actualizarPrecioCuotaMasivoCDM = abrirModalAumentoMasivoYAlias25;
+}
+
+// =========================================================================
+// 35.4 CONECTAR EL MODAL "CIERRE DE CAJA 25" AL MISMO LIBRO MAYOR UNIFICADO
+// =========================================================================
+
+window.abrirModalCierreCaja25 = function (mesOpt = null) {
+    const mesSel = mesOpt || obtenerMesActualYYYYMM25();
+    const hoy = obtenerHoyISO();
+    const bal = calcularBalanceGeneralContableCDM("TODAS", mesSel);
+    const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+    const modal = asegurarModalPaquete1_25();
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:880px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-ok">💵 ARQUEO UNIFICADO DE CAJA (4 MEDIOS DE PAGO)</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Cierre de Caja — ${lic.nombreEntidad || "Mi Comercio"}</h3>
+                </div>
+                <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                    <input type="month" value="${mesSel}" onchange="abrirModalCierreCaja25(this.value)" style="width:auto; min-height:32px; font-weight:800; font-size:0.78rem;">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+
+            <div class="fin35-cajas-grid" style="margin-bottom:0.9rem;">
+                ${CUENTAS_TESORERIA_CDM.map(c => {
+                    const info = bal.arqueoCajas[c.clave];
+                    return `
+                        <div class="fin35-caja-card" style="padding:0.65rem 0.8rem;">
+                            <small style="font-weight:800; color:var(--ink-500);">${c.icono} ${c.clave}</small>
+                            <strong style="font-size:1.15rem; color:var(--ink-900);">$${info.saldoFinal.toLocaleString("es-AR")}</strong>
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+
+            <form onsubmit="guardarMovDesdeModalCaja35(event, '${mesSel}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:14px; padding:0.85rem; margin-bottom:0.9rem;">
+                <div class="grid-caja-rapida-25">
+                    <div class="field"><label>Tipo</label><select id="mCajaTipo35"><option value="ingreso">🟢 Ingreso</option><option value="egreso">🔴 Gasto</option></select></div>
+                    <div class="field"><label>Fecha *</label><input type="date" id="mCajaFecha35" required value="${hoy}"></div>
+                    <div class="field"><label>Concepto *</label><input type="text" id="mCajaConcepto35" required placeholder="Ej: Sesión / Cuota / Gasto..."></div>
+                    <div class="field"><label>Medio</label><select id="mCajaMedio35">${CUENTAS_TESORERIA_CDM.map(c => `<option value="${c.clave}">${c.icono} ${c.clave}</option>`).join("")}</select></div>
+                    <div class="field"><label>Monto ($) *</label><input type="number" id="mCajaMonto35" required min="1" placeholder="15000"></div>
+                    <button type="submit" class="btn btn-primary btn-sm" style="min-height:38px;">+ Sumar</button>
+                </div>
+            </form>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.45rem; margin-bottom:0.6rem;">
+                <strong style="font-size:0.85rem;">Balance Neto (${mesSel}): <span style="color:${bal.utilidadNeta >= 0 ? "var(--ok-ink)" : "var(--err-ink)"};">$${bal.utilidadNeta.toLocaleString("es-AR")}</span></strong>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="cerrarModalPaquete1_25(); abrirModuloContabilidadIndependienteCDM();">Abrir Contabilidad Completa →</button>
+                    <button type="button" class="btn btn-ok btn-sm" onclick="exportarInformeContableCSV()">📥 Excel</button>
+                </div>
+            </div>
+
+            <div class="table-wrap" style="max-height:240px; overflow-y:auto;">
+                <table class="app-table">
+                    <thead><tr><th>Fecha</th><th>Concepto</th><th>Caja</th><th>Monto</th></tr></thead>
+                    <tbody>
+                        ${bal.movsPeriodo.length === 0 ? `<tr><td colspan="4" style="text-align:center;">Sin movimientos en ${mesSel}.</td></tr>` :
+                        bal.movsPeriodo.slice(0, 25).map(m => `
+                            <tr>
+                                <td><b>${m.fecha}</b></td>
+                                <td><strong>${m.concepto}</strong></td>
+                                <td><span class="badge badge-celeste">${m.medio}</span></td>
+                                <td><strong style="color:${m.tipo === "ingreso" ? "var(--ok-ink)" : "var(--err-ink)"};">${m.tipo === "ingreso" ? "+" : "-"}$${Number(m.monto || 0).toLocaleString("es-AR")}</strong></td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.guardarMovDesdeModalCaja35 = function (e, mesSel) {
+    e.preventDefault();
+    const movs = obtenerMovimientosContablesCDM();
+    const tipo = document.getElementById("mCajaTipo35").value;
+    movs.unshift({
+        id: Date.now(),
+        comprobante: `CAJ-${Math.floor(1000 + Math.random() * 8999)}`,
+        fecha: document.getElementById("mCajaFecha35").value || obtenerHoyISO(),
+        tipo,
+        origen: "Caja Rápida",
+        rubro: tipo === "egreso" ? "Mantenimiento y Limpieza" : "Consulta Particular / Coseguro",
+        concepto: document.getElementById("mCajaConcepto35").value.trim(),
+        medio: normalizarMedioUnificado35(document.getElementById("mCajaMedio35").value),
+        monto: parseFloat(document.getElementById("mCajaMonto35").value) || 0,
+        personaId: null,
+        nota: ""
+    });
+    guardarMovimientosContablesCDM(movs);
+    if (typeof mostrarToast === "function") mostrarToast("💵 Movimiento guardado en el Libro Mayor.");
+    abrirModalCierreCaja25(mesSel);
+    if (!document.getElementById("cdmSeccionContabilidadGlobal")?.classList.contains("hidden")) {
+        renderizarModuloContabilidadCompletoCDM();
+    }
+};

@@ -1,6 +1,6 @@
 {
   "claveClub": "cdm_adelia_maria_principal",
-  "ultimaActualizacionISO": "2026-11-19T18:42:43.694Z",
+  "ultimaActualizacionISO": "2026-11-19T19:49:47.794Z",
   "personas": [
     {
       "id": 101,
@@ -77,7 +77,7 @@
           "nota": "Récord"
         }
       ],
-      "codigoAcceso": "CDM-Z8CX",
+      "codigoAcceso": "CDM-CBJK",
       "historialPagos": [],
       "puntosCategoria": 9,
       "becaPct": 0,
@@ -87,7 +87,7 @@
       "_saldoPendienteCalculado": 0,
       "ultimoPagoFecha": "2026-11-18",
       "foto": null,
-      "puedeCrearRutinas": false,
+      "puedeCrearRutinas": true,
       "modoVistaRutina": "simple",
       "fechaNacimiento": "2026-11-18"
     },
@@ -1005,7 +1005,7 @@
   "clubes": {
     "cdm_adelia_maria_principal": {
       "claveClub": "cdm_adelia_maria_principal",
-      "ultimaActualizacionISO": "2026-11-19T18:42:43.694Z",
+      "ultimaActualizacionISO": "2026-11-19T19:49:47.794Z",
       "personas": [
         {
           "id": 101,
@@ -1082,7 +1082,7 @@
               "nota": "Récord"
             }
           ],
-          "codigoAcceso": "CDM-Z8CX",
+          "codigoAcceso": "CDM-CBJK",
           "historialPagos": [],
           "puntosCategoria": 9,
           "becaPct": 0,
@@ -1092,7 +1092,7 @@
           "_saldoPendienteCalculado": 0,
           "ultimoPagoFecha": "2026-11-18",
           "foto": null,
-          "puedeCrearRutinas": false,
+          "puedeCrearRutinas": true,
           "modoVistaRutina": "simple",
           "fechaNacimiento": "2026-11-18"
         },
