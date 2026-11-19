@@ -9132,27 +9132,30 @@ document.addEventListener("DOMContentLoaded", () => {
     if (deportePagina === "Gimnasio") renderizarVideotecaGym();
 });
 // =========================================================================
-// 17. MÓDULO DE CONSULTORIO 100% RESPONSIVO + CUADERNO HISTÓRICO DE NOTAS POR SESIÓN
-//     - CALENDARIO DE 30 DÍAS ADAPTATIVO EN MÓVIL Y ESCRITORIO + AGENDA DEL DÍA AL PIE
-//     - HISTÓRICO DE SESIONES CLARO, NUMERADO (SESIÓN #1, #2, #3...) Y EDITABLE POR PACIENTE
-//     - MODAL DEL DÍA CON MEMORIA DE LA ÚLTIMA NOTA Y ALTA DE TURNO + PACIENTE + MUTUAL
+// 17. SUITE CLÍNICA MULTIDISCIPLINARIA REORGANIZADA:
+//     - PESTAÑA 1: CALENDARIO DE 30 DÍAS RESPONSIVO + AGENDA DEL DÍA
+//     - PESTAÑA 2: TARJETAS DE PACIENTES RÁPIDAS Y LIMPIAS (AL INGRESAR AL PACIENTE SE VE EL HISTORIAL COMPLETO)
+//     - PESTAÑA 3: EQUIPO DE PROFESIONALES (M.P., HORARIOS Y COMISIONES)
+//     - PESTAÑA 4: ARANCELES Y MUTUALES (EDITOR LIMPIO CON MODAL PROPIO)
+//     - PESTAÑA 5: LIQUIDACIÓN DE ÓRDENES A FINANZAS (SEPARADO 100% DEL EDITOR DE MUTUALES)
 // Pegar al final de app.js (reemplazando el Bloque 17 anterior)
 // =========================================================================
 
-const STORAGE_PACIENTES_CLINICOS_KEY = "cdm_pacientes_clinicos_v1";
+const STORAGE_PACIENTES_CLINICOS_KEY = "cdm_pacientes_clinicos_v2";
 const STORAGE_TURNOS_AGENDA_KEY = "cdm_agenda_turnos_v1";
 const STORAGE_MUTUALES_CONVENIOS_KEY = "cdm_mutuales_convenios_v1";
 const STORAGE_ORDENES_MUTUAL_KEY = "cdm_ordenes_mutual_pendientes_v1";
 const STORAGE_PROFESIONES_EXTRA_CLINICA_KEY = "cdm_profesiones_clinicas_catalogo_v1";
+const STORAGE_STAFF_PROFESIONALES_KEY = "cdm_staff_profesionales_salud_v1";
 
-let tabActivaConsultorioCDM = "agenda"; // 'agenda' | 'pacientes' | 'mutuales'
+let tabActivaConsultorioCDM = "agenda"; // 'agenda' | 'pacientes' | 'profesionales' | 'mutuales' | 'liquidaciones'
 let especialidadFiltroConsultorioCDM = "TODAS";
+let filtroMutualLiquidacionCDM = "TODAS";
 let fechaSeleccionadaCalendarioCDM = obtenerHoyISO();
 let anioCalendarioVisualCDM = new Date().getFullYear();
 let mesCalendarioVisualCDM = new Date().getMonth();
 let chartEvolucionClinicaInstancia = null;
 
-// Inyector automático de estilos responsivos para garantizar que en celulares y PC se vea impecable sin importar la caché
 function asegurarEstilosCalendario30DiasEnDOM() {
     let st = document.getElementById("cdmEstilosCalendario30DiasAuto");
     if (!st) {
@@ -9161,6 +9164,7 @@ function asegurarEstilosCalendario30DiasEnDOM() {
         document.head.appendChild(st);
     }
     st.textContent = `
+        .clinic-specialty-bar { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; background: linear-gradient(135deg, #0c192c 0%, #0369a1 100%); color: #ffffff; border-radius: 18px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; box-shadow: var(--shadow-card); }
         .conventional-cal-panel { background: var(--surface-solid); border: 1.5px solid var(--line-strong); border-radius: 22px; padding: 1.25rem; box-shadow: var(--shadow-card); width: 100%; overflow: hidden; }
         .conventional-cal-topbar { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--line-strong); }
         .conventional-cal-nav { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
@@ -9188,10 +9192,38 @@ function asegurarEstilosCalendario30DiasEnDOM() {
         .conv-mob-dot.ok { background: var(--ok); }
         .conv-mob-dot.warn { background: var(--warn); }
         .conv-day-add-hint { font-size: 0.62rem; font-weight: 700; color: var(--ink-400); margin-top: auto; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .patients-history-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 1.15rem; width: 100%; }
-        .patient-history-pro-card { background: var(--surface-solid); border: 1.5px solid var(--line-strong); border-top: 4px solid var(--cdm-500); border-radius: 20px; padding: 1.2rem; box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 0.85rem; }
-        .patient-recent-notes-box { background: var(--surface-subtle); border: 1px solid var(--line-strong); border-radius: 14px; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.55rem; }
-        .session-mini-log-item { background: var(--surface-solid); border: 1px solid var(--line); border-left: 3.5px solid var(--cdm-500); border-radius: 10px; padding: 0.55rem 0.75rem; font-size: 0.78rem; }
+        .patients-quick-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)) !important; gap: 1.1rem; width: 100%; }
+        .patient-quick-card { background: var(--surface-solid); border: 1.5px solid var(--line-strong); border-top: 4px solid var(--cdm-500); border-radius: 20px; padding: 1.15rem 1.2rem; box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 0.8rem; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+        .patient-quick-card:hover { transform: translateY(-3px); border-color: var(--cdm-400); box-shadow: var(--shadow-float); }
+        .patient-quick-top { display: flex; align-items: center; gap: 0.85rem; }
+        .patient-quick-avatar { width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff; font-weight: 800; font-size: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25); }
+        .patient-quick-info { flex: 1; min-width: 0; }
+        .patient-quick-info h4 { font-size: 1.02rem; font-weight: 800; color: var(--ink-900); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .patient-quick-info small { font-size: 0.74rem; color: var(--ink-500); font-weight: 600; display: block; margin-top: 1px; }
+        .patient-quick-diag { font-size: 0.78rem; color: var(--ink-700); background: var(--surface-subtle); border: 1px solid var(--line); border-radius: 10px; padding: 0.48rem 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .patient-quick-footer { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; padding-top: 0.65rem; border-top: 1px solid var(--line); margin-top: auto; }
+        .mutuals-manager-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr)) !important; gap: 1.1rem; width: 100%; }
+        .mutual-pro-card { background: var(--surface-solid); border: 1.5px solid var(--line-strong); border-top: 4px solid var(--purple); border-radius: 18px; padding: 1.15rem 1.25rem; box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 0.75rem; transition: transform 0.2s ease; }
+        .mutual-pro-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-float); }
+        .mutual-pro-card.is-particular { border-top-color: var(--ok); }
+        .mutual-amounts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; background: var(--surface-subtle); border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem 0.7rem; }
+        .mutual-amount-item small { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; color: var(--ink-500); display: block; }
+        .mutual-amount-item strong { font-size: 0.96rem; font-weight: 800; color: var(--ink-900); }
+        .mutual-total-strip { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.75rem; background: var(--cdm-50); border: 1px solid var(--line-celeste); border-radius: 10px; font-size: 0.8rem; }
+        .specialty-clinical-panel { background: linear-gradient(145deg, var(--surface-subtle) 0%, var(--cdm-50) 100%); border: 1.5px solid var(--line-celeste); border-radius: 16px; padding: 0.95rem 1.05rem; margin-bottom: 0.9rem; }
+        .spine-map-grid { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
+        .spine-vertebra-btn { border: 1.5px solid var(--line-strong); background: var(--surface-solid); color: var(--ink-700); font-size: 0.72rem; font-weight: 800; padding: 0.32rem 0.6rem; border-radius: 8px; cursor: pointer; transition: all 0.15s ease; }
+        .spine-vertebra-btn.active { background: #e11d48; border-color: #be123c; color: #ffffff; box-shadow: 0 3px 8px rgba(225, 29, 72, 0.35); }
+        .physio-agent-chip { border: 1.5px solid var(--line-strong); background: var(--surface-solid); color: var(--ink-700); font-size: 0.72rem; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 999px; cursor: pointer; transition: all 0.15s ease; }
+        .physio-agent-chip.active { background: var(--cdm-500); border-color: var(--cdm-600); color: #ffffff; }
+        .nutri-macros-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); gap: 0.45rem; margin-top: 0.45rem; }
+        .nutri-macro-box { background: var(--surface-solid); border: 1px solid var(--line-strong); border-radius: 10px; padding: 0.4rem 0.5rem; text-align: center; }
+        .nutri-macro-box small { font-size: 0.6rem; font-weight: 700; color: var(--ink-500); display: block; text-transform: uppercase; }
+        .nutri-macro-box strong { font-size: 0.86rem; font-weight: 800; color: var(--ink-900); }
+        .pro-staff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 1.1rem; margin-bottom: 1.25rem; }
+        .pro-staff-card { background: var(--surface-solid); border: 1.5px solid var(--line-strong); border-left: 5px solid var(--cdm-500); border-radius: 18px; padding: 1.15rem 1.2rem; box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 0.65rem; }
+        .clinical-session-timeline { display: flex; flex-direction: column; gap: 0.85rem; }
+        .clinical-note-card { background: var(--surface-subtle); border: 1.5px solid var(--line-strong); border-left: 4.5px solid var(--cdm-500); border-radius: 16px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.55rem; }
         .modal-hours-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 0.35rem; margin: 0.4rem 0 0.75rem 0; }
         .hour-chip-btn { border: 1.5px solid var(--line-strong); background: var(--surface-subtle); color: var(--ink-700); font-size: 0.74rem; font-weight: 700; padding: 0.36rem 0.2rem; border-radius: 9px; cursor: pointer; text-align: center; }
         .hour-chip-btn.selected { background: var(--cdm-500); border-color: var(--cdm-500); color: #ffffff; }
@@ -9225,55 +9257,78 @@ function asegurarEstilosCalendario30DiasEnDOM() {
     `;
 }
 
+// =========================================================================
+// 1. CATÁLOGO DE ESPECIALIDADES Y SU PROTOCOLO CLÍNICO PROPIO
+// =========================================================================
+
 const ESPECIALIDADES_PROFESIONALES_BASE_CDM = [
+    {
+        clave: "Kinesiología",
+        icono: "🦿",
+        titulo: "Kinesiología y Fisioterapia",
+        metricaPrincipal: "Dolor EVA (0-10)",
+        metricaSecundaria: "Rango Articular / Función (%)",
+        placeholderZona: "Ej: Rehabilitación LCA Rodilla Derecha / Manguito rotador",
+        placeholderTecnica: "Ej: Magnetoterapia + Movilización patelar + Ejercicios isométricos y excéntricos",
+        chipsZonas: ["Rodilla (LCA / Meniscos)", "Hombro (Manguito Rotador)", "Columna Lumbosacra", "Tobillo (Esguince)", "Isquiotibiales / Desgarro", "Tendón Rotuliano/Aquiles"],
+        chipsTecnicas: ["Terapia Manual Articular", "Movilización Activa Asistida", "Propiocepción en Bosu", "Fortalecimiento Isométrico", "Fortalecimiento Excéntrico", "Punción Seca / Liberación"]
+    },
     {
         clave: "Quiropraxia",
         icono: "🦴",
         titulo: "Quiropraxia y Osteopatía",
         metricaPrincipal: "Escala Dolor EVA (0-10)",
         metricaSecundaria: "Simetría / Movilidad (%)",
-        placeholderZona: "Ej: Subluxación Cervical C2-C3 / Sacroilíaca derecha",
-        placeholderTecnica: "Ej: Ajuste quiropráctico específico + Drop pélvico + Liberación miofascial",
-        chipsZonas: ["Cervical C1-C2 (Atlas/Axis)", "Cervical Baja C5-C7", "Dorsal T4-T8", "Lumbar L4-L5", "Sacroilíaca / Pelvis", "ATM / Mandíbula"],
-        chipsTecnicas: ["Ajuste específico Diversified", "Técnica Drop Pélvico", "Activador Instrumental", "Liberación Miofascial", "Descompresión Axial", "Pautas posturales"]
-    },
-    {
-        clave: "Kinesiología",
-        icono: "🦿",
-        titulo: "Kinesiología y Fisioterapia",
-        metricaPrincipal: "Dolor EVA (0-10)",
-        metricaSecundaria: "Rango Articular ROM (%)",
-        placeholderZona: "Ej: Rehabilitación LCA Rodilla Derecha / Manguito rotador",
-        placeholderTecnica: "Ej: Magnetoterapia 20m + Ultrasonido + Ejercicios isométricos y propiocepción",
-        chipsZonas: ["Rodilla (LCA / Meniscos)", "Hombro (Manguito Rotador)", "Columna Lumbosacra", "Tobillo (Esguince)", "Isquiotibiales / Desgarro", "Tendón Rotuliano/Aquiles"],
-        chipsTecnicas: ["Magnetoterapia 20 min", "Ultrasonido Pulsado", "TENS / Electroanalgesia", "Movilización Articular Activa", "Propiocepción en Bosu", "Fortalecimiento Excéntrico"]
-    },
-    {
-        clave: "Psicología",
-        icono: "🧠",
-        titulo: "Psicología y Salud Mental",
-        metricaPrincipal: "Nivel Ansiedad/Malestar (0-10)",
-        metricaSecundaria: "Bienestar / Regulación (%)",
-        placeholderZona: "Ej: Motivo de consulta / Foco emocional de la sesión de hoy",
-        placeholderTecnica: "Ej: Reestructuración cognitiva, regulación emocional y pautas semanales",
-        chipsZonas: ["Ansiedad por rendimiento", "Manejo del estrés laboral", "Regulación del sueño", "Vínculos y comunicación", "Autoestima y foco", "Duelo / Transición vital"],
-        chipsTecnicas: ["Reestructuración Cognitiva", "Técnicas de Respiración/Mindfulness", "Registro de Pensamientos", "Exposición Gradual", "Psicoeducación", "Acuerdo de metas semanales"]
+        placeholderZona: "Ej: Subluxación Cervical C1-C2 y Sacroilíaca derecha",
+        placeholderTecnica: "Ej: Ajuste específico Diversified + Drop pélvico + Descarga suboccipital",
+        chipsZonas: ["Cervical Alta C1-C2", "Cervical Baja C5-C7", "Dorsal T4-T8", "Lumbar L4-L5", "Art. Sacroilíaca", "ATM / Mandíbula"],
+        chipsTecnicas: ["Ajuste específico Diversified", "Técnica Drop Pélvico", "Activador Instrumental", "Técnica Gonstead", "Liberación Miofascial", "Descompresión Axial"]
     },
     {
         clave: "Nutrición",
         icono: "🥗",
-        titulo: "Nutrición y Antropometría",
-        metricaPrincipal: "Dificultad / Ansiedad (0-10)",
-        metricaSecundaria: "Adherencia al Plan (%)",
-        placeholderZona: "Ej: Control antropométrico / Peso actual: 74.5 kg / % Muscular",
-        placeholderTecnica: "Ej: Ajuste de macronutrientes, distribución proteica e hidratación",
-        chipsZonas: ["Control Antropométrico ISAK", "Recomposición Corporal", "Déficit Calórico Controlado", "Superávit Masa Muscular", "Nutrición Pre/Post Competencia", "Salud Digestiva"],
-        chipsTecnicas: ["Ajuste de Proteínas Diarias", "Planificación Menú Semanal", "Protocolo de Hidratación", "Suplementación Deportiva", "Educación en Porciones", "Recetario Práctico"]
+        titulo: "Nutrición y Antropometría ISAK",
+        metricaPrincipal: "Dificultad / Ansiedad Alimentaria (0-10)",
+        metricaSecundaria: "Adherencia al Plan Nutricional (%)",
+        placeholderZona: "Ej: Control antropométrico mensual / Recomposición corporal",
+        placeholderTecnica: "Ej: Ajuste de distribución proteica peri-entreno, hidratación y colaciones",
+        chipsZonas: ["Control Antropométrico ISAK", "Recomposición Corporal", "Descenso de Tejido Adiposo", "Hipertrofia / Masa Muscular", "Nutrición Pre/Post Partido", "Salud Digestiva"],
+        chipsTecnicas: ["Déficit Calórico Controlado", "Superávit Proteico", "Carga de Glucógeno", "Protocolo de Hidratación", "Suplementación (Creatina/Whey)", "Educación Alimentaria"]
+    },
+    {
+        clave: "Psicología",
+        icono: "🧠",
+        titulo: "Psicología Clínica y Deportiva",
+        metricaPrincipal: "Nivel Ansiedad / Malestar (0-10)",
+        metricaSecundaria: "Bienestar / Regulación Emocional (%)",
+        placeholderZona: "Ej: Gestión de presión pre-competitiva / Ansiedad laboral y sueño",
+        placeholderTecnica: "Ej: Reestructuración cognitiva, técnicas de foco atencional y respiración diafragmática",
+        chipsZonas: ["Ansiedad por rendimiento", "Manejo del estrés y frustración", "Higiene del sueño", "Foco y concentración", "Vínculos y comunicación", "Confianza post-lesión"],
+        chipsTecnicas: ["Reestructuración Cognitiva", "Respiración / Mindfulness", "Registro de Pensamientos", "Visualización Deportiva", "Exposición Gradual", "Acuerdo de metas semanales"]
     }
 ];
 
+function obtenerStaffProfesionalesCDM() {
+    try {
+        const s = JSON.parse(localStorage.getItem(STORAGE_STAFF_PROFESIONALES_KEY) || "null");
+        if (Array.isArray(s) && s.length > 0) return s;
+    } catch {}
+    const defecto = [
+        { id: 101, nombre: "Lic. Martín", apellido: "Cabrera", especialidad: "Kinesiología", matricula: "M.P. 4892", whatsapp: "5493584102030", diasHorarios: "Lun a Vie 08:00 a 13:00 y 16:00 a 20:00", comisionPct: 70, rolDetalle: "Kinesiólogo y Fisioterapeuta Deportivo" },
+        { id: 102, nombre: "Dr. Santiago", apellido: "Vega", especialidad: "Quiropraxia", matricula: "M.P. 3105", whatsapp: "5493584203040", diasHorarios: "Mar y Jue 09:00 a 19:00", comisionPct: 75, rolDetalle: "Quiropráctico y Osteópata Estructural" },
+        { id: 103, nombre: "Lic. Julieta", apellido: "Molina", especialidad: "Nutrición", matricula: "M.P. 2740", whatsapp: "5493584304050", diasHorarios: "Lun, Mié y Vie 14:00 a 20:00", comisionPct: 70, rolDetalle: "Nutricionista Deportiva Certificada ISAK II" },
+        { id: 104, nombre: "Lic. Camila", apellido: "Rojas", especialidad: "Psicología", matricula: "M.P. 6518", whatsapp: "5493584405060", diasHorarios: "Lun a Vie 09:00 a 18:00 (Presencial y Online)", comisionPct: 80, rolDetalle: "Psicóloga Clínica y del Alto Rendimiento" }
+    ];
+    localStorage.setItem(STORAGE_STAFF_PROFESIONALES_KEY, JSON.stringify(defecto));
+    return defecto;
+}
+
+function guardarStaffProfesionalesCDM(lista) {
+    localStorage.setItem(STORAGE_STAFF_PROFESIONALES_KEY, JSON.stringify(lista));
+}
+
 function obtenerCatalogoProfesionesGuardadasCDM() {
-    let base = ["Quiropraxia", "Kinesiología", "Psicología", "Nutrición"];
+    let base = ["Kinesiología", "Quiropraxia", "Nutrición", "Psicología"];
     try {
         const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : null;
         if (lic && Array.isArray(lic.profesionesHabilitadas) && lic.profesionesHabilitadas.length > 0) {
@@ -9313,7 +9368,7 @@ function asegurarProfesionEnCatalogoCDM(nombreProfesionRaw = "") {
             }
         }
     } catch {}
-    mostrarToast(`✨ Nueva profesión "${limpio}" incorporada automáticamente a la lista.`);
+    mostrarToast(`✨ Nueva profesión "${limpio}" incorporada automáticamente.`);
     return limpio;
 }
 
@@ -9395,25 +9450,6 @@ function obtenerPacientesClinicosCDM() {
     const hoy = obtenerHoyISO();
     const defecto = [
         {
-            id: 8001,
-            codigoAcceso: "PAC-801",
-            nombre: "Valeria",
-            apellido: "Gómez",
-            dni: "34.890.112",
-            edad: 34,
-            whatsapp: "5493584112233",
-            especialidad: "Quiropraxia",
-            mutual: "APROSS",
-            nroAfiliado: "45-34890112-01",
-            diagnostico: "Cervicalgia mecánica y rectificación cervical con irradiación a hombro derecho.",
-            sesionesAutorizadas: 6,
-            sesionesRealizadas: 2,
-            sesiones: [
-                { id: 901, fecha: "2026-11-03", numSesion: 1, especialidad: "Quiropraxia", zona: "Atlas C1, C5 y Dorsal T4. Asimetría pélvica +6mm derecha.", intervencion: "Ajuste específico C1/C5 en camilla con drop y descarga suboccipital.", dolorEVA: 8, evolucionPct: 35, profesional: "Consultorio Oficial", cobroDetalle: "APROSS ($11.500) + Coseguro ($4.500)" },
-                { id: 902, fecha: hoy, numSesion: 2, especialidad: "Quiropraxia", zona: "Mejoría en rotación cervical. Persiste leve tensión en T4 y sacro.", intervencion: "Ajuste sacroilíaco y movilización dorsal. Nivelación de miembros inferiores lograda.", dolorEVA: 3, evolucionPct: 80, profesional: "Consultorio Oficial", cobroDetalle: "APROSS ($11.500) + Coseguro ($4.500)" }
-            ]
-        },
-        {
             id: 8002,
             codigoAcceso: "PAC-802",
             nombre: "Marcos",
@@ -9422,14 +9458,89 @@ function obtenerPacientesClinicosCDM() {
             edad: 41,
             whatsapp: "5493584223344",
             especialidad: "Kinesiología",
+            profesionalAsignado: "Lic. Martín Cabrera (M.P. 4892)",
             mutual: "Sancor Salud",
             nroAfiliado: "880912-00",
             diagnostico: "Post-operatorio ligamento cruzado anterior (LCA) rodilla izquierda — Semana 6.",
             sesionesAutorizadas: 10,
-            sesionesRealizadas: 4,
+            sesionesRealizadas: 2,
             sesiones: [
-                { id: 903, fecha: "2026-11-05", numSesion: 3, especialidad: "Kinesiología", zona: "Flexión activa en 85°, leve edema perirrotuliano.", intervencion: "Magnetoterapia, electroestimulación rusa en vasto medial y ejercicios de cadena cerrada.", dolorEVA: 6, evolucionPct: 50, profesional: "Lic. Kinesiología", cobroDetalle: "Sancor Salud ($13.500) + Coseguro ($3.000)" },
-                { id: 904, fecha: hoy, numSesion: 4, especialidad: "Kinesiología", zona: "Logra 108° de flexión activa sin dolor agudo. Mejor control unipodal.", intervencion: "Movilización patelar, prensa unilateral liviana y propiocepción en bosu.", dolorEVA: 2, evolucionPct: 82, profesional: "Lic. Kinesiología", cobroDetalle: "Sancor Salud ($13.500) + Coseguro ($3.000)" }
+                {
+                    id: 903, fecha: "2026-11-05", numSesion: 1, especialidad: "Kinesiología",
+                    zona: "Rodilla Izquierda (LCA) — Leve edema perirrotuliano",
+                    intervencion: "Magnetoterapia 20m, electroestimulación rusa en vasto medial y ejercicios isométricos.",
+                    dolorEVA: 6, evolucionPct: 50, profesional: "Lic. Martín Cabrera (M.P. 4892)",
+                    cobroDetalle: "Sancor Salud ($13.500) + Coseguro ($3.000)",
+                    datosEspecialidad: { tipo: "Kinesiología", romFlexion: 85, romExtension: 5, fuerzaDaniels: "3+/5", asimetriaPct: 24, agentesFisicos: ["Magneto", "Electro / TENS", "Isométricos"], aptoDeportivo: "Entreno Diferenciado" }
+                },
+                {
+                    id: 904, fecha: hoy, numSesion: 2, especialidad: "Kinesiología",
+                    zona: "Rodilla Izquierda — Mejor control neuromuscular unipodal",
+                    intervencion: "Movilización patelar, prensa unilateral controlada y propiocepción en bosu.",
+                    dolorEVA: 2, evolucionPct: 82, profesional: "Lic. Martín Cabrera (M.P. 4892)",
+                    cobroDetalle: "Sancor Salud ($13.500) + Coseguro ($3.000)",
+                    datosEspecialidad: { tipo: "Kinesiología", romFlexion: 112, romExtension: 0, fuerzaDaniels: "4+/5", asimetriaPct: 11, agentesFisicos: ["Ultrasonido", "Terapia Manual", "Propiocepción"], aptoDeportivo: "Entreno Diferenciado" }
+                }
+            ]
+        },
+        {
+            id: 8001,
+            codigoAcceso: "PAC-801",
+            nombre: "Valeria",
+            apellido: "Gómez",
+            dni: "34.890.112",
+            edad: 34,
+            whatsapp: "5493584112233",
+            especialidad: "Quiropraxia",
+            profesionalAsignado: "Dr. Santiago Vega (M.P. 3105)",
+            mutual: "APROSS",
+            nroAfiliado: "45-34890112-01",
+            diagnostico: "Cervicalgia mecánica y rectificación cervical con irradiación a hombro derecho.",
+            sesionesAutorizadas: 6,
+            sesionesRealizadas: 2,
+            sesiones: [
+                {
+                    id: 901, fecha: "2026-11-03", numSesion: 1, especialidad: "Quiropraxia",
+                    zona: "Subluxación C1 Atlas, C5 y Sacroilíaca derecha",
+                    intervencion: "Ajuste específico C1/C5 en camilla con drop pélvico y descarga suboccipital.",
+                    dolorEVA: 8, evolucionPct: 40, profesional: "Dr. Santiago Vega (M.P. 3105)",
+                    cobroDetalle: "APROSS ($11.500) + Coseguro ($4.500)",
+                    datosEspecialidad: { tipo: "Quiropraxia", vertebras: ["C1 Atlas", "C5-C7", "T4-T8", "Ilíaco Der"], dismetriaMm: 6, tecnicaQuiro: "Diversified + Drop Pélvico" }
+                },
+                {
+                    id: 902, fecha: hoy, numSesion: 2, especialidad: "Quiropraxia",
+                    zona: "Rotación cervical simétrica. Leve tensión residual en T4",
+                    intervencion: "Ajuste sacroilíaco y movilización dorsal. Miembros inferiores nivelados (0mm).",
+                    dolorEVA: 2, evolucionPct: 88, profesional: "Dr. Santiago Vega (M.P. 3105)",
+                    cobroDetalle: "APROSS ($11.500) + Coseguro ($4.500)",
+                    datosEspecialidad: { tipo: "Quiropraxia", vertebras: ["C1 Atlas", "T4-T8", "Sacro"], dismetriaMm: 0, tecnicaQuiro: "Activador Instrumental + Diversified" }
+                }
+            ]
+        },
+        {
+            id: 8004,
+            codigoAcceso: "PAC-804",
+            nombre: "Tomás",
+            apellido: "Benítez",
+            dni: "41.552.901",
+            edad: 24,
+            whatsapp: "5493584667788",
+            especialidad: "Nutrición",
+            profesionalAsignado: "Lic. Julieta Molina (M.P. 2740)",
+            mutual: "OSDE",
+            nroAfiliado: "61-41552901-0",
+            diagnostico: "Recomposición corporal para alto rendimiento deportivo (aumento de masa muscular y descenso de pliegues).",
+            sesionesAutorizadas: 6,
+            sesionesRealizadas: 1,
+            sesiones: [
+                {
+                    id: 906, fecha: hoy, numSesion: 1, especialidad: "Nutrición",
+                    zona: "Evaluación Antropométrica ISAK completa",
+                    intervencion: "Distribución de 4 comidas + colación pre/post entreno, 2.2g/kg de proteína y 3.5L de hidratación.",
+                    dolorEVA: 2, evolucionPct: 85, profesional: "Lic. Julieta Molina (M.P. 2740)",
+                    cobroDetalle: "OSDE ($16.000)",
+                    datosEspecialidad: { tipo: "Nutrición", pesoKg: 76.4, tallaCm: 178, imc: 24.1, grasaPct: 14.2, musculoPct: 47.8, cinturaCm: 79, plieguesMm: 46, kcalPlan: 2850, protG: 168, carbG: 360, grasasG: 80, aguaL: 3.5 }
+                }
             ]
         },
         {
@@ -9441,13 +9552,21 @@ function obtenerPacientesClinicosCDM() {
             edad: 28,
             whatsapp: "5493584556677",
             especialidad: "Psicología",
+            profesionalAsignado: "Lic. Camila Rojas (M.P. 6518)",
             mutual: "Particular (Sin Mutual)",
             nroAfiliado: "Particular",
             diagnostico: "Ansiedad por rendimiento laboral y deportivo, dificultades en conciliación del sueño.",
             sesionesAutorizadas: 0,
-            sesionesRealizadas: 3,
+            sesionesRealizadas: 1,
             sesiones: [
-                { id: 905, fecha: hoy, numSesion: 3, especialidad: "Psicología", zona: "Revisión de disparadores de exigencia semanal y registro de sueño.", intervencion: "Técnicas de defusión cognitiva, higiene del sueño y pautas de exposición gradual.", dolorEVA: 3, evolucionPct: 78, profesional: "Lic. Psicología", cobroDetalle: "Particular Transferencia ($18.000)" }
+                {
+                    id: 905, fecha: hoy, numSesion: 1, especialidad: "Psicología",
+                    zona: "Revisión de disparadores de exigencia semanal y registro de sueño",
+                    intervencion: "Técnicas de defusión cognitiva, higiene del sueño y pautas de respiración 4-7-8.",
+                    dolorEVA: 3, evolucionPct: 78, profesional: "Lic. Camila Rojas (M.P. 6518)",
+                    cobroDetalle: "Particular Transferencia ($18.000)",
+                    datosEspecialidad: { tipo: "Psicología", modalidad: "Presencial", ansiedad: 4, sueno: 7, animo: 8, estres: 4, tareaSemanal: "Completar registro de pensamientos automáticos y desconexión 45m antes de dormir." }
+                }
             ]
         }
     ];
@@ -9466,14 +9585,13 @@ function obtenerTurnosAgendaCDM() {
     } catch {}
     const hoy = obtenerHoyISO();
     const manana = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-    const pasado = new Date(Date.now() + 172800000).toISOString().split("T")[0];
 
     const defecto = [
-        { id: 701, fecha: hoy, hora: "09:00", duracion: "45 min", pacienteId: 8001, pacienteNombre: "Gómez, Valeria", especialidad: "Quiropraxia", mutual: "APROSS", motivo: "2° Ajuste Cervical y Pelvis", estado: "Atendido", pagado: true, montoTotal: 16000 },
-        { id: 702, fecha: hoy, hora: "10:30", duracion: "45 min", pacienteId: 8002, pacienteNombre: "Ríos, Marcos", especialidad: "Kinesiología", mutual: "Sancor Salud", motivo: "Sesión 4/10 Rehab LCA", estado: "En Sala", pagado: false, montoTotal: 16500 },
-        { id: 703, fecha: hoy, hora: "16:00", duracion: "45 min", pacienteId: 8003, pacienteNombre: "Paz, Carolina", especialidad: "Psicología", mutual: "Particular (Sin Mutual)", motivo: "Sesión Terapia Individual", estado: "Reservado", pagado: false, montoTotal: 18000 },
-        { id: 704, fecha: manana, hora: "09:30", duracion: "45 min", pacienteId: 8002, pacienteNombre: "Ríos, Marcos", especialidad: "Kinesiología", mutual: "Sancor Salud", motivo: "Sesión 5/10 Rehab LCA", estado: "Reservado", pagado: false, montoTotal: 16500 },
-        { id: 705, fecha: pasado, hora: "11:00", duracion: "45 min", pacienteId: 8001, pacienteNombre: "Gómez, Valeria", especialidad: "Quiropraxia", mutual: "APROSS", motivo: "Control de Pelvis y Atlas", estado: "Reservado", pagado: false, montoTotal: 16000 }
+        { id: 701, fecha: hoy, hora: "09:00", duracion: "45 min", pacienteId: 8001, pacienteNombre: "Gómez, Valeria", especialidad: "Quiropraxia", profesional: "Dr. Santiago Vega (M.P. 3105)", mutual: "APROSS", motivo: "2° Ajuste Cervical y Pelvis", estado: "Atendido", pagado: true, montoTotal: 16000 },
+        { id: 702, fecha: hoy, hora: "10:30", duracion: "45 min", pacienteId: 8002, pacienteNombre: "Ríos, Marcos", especialidad: "Kinesiología", profesional: "Lic. Martín Cabrera (M.P. 4892)", mutual: "Sancor Salud", motivo: "Sesión Rehab LCA y Goniometría", estado: "En Sala", pagado: false, montoTotal: 16500 },
+        { id: 706, fecha: hoy, hora: "14:30", duracion: "45 min", pacienteId: 8004, pacienteNombre: "Benítez, Tomás", especialidad: "Nutrición", profesional: "Lic. Julieta Molina (M.P. 2740)", mutual: "OSDE", motivo: "Antropometría ISAK y Plan Macros", estado: "Reservado", pagado: false, montoTotal: 16000 },
+        { id: 703, fecha: hoy, hora: "16:00", duracion: "45 min", pacienteId: 8003, pacienteNombre: "Paz, Carolina", especialidad: "Psicología", profesional: "Lic. Camila Rojas (M.P. 6518)", mutual: "Particular (Sin Mutual)", motivo: "Sesión Terapia Individual", estado: "Reservado", pagado: false, montoTotal: 18000 },
+        { id: 704, fecha: manana, hora: "09:30", duracion: "45 min", pacienteId: 8002, pacienteNombre: "Ríos, Marcos", especialidad: "Kinesiología", profesional: "Lic. Martín Cabrera (M.P. 4892)", mutual: "Sancor Salud", motivo: "Fisioterapia y Fortalecimiento", estado: "Reservado", pagado: false, montoTotal: 16500 }
     ];
     localStorage.setItem(STORAGE_TURNOS_AGENDA_KEY, JSON.stringify(defecto));
     return defecto;
@@ -9491,7 +9609,8 @@ function obtenerOrdenesMutualPendientesCDM() {
     const hoy = obtenerHoyISO();
     const defecto = [
         { id: 601, fecha: hoy, mutual: "APROSS", pacienteNombre: "Gómez, Valeria", nroAfiliado: "45-34890112-01", nroOrden: "AUT-99210", especialidad: "Quiropraxia", montoMutual: 11500, coseguroCobrado: 4500, estado: "Pendiente" },
-        { id: 602, fecha: hoy, mutual: "Sancor Salud", pacienteNombre: "Ríos, Marcos", nroAfiliado: "880912-00", nroOrden: "AUT-44108", especialidad: "Kinesiología", montoMutual: 13500, coseguroCobrado: 3000, estado: "Pendiente" }
+        { id: 602, fecha: hoy, mutual: "Sancor Salud", pacienteNombre: "Ríos, Marcos", nroAfiliado: "880912-00", nroOrden: "AUT-44108", especialidad: "Kinesiología", montoMutual: 13500, coseguroCobrado: 3000, estado: "Pendiente" },
+        { id: 603, fecha: hoy, mutual: "OSDE", pacienteNombre: "Benítez, Tomás", nroAfiliado: "61-41552901-0", nroOrden: "AUT-77312", especialidad: "Nutrición", montoMutual: 16000, coseguroCobrado: 0, estado: "Pendiente" }
     ];
     localStorage.setItem(STORAGE_ORDENES_MUTUAL_KEY, JSON.stringify(defecto));
     return defecto;
@@ -9500,6 +9619,70 @@ function obtenerOrdenesMutualPendientesCDM() {
 function guardarOrdenesMutualPendientesCDM(lista) {
     localStorage.setItem(STORAGE_ORDENES_MUTUAL_KEY, JSON.stringify(lista));
 }
+
+// =========================================================================
+// RENDERIZADOR DE MÉTRICAS CLÍNICAS DENTRO DEL HISTORIAL DEL PACIENTE
+// =========================================================================
+
+function renderizarResumenMetricasEspecialidadSesionHTML(s) {
+    const d = s?.datosEspecialidad;
+    if (!d) return "";
+
+    if (d.tipo === "Kinesiología" || s.especialidad === "Kinesiología") {
+        const agentes = Array.isArray(d.agentesFisicos) && d.agentesFisicos.length ? d.agentesFisicos.join(" • ") : "";
+        return `
+            <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.4rem;">
+                ${d.romFlexion !== undefined ? `<span class="badge badge-celeste">📐 ROM Flex: ${d.romFlexion}° / Ext: ${d.romExtension || 0}°</span>` : ""}
+                ${d.fuerzaDaniels ? `<span class="badge badge-purple">💪 Fuerza Daniels: ${d.fuerzaDaniels}</span>` : ""}
+                ${d.asimetriaPct !== undefined ? `<span class="badge ${Number(d.asimetriaPct) > 15 ? "badge-warn" : "badge-ok"}">⚖️ Asimetría: ${d.asimetriaPct}%</span>` : ""}
+                ${d.aptoDeportivo ? `<span class="badge ${d.aptoDeportivo.includes("Total") ? "badge-ok" : "badge-warn"}">🏃 ${d.aptoDeportivo}</span>` : ""}
+                ${agentes ? `<span class="badge badge-celeste">⚡ ${agentes}</span>` : ""}
+            </div>
+        `;
+    }
+
+    if (d.tipo === "Quiropraxia" || s.especialidad === "Quiropraxia") {
+        const verts = Array.isArray(d.vertebras) && d.vertebras.length ? d.vertebras.join(", ") : "";
+        return `
+            <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.4rem;">
+                ${verts ? `<span class="badge badge-danger">🦴 Ajustes: ${verts}</span>` : ""}
+                ${d.dismetriaMm !== undefined ? `<span class="badge ${Number(d.dismetriaMm) === 0 ? "badge-ok" : "badge-warn"}">📏 Dismetría MMII: ${d.dismetriaMm} mm</span>` : ""}
+                ${d.tecnicaQuiro ? `<span class="badge badge-purple">👐 Técnica: ${d.tecnicaQuiro}</span>` : ""}
+            </div>
+        `;
+    }
+
+    if (d.tipo === "Nutrición" || s.especialidad === "Nutrición") {
+        return `
+            <div class="nutri-macros-strip">
+                <div class="nutri-macro-box"><small>⚖️ Peso / IMC</small><strong>${d.pesoKg || "-"}kg (${d.imc || "-"})</strong></div>
+                <div class="nutri-macro-box"><small>📉 % Grasa</small><strong style="color:var(--warn-ink);">${d.grasaPct || "-"}%</strong></div>
+                <div class="nutri-macro-box"><small>💪 % Músculo</small><strong style="color:var(--ok-ink);">${d.musculoPct || "-"}%</strong></div>
+                <div class="nutri-macro-box"><small>📏 Cintura / Pliegues</small><strong>${d.cinturaCm || "-"}cm / ${d.plieguesMm || "-"}mm</strong></div>
+                <div class="nutri-macro-box"><small>🔥 Plan Kcal</small><strong style="color:var(--cdm-600);">${d.kcalPlan || "-"} kcal</strong></div>
+                <div class="nutri-macro-box"><small>🥩 P / C / G</small><strong>${d.protG || "-"}g / ${d.carbG || "-"}g / ${d.grasasG || "-"}g</strong></div>
+            </div>
+        `;
+    }
+
+    if (d.tipo === "Psicología" || s.especialidad === "Psicología") {
+        return `
+            <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.4rem;">
+                ${d.modalidad ? `<span class="badge badge-celeste">💻 ${d.modalidad}</span>` : ""}
+                ${d.ansiedad !== undefined ? `<span class="badge ${d.ansiedad <= 4 ? "badge-ok" : "badge-warn"}">🧠 Ansiedad: ${d.ansiedad}/10</span>` : ""}
+                ${d.sueno !== undefined ? `<span class="badge badge-purple">🌙 Sueño: ${d.sueno}/10</span>` : ""}
+                ${d.animo !== undefined ? `<span class="badge badge-ok">⚡ Ánimo/Foco: ${d.animo}/10</span>` : ""}
+                ${d.tareaSemanal ? `<div style="width:100%; font-size:0.74rem; color:var(--ink-700); margin-top:2px;">🎯 <b>Tarea inter-sesión:</b> ${d.tareaSemanal}</div>` : ""}
+            </div>
+        `;
+    }
+
+    return "";
+}
+
+// =========================================================================
+// ACCESO EN SIDEBAR E INDEX
+// =========================================================================
 
 function inyectarAccesoConsultorioEnSidebarEIndexCDM() {
     asegurarEstilosCalendario30DiasEnDOM();
@@ -9539,20 +9722,20 @@ function inyectarAccesoConsultorioEnSidebarEIndexCDM() {
         card.innerHTML = `
             <div class="sport-card-visual" style="background:linear-gradient(135deg, #0f172a 0%, #0369a1 55%, #0d9488 100%);">
                 <div class="sport-card-top">
-                    <span class="sport-chip-glass">🩺 Salud & Consultorios</span>
+                    <span class="sport-chip-glass">🩺 Salud & Profesionales</span>
                     <span class="showcase-live-count">${turnosHoy} turnos hoy</span>
                 </div>
                 <div class="sport-card-visual-title">
-                    <h3>Consultorio & Turnos</h3>
+                    <h3>Consultorio & Profesionales</h3>
                 </div>
             </div>
             <div class="sport-card-content">
-                <p class="sport-card-desc">Calendario mensual de 30 días, cuaderno histórico de notas por sesión de cada paciente y liquidación de mutuales.</p>
+                <p class="sport-card-desc">Kinesiología, Quiropraxia, Nutrición ISAK y Psicología: calendario de 30 días, fichas de pacientes y mutuales.</p>
                 <div class="sport-card-pills">
                     ${profsHab.slice(0, 4).map(p => `<span class="sport-mini-pill">${p.icono} ${p.clave}</span>`).join("")}
                 </div>
                 <div class="sport-card-footer">
-                    <span>Abrir Calendario e Histórico de Sesiones</span>
+                    <span>Abrir Consultorio Multidisciplinario</span>
                     <i class="ri-arrow-right-line"></i>
                 </div>
             </div>
@@ -9591,7 +9774,7 @@ function abrirModuloConsultorioIndependienteCDM(tabForzada = null) {
 
     const topTitle = document.querySelector(".topbar-title h2");
     if (topTitle) {
-        topTitle.innerHTML = `🩺 Consultorio, Calendario e Histórico por Sesión <span class="cat-active-pill">${profsHab.map(p => p.clave).join(" • ")}</span>`;
+        topTitle.innerHTML = `🩺 Suite de Profesionales de la Salud <span class="cat-active-pill">${profsHab.map(p => p.clave).join(" • ")}</span>`;
     }
 
     renderizarModuloConsultorioCompletoCDM();
@@ -9609,7 +9792,7 @@ function cambiarEspecialidadFiltroConsultorioCDM(esp) {
 }
 
 // =========================================================================
-// CALENDARIO CONVENCIONAL DE 30/31 DÍAS (RESPONSIVO + AGENDA DEL DÍA AL PIE)
+// CALENDARIO CONVENCIONAL DE 30/31 DÍAS + RESUMEN RÁPIDO DEL DÍA
 // =========================================================================
 
 function navegarMesCalendarioTurnosCDM(deltaMes) {
@@ -9646,7 +9829,6 @@ function generarCalendarioConvencional30DiasHTML(turnosFiltradosEsp) {
 
     const offsetLunes = (primerDiaMes.getDay() + 6) % 7;
     const hoyISO = obtenerHoyISO();
-    const todosPacs = obtenerPacientesClinicosCDM();
 
     const mapaTurnosPorDia = {};
     turnosFiltradosEsp.forEach(t => {
@@ -9668,7 +9850,6 @@ function generarCalendarioConvencional30DiasHTML(turnosFiltradosEsp) {
         const esHoy = fechaISO === hoyISO;
         const esSel = fechaISO === fechaSeleccionadaCalendarioCDM;
 
-        // En escritorio se ven las píldoras con hora y apellido; en móvil se ven puntos de color + contador compacto
         const chipsEventosHTML = turnosDia.slice(0, 3).map(t => {
             const cls = t.estado === "Atendido" ? "chip-atendido" : (t.estado === "En Sala" ? "chip-en-sala" : "");
             return `<span class="conv-event-chip ${cls}">${t.hora} ${t.pacienteNombre}</span>`;
@@ -9707,14 +9888,13 @@ function generarCalendarioConvencional30DiasHTML(turnosFiltradosEsp) {
         `;
     }
 
-    // Resumen claro al pie del calendario para el día seleccionado (ideal en celulares)
     const turnosDiaSel = (mapaTurnosPorDia[fechaSeleccionadaCalendarioCDM] || []).sort((a, b) => a.hora.localeCompare(b.hora));
     const resumenDiaSeleccionadoHTML = `
         <div class="app-panel" style="margin-top:1.15rem; margin-bottom:0;">
             <div class="panel-head" style="margin-bottom:0.8rem; padding-bottom:0.65rem;">
                 <div>
-                    <h3><i class="ri-calendar-check-fill"></i> Turnos e Histórico del Día: <span style="color:var(--cdm-500);">${fechaSeleccionadaCalendarioCDM}</span> (${turnosDiaSel.length})</h3>
-                    <small style="color:var(--ink-500);">En cada paciente ves la nota de su última sesión y podés anotar la sesión de hoy o abrir su Cuaderno Histórico.</small>
+                    <h3><i class="ri-calendar-check-fill"></i> Turnos del Día Seleccionado: <span style="color:var(--cdm-500);">${fechaSeleccionadaCalendarioCDM}</span> (${turnosDiaSel.length})</h3>
+                    <small style="color:var(--ink-500);">Tocá sobre el paciente para abrir su expediente clínico completo o evolucionar su sesión de hoy.</small>
                 </div>
                 <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalDiaCalendarioYTurnoCDM('${fechaSeleccionadaCalendarioCDM}')">
                     <i class="ri-add-circle-line"></i> + Asignar Turno en ${fechaSeleccionadaCalendarioCDM}
@@ -9722,56 +9902,44 @@ function generarCalendarioConvencional30DiasHTML(turnosFiltradosEsp) {
             </div>
 
             ${turnosDiaSel.length > 0 ? `
-                <div style="display:flex; flex-direction:column; gap:0.65rem;">
-                    ${turnosDiaSel.map(t => {
-                        const pac = todosPacs.find(p => Number(p.id) === Number(t.pacienteId));
-                        const ultNota = (pac && Array.isArray(pac.sesiones) && pac.sesiones.length > 0)
-                            ? pac.sesiones[pac.sesiones.length - 1]
-                            : null;
-
-                        return `
-                            <div class="turn-slot-card ${t.estado === "Atendido" ? "status-atendido" : ""}">
-                                <div style="display:flex; align-items:flex-start; gap:0.85rem; flex:1; min-width:230px;">
-                                    <div class="turn-time-pill">${t.hora}<br><small style="font-size:0.6rem; color:#bae6fd;">${t.duracion || "45m"}</small></div>
-                                    <div style="flex:1; min-width:0;">
-                                        <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
-                                            <span class="badge ${t.estado === "Atendido" ? "badge-ok" : "badge-celeste"}">${t.estado.toUpperCase()}</span>
-                                            <span class="badge badge-celeste">${t.especialidad}</span>
-                                            <span class="badge badge-purple">🏥 ${t.mutual}</span>
-                                        </div>
-                                        <h4 style="font-size:1.02rem; font-weight:800; color:var(--ink-900); margin:0.2rem 0;" onclick="abrirModalHistoriaClinicaPacienteCDM(${t.pacienteId})">
-                                            ${t.pacienteNombre}
-                                        </h4>
-                                        <div style="font-size:0.78rem; color:var(--ink-700);"><b>Motivo hoy:</b> ${t.motivo || "Sesión clínica"}</div>
-                                        ${ultNota ? `
-                                            <div style="margin-top:0.35rem; padding:0.4rem 0.65rem; background:var(--cdm-50); border-left:3px solid var(--cdm-500); border-radius:8px; font-size:0.75rem; color:var(--ink-700);">
-                                                <b>📓 Última Nota (Sesión #${ultNota.numSesion} - ${ultNota.fecha}):</b> ${ultNota.zona} — <i>${ultNota.intervencion}</i> (EVA: ${ultNota.dolorEVA}/10)
-                                            </div>
-                                        ` : `<small style="color:var(--ink-400); display:block; margin-top:3px;">📓 Sin notas de sesiones previas registradas aún.</small>`}
+                <div style="display:flex; flex-direction:column; gap:0.6rem;">
+                    ${turnosDiaSel.map(t => `
+                        <div class="turn-slot-card ${t.estado === "Atendido" ? "status-atendido" : ""}">
+                            <div style="display:flex; align-items:center; gap:0.85rem; flex:1; min-width:220px;">
+                                <div class="turn-time-pill">${t.hora}<br><small style="font-size:0.6rem; color:#bae6fd;">${t.duracion || "45m"}</small></div>
+                                <div style="flex:1; min-width:0;">
+                                    <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
+                                        <span class="badge ${t.estado === "Atendido" ? "badge-ok" : "badge-celeste"}">${t.estado.toUpperCase()}</span>
+                                        <span class="badge badge-celeste">${t.especialidad}</span>
+                                        <span class="badge badge-purple">🏥 ${t.mutual}</span>
                                     </div>
-                                </div>
-
-                                <div style="display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;">
-                                    <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRegistrarSesionYEvolucionCDM(${t.pacienteId}, ${t.id})">
-                                        ✍️ Anotar Sesión Hoy
-                                    </button>
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalHistoriaClinicaPacienteCDM(${t.pacienteId})">
-                                        📓 Histórico (${pac?.sesiones?.length || 0})
-                                    </button>
-                                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarRecordatorioTurnoWhatsAppCDM(${t.id})">
-                                        <i class="ri-whatsapp-line"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-danger btn-sm" onclick="eliminarTurnoAgendaCDM(${t.id})">
-                                        🗑️
-                                    </button>
+                                    <h4 style="font-size:1.02rem; font-weight:800; color:var(--ink-900); margin:0.2rem 0; cursor:pointer;" onclick="abrirModalHistoriaClinicaPacienteCDM(${t.pacienteId})">
+                                        ${t.pacienteNombre}
+                                    </h4>
+                                    <small style="color:var(--ink-500); font-weight:600;">📌 ${t.motivo || "Sesión clínica"} ${t.profesional ? `• 👨‍⚕️ ${t.profesional}` : ""}</small>
                                 </div>
                             </div>
-                        `;
-                    }).join("")}
+
+                            <div style="display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;">
+                                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRegistrarSesionYEvolucionCDM(${t.pacienteId}, ${t.id})">
+                                    ✍️ Evolucionar
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalHistoriaClinicaPacienteCDM(${t.pacienteId})">
+                                    📂 Abrir Paciente
+                                </button>
+                                <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarRecordatorioTurnoWhatsAppCDM(${t.id})">
+                                    <i class="ri-whatsapp-line"></i>
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="eliminarTurnoAgendaCDM(${t.id})">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    `).join("")}
                 </div>
             ` : `
                 <div class="empty-box" style="padding:1.25rem;">
-                    No hay turnos cargados para el día <b>${fechaSeleccionadaCalendarioCDM}</b>. Tocá cualquier recuadro del calendario o el botón <b>"+ Asignar Turno"</b>.
+                    No hay turnos cargados para el día <b>${fechaSeleccionadaCalendarioCDM}</b>. Tocá cualquier día del calendario o el botón <b>"+ Asignar Turno"</b>.
                 </div>
             `}
         </div>
@@ -9817,7 +9985,540 @@ function generarCalendarioConvencional30DiasHTML(turnosFiltradosEsp) {
 }
 
 // =========================================================================
-// MODAL DEL DÍA DEL CALENDARIO: MUESTRA TURNOS + ÚLTIMA NOTA + FORMULARIO COMPLETO
+// RENDERIZADOR PRINCIPAL DEL CONSULTORIO (5 PESTAÑAS LIMPIAS Y SEPARADAS)
+// =========================================================================
+
+function renderizarModuloConsultorioCompletoCDM() {
+    asegurarEstilosCalendario30DiasEnDOM();
+    const sec = document.getElementById("cdmSeccionConsultorioGlobal");
+    if (!sec) return;
+
+    const especialidadesHab = obtenerEspecialidadesHabilitadasConsultorioCDM();
+    if (especialidadesHab.length === 1) {
+        especialidadFiltroConsultorioCDM = especialidadesHab[0].clave;
+    }
+
+    const busqPac = (document.getElementById("inputBuscarPacienteClinico")?.value || "").toLowerCase().trim();
+    const filtroMutualPac = document.getElementById("selectFiltroMutualPacientes")?.value || "TODAS";
+
+    const todosPacientes = obtenerPacientesClinicosCDM();
+    const todosTurnos = obtenerTurnosAgendaCDM();
+    const todasOrdenes = obtenerOrdenesMutualPendientesCDM();
+    const mutualesConfig = obtenerConfigMutualesCDM();
+    const staffList = obtenerStaffProfesionalesCDM();
+
+    const pacientesEsp = especialidadFiltroConsultorioCDM === "TODAS"
+        ? todosPacientes
+        : todosPacientes.filter(p => p.especialidad === especialidadFiltroConsultorioCDM);
+
+    const turnosFiltradosEsp = especialidadFiltroConsultorioCDM === "TODAS"
+        ? todosTurnos
+        : todosTurnos.filter(t => t.especialidad === especialidadFiltroConsultorioCDM);
+
+    const prefijoMesActual = `${anioCalendarioVisualCDM}-${String(mesCalendarioVisualCDM + 1).padStart(2, "0")}`;
+    const turnosDelMes = turnosFiltradosEsp.filter(t => String(t.fecha || "").startsWith(prefijoMesActual));
+
+    const ordenesPendientes = todasOrdenes.filter(o => o.estado === "Pendiente");
+    const totalPendienteMutuales = ordenesPendientes.reduce((acc, o) => acc + Number(o.montoMutual || 0), 0);
+
+    const espActivaNombre = especialidadFiltroConsultorioCDM === "TODAS"
+        ? (especialidadesHab.length === 1 ? especialidadesHab[0].clave : "Todas las Profesiones")
+        : especialidadFiltroConsultorioCDM;
+
+    sec.innerHTML = `
+        <div class="clinic-specialty-bar">
+            <div>
+                <span class="badge badge-celeste" style="background:rgba(255,255,255,0.18); color:#fff; border-color:rgba(255,255,255,0.3);">
+                    🏥 SISTEMA CLÍNICO MULTIDISCIPLINARIO
+                </span>
+                <h3 style="font-size:1.12rem; font-weight:800; color:#ffffff; margin-top:4px;">
+                    Especialidad Activa: ${espActivaNombre}
+                </h3>
+            </div>
+            <div style="display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;">
+                ${especialidadesHab.length > 1 ? `
+                    <button type="button" class="btn ${especialidadFiltroConsultorioCDM === "TODAS" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="cambiarEspecialidadFiltroConsultorioCDM('TODAS')">
+                        🏢 Todas
+                    </button>
+                ` : ""}
+                ${especialidadesHab.map(e => `
+                    <button type="button" class="btn ${especialidadFiltroConsultorioCDM === e.clave ? "btn-primary" : "btn-ghost"} btn-sm" onclick="cambiarEspecialidadFiltroConsultorioCDM('${e.clave}')">
+                        ${e.icono} ${e.clave}
+                    </button>
+                `).join("")}
+                <button type="button" class="btn btn-secondary btn-sm" onclick="agregarNuevaProfesionPromptCDM()">
+                    ➕ Profesión
+                </button>
+            </div>
+        </div>
+
+        <div class="bento-kpis">
+            <div class="bento-kpi" style="cursor:pointer;" onclick="cambiarSubTabConsultorioCDM('agenda')">
+                <div class="kpi-icon"><i class="ri-calendar-check-line"></i></div>
+                <div class="kpi-data">
+                    <span>Turnos del Mes (${prefijoMesActual})</span>
+                    <strong>${turnosDelMes.length} turnos (${turnosDelMes.filter(t => t.estado === "Atendido").length} atendidos)</strong>
+                </div>
+            </div>
+            <div class="bento-kpi" style="cursor:pointer;" onclick="cambiarSubTabConsultorioCDM('pacientes')">
+                <div class="kpi-icon ok"><i class="ri-user-heart-line"></i></div>
+                <div class="kpi-data">
+                    <span>Padrón de Pacientes</span>
+                    <strong>${pacientesEsp.length} pacientes activos</strong>
+                </div>
+            </div>
+            <div class="bento-kpi" style="cursor:pointer;" onclick="cambiarSubTabConsultorioCDM('mutuales')">
+                <div class="kpi-icon purple"><i class="ri-hospital-line"></i></div>
+                <div class="kpi-data">
+                    <span>Convenios y Mutuales</span>
+                    <strong>${mutualesConfig.length} coberturas activas</strong>
+                </div>
+            </div>
+            <div class="bento-kpi" style="cursor:pointer;" onclick="cambiarSubTabConsultorioCDM('liquidaciones')">
+                <div class="kpi-icon warn"><i class="ri-bank-card-line"></i></div>
+                <div class="kpi-data">
+                    <span>Órdenes por Liquidar (${ordenesPendientes.length})</span>
+                    <strong style="color:var(--warn-ink);">$${totalPendienteMutuales.toLocaleString("es-AR")}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5 PESTAÑAS BIEN SEPARADAS -->
+        <div class="module-tabs">
+            <button type="button" class="mod-tab ${tabActivaConsultorioCDM === "agenda" ? "active" : ""}" onclick="cambiarSubTabConsultorioCDM('agenda')">
+                <i class="ri-calendar-2-line"></i><span>1. Calendario 30 Días (${turnosDelMes.length})</span>
+            </button>
+            <button type="button" class="mod-tab ${tabActivaConsultorioCDM === "pacientes" ? "active" : ""}" onclick="cambiarSubTabConsultorioCDM('pacientes')">
+                <i class="ri-user-heart-line"></i><span>2. Pacientes (${pacientesEsp.length})</span>
+            </button>
+            <button type="button" class="mod-tab ${tabActivaConsultorioCDM === "profesionales" ? "active" : ""}" onclick="cambiarSubTabConsultorioCDM('profesionales')">
+                <i class="ri-user-star-line"></i><span>3. Profesionales (${staffList.length})</span>
+            </button>
+            <button type="button" class="mod-tab ${tabActivaConsultorioCDM === "mutuales" ? "active" : ""}" onclick="cambiarSubTabConsultorioCDM('mutuales')">
+                <i class="ri-hospital-line"></i><span>4. Mutuales y Aranceles (${mutualesConfig.length})</span>
+            </button>
+            <button type="button" class="mod-tab ${tabActivaConsultorioCDM === "liquidaciones" ? "active" : ""}" onclick="cambiarSubTabConsultorioCDM('liquidaciones')">
+                <i class="ri-bank-line"></i><span>5. Liquidación de Órdenes (${ordenesPendientes.length})</span>
+            </button>
+        </div>
+
+        <div id="contenedorCuerpoConsultorioCDM"></div>
+    `;
+
+    const bodyCli = document.getElementById("contenedorCuerpoConsultorioCDM");
+    if (!bodyCli) return;
+
+    // ---------------------------------------------------------------------
+    // PESTAÑA 1: CALENDARIO DE 30 DÍAS
+    // ---------------------------------------------------------------------
+    if (tabActivaConsultorioCDM === "agenda") {
+        bodyCli.innerHTML = generarCalendarioConvencional30DiasHTML(turnosFiltradosEsp);
+    }
+
+    // ---------------------------------------------------------------------
+    // PESTAÑA 2: PACIENTES (TARJETAS LIMPIAS SOLO CON DATOS RÁPIDOS; AL ENTRAR SE VE EL HISTORIAL)
+    // ---------------------------------------------------------------------
+    else if (tabActivaConsultorioCDM === "pacientes") {
+        let pacsFiltrados = [...pacientesEsp];
+        if (filtroMutualPac !== "TODAS") {
+            pacsFiltrados = pacsFiltrados.filter(p => p.mutual === filtroMutualPac);
+        }
+        if (busqPac) {
+            pacsFiltrados = pacsFiltrados.filter(p =>
+                p.nombre.toLowerCase().includes(busqPac) ||
+                p.apellido.toLowerCase().includes(busqPac) ||
+                (p.dni || "").includes(busqPac) ||
+                (p.diagnostico || "").toLowerCase().includes(busqPac)
+            );
+        }
+
+        const espDefaultAlta = especialidadFiltroConsultorioCDM === "TODAS" ? especialidadesHab[0].clave : especialidadFiltroConsultorioCDM;
+
+        const tarjetasRapidasHTML = pacsFiltrados.length ? pacsFiltrados.map(p => {
+            const iniciales = `${(p.nombre || "P").charAt(0)}${(p.apellido || "C").charAt(0)}`.toUpperCase();
+            const cantSesiones = Array.isArray(p.sesiones) ? p.sesiones.length : (p.sesionesRealizadas || 0);
+            const ultSesion = (Array.isArray(p.sesiones) && p.sesiones.length > 0) ? p.sesiones[p.sesiones.length - 1] : null;
+            const evaVal = ultSesion ? Number(ultSesion.dolorEVA) : null;
+            const evaCls = evaVal === null ? "" : (evaVal <= 3 ? "badge-ok" : (evaVal <= 6 ? "badge-warn" : "badge-danger"));
+
+            return `
+                <div class="patient-quick-card" onclick="abrirModalHistoriaClinicaPacienteCDM(${p.id})">
+                    <div class="patient-quick-top">
+                        <div class="patient-quick-avatar">${iniciales}</div>
+                        <div class="patient-quick-info">
+                            <h4>${p.apellido}, ${p.nombre}</h4>
+                            <small>${p.edad || 30} años • DNI ${p.dni}</small>
+                        </div>
+                        <div style="display:flex; gap:0.2rem;" onclick="event.stopPropagation();">
+                            <button type="button" class="btn btn-ghost btn-sm" style="padding:0.25rem 0.45rem; min-height:28px;" onclick="abrirModalNuevoPacienteClinicoCDM(${p.id})" title="Editar datos personales">✏️</button>
+                            <button type="button" class="btn btn-danger btn-sm" style="padding:0.25rem 0.45rem; min-height:28px;" onclick="eliminarPacienteClinicoCDM(${p.id})" title="Eliminar paciente">🗑️</button>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                        <span class="badge badge-celeste">${p.especialidad}</span>
+                        <span class="badge badge-purple">🏥 ${p.mutual}</span>
+                        <span class="badge badge-ok">📋 ${cantSesiones}${p.sesionesAutorizadas > 0 ? "/" + p.sesionesAutorizadas : ""} sesiones</span>
+                        ${evaVal !== null ? `<span class="badge ${evaCls}">EVA ${evaVal}/10</span>` : ""}
+                    </div>
+
+                    <div class="patient-quick-diag" title="${(p.diagnostico || "").replace(/"/g, "&quot;")}">
+                        🩺 ${p.diagnostico || "Sin diagnóstico inicial especificado"}
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; color:var(--ink-500); font-weight:600;">
+                        <span>👨‍⚕️ ${p.profesionalAsignado || "Consultorio Oficial"}</span>
+                        <span>${ultSesion ? `Últ. visita: ${ultSesion.fecha}` : "Sin visitas aún"}</span>
+                    </div>
+
+                    <div class="patient-quick-footer" onclick="event.stopPropagation();">
+                        <button type="button" class="btn btn-primary btn-sm" style="flex:1;" onclick="abrirModalHistoriaClinicaPacienteCDM(${p.id})">
+                            📂 Ingresar al Paciente
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalRegistrarSesionYEvolucionCDM(${p.id}, null)" title="Anotar nueva sesión hoy">
+                            ✍️ + Sesión
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalDiaCalendarioYTurnoCDM('${obtenerHoyISO()}', '09:00', ${p.id})" title="Dar turno en el calendario">
+                            📅
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join("") : `<div class="empty-box" style="grid-column:1/-1;">No se encontraron pacientes registrados con este filtro.</div>`;
+
+        bodyCli.innerHTML = `
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3><i class="ri-user-heart-line"></i> Padrón de Pacientes (${espActivaNombre})</h3>
+                        <small style="color:var(--ink-500);">Vista rápida de pacientes. Tocá sobre cualquier paciente o en <b>"📂 Ingresar al Paciente"</b> para abrir su historial completo de sesiones, métricas y gráficos.</small>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalNuevoPacienteClinicoCDM(null, '${espDefaultAlta}')">
+                        <i class="ri-user-add-line"></i> + Nuevo Paciente
+                    </button>
+                </div>
+
+                <div class="filter-strip" style="grid-template-columns: 1fr auto; margin-bottom:1.15rem;">
+                    <div class="search-box">
+                        <i class="ri-search-line"></i>
+                        <input type="text" id="inputBuscarPacienteClinico" placeholder="Buscar por apellido, nombre, DNI o diagnóstico..." value="${busqPac.replace(/"/g, "&quot;")}" oninput="renderizarModuloConsultorioCompletoCDM()">
+                    </div>
+                    <select id="selectFiltroMutualPacientes" onchange="renderizarModuloConsultorioCompletoCDM()" style="width:auto;">
+                        <option value="TODAS" ${filtroMutualPac === "TODAS" ? "selected" : ""}>🏥 Todas las Mutuales / Particulares</option>
+                        ${mutualesConfig.map(m => `<option value="${m.nombre}" ${filtroMutualPac === m.nombre ? "selected" : ""}>${m.nombre}</option>`).join("")}
+                    </select>
+                </div>
+
+                <div class="patients-quick-grid">
+                    ${tarjetasRapidasHTML}
+                </div>
+            </div>
+        `;
+    }
+
+    // ---------------------------------------------------------------------
+    // PESTAÑA 3: DIRECTORIO DE PROFESIONALES (STAFF Y MATRÍCULAS M.P.)
+    // ---------------------------------------------------------------------
+    else if (tabActivaConsultorioCDM === "profesionales") {
+        bodyCli.innerHTML = `
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3><i class="ri-user-star-line"></i> Equipo de Profesionales de la Salud (Matrículas M.P., Horarios y Comisiones)</h3>
+                        <small style="color:var(--ink-500);">Administrá los datos de cada Kinesiólogo, Fisioterapeuta, Quiropráctico, Nutricionista o Psicólogo.</small>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalCrearOEditarProfesionalStaffCDM(null)">
+                        <i class="ri-user-add-line"></i> + Agregar Profesional al Equipo
+                    </button>
+                </div>
+
+                <div class="pro-staff-grid">
+                    ${staffList.map(st => {
+                        const cantPacs = todosPacientes.filter(p => (p.profesionalAsignado || "").includes(st.apellido) || p.especialidad === st.especialidad).length;
+                        return `
+                            <div class="pro-staff-card">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+                                    <div>
+                                        <span class="badge badge-celeste">${st.especialidad}</span>
+                                        <span class="badge badge-purple">${st.matricula}</span>
+                                        <h4 style="font-size:1.06rem; font-weight:800; color:var(--ink-900); margin:0.3rem 0 0.1rem 0;">
+                                            ${st.nombre} ${st.apellido}
+                                        </h4>
+                                        <small style="color:var(--cdm-600); font-weight:700;">${st.rolDetalle || st.especialidad}</small>
+                                    </div>
+                                    <div style="display:flex; gap:0.25rem;">
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalCrearOEditarProfesionalStaffCDM(${st.id})">✏️</button>
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="eliminarProfesionalStaffCDM(${st.id})">🗑️</button>
+                                    </div>
+                                </div>
+
+                                <div style="font-size:0.78rem; color:var(--ink-700); background:var(--surface-subtle); padding:0.55rem 0.75rem; border-radius:10px; border:1px solid var(--line);">
+                                    <div>🕒 <b>Días y Horarios:</b> ${st.diasHorarios}</div>
+                                    <div>📱 <b>WhatsApp:</b> ${st.whatsapp} • 💰 <b>Honorario:</b> ${st.comisionPct || 70}%</div>
+                                    <div>👥 <b>Pacientes asignados:</b> ${cantPacs} pacientes</div>
+                                </div>
+
+                                <div style="display:flex; gap:0.4rem; margin-top:auto;">
+                                    <button type="button" class="btn btn-primary btn-sm" style="flex:1;" onclick="cambiarEspecialidadFiltroConsultorioCDM('${st.especialidad}'); cambiarSubTabConsultorioCDM('agenda');">
+                                        📅 Ver Agenda
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" style="flex:1;" onclick="cambiarEspecialidadFiltroConsultorioCDM('${st.especialidad}'); cambiarSubTabConsultorioCDM('pacientes');">
+                                        📂 Ver Pacientes
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            </div>
+        `;
+    }
+
+    // ---------------------------------------------------------------------
+    // PESTAÑA 4: EDITOR EXCLUSIVO DE MUTUALES, ARANCELES Y COSEGUROS (SIN MEZCLARSE CON LIQUIDACIONES)
+    // ---------------------------------------------------------------------
+    else if (tabActivaConsultorioCDM === "mutuales") {
+        bodyCli.innerHTML = `
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3><i class="ri-hospital-line"></i> Catálogo y Editor de Mutuales, Obras Sociales y Aranceles</h3>
+                        <small style="color:var(--ink-500);">Configurá de forma clara cuánto cubre cada mutual por sesión y cuánto abona el paciente de coseguro o consulta particular.</small>
+                    </div>
+                    <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalCrearOEditarMutualCDM(null)">
+                            <i class="ri-add-circle-line"></i> + Agregar Nueva Mutual / Obra Social
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="cambiarSubTabConsultorioCDM('liquidaciones')">
+                            🏦 Ir a Liquidación de Órdenes →
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mutuals-manager-grid">
+                    ${mutualesConfig.map(m => {
+                        const totalSesion = Number(m.arancelMutual || 0) + Number(m.coseguroPaciente || 0);
+                        const cantPacsMutual = todosPacientes.filter(p => p.mutual === m.nombre).length;
+                        return `
+                            <div class="mutual-pro-card ${m.esParticular ? "is-particular" : ""}">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+                                    <div>
+                                        <span class="badge ${m.esParticular ? "badge-ok" : "badge-purple"}">${m.esParticular ? "💵 ATENCIÓN PARTICULAR" : "🏥 CONVENIO OBRA SOCIAL"}</span>
+                                        <h4 style="font-size:1.08rem; font-weight:800; color:var(--ink-900); margin:0.3rem 0 0 0;">${m.nombre}</h4>
+                                        <small style="color:var(--ink-500); font-weight:600;">👥 ${cantPacsMutual} paciente(s) con esta cobertura</small>
+                                    </div>
+                                    <div style="display:flex; gap:0.25rem;">
+                                        <button type="button" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.55rem; min-height:28px;" onclick="abrirModalCrearOEditarMutualCDM(${m.id})" title="Editar montos de esta mutual">
+                                            ✏️ Editar
+                                        </button>
+                                        ${!m.esParticular ? `
+                                            <button type="button" class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem; min-height:28px;" onclick="eliminarMutualConvenioCDM(${m.id})" title="Eliminar mutual">
+                                                🗑️
+                                            </button>
+                                        ` : ""}
+                                    </div>
+                                </div>
+
+                                <div class="mutual-amounts-grid">
+                                    <div class="mutual-amount-item">
+                                        <small>Cubre la Mutual</small>
+                                        <strong style="color:var(--cdm-600);">$${Number(m.arancelMutual || 0).toLocaleString("es-AR")}</strong>
+                                    </div>
+                                    <div class="mutual-amount-item">
+                                        <small>Coseguro Paciente</small>
+                                        <strong style="color:var(--ok-ink);">$${Number(m.coseguroPaciente || 0).toLocaleString("es-AR")}</strong>
+                                    </div>
+                                </div>
+
+                                <div class="mutual-total-strip">
+                                    <span style="font-weight:700; color:var(--ink-700);">Valor Total por Sesión:</span>
+                                    <strong style="font-size:0.95rem; font-weight:900; color:var(--ink-900);">$${totalSesion.toLocaleString("es-AR")}</strong>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            </div>
+        `;
+    }
+
+    // ---------------------------------------------------------------------
+    // PESTAÑA 5: LIQUIDACIÓN DE ÓRDENES DE MUTUALES A CONTABILIDAD Y CAJA (100% SEPARADA)
+    // ---------------------------------------------------------------------
+    else {
+        let ordenesFiltradas = [...todasOrdenes];
+        if (filtroMutualLiquidacionCDM !== "TODAS") {
+            ordenesFiltradas = ordenesFiltradas.filter(o => o.mutual === filtroMutualLiquidacionCDM);
+        }
+        const pendientesFiltro = ordenesFiltradas.filter(o => o.estado === "Pendiente");
+        const montoPendienteFiltro = pendientesFiltro.reduce((a, o) => a + Number(o.montoMutual || 0), 0);
+
+        bodyCli.innerHTML = `
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3><i class="ri-bank-line"></i> Liquidación de Órdenes de Mutuales hacia Contabilidad y Caja</h3>
+                        <small style="color:var(--ink-500);">Filtrá por Obra Social y tocá <b>"🏦 Liquidar a Banco"</b> cuando te acrediten el pago mensual para que impacte automáticamente en el Libro Mayor.</small>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                        <select onchange="filtroMutualLiquidacionCDM=this.value; renderizarModuloConsultorioCompletoCDM();" style="width:auto; min-height:34px; font-weight:700;">
+                            <option value="TODAS" ${filtroMutualLiquidacionCDM === "TODAS" ? "selected" : ""}>🏥 Todas las Mutuales (${todasOrdenes.length})</option>
+                            ${mutualesConfig.filter(m => !m.esParticular).map(m => `<option value="${m.nombre}" ${filtroMutualLiquidacionCDM === m.nombre ? "selected" : ""}>${m.nombre}</option>`).join("")}
+                        </select>
+                        ${pendientesFiltro.length > 0 ? `
+                            <button type="button" class="btn btn-primary btn-sm" onclick="liquidarTodasLasOrdenesMutualesAlBancoCDM()">
+                                <i class="ri-check-double-line"></i> 🏦 Liquidar Pendientes ($${montoPendienteFiltro.toLocaleString("es-AR")})
+                            </button>
+                        ` : ""}
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Mutual / Obra Social</th>
+                                <th>Paciente / Afiliado</th>
+                                <th>N° Orden / Autorización</th>
+                                <th>Coseguro (Ya en Caja)</th>
+                                <th>Monto Mutual</th>
+                                <th>Estado</th>
+                                <th>Acción Contable</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${ordenesFiltradas.length ? ordenesFiltradas.map(o => {
+                                const liq = o.estado === "Liquidada";
+                                return `
+                                    <tr>
+                                        <td data-label="Fecha"><b>${o.fecha}</b></td>
+                                        <td data-label="Mutual"><span class="badge badge-purple">${o.mutual}</span></td>
+                                        <td data-label="Paciente"><strong>${o.pacienteNombre}</strong><br><small>Afil: ${o.nroAfiliado || "-"}</small></td>
+                                        <td data-label="N° Orden"><b>${o.nroOrden || "S/N"}</b> (${o.especialidad})</td>
+                                        <td data-label="Coseguro"><span style="color:var(--ok-ink); font-weight:700;">$${Number(o.coseguroCobrado || 0).toLocaleString("es-AR")}</span></td>
+                                        <td data-label="Monto Mutual"><strong>$${Number(o.montoMutual || 0).toLocaleString("es-AR")}</strong></td>
+                                        <td data-label="Estado"><span class="badge ${liq ? "badge-ok" : "badge-warn"}">${liq ? "✓ LIQUIDADA EN BANCO" : "⏳ PENDIENTE DE COBRO"}</span></td>
+                                        <td data-label="Acción">
+                                            <div style="display:flex; gap:0.3rem; justify-content:flex-end;">
+                                                ${!liq ? `<button type="button" class="btn btn-primary btn-sm" onclick="liquidarOrdenIndividualMutualABancoCDM(${o.id})">🏦 Liquidar a Banco</button>` : ""}
+                                                <button type="button" class="btn btn-danger btn-sm" onclick="eliminarOrdenMutualCDM(${o.id})">🗑️</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join("") : `<tr><td colspan="8"><div class="empty-box">No hay órdenes de mutuales para este filtro.</div></td></tr>`}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// =========================================================================
+// MODAL VISUAL PROPIO PARA CREAR O EDITAR UNA MUTUAL / OBRA SOCIAL
+// =========================================================================
+
+function abrirModalCrearOEditarMutualCDM(idMutualEditar = null) {
+    asegurarModalVideoEnPaginaActualCDM();
+    const lista = obtenerConfigMutualesCDM();
+    const m = idMutualEditar ? lista.find(x => Number(x.id) === Number(idMutualEditar)) : null;
+
+    const modal = document.getElementById("modalVideoEjercicio");
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:520px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-purple">${m ? "✏️ EDITAR CONVENIO Y ARANCELES" : "🏥 NUEVA OBRA SOCIAL / MUTUAL"}</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">${m ? `Editar: ${m.nombre}` : "Agregar Obra Social o Prepaga"}</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalVideoEjercicio()">✕</button>
+            </div>
+
+            <form onsubmit="guardarMutualDesdeModalCDM(event, ${m ? m.id : "null"})">
+                <div class="field" style="margin-bottom:0.85rem;">
+                    <label>Nombre de la Obra Social / Mutual / Cobertura *</label>
+                    <input type="text" id="mutModalNombre" required placeholder="Ej: APROSS / OSDE / Sancor Salud" value="${(m?.nombre || "").replace(/"/g, "&quot;")}" ${m?.esParticular ? "readonly" : ""}>
+                </div>
+
+                <div class="grid-2" style="margin-bottom:0.85rem;">
+                    <div class="field">
+                        <label>Monto que Cubre la Mutual ($) *</label>
+                        <input type="number" id="mutModalArancel" required min="0" value="${m ? m.arancelMutual : 14000}" oninput="actualizarSumaTotalModalMutualCDM()">
+                        <small style="color:var(--ink-500); font-size:0.68rem;">Lo que te liquida la Obra Social por orden.</small>
+                    </div>
+                    <div class="field">
+                        <label>Coseguro / Abona Paciente ($) *</label>
+                        <input type="number" id="mutModalCoseguro" required min="0" value="${m ? m.coseguroPaciente : 3500}" oninput="actualizarSumaTotalModalMutualCDM()">
+                        <small style="color:var(--ink-500); font-size:0.68rem;">Lo que paga el paciente en el consultorio.</small>
+                    </div>
+                </div>
+
+                <div class="mutual-total-strip" style="margin-bottom:1.15rem;">
+                    <span style="font-weight:700; color:var(--ink-700);">Valor Total por Sesión:</span>
+                    <strong id="mutModalTotalPreview" style="font-size:1.1rem; font-weight:900; color:var(--cdm-600);">
+                        $${((m ? Number(m.arancelMutual) : 14000) + (m ? Number(m.coseguroPaciente) : 3500)).toLocaleString("es-AR")}
+                    </strong>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+                    <button type="button" class="btn btn-ghost" onclick="cerrarModalVideoEjercicio()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="ri-save-3-line"></i> Guardar Convenio
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+}
+
+function actualizarSumaTotalModalMutualCDM() {
+    const a = parseFloat(document.getElementById("mutModalArancel")?.value) || 0;
+    const c = parseFloat(document.getElementById("mutModalCoseguro")?.value) || 0;
+    const el = document.getElementById("mutModalTotalPreview");
+    if (el) el.innerText = `$${(a + c).toLocaleString("es-AR")}`;
+}
+
+function guardarMutualDesdeModalCDM(e, idEditar = null) {
+    e.preventDefault();
+    const lista = obtenerConfigMutualesCDM();
+    const nombre = document.getElementById("mutModalNombre").value.trim();
+    const arancelMutual = parseFloat(document.getElementById("mutModalArancel").value) || 0;
+    const coseguroPaciente = parseFloat(document.getElementById("mutModalCoseguro").value) || 0;
+
+    if (idEditar) {
+        const idx = lista.findIndex(x => Number(x.id) === Number(idEditar));
+        if (idx >= 0) {
+            lista[idx] = { ...lista[idx], nombre, arancelMutual, coseguroPaciente };
+        }
+        mostrarToast(`✏️ Aranceles de "${nombre}" actualizados.`);
+    } else {
+        lista.push({
+            id: Date.now(),
+            nombre,
+            arancelMutual,
+            coseguroPaciente,
+            esParticular: nombre.toLowerCase().includes("particular")
+        });
+        mostrarToast(`🏥 Obra Social / Mutual "${nombre}" agregada.`);
+    }
+
+    guardarConfigMutualesCDM(lista);
+    cerrarModalVideoEjercicio();
+    renderizarModuloConsultorioCompletoCDM();
+}
+
+agregarNuevaMutualConvenioPromptCDM = function () {
+    abrirModalCrearOEditarMutualCDM(null);
+};
+editarArancelMutualPromptCDM = function (idMutual) {
+    abrirModalCrearOEditarMutualCDM(idMutual);
+};
+
+// =========================================================================
+// RESTO DE MODALES (AGENDA DEL DÍA, STAFF, PROTOCOLOS Y EXPEDIENTE INTERNO DEL PACIENTE)
 // =========================================================================
 
 function seleccionarHorarioChipEnModalDiaCDM(horaStr, btnEl) {
@@ -9844,22 +10545,25 @@ function alEscribirNombrePacienteEnModalDiaCDM(valorInput) {
         document.getElementById("mdPacDni").value = encontrado.dni || "";
         document.getElementById("mdPacEdad").value = encontrado.edad || 32;
         document.getElementById("mdPacWhatsapp").value = encontrado.whatsapp || "5493584";
-        document.getElementById("mdPacProfesion").value = encontrado.especialidad || "Quiropraxia";
+        document.getElementById("mdPacProfesion").value = encontrado.especialidad || "Kinesiología";
         document.getElementById("mdPacMutual").value = encontrado.mutual || "Particular (Sin Mutual)";
         document.getElementById("mdPacAfiliado").value = encontrado.nroAfiliado || "";
         document.getElementById("mdPacSesionesAut").value = encontrado.sesionesAutorizadas || 0;
         document.getElementById("mdPacDiagnostico").value = encontrado.diagnostico || "";
+        if (encontrado.profesionalAsignado && document.getElementById("mdTurProfesionalAsignado")) {
+            document.getElementById("mdTurProfesionalAsignado").value = encontrado.profesionalAsignado;
+        }
         alEscribirMutualEnModalDiaCDM(encontrado.mutual);
 
         if (badgeEstado) {
             badgeEstado.className = "badge badge-ok";
-            badgeEstado.innerText = `✓ Paciente Registrado (${encontrado.sesiones?.length || 0} sesiones en su histórico)`;
+            badgeEstado.innerText = `✓ Paciente Registrado (${encontrado.sesiones?.length || 0} sesiones previas)`;
         }
     } else {
         document.getElementById("mdPacIdExistente").value = "";
         if (badgeEstado) {
             badgeEstado.className = "badge badge-celeste";
-            badgeEstado.innerText = "✨ Paciente Nuevo (Se creará su ficha e histórico al guardar)";
+            badgeEstado.innerText = "✨ Paciente Nuevo (Se creará su ficha al guardar)";
         }
     }
 }
@@ -9891,6 +10595,7 @@ function abrirModalDiaCalendarioYTurnoCDM(fechaISO, horaPre = "09:00", pacienteI
     const pacs = obtenerPacientesClinicosCDM();
     const mutuales = obtenerConfigMutualesCDM();
     const profesiones = obtenerEspecialidadesHabilitadasConsultorioCDM();
+    const staff = obtenerStaffProfesionalesCDM();
     const todosTurnos = obtenerTurnosAgendaCDM();
 
     const turnosDeEseDia = todosTurnos
@@ -9902,7 +10607,7 @@ function abrirModalDiaCalendarioYTurnoCDM(fechaISO, horaPre = "09:00", pacienteI
     const primeraHoraLibre = horariosSugeridos.find(h => !horasOcupadas.includes(h)) || horaPre;
 
     const pacPre = pacienteIdPre ? pacs.find(x => Number(x.id) === Number(pacienteIdPre)) : null;
-    const profInicial = pacPre?.especialidad || (especialidadFiltroConsultorioCDM !== "TODAS" ? especialidadFiltroConsultorioCDM : (profesiones[0]?.clave || "Quiropraxia"));
+    const profInicial = pacPre?.especialidad || (especialidadFiltroConsultorioCDM !== "TODAS" ? especialidadFiltroConsultorioCDM : (profesiones[0]?.clave || "Kinesiología"));
     const mutualInicial = pacPre?.mutual || mutuales[0]?.nombre || "Particular (Sin Mutual)";
     const objMutualIni = mutuales.find(m => m.nombre === mutualInicial) || mutuales[0];
 
@@ -9912,53 +10617,39 @@ function abrirModalDiaCalendarioYTurnoCDM(fechaISO, horaPre = "09:00", pacienteI
                 <strong style="font-size:0.84rem; color:var(--ink-900); text-transform:uppercase;">
                     📋 Turnos del Día ${fechaISO} (${turnosDeEseDia.length})
                 </strong>
-                <small style="color:var(--ink-500);">Tocá "✍️ Anotar Sesión" para cargar la nota de hoy en el histórico del paciente</small>
+                <small style="color:var(--ink-500);">Tocá "📂 Abrir Paciente" para ver su historial completo</small>
             </div>
             <div style="display:flex; flex-direction:column; gap:0.55rem;">
-                ${turnosDeEseDia.map(t => {
-                    const pObj = pacs.find(x => Number(x.id) === Number(t.pacienteId));
-                    const ultNota = (pObj && Array.isArray(pObj.sesiones) && pObj.sesiones.length > 0)
-                        ? pObj.sesiones[pObj.sesiones.length - 1]
-                        : null;
-
-                    return `
-                        <div style="background:var(--surface-solid); border:1px solid var(--line-strong); border-left:4px solid var(--cdm-500); border-radius:12px; padding:0.65rem 0.85rem; display:flex; justify-content:space-between; align-items:center; gap:0.65rem; flex-wrap:wrap;">
-                            <div style="flex:1; min-width:210px;">
-                                <div>
-                                    <span class="badge badge-celeste">🕒 ${t.hora} hs</span>
-                                    <strong style="font-size:0.94rem; color:var(--ink-900); margin-left:6px; cursor:pointer;" onclick="abrirModalHistoriaClinicaPacienteCDM(${t.pacienteId})">${t.pacienteNombre}</strong>
-                                    <small style="color:var(--ink-500); margin-left:4px;">(${t.especialidad} • ${t.mutual})</small>
-                                </div>
-                                ${ultNota ? `
-                                    <div style="font-size:0.74rem; color:var(--ink-700); margin-top:4px; background:var(--cdm-50); padding:4px 8px; border-radius:6px;">
-                                        <b>📓 Última Sesión (#${ultNota.numSesion}):</b> ${ultNota.zona} — <i>${ultNota.intervencion}</i>
-                                    </div>
-                                ` : ""}
-                            </div>
-                            <div style="display:flex; gap:0.3rem; flex-wrap:wrap; align-items:center;">
-                                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRegistrarSesionYEvolucionCDM(${t.pacienteId}, ${t.id})">
-                                    ✍️ Anotar Sesión
-                                </button>
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalHistoriaClinicaPacienteCDM(${t.pacienteId})">
-                                    📓 Histórico (${pObj?.sesiones?.length || 0})
-                                </button>
-                                <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarRecordatorioTurnoWhatsAppCDM(${t.id})">
-                                    <i class="ri-whatsapp-line"></i>
-                                </button>
-                                <button type="button" class="btn btn-danger btn-sm" onclick="eliminarTurnoAgendaCDM(${t.id}); abrirModalDiaCalendarioYTurnoCDM('${fechaISO}');">
-                                    🗑️
-                                </button>
-                            </div>
+                ${turnosDeEseDia.map(t => `
+                    <div style="background:var(--surface-solid); border:1px solid var(--line-strong); border-left:4px solid var(--cdm-500); border-radius:12px; padding:0.65rem 0.85rem; display:flex; justify-content:space-between; align-items:center; gap:0.65rem; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:210px;">
+                            <span class="badge badge-celeste">🕒 ${t.hora} hs</span>
+                            <strong style="font-size:0.94rem; color:var(--ink-900); margin-left:6px; cursor:pointer;" onclick="abrirModalHistoriaClinicaPacienteCDM(${t.pacienteId})">${t.pacienteNombre}</strong>
+                            <small style="color:var(--ink-500); margin-left:4px;">(${t.especialidad} • ${t.mutual})</small>
                         </div>
-                    `;
-                }).join("")}
+                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; align-items:center;">
+                            <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRegistrarSesionYEvolucionCDM(${t.pacienteId}, ${t.id})">
+                                ✍️ Evolucionar
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalHistoriaClinicaPacienteCDM(${t.pacienteId})">
+                                📂 Abrir Paciente
+                            </button>
+                            <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarRecordatorioTurnoWhatsAppCDM(${t.id})">
+                                <i class="ri-whatsapp-line"></i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="eliminarTurnoAgendaCDM(${t.id}); abrirModalDiaCalendarioYTurnoCDM('${fechaISO}');">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `).join("")}
             </div>
         </div>
     ` : "";
 
     const modal = document.getElementById("modalVideoEjercicio");
     modal.innerHTML = `
-        <div class="modal-window" style="max-width:760px;">
+        <div class="modal-window" style="max-width:780px;">
             <div class="modal-top">
                 <div>
                     <span class="badge badge-celeste">AGENDA DEL DÍA + FICHA DEL PACIENTE</span>
@@ -10003,12 +10694,12 @@ function abrirModalDiaCalendarioYTurnoCDM(fechaISO, horaPre = "09:00", pacienteI
                         <div class="field"><label>Fecha *</label><input type="date" id="mdTurFecha" required value="${fechaISO}"></div>
                         <div class="field"><label>Hora Exacta *</label><input type="time" id="mdTurHora" required value="${primeraHoraLibre}"></div>
                         <div class="field">
-                            <label>Duración</label>
-                            <select id="mdTurDuracion">
-                                <option value="30 min">30 min</option>
-                                <option value="45 min" selected>45 min</option>
-                                <option value="60 min">60 min</option>
-                            </select>
+                            <label>Profesional a Cargo *</label>
+                            <input type="text" id="mdTurProfesionalAsignado" list="dlStaffProfesionalesModal" required
+                                   value="${pacPre?.profesionalAsignado || (staff[0] ? `${staff[0].nombre} ${staff[0].apellido} (${staff[0].matricula})` : "Consultorio Oficial")}">
+                            <datalist id="dlStaffProfesionalesModal">
+                                ${staff.map(st => `<option value="${st.nombre} ${st.apellido} (${st.matricula})">${st.especialidad} • ${st.rolDetalle}</option>`).join("")}
+                            </datalist>
                         </div>
                     </div>
 
@@ -10033,7 +10724,7 @@ function abrirModalDiaCalendarioYTurnoCDM(fechaISO, horaPre = "09:00", pacienteI
                     <div class="grid-3" style="margin-bottom:0.75rem;">
                         <div class="field"><label>WhatsApp *</label><input type="text" id="mdPacWhatsapp" required value="${(pacPre?.whatsapp || "5493584").replace(/"/g, "&quot;")}"></div>
                         <div class="field">
-                            <label>Profesión * (Elegí o escribí)</label>
+                            <label>Profesión / Especialidad *</label>
                             <input type="text" id="mdPacProfesion" list="dlProfesionesConsultorio" required value="${profInicial.replace(/"/g, "&quot;")}">
                             <datalist id="dlProfesionesConsultorio">
                                 ${profesiones.map(pr => `<option value="${pr.clave}">${pr.icono} ${pr.titulo}</option>`).join("")}
@@ -10061,8 +10752,8 @@ function abrirModalDiaCalendarioYTurnoCDM(fechaISO, horaPre = "09:00", pacienteI
                     </div>
 
                     <div class="grid-2" style="margin-bottom:0.85rem;">
-                        <div class="field"><label>Diagnóstico / Antecedentes del Paciente *</label><input type="text" id="mdPacDiagnostico" required placeholder="Ej: Cervicalgia / Rehab LCA..." value="${(pacPre?.diagnostico || "").replace(/"/g, "&quot;")}"></div>
-                        <div class="field"><label>Motivo del Turno / Nota Inicial para esta Sesión *</label><input type="text" id="mdTurMotivo" required value="Sesión y evaluación clínica"></div>
+                        <div class="field"><label>Diagnóstico / Antecedentes del Paciente *</label><input type="text" id="mdPacDiagnostico" required placeholder="Ej: Cervicalgia / Rehab LCA / Plan ISAK..." value="${(pacPre?.diagnostico || "").replace(/"/g, "&quot;")}"></div>
+                        <div class="field"><label>Motivo del Turno *</label><input type="text" id="mdTurMotivo" required value="Sesión y evaluación clínica"></div>
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
@@ -10084,7 +10775,7 @@ function guardarTurnoYPacienteCompletoDesdeModalDiaCDM(e) {
     e.preventDefault();
     const fecha = document.getElementById("mdTurFecha").value || obtenerHoyISO();
     const hora = document.getElementById("mdTurHora").value || "09:00";
-    const duracion = document.getElementById("mdTurDuracion").value || "45 min";
+    const profesionalAsignado = document.getElementById("mdTurProfesionalAsignado")?.value.trim() || "Consultorio Oficial";
     const motivoTurno = document.getElementById("mdTurMotivo").value.trim() || "Sesión clínica";
 
     const idExistente = document.getElementById("mdPacIdExistente").value;
@@ -10107,7 +10798,7 @@ function guardarTurnoYPacienteCompletoDesdeModalDiaCDM(e) {
     if (idExistente) {
         const idx = pacs.findIndex(x => Number(x.id) === Number(idExistente));
         if (idx >= 0) {
-            pacs[idx] = { ...pacs[idx], nombre, apellido, dni, edad, whatsapp, especialidad: profesionCanon, mutual: mutualCanonObj.nombre, nroAfiliado, sesionesAutorizadas: sesionesAut, diagnostico };
+            pacs[idx] = { ...pacs[idx], nombre, apellido, dni, edad, whatsapp, especialidad: profesionCanon, profesionalAsignado, mutual: mutualCanonObj.nombre, nroAfiliado, sesionesAutorizadas: sesionesAut, diagnostico };
             pacienteFinal = pacs[idx];
         }
     }
@@ -10118,6 +10809,7 @@ function guardarTurnoYPacienteCompletoDesdeModalDiaCDM(e) {
             codigoAcceso: `PAC-${Math.floor(100 + Math.random() * 899)}`,
             nombre, apellido, dni, edad, whatsapp,
             especialidad: profesionCanon,
+            profesionalAsignado,
             mutual: mutualCanonObj.nombre,
             nroAfiliado, diagnostico,
             sesionesAutorizadas: sesionesAut,
@@ -10131,10 +10823,11 @@ function guardarTurnoYPacienteCompletoDesdeModalDiaCDM(e) {
     const turnos = obtenerTurnosAgendaCDM();
     turnos.push({
         id: Date.now(),
-        fecha, hora, duracion,
+        fecha, hora, duracion: "45 min",
         pacienteId: pacienteFinal.id,
         pacienteNombre: `${pacienteFinal.apellido}, ${pacienteFinal.nombre}`,
         especialidad: profesionCanon,
+        profesional: profesionalAsignado,
         mutual: mutualCanonObj.nombre,
         motivo: motivoTurno,
         estado: "Reservado",
@@ -10152,570 +10845,53 @@ function guardarTurnoYPacienteCompletoDesdeModalDiaCDM(e) {
 
     cerrarModalVideoEjercicio();
     renderizarModuloConsultorioCompletoCDM();
-    mostrarToast(`📅 Turno agendado el ${fecha} (${hora} hs) para ${pacienteFinal.apellido}, ${pacienteFinal.nombre}.`);
+    mostrarToast(`📅 Turno agendado el ${fecha} (${hora} hs) con ${profesionalAsignado}.`);
 }
 
-// =========================================================================
-// RENDERIZADOR PRINCIPAL DEL CONSULTORIO (CON HISTÓRICO CLARO DE SESIONES POR USUARIO)
-// =========================================================================
-
-function renderizarModuloConsultorioCompletoCDM() {
-    asegurarEstilosCalendario30DiasEnDOM();
-    const sec = document.getElementById("cdmSeccionConsultorioGlobal");
-    if (!sec) return;
-
-    const especialidadesHab = obtenerEspecialidadesHabilitadasConsultorioCDM();
-    if (especialidadesHab.length === 1) {
-        especialidadFiltroConsultorioCDM = especialidadesHab[0].clave;
-    }
-
-    const busqPac = (document.getElementById("inputBuscarPacienteClinico")?.value || "").toLowerCase().trim();
-    const filtroMutualPac = document.getElementById("selectFiltroMutualPacientes")?.value || "TODAS";
-
-    const todosPacientes = obtenerPacientesClinicosCDM();
-    const todosTurnos = obtenerTurnosAgendaCDM();
-    const todasOrdenes = obtenerOrdenesMutualPendientesCDM();
-    const mutualesConfig = obtenerConfigMutualesCDM();
-
-    const pacientesEsp = especialidadFiltroConsultorioCDM === "TODAS"
-        ? todosPacientes
-        : todosPacientes.filter(p => p.especialidad === especialidadFiltroConsultorioCDM);
-
-    const turnosFiltradosEsp = especialidadFiltroConsultorioCDM === "TODAS"
-        ? todosTurnos
-        : todosTurnos.filter(t => t.especialidad === especialidadFiltroConsultorioCDM);
-
-    const prefijoMesActual = `${anioCalendarioVisualCDM}-${String(mesCalendarioVisualCDM + 1).padStart(2, "0")}`;
-    const turnosDelMes = turnosFiltradosEsp.filter(t => String(t.fecha || "").startsWith(prefijoMesActual));
-
-    const ordenesPendientes = todasOrdenes.filter(o => o.estado === "Pendiente");
-    const totalPendienteMutuales = ordenesPendientes.reduce((acc, o) => acc + Number(o.montoMutual || 0), 0);
-    const totalLiquidadoMutuales = todasOrdenes.filter(o => o.estado === "Liquidada").reduce((acc, o) => acc + Number(o.montoMutual || 0), 0);
-
-    const espActivaNombre = especialidadFiltroConsultorioCDM === "TODAS"
-        ? (especialidadesHab.length === 1 ? especialidadesHab[0].clave : "Todas las Profesiones")
-        : especialidadFiltroConsultorioCDM;
-
-    sec.innerHTML = `
-        <div class="clinic-specialty-bar">
-            <div>
-                <span class="badge badge-celeste" style="background:rgba(255,255,255,0.18); color:#fff; border-color:rgba(255,255,255,0.3);">
-                    🏥 CONSULTORIO PROFESIONAL E HISTÓRICO POR SESIÓN
-                </span>
-                <h3 style="font-size:1.12rem; font-weight:800; color:#ffffff; margin-top:4px;">
-                    Especialidad: ${espActivaNombre}
-                </h3>
-            </div>
-            <div style="display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;">
-                ${especialidadesHab.length > 1 ? `
-                    <button type="button" class="btn ${especialidadFiltroConsultorioCDM === "TODAS" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="cambiarEspecialidadFiltroConsultorioCDM('TODAS')">
-                        🏢 Todas
-                    </button>
-                ` : ""}
-                ${especialidadesHab.map(e => `
-                    <button type="button" class="btn ${especialidadFiltroConsultorioCDM === e.clave ? "btn-primary" : "btn-ghost"} btn-sm" onclick="cambiarEspecialidadFiltroConsultorioCDM('${e.clave}')">
-                        ${e.icono} ${e.clave}
-                    </button>
-                `).join("")}
-                <button type="button" class="btn btn-secondary btn-sm" onclick="agregarNuevaProfesionPromptCDM()">
-                    ➕ Profesión
-                </button>
-            </div>
-        </div>
-
-        <div class="bento-kpis">
-            <div class="bento-kpi">
-                <div class="kpi-icon"><i class="ri-calendar-check-line"></i></div>
-                <div class="kpi-data">
-                    <span>Turnos del Mes (${prefijoMesActual})</span>
-                    <strong>${turnosDelMes.length} turnos (${turnosDelMes.filter(t => t.estado === "Atendido").length} atendidos)</strong>
-                </div>
-            </div>
-            <div class="bento-kpi" style="cursor:pointer;" onclick="cambiarSubTabConsultorioCDM('pacientes')">
-                <div class="kpi-icon ok"><i class="ri-book-read-line"></i></div>
-                <div class="kpi-data">
-                    <span>Pacientes e Histórico de Sesiones</span>
-                    <strong>${pacientesEsp.length} pacientes activos</strong>
-                </div>
-            </div>
-            <div class="bento-kpi" style="cursor:pointer;" onclick="cambiarSubTabConsultorioCDM('mutuales')">
-                <div class="kpi-icon warn"><i class="ri-hospital-line"></i></div>
-                <div class="kpi-data">
-                    <span>Por Cobrar a Mutuales (${ordenesPendientes.length} órdenes)</span>
-                    <strong style="color:var(--warn-ink);">$${totalPendienteMutuales.toLocaleString("es-AR")}</strong>
-                </div>
-            </div>
-            <div class="bento-kpi" style="cursor:pointer;" onclick="abrirModuloContabilidadIndependienteCDM()">
-                <div class="kpi-icon purple"><i class="ri-wallet-3-line"></i></div>
-                <div class="kpi-data">
-                    <span>Mutuales Liquidadas en Caja</span>
-                    <strong>$${totalLiquidadoMutuales.toLocaleString("es-AR")} (Ver Caja →)</strong>
-                </div>
-            </div>
-        </div>
-
-        <div class="module-tabs">
-            <button type="button" class="mod-tab ${tabActivaConsultorioCDM === "agenda" ? "active" : ""}" onclick="cambiarSubTabConsultorioCDM('agenda')">
-                <i class="ri-calendar-2-line"></i><span>1. Calendario de 30 Días (${turnosDelMes.length})</span>
-            </button>
-            <button type="button" class="mod-tab ${tabActivaConsultorioCDM === "pacientes" ? "active" : ""}" onclick="cambiarSubTabConsultorioCDM('pacientes')">
-                <i class="ri-book-open-line"></i><span>2. Pacientes e Histórico por Sesión (${pacientesEsp.length})</span>
-            </button>
-            <button type="button" class="mod-tab ${tabActivaConsultorioCDM === "mutuales" ? "active" : ""}" onclick="cambiarSubTabConsultorioCDM('mutuales')">
-                <i class="ri-hospital-line"></i><span>3. Mutuales, Profesiones y Liquidación</span>
-            </button>
-        </div>
-
-        <div id="contenedorCuerpoConsultorioCDM"></div>
-    `;
-
-    const bodyCli = document.getElementById("contenedorCuerpoConsultorioCDM");
-    if (!bodyCli) return;
-
-    if (tabActivaConsultorioCDM === "agenda") {
-        bodyCli.innerHTML = generarCalendarioConvencional30DiasHTML(turnosFiltradosEsp);
-    }
-
-    // ---------------------------------------------------------------------
-    // PESTAÑA 2: TARJETAS CLARAS DE PACIENTES CON HISTÓRICO DE NOTAS POR SESIÓN A LA VISTA
-    // ---------------------------------------------------------------------
-    else if (tabActivaConsultorioCDM === "pacientes") {
-        let pacsFiltrados = [...pacientesEsp];
-        if (filtroMutualPac !== "TODAS") {
-            pacsFiltrados = pacsFiltrados.filter(p => p.mutual === filtroMutualPac);
-        }
-        if (busqPac) {
-            pacsFiltrados = pacsFiltrados.filter(p =>
-                p.nombre.toLowerCase().includes(busqPac) ||
-                p.apellido.toLowerCase().includes(busqPac) ||
-                (p.dni || "").includes(busqPac) ||
-                (p.diagnostico || "").toLowerCase().includes(busqPac) ||
-                (p.sesiones || []).some(s => (s.zona || "").toLowerCase().includes(busqPac) || (s.intervencion || "").toLowerCase().includes(busqPac))
-            );
-        }
-
-        const espDefaultAlta = especialidadFiltroConsultorioCDM === "TODAS" ? especialidadesHab[0].clave : especialidadFiltroConsultorioCDM;
-
-        const tarjetasPacientesHTML = pacsFiltrados.length ? pacsFiltrados.map(p => {
-            const sesionesOrdenadas = [...(p.sesiones || [])].sort((a, b) => b.numSesion - a.numSesion || new Date(b.fecha) - new Date(a.fecha));
-            const ultimas3Sesiones = sesionesOrdenadas.slice(0, 3);
-
-            const listaSesionesCardHTML = ultimas3Sesiones.length > 0 ? ultimas3Sesiones.map(s => {
-                const evaCls = s.dolorEVA <= 3 ? "eva-low" : (s.dolorEVA <= 6 ? "eva-mid" : "eva-high");
-                return `
-                    <div class="session-mini-log-item">
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap; margin-bottom:3px;">
-                            <strong style="color:var(--cdm-600);">📌 SESIÓN #${s.numSesion} — ${s.fecha}</strong>
-                            <div style="display:flex; gap:0.3rem; align-items:center;">
-                                <span class="eva-pain-pill ${evaCls}" style="font-size:0.64rem; padding:1px 6px;">EVA ${s.dolorEVA}/10 • Avance ${s.evolucionPct}%</span>
-                                <button type="button" class="btn btn-ghost btn-sm" style="min-height:22px; padding:0 6px; font-size:0.65rem;" onclick="editarNotaSesionExistentePromptCDM(${p.id}, ${s.id})" title="Editar nota de esta sesión">✏️</button>
-                            </div>
-                        </div>
-                        <div style="color:var(--ink-900); font-weight:600;">🔍 <b>Evaluación/Zona:</b> ${s.zona}</div>
-                        <div style="color:var(--ink-700); margin-top:2px;">📝 <b>Nota de Sesión:</b> ${s.intervencion}</div>
-                    </div>
-                `;
-            }).join("") : `<div style="font-size:0.78rem; color:var(--ink-400); text-align:center; padding:0.6rem;">Aún no tiene sesiones anotadas. Tocá "✍️ + Anotar Nueva Sesión" abajo.</div>`;
-
-            return `
-                <div class="patient-history-pro-card">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; flex-wrap:wrap;">
-                        <div>
-                            <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:0.3rem;">
-                                <span class="badge badge-celeste">${p.especialidad}</span>
-                                <span class="badge badge-purple">🏥 ${p.mutual} (Afil: ${p.nroAfiliado || "-"})</span>
-                                <span class="badge badge-ok">📓 ${sesionesOrdenadas.length}${p.sesionesAutorizadas > 0 ? "/" + p.sesionesAutorizadas : ""} sesiones</span>
-                            </div>
-                            <h4 style="font-size:1.12rem; font-weight:800; color:var(--ink-900); margin:0;">
-                                ${p.apellido}, ${p.nombre} <small style="font-size:0.78rem; color:var(--ink-500); font-weight:600;">(${p.edad || 30} años • DNI ${p.dni})</small>
-                            </h4>
-                        </div>
-                        <div style="display:flex; gap:0.25rem;">
-                            <button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalNuevoPacienteClinicoCDM(${p.id})" title="Editar datos del paciente">✏️</button>
-                            <button type="button" class="btn btn-danger btn-sm" onclick="eliminarPacienteClinicoCDM(${p.id})" title="Eliminar paciente">🗑️</button>
-                        </div>
-                    </div>
-
-                    <div style="background:var(--cdm-50); border:1px solid var(--line-celeste); border-radius:10px; padding:0.5rem 0.75rem; font-size:0.78rem; color:var(--ink-900);">
-                        <b>🩺 Diagnóstico / Motivo Base:</b> ${p.diagnostico || "Sin especificar"}
-                    </div>
-
-                    <!-- HISTÓRICO DE SESIONES Y NOTAS DIRECTAMENTE VISIBLE -->
-                    <div class="patient-recent-notes-box">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <strong style="font-size:0.74rem; text-transform:uppercase; color:var(--ink-700); letter-spacing:0.03em;">
-                                📓 Histórico de Notas por Sesión (Últimas ${ultimas3Sesiones.length} de ${sesionesOrdenadas.length})
-                            </strong>
-                            ${sesionesOrdenadas.length > 3 ? `<small style="color:var(--cdm-600); font-weight:700; cursor:pointer;" onclick="abrirModalHistoriaClinicaPacienteCDM(${p.id})">Ver las ${sesionesOrdenadas.length} sesiones →</small>` : ""}
-                        </div>
-                        ${listaSesionesCardHTML}
-                    </div>
-
-                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:auto; padding-top:0.25rem;">
-                        <button type="button" class="btn btn-primary btn-sm" style="flex:1;" onclick="abrirModalRegistrarSesionYEvolucionCDM(${p.id}, null)">
-                            ✍️ + Anotar Nueva Sesión
-                        </button>
-                        <button type="button" class="btn btn-secondary btn-sm" style="flex:1;" onclick="abrirModalHistoriaClinicaPacienteCDM(${p.id})">
-                            📓 Ver Histórico Completo (${sesionesOrdenadas.length})
-                        </button>
-                        <button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalDiaCalendarioYTurnoCDM('${obtenerHoyISO()}', '09:00', ${p.id})" title="Agendar próximo turno">
-                            📅 Turno
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join("") : `<div class="empty-box" style="grid-column:1/-1;">No se encontraron pacientes con ese criterio.</div>`;
-
-        bodyCli.innerHTML = `
-            <div class="app-panel">
-                <div class="panel-head">
-                    <div>
-                        <h3><i class="ri-book-open-line"></i> Cuaderno Histórico de Sesiones y Notas por Paciente (${espActivaNombre})</h3>
-                        <small style="color:var(--ink-500);">En cada tarjeta ves las notas anotadas sesión por sesión, podés agregar una nueva sesión en 1 clic o editar cualquier nota anterior.</small>
-                    </div>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalNuevoPacienteClinicoCDM(null, '${espDefaultAlta}')">
-                        <i class="ri-user-add-line"></i> + Nuevo Paciente
-                    </button>
-                </div>
-
-                <div class="filter-strip" style="grid-template-columns: 1fr auto; margin-bottom:1.15rem;">
-                    <div class="search-box">
-                        <i class="ri-search-line"></i>
-                        <input type="text" id="inputBuscarPacienteClinico" placeholder="Buscar por paciente, DNI, diagnóstico o palabra escrita en una sesión..." value="${busqPac.replace(/"/g, "&quot;")}" oninput="renderizarModuloConsultorioCompletoCDM()">
-                    </div>
-                    <select id="selectFiltroMutualPacientes" onchange="renderizarModuloConsultorioCompletoCDM()" style="width:auto;">
-                        <option value="TODAS" ${filtroMutualPac === "TODAS" ? "selected" : ""}>🏥 Todas las Mutuales / Particulares</option>
-                        ${mutualesConfig.map(m => `<option value="${m.nombre}" ${filtroMutualPac === m.nombre ? "selected" : ""}>${m.nombre}</option>`).join("")}
-                    </select>
-                </div>
-
-                <div class="patients-history-cards-grid">
-                    ${tarjetasPacientesHTML}
-                </div>
-            </div>
-        `;
-    }
-
-    // ---------------------------------------------------------------------
-    // PESTAÑA 3: SECTOR DE MUTUALES, PROFESIONES Y LIQUIDACIÓN A CAJA
-    // ---------------------------------------------------------------------
-    else {
-        bodyCli.innerHTML = `
-            <div class="app-panel" style="margin-bottom:1.25rem;">
-                <div class="panel-head" style="margin-bottom:0.75rem; padding-bottom:0.65rem;">
-                    <div>
-                        <h3><i class="ri-user-star-line"></i> Catálogo de Profesiones y Especialidades Habilitadas</h3>
-                        <small style="color:var(--ink-500);">El modal del calendario absorbe estas profesiones y también agrega automáticamente cualquier otra que escribas.</small>
-                    </div>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="agregarNuevaProfesionPromptCDM()">
-                        + Agregar Nueva Profesión
-                    </button>
-                </div>
-                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                    ${especialidadesHab.map(e => `<span class="badge badge-celeste" style="font-size:0.82rem; padding:0.42rem 0.9rem;">${e.icono} ${e.clave}</span>`).join("")}
-                </div>
-            </div>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
-                <div>
-                    <h4 style="font-size:0.98rem; font-weight:800; color:var(--ink-900); margin:0;">🏥 Catálogo de Mutuales y Obras Sociales</h4>
-                    <small style="color:var(--ink-500);">Podés cargar mutuales acá o escribirlas directo al crear un turno.</small>
-                </div>
-                <button type="button" class="btn btn-primary btn-sm" onclick="agregarNuevaMutualConvenioPromptCDM()">
-                    + Agregar Obra Social / Mutual
-                </button>
-            </div>
-
-            <div class="mutual-card-grid">
-                ${mutualesConfig.map(m => `
-                    <div class="mutual-convenio-card">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <strong style="font-size:0.95rem; color:var(--ink-900);">🏥 ${m.nombre}</strong>
-                            <div style="display:flex; gap:0.25rem;">
-                                <button type="button" class="btn btn-ghost btn-sm" style="min-height:26px; padding:0.15rem 0.45rem;" onclick="editarArancelMutualPromptCDM(${m.id})">✏️</button>
-                                ${!m.esParticular ? `<button type="button" class="btn btn-danger btn-sm" style="min-height:26px; padding:0.15rem 0.45rem;" onclick="eliminarMutualConvenioCDM(${m.id})">🗑️</button>` : ""}
-                            </div>
-                        </div>
-                        <div style="font-size:0.78rem; color:var(--ink-700); display:flex; flex-direction:column; gap:0.2rem;">
-                            <div>Cubre la Mutual: <b style="color:var(--cdm-600);">$${Number(m.arancelMutual || 0).toLocaleString("es-AR")}</b></div>
-                            <div>Coseguro / Particular: <b style="color:var(--ok-ink);">$${Number(m.coseguroPaciente || 0).toLocaleString("es-AR")}</b></div>
-                            <div style="padding-top:4px; border-top:1px dashed var(--line-strong);">Total por Sesión: <b>$${(Number(m.arancelMutual || 0) + Number(m.coseguroPaciente || 0)).toLocaleString("es-AR")}</b></div>
-                        </div>
-                    </div>
-                `).join("")}
-            </div>
-
-            <div class="app-panel">
-                <div class="panel-head">
-                    <div>
-                        <h3><i class="ri-bank-line"></i> Liquidación de Órdenes de Mutuales a Contabilidad y Caja</h3>
-                        <small style="color:var(--ink-500);">Tocá <b>"🏦 Liquidar a Banco"</b> para transferir el pago de la mutual al Libro Mayor de Finanzas.</small>
-                    </div>
-                    ${ordenesPendientes.length > 0 ? `
-                        <button type="button" class="btn btn-primary btn-sm" onclick="liquidarTodasLasOrdenesMutualesAlBancoCDM()">
-                            <i class="ri-check-double-line"></i> 🏦 Liquidar Todas ($${totalPendienteMutuales.toLocaleString("es-AR")})
-                        </button>
-                    ` : ""}
-                </div>
-
-                <div class="table-wrap">
-                    <table class="app-table">
-                        <thead>
-                            <tr><th>Fecha</th><th>Mutual</th><th>Paciente</th><th>N° Orden</th><th>Coseguro</th><th>Monto Mutual</th><th>Estado</th><th>Acción</th></tr>
-                        </thead>
-                        <tbody>
-                            ${todasOrdenes.length ? todasOrdenes.map(o => {
-                                const liq = o.estado === "Liquidada";
-                                return `
-                                    <tr>
-                                        <td data-label="Fecha"><b>${o.fecha}</b></td>
-                                        <td data-label="Mutual"><span class="badge badge-purple">${o.mutual}</span></td>
-                                        <td data-label="Paciente"><strong>${o.pacienteNombre}</strong><br><small>Afil: ${o.nroAfiliado || "-"}</small></td>
-                                        <td data-label="N° Orden"><b>${o.nroOrden || "S/N"}</b></td>
-                                        <td data-label="Coseguro"><span style="color:var(--ok-ink); font-weight:700;">$${Number(o.coseguroCobrado || 0).toLocaleString("es-AR")}</span></td>
-                                        <td data-label="Monto Mutual"><strong>$${Number(o.montoMutual || 0).toLocaleString("es-AR")}</strong></td>
-                                        <td data-label="Estado"><span class="badge ${liq ? "badge-ok" : "badge-warn"}">${liq ? "✓ LIQUIDADA" : "⏳ PENDIENTE"}</span></td>
-                                        <td data-label="Acción">
-                                            <div style="display:flex; gap:0.3rem; justify-content:flex-end;">
-                                                ${!liq ? `<button type="button" class="btn btn-primary btn-sm" onclick="liquidarOrdenIndividualMutualABancoCDM(${o.id})">🏦 Liquidar</button>` : ""}
-                                                <button type="button" class="btn btn-danger btn-sm" onclick="eliminarOrdenMutualCDM(${o.id})">🗑️</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `;
-                            }).join("") : `<tr><td colspan="8"><div class="empty-box">Sin órdenes de mutuales registradas.</div></td></tr>`}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-    }
-}
-
-// =========================================================================
-// CUADERNO HISTÓRICO DE NOTAS POR SESIÓN (VER, AGREGAR Y EDITAR CADA NOTA)
-// =========================================================================
-
-function editarNotaSesionExistentePromptCDM(pacienteId, sesionId) {
-    const pacs = obtenerPacientesClinicosCDM();
-    const p = pacs.find(x => Number(x.id) === Number(pacienteId));
-    if (!p || !Array.isArray(p.sesiones)) return;
-    const s = p.sesiones.find(x => Number(x.id) === Number(sesionId));
-    if (!s) return;
-
-    const nuevaZona = prompt(`✏️ Editar Evaluación / Zona trabajada en Sesión #${s.numSesion} (${s.fecha}):`, s.zona);
-    if (nuevaZona === null) return;
-    const nuevaInterv = prompt(`📝 Editar Nota de la Sesión #${s.numSesion}:`, s.intervencion);
-    if (nuevaInterv === null) return;
-    const nuevoEVA = prompt(`📊 Dolor / Malestar EVA (0 a 10):`, s.dolorEVA);
-
-    s.zona = nuevaZona.trim() || s.zona;
-    s.intervencion = nuevaInterv.trim() || s.intervencion;
-    if (nuevoEVA !== null && !isNaN(parseInt(nuevoEVA))) {
-        s.dolorEVA = Math.max(0, Math.min(10, parseInt(nuevoEVA)));
-    }
-
-    guardarPacientesClinicosCDM(pacs);
-    if (!document.getElementById("modalVideoEjercicio")?.classList.contains("hidden")) {
-        abrirModalHistoriaClinicaPacienteCDM(p.id);
-    }
-    renderizarModuloConsultorioCompletoCDM();
-    mostrarToast(`✏️ Nota de la Sesión #${s.numSesion} actualizada.`);
-}
-
-function enviarHistorialClinicoWhatsAppCDM(pacienteId) {
-    const p = obtenerPacientesClinicosCDM().find(x => Number(x.id) === Number(pacienteId));
-    if (!p) return;
-    const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
-    let msg = `📓 *RESUMEN DE HISTORIA CLÍNICA — ${(lic.nombreEntidad || "CONSULTORIO").toUpperCase()}*\n`;
-    msg += `👤 *Paciente:* ${p.apellido}, ${p.nombre} (DNI ${p.dni})\n`;
-    msg += `🩺 *Especialidad:* ${p.especialidad} • *Cobertura:* ${p.mutual}\n`;
-    msg += `📋 *Diagnóstico:* ${p.diagnostico}\n`;
-    msg += `----------------------------------\n`;
-    (p.sesiones || []).forEach(s => {
-        msg += `📌 *Sesión #${s.numSesion} (${s.fecha}):*\n`;
-        msg += `   • Evaluación: ${s.zona}\n`;
-        msg += `   • Nota: ${s.intervencion}\n`;
-        msg += `   • EVA: ${s.dolorEVA}/10 | Avance: ${s.evolucionPct}%\n\n`;
-    });
-    window.open(`https://wa.me/${p.whatsapp || ""}?text=${encodeURIComponent(msg)}`, "_blank");
-}
-
-function abrirModalHistoriaClinicaPacienteCDM(pacienteId) {
-    const pacs = obtenerPacientesClinicosCDM();
-    const p = pacs.find(x => Number(x.id) === Number(pacienteId));
-    if (!p) return;
+function abrirModalCrearOEditarProfesionalStaffCDM(idStaffEditar = null) {
     asegurarModalVideoEnPaginaActualCDM();
-
-    const sesiones = [...(p.sesiones || [])].sort((a, b) => b.numSesion - a.numSesion || new Date(b.fecha) - new Date(a.fecha));
-    const modal = document.getElementById("modalVideoEjercicio");
-
-    modal.innerHTML = `
-        <div class="modal-window" style="max-width:800px;">
-            <div class="modal-top">
-                <div>
-                    <span class="badge badge-celeste">CUADERNO HISTÓRICO DE SESIONES • ${p.especialidad.toUpperCase()}</span>
-                    <h3 style="color:var(--ink-900); margin-top:4px;">📓 ${p.apellido}, ${p.nombre} (${p.edad || 30} años • DNI ${p.dni})</h3>
-                </div>
-                <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
-                    <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRegistrarSesionYEvolucionCDM(${p.id}, null)">
-                        ✍️ + Anotar Nueva Sesión
-                    </button>
-                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarHistorialClinicoWhatsAppCDM(${p.id})">
-                        <i class="ri-whatsapp-line"></i> WA
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">
-                        <i class="ri-printer-line"></i> PDF
-                    </button>
-                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalVideoEjercicio()">✕</button>
-                </div>
-            </div>
-
-            <div style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem 1rem; margin-bottom:1rem; font-size:0.82rem; display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:0.65rem;">
-                <div><small style="color:var(--ink-500); display:block;">PROFESIÓN</small><strong>${p.especialidad}</strong></div>
-                <div><small style="color:var(--ink-500); display:block;">MUTUAL / AFILIADO</small><strong>${p.mutual} (${p.nroAfiliado || "-"})</strong></div>
-                <div><small style="color:var(--ink-500); display:block;">SESIONES REGISTRADAS</small><strong>${sesiones.length}${p.sesionesAutorizadas > 0 ? " de " + p.sesionesAutorizadas + " autorizadas" : " sesiones"}</strong></div>
-                <div style="grid-column:1/-1; border-top:1px dashed var(--line-strong); padding-top:0.45rem;">
-                    <small style="color:var(--ink-500);">DIAGNÓSTICO / MOTIVO INICIAL:</small>
-                    <div style="font-weight:700; color:var(--ink-900);">${p.diagnostico}</div>
-                </div>
-            </div>
-
-            <!-- CURVA DE EVOLUCIÓN CLÍNICA -->
-            <div class="app-panel" style="padding:0.95rem; margin-bottom:1rem;">
-                <h4 style="font-size:0.86rem; font-weight:800; color:var(--ink-900); margin-bottom:0.45rem;">
-                    📈 Curva Histórica de Evolución (Dolor EVA 0-10 vs. Recuperación %)
-                </h4>
-                <div class="chart-canvas-box" style="height:195px;">
-                    <canvas id="canvasEvolucionClinicaPaciente"></canvas>
-                </div>
-            </div>
-
-            <!-- BITÁCORA NUMERADA DE NOTAS POR CADA SESIÓN -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; flex-wrap:wrap; gap:0.5rem;">
-                <h4 style="font-size:0.94rem; font-weight:800; color:var(--ink-900); margin:0;">
-                    📑 Histórico Detallado Sesión por Sesión (${sesiones.length})
-                </h4>
-                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRegistrarSesionYEvolucionCDM(${p.id}, null)">
-                    + Agregar Nota de Sesión #${sesiones.length + 1}
-                </button>
-            </div>
-
-            <div class="clinical-session-timeline">
-                ${sesiones.length ? sesiones.map(s => {
-                    const evaCls = s.dolorEVA <= 3 ? "eva-low" : (s.dolorEVA <= 6 ? "eva-mid" : "eva-high");
-                    return `
-                        <div class="clinical-note-card">
-                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-                                <div class="clinical-metrics-strip">
-                                    <span class="badge badge-celeste" style="font-size:0.76rem; font-weight:800;">📌 SESIÓN #${s.numSesion}</span>
-                                    <span class="badge badge-purple">📅 ${s.fecha}</span>
-                                    <span class="eva-pain-pill ${evaCls}">Dolor EVA: ${s.dolorEVA}/10</span>
-                                    <span class="badge badge-ok">Avance: ${s.evolucionPct}%</span>
-                                </div>
-                                <div style="display:flex; gap:0.3rem;">
-                                    <button type="button" class="btn btn-secondary btn-sm" style="min-height:26px; padding:0.1rem 0.55rem; font-size:0.7rem;" onclick="editarNotaSesionExistentePromptCDM(${p.id}, ${s.id})">
-                                        ✏️ Editar Nota
-                                    </button>
-                                    <button type="button" class="btn btn-danger btn-sm" style="min-height:26px; padding:0.1rem 0.5rem;" onclick="eliminarNotaSesionPacienteCDM(${p.id}, ${s.id})">
-                                        🗑️
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div style="background:var(--surface-solid); border:1px solid var(--line-strong); border-radius:10px; padding:0.65rem 0.85rem; margin-top:0.2rem;">
-                                <div style="font-size:0.84rem; color:var(--ink-900); margin-bottom:0.3rem;">
-                                    <b>🔍 Zona / Evaluación de la Sesión:</b> ${s.zona}
-                                </div>
-                                <div style="font-size:0.84rem; color:var(--ink-700);">
-                                    <b>📝 Nota Clínica / Qué se realizó:</b> ${s.intervencion}
-                                </div>
-                            </div>
-
-                            <small style="color:var(--ink-500); font-size:0.72rem;">💳 ${s.cobroDetalle || "Sesión registrada"}</small>
-                        </div>
-                    `;
-                }).join("") : `<div class="empty-box">Todavía no hay notas cargadas. Tocá "+ Agregar Nota de Sesión #1" arriba.</div>`}
-            </div>
-        </div>
-    `;
-    modal.classList.remove("hidden");
-
-    setTimeout(() => dibujarGraficoEvolucionPacienteClinicoCDM(p), 60);
-}
-
-// Resto de funciones de soporte (Alta de paciente, Evolución, Mutuales y Liquidación)
-function agregarNuevaProfesionPromptCDM() {
-    const nueva = prompt("🩺 Escribí el nombre de la nueva Profesión / Especialidad (Ej: Osteopatía, Podología, Fonoaudiología, Masoterapia):");
-    if (!nueva || !nueva.trim()) return;
-    asegurarProfesionEnCatalogoCDM(nueva.trim());
-    renderizarModuloConsultorioCompletoCDM();
-}
-
-function eliminarMutualConvenioCDM(idMutual) {
-    if (!confirm("🗑️ ¿Quitar esta mutual del listado?")) return;
-    guardarConfigMutualesCDM(obtenerConfigMutualesCDM().filter(x => Number(x.id) !== Number(idMutual)));
-    renderizarModuloConsultorioCompletoCDM();
-}
-
-function abrirModalNuevoPacienteClinicoCDM(idEditar = null, especialidadPredefinida = null) {
-    asegurarModalVideoEnPaginaActualCDM();
-    const pacs = obtenerPacientesClinicosCDM();
-    const p = idEditar ? pacs.find(x => Number(x.id) === Number(idEditar)) : null;
-    const mutuales = obtenerConfigMutualesCDM();
-    const especialidadesHab = obtenerEspecialidadesHabilitadasConsultorioCDM();
-    const espSeleccionada = p?.especialidad || especialidadPredefinida || especialidadesHab[0]?.clave || "Quiropraxia";
+    const staff = obtenerStaffProfesionalesCDM();
+    const st = idStaffEditar ? staff.find(x => Number(x.id) === Number(idStaffEditar)) : null;
+    const profesiones = obtenerEspecialidadesHabilitadasConsultorioCDM();
 
     const modal = document.getElementById("modalVideoEjercicio");
     modal.innerHTML = `
-        <div class="modal-window" style="max-width:620px;">
+        <div class="modal-window" style="max-width:600px;">
             <div class="modal-top">
                 <div>
-                    <span class="badge badge-celeste">${p ? "✏️ EDITAR FICHA DE PACIENTE" : "🧑‍⚕️ ALTA DE PACIENTE"}</span>
-                    <h3 style="color:var(--ink-900); margin-top:4px;">${p ? `${p.apellido}, ${p.nombre}` : `Nuevo Paciente`}</h3>
+                    <span class="badge badge-celeste">STAFF DE PROFESIONALES DE LA SALUD</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">${st ? `✏️ Editar: ${st.nombre} ${st.apellido}` : "👨‍⚕️ Agregar Profesional al Consultorio"}</h3>
                 </div>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalVideoEjercicio()">✕</button>
             </div>
 
-            <form onsubmit="guardarPacienteClinicoModalCDM(event, ${p ? p.id : "null"})">
+            <form onsubmit="guardarProfesionalStaffModalCDM(event, ${st ? st.id : "null"})">
                 <div class="grid-3" style="margin-bottom:0.75rem;">
-                    <div class="field"><label>Nombre *</label><input type="text" id="pacNombre" required value="${(p?.nombre || "").replace(/"/g, "&quot;")}"></div>
-                    <div class="field"><label>Apellido *</label><input type="text" id="pacApellido" required value="${(p?.apellido || "").replace(/"/g, "&quot;")}"></div>
-                    <div class="field"><label>DNI *</label><input type="text" id="pacDni" required value="${(p?.dni || "").replace(/"/g, "&quot;")}"></div>
-                </div>
-
-                <div class="grid-3" style="margin-bottom:0.75rem;">
-                    <div class="field"><label>Edad</label><input type="number" id="pacEdad" value="${p?.edad || 32}"></div>
-                    <div class="field"><label>WhatsApp *</label><input type="text" id="pacWhatsapp" required value="${(p?.whatsapp || "5493584").replace(/"/g, "&quot;")}"></div>
-                    <div class="field">
-                        <label>Profesión * (Elegí o escribí)</label>
-                        <input type="text" id="pacEspecialidad" list="dlProfFichaPac" required value="${espSeleccionada.replace(/"/g, "&quot;")}">
-                        <datalist id="dlProfFichaPac">
-                            ${especialidadesHab.map(e => `<option value="${e.clave}">${e.icono} ${e.titulo}</option>`).join("")}
-                        </datalist>
-                    </div>
+                    <div class="field"><label>Título y Nombre *</label><input type="text" id="stNombre" required placeholder="Ej: Lic. Martín" value="${(st?.nombre || "").replace(/"/g, "&quot;")}"></div>
+                    <div class="field"><label>Apellido *</label><input type="text" id="stApellido" required placeholder="Ej: Cabrera" value="${(st?.apellido || "").replace(/"/g, "&quot;")}"></div>
+                    <div class="field"><label>Matrícula (M.P.) *</label><input type="text" id="stMatricula" required placeholder="Ej: M.P. 4892" value="${(st?.matricula || "M.P. ").replace(/"/g, "&quot;")}"></div>
                 </div>
 
                 <div class="grid-3" style="margin-bottom:0.75rem;">
                     <div class="field">
-                        <label>Mutual * (Elegí o escribí nueva)</label>
-                        <input type="text" id="pacMutual" list="dlMutFichaPac" required value="${(p?.mutual || mutuales[0].nombre).replace(/"/g, "&quot;")}">
-                        <datalist id="dlMutFichaPac">
-                            ${mutuales.map(m => `<option value="${m.nombre}">`).join("")}
+                        <label>Especialidad *</label>
+                        <input type="text" id="stEspecialidad" list="dlStaffEsp" required value="${(st?.especialidad || profesiones[0]?.clave || "Kinesiología").replace(/"/g, "&quot;")}">
+                        <datalist id="dlStaffEsp">
+                            ${profesiones.map(p => `<option value="${p.clave}">${p.icono} ${p.titulo}</option>`).join("")}
                         </datalist>
                     </div>
-                    <div class="field"><label>N° Afiliado</label><input type="text" id="pacAfiliado" value="${(p?.nroAfiliado || "").replace(/"/g, "&quot;")}"></div>
-                    <div class="field"><label>Sesiones Autorizadas</label><input type="number" id="pacSesionesAut" min="0" value="${p?.sesionesAutorizadas || 0}"></div>
+                    <div class="field"><label>WhatsApp *</label><input type="text" id="stWhatsapp" required value="${(st?.whatsapp || "5493584").replace(/"/g, "&quot;")}"></div>
+                    <div class="field"><label>% Comisión / Honorario</label><input type="number" id="stComision" min="0" max="100" value="${st?.comisionPct || 70}"></div>
                 </div>
 
-                <div class="field" style="margin-bottom:1.1rem;">
-                    <label>Diagnóstico Médico / Motivo de Consulta *</label>
-                    <textarea id="pacDiagnostico" rows="2" required>${p?.diagnostico || ""}</textarea>
+                <div class="grid-2" style="margin-bottom:1rem;">
+                    <div class="field"><label>Especialización / Subtítulo Clínico</label><input type="text" id="stRolDetalle" placeholder="Ej: Kinesiólogo Deportivo / Nutricionista ISAK II" value="${(st?.rolDetalle || "").replace(/"/g, "&quot;")}"></div>
+                    <div class="field"><label>Días y Horarios de Consultorio</label><input type="text" id="stHorarios" placeholder="Ej: Lun a Vie 08:00 a 12:00 y 16:00 a 20:00" value="${(st?.diasHorarios || "Lun a Vie 09:00 a 19:00").replace(/"/g, "&quot;")}"></div>
                 </div>
 
                 <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
                     <button type="button" class="btn btn-ghost" onclick="cerrarModalVideoEjercicio()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar Paciente</button>
+                    <button type="submit" class="btn btn-primary">Guardar Profesional</button>
                 </div>
             </form>
         </div>
@@ -10723,73 +10899,230 @@ function abrirModalNuevoPacienteClinicoCDM(idEditar = null, especialidadPredefin
     modal.classList.remove("hidden");
 }
 
-function guardarPacienteClinicoModalCDM(e, idEditar = null) {
+function guardarProfesionalStaffModalCDM(e, idEditar = null) {
     e.preventDefault();
-    const pacs = obtenerPacientesClinicosCDM();
-    const profCanon = asegurarProfesionEnCatalogoCDM(document.getElementById("pacEspecialidad").value);
-    const mutCanon = asegurarMutualEnCatalogoCDM(document.getElementById("pacMutual").value);
+    const staff = obtenerStaffProfesionalesCDM();
+    const espCanon = asegurarProfesionEnCatalogoCDM(document.getElementById("stEspecialidad").value);
 
     const datos = {
-        nombre: document.getElementById("pacNombre").value.trim(),
-        apellido: document.getElementById("pacApellido").value.trim(),
-        dni: document.getElementById("pacDni").value.trim(),
-        edad: parseInt(document.getElementById("pacEdad").value) || 30,
-        whatsapp: document.getElementById("pacWhatsapp").value.trim(),
-        especialidad: profCanon,
-        mutual: mutCanon.nombre,
-        nroAfiliado: document.getElementById("pacAfiliado").value.trim() || "Particular",
-        sesionesAutorizadas: parseInt(document.getElementById("pacSesionesAut").value) || 0,
-        diagnostico: document.getElementById("pacDiagnostico").value.trim()
+        nombre: document.getElementById("stNombre").value.trim(),
+        apellido: document.getElementById("stApellido").value.trim(),
+        matricula: document.getElementById("stMatricula").value.trim(),
+        especialidad: espCanon,
+        whatsapp: document.getElementById("stWhatsapp").value.trim(),
+        comisionPct: parseInt(document.getElementById("stComision").value) || 70,
+        rolDetalle: document.getElementById("stRolDetalle").value.trim() || espCanon,
+        diasHorarios: document.getElementById("stHorarios").value.trim()
     };
 
     if (idEditar) {
-        const idx = pacs.findIndex(x => Number(x.id) === Number(idEditar));
-        if (idx >= 0) pacs[idx] = { ...pacs[idx], ...datos };
-        mostrarToast(`✏️ Ficha de ${datos.apellido}, ${datos.nombre} actualizada.`);
+        const idx = staff.findIndex(x => Number(x.id) === Number(idEditar));
+        if (idx >= 0) staff[idx] = { ...staff[idx], ...datos };
     } else {
-        pacs.unshift({
-            id: Date.now(),
-            codigoAcceso: `PAC-${Math.floor(100 + Math.random() * 899)}`,
-            sesionesRealizadas: 0,
-            sesiones: [],
-            ...datos
-        });
-        mostrarToast(`🧑‍⚕️ Paciente ${datos.apellido}, ${datos.nombre} guardado.`);
+        staff.push({ id: Date.now(), ...datos });
     }
-
-    guardarPacientesClinicosCDM(pacs);
+    guardarStaffProfesionalesCDM(staff);
     cerrarModalVideoEjercicio();
     renderizarModuloConsultorioCompletoCDM();
+    mostrarToast(`👨‍⚕️ Profesional ${datos.nombre} ${datos.apellido} (${datos.matricula}) guardado.`);
 }
 
-function eliminarPacienteClinicoCDM(idPac) {
-    const pacs = obtenerPacientesClinicosCDM();
-    const p = pacs.find(x => Number(x.id) === Number(idPac));
-    if (!p || !confirm(`🗑️ ¿Eliminar la ficha clínica de ${p.apellido}, ${p.nombre}?`)) return;
-    guardarPacientesClinicosCDM(pacs.filter(x => Number(x.id) !== Number(idPac)));
+function eliminarProfesionalStaffCDM(idStaff) {
+    if (!confirm("🗑️ ¿Quitar este profesional del directorio?")) return;
+    guardarStaffProfesionalesCDM(obtenerStaffProfesionalesCDM().filter(x => Number(x.id) !== Number(idStaff)));
     renderizarModuloConsultorioCompletoCDM();
 }
 
-function eliminarTurnoAgendaCDM(idTurno) {
-    if (!confirm("🗑️ ¿Cancelar y quitar este turno del calendario?")) return;
-    guardarTurnosAgendaCDM(obtenerTurnosAgendaCDM().filter(x => Number(x.id) !== Number(idTurno)));
-    renderizarModuloConsultorioCompletoCDM();
+function calcularIMCAutomaticoNutriModalCDM() {
+    const peso = parseFloat(document.getElementById("espNutriPeso")?.value);
+    const tallaCm = parseFloat(document.getElementById("espNutriTalla")?.value);
+    const inpIMC = document.getElementById("espNutriIMC");
+    if (!inpIMC || !peso || !tallaCm || tallaCm < 50) return;
+    const tallaM = tallaCm / 100;
+    inpIMC.value = (peso / (tallaM * tallaM)).toFixed(1);
 }
 
-function enviarRecordatorioTurnoWhatsAppCDM(idTurno) {
-    const t = obtenerTurnosAgendaCDM().find(x => Number(x.id) === Number(idTurno));
-    if (!t) return;
-    const p = obtenerPacientesClinicosCDM().find(x => Number(x.id) === Number(t.pacienteId));
-    const tel = p?.whatsapp || "";
-    const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
-    let msg = `🩺 *RECORDATORIO DE TURNO — ${(lic.nombreEntidad || "CONSULTORIO OFICIAL").toUpperCase()}*\n`;
-    msg += `Hola *${p ? p.nombre : t.pacienteNombre}*, te recordamos tu turno programado:\n\n`;
-    msg += `📅 *Fecha:* ${t.fecha}\n`;
-    msg += `⏰ *Hora:* ${t.hora} hs\n`;
-    msg += `🧑‍⚕️ *Especialidad:* ${t.especialidad}\n`;
-    msg += `🏥 *Cobertura:* ${t.mutual}\n\n`;
-    msg += `Por favor confirmá tu asistencia respondiendo este mensaje. ¡Te esperamos!`;
-    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
+function construirSubFormularioEspecialidadHTML(especialidadClave) {
+    const esp = String(especialidadClave || "").toLowerCase();
+
+    if (esp.includes("kinesi") || esp.includes("fisio")) {
+        const agentes = ["Magneto", "Ultrasonido", "Electro / TENS", "MEP", "Láser", "Terapia Manual", "Punción Seca", "Propiocepción", "Isométricos / Excéntricos"];
+        return `
+            <div class="specialty-clinical-panel">
+                <strong style="font-size:0.78rem; color:var(--cdm-700); display:block; margin-bottom:0.55rem; text-transform:uppercase;">
+                    🦿 Protocolo Específico de Kinesiología y Fisioterapia
+                </strong>
+                <div class="grid-4" style="margin-bottom:0.65rem;">
+                    <div class="field"><label>ROM Flexión (°)</label><input type="number" id="espKineFlexion" value="110"></div>
+                    <div class="field"><label>ROM Extensión (°)</label><input type="number" id="espKineExtension" value="0"></div>
+                    <div class="field">
+                        <label>Fuerza (Escala Daniels)</label>
+                        <select id="espKineDaniels">
+                            <option value="5/5">5/5 — Fuerza Normal</option>
+                            <option value="4+/5" selected>4+/5 — Resistencia fuerte</option>
+                            <option value="4/5">4/5 — Resistencia moderada</option>
+                            <option value="3/5">3/5 — Vence gravedad</option>
+                            <option value="2/5">2/5 — Sin gravedad</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>Asimetría Izq/Der (%)</label><input type="number" id="espKineAsimetria" value="8" min="0" max="100"></div>
+                </div>
+
+                <label style="font-size:0.66rem; font-weight:700; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.3rem;">
+                    ⚡ Agentes Físicos Aplicados Hoy (Tocá para marcar):
+                </label>
+                <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:0.65rem;">
+                    ${agentes.map((ag, idx) => `<button type="button" class="physio-agent-chip ${idx < 2 ? "active" : ""}" onclick="this.classList.toggle('active')">${ag}</button>`).join("")}
+                </div>
+
+                <div class="field">
+                    <label>🏃 Estado de Apto e Indicación para Gimnasio / DT</label>
+                    <select id="espKineApto">
+                        <option value="Apto Total (Sin restricciones)">🟢 Apto Total (Sin restricciones)</option>
+                        <option value="Entreno Diferenciado (Carga controlada)" selected>🟡 Entreno Diferenciado (Carga controlada)</option>
+                        <option value="Reposo Deportivo / Solo Fisioterapia">🔴 Reposo Deportivo / Solo Fisioterapia</option>
+                    </select>
+                </div>
+            </div>
+        `;
+    }
+
+    if (esp.includes("quiro") || esp.includes("osteo") || esp.includes("rpg")) {
+        const segmentos = ["C1 Atlas", "C2 Axis", "C3-C5", "C6-C7", "T1-T4", "T5-T8", "T9-T12", "L1-L3", "L4-L5", "Sacro", "Ilíaco Der", "Ilíaco Izq", "ATM"];
+        return `
+            <div class="specialty-clinical-panel">
+                <strong style="font-size:0.78rem; color:var(--cdm-700); display:block; margin-bottom:0.45rem; text-transform:uppercase;">
+                    🦴 Mapa Vertebral y Pélvico de Quiropraxia (Tocá los segmentos ajustados hoy)
+                </strong>
+                <div class="spine-map-grid" style="margin-bottom:0.75rem;">
+                    ${segmentos.map((seg, i) => `<button type="button" class="spine-vertebra-btn ${i === 0 || i === 8 ? "active" : ""}" onclick="this.classList.toggle('active')">${seg}</button>`).join("")}
+                </div>
+
+                <div class="grid-2">
+                    <div class="field"><label>📏 Dismetría MMII post-ajuste (mm)</label><input type="number" id="espQuiroDismetria" value="0" min="0" max="40"></div>
+                    <div class="field">
+                        <label>👐 Técnica Principal Empleada</label>
+                        <select id="espQuiroTecnica">
+                            <option value="Diversified + Drop Pélvico">Diversified + Drop Pélvico</option>
+                            <option value="Activador Instrumental">Activador Instrumental</option>
+                            <option value="Técnica Gonstead">Técnica Gonstead</option>
+                            <option value="SOT / Bloques Pélvicos">SOT / Bloques Pélvicos</option>
+                            <option value="Osteopatía Estructural y Craneal">Osteopatía Estructural y Craneal</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    if (esp.includes("nutri")) {
+        return `
+            <div class="specialty-clinical-panel">
+                <strong style="font-size:0.78rem; color:var(--cdm-700); display:block; margin-bottom:0.55rem; text-transform:uppercase;">
+                    🥗 Evaluación Antropométrica ISAK y Prescripción de Macronutrientes
+                </strong>
+                <div class="grid-4" style="margin-bottom:0.6rem;">
+                    <div class="field"><label>Peso Actual (kg)</label><input type="number" step="0.1" id="espNutriPeso" value="75.0" oninput="calcularIMCAutomaticoNutriModalCDM()"></div>
+                    <div class="field"><label>Talla (cm)</label><input type="number" id="espNutriTalla" value="175" oninput="calcularIMCAutomaticoNutriModalCDM()"></div>
+                    <div class="field"><label>IMC (Auto)</label><input type="number" step="0.1" id="espNutriIMC" value="24.5" readonly></div>
+                    <div class="field"><label>% Grasa Corp.</label><input type="number" step="0.1" id="espNutriGrasa" value="16.5"></div>
+                </div>
+                <div class="grid-4">
+                    <div class="field"><label>% Masa Muscular</label><input type="number" step="0.1" id="espNutriMusculo" value="45.0"></div>
+                    <div class="field"><label>Cintura (cm) / 6 Pliegues (mm)</label><input type="text" id="espNutriCinturaPliegues" value="78cm / 52mm"></div>
+                    <div class="field"><label>Objetivo Kcal/día</label><input type="number" id="espNutriKcal" value="2400"></div>
+                    <div class="field"><label>Macros P / C / G (g)</label><input type="text" id="espNutriMacros" value="150g / 280g / 70g"></div>
+                </div>
+            </div>
+        `;
+    }
+
+    if (esp.includes("psico")) {
+        return `
+            <div class="specialty-clinical-panel">
+                <strong style="font-size:0.78rem; color:var(--cdm-700); display:block; margin-bottom:0.55rem; text-transform:uppercase;">
+                    🧠 Escalas Psicométricas de la Sesión y Tareas Inter-sesión
+                </strong>
+                <div class="grid-4" style="margin-bottom:0.65rem;">
+                    <div class="field">
+                        <label>Modalidad</label>
+                        <select id="espPsicoModalidad">
+                            <option value="Presencial">🛋️ Presencial</option>
+                            <option value="Online / Videollamada">💻 Online / Videollamada</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>Ansiedad (0-10)</label><input type="number" id="espPsicoAnsiedad" min="0" max="10" value="4"></div>
+                    <div class="field"><label>Calidad Sueño (0-10)</label><input type="number" id="espPsicoSueno" min="0" max="10" value="7"></div>
+                    <div class="field"><label>Ánimo / Foco (0-10)</label><input type="number" id="espPsicoAnimo" min="0" max="10" value="8"></div>
+                </div>
+                <div class="field">
+                    <label>🎯 Tarea / Herramienta Acordada para la Semana</label>
+                    <input type="text" id="espPsicoTarea" placeholder="Ej: Registro de pensamientos automáticos y respiración diafragmática...">
+                </div>
+            </div>
+        `;
+    }
+
+    return "";
+}
+
+function recoletarDatosSubFormularioEspecialidadCDM(especialidadClave) {
+    const esp = String(especialidadClave || "").toLowerCase();
+
+    if (esp.includes("kinesi") || esp.includes("fisio")) {
+        const agentes = Array.from(document.querySelectorAll(".physio-agent-chip.active")).map(b => b.innerText.trim());
+        return {
+            tipo: "Kinesiología",
+            romFlexion: parseFloat(document.getElementById("espKineFlexion")?.value) || 0,
+            romExtension: parseFloat(document.getElementById("espKineExtension")?.value) || 0,
+            fuerzaDaniels: document.getElementById("espKineDaniels")?.value || "4+/5",
+            asimetriaPct: parseFloat(document.getElementById("espKineAsimetria")?.value) || 0,
+            agentesFisicos: agentes,
+            aptoDeportivo: document.getElementById("espKineApto")?.value || "Apto Total"
+        };
+    }
+
+    if (esp.includes("quiro") || esp.includes("osteo") || esp.includes("rpg")) {
+        const vertebras = Array.from(document.querySelectorAll(".spine-vertebra-btn.active")).map(b => b.innerText.trim());
+        return {
+            tipo: "Quiropraxia",
+            vertebras,
+            dismetriaMm: parseFloat(document.getElementById("espQuiroDismetria")?.value) || 0,
+            tecnicaQuiro: document.getElementById("espQuiroTecnica")?.value || "Diversified"
+        };
+    }
+
+    if (esp.includes("nutri")) {
+        const cp = (document.getElementById("espNutriCinturaPliegues")?.value || "78cm / 50mm").split("/");
+        const mac = (document.getElementById("espNutriMacros")?.value || "150 / 260 / 70").split("/");
+        return {
+            tipo: "Nutrición",
+            pesoKg: parseFloat(document.getElementById("espNutriPeso")?.value) || 70,
+            tallaCm: parseFloat(document.getElementById("espNutriTalla")?.value) || 172,
+            imc: parseFloat(document.getElementById("espNutriIMC")?.value) || 23.6,
+            grasaPct: parseFloat(document.getElementById("espNutriGrasa")?.value) || 18,
+            musculoPct: parseFloat(document.getElementById("espNutriMusculo")?.value) || 44,
+            cinturaCm: parseFloat(cp[0]) || 78,
+            plieguesMm: parseFloat(cp[1]) || 50,
+            kcalPlan: parseInt(document.getElementById("espNutriKcal")?.value) || 2300,
+            protG: parseInt(mac[0]) || 150,
+            carbG: parseInt(mac[1]) || 260,
+            grasasG: parseInt(mac[2]) || 70
+        };
+    }
+
+    if (esp.includes("psico")) {
+        return {
+            tipo: "Psicología",
+            modalidad: document.getElementById("espPsicoModalidad")?.value || "Presencial",
+            ansiedad: parseInt(document.getElementById("espPsicoAnsiedad")?.value) || 4,
+            sueno: parseInt(document.getElementById("espPsicoSueno")?.value) || 7,
+            animo: parseInt(document.getElementById("espPsicoAnimo")?.value) || 8,
+            tareaSemanal: document.getElementById("espPsicoTarea")?.value.trim() || ""
+        };
+    }
+
+    return null;
 }
 
 function seleccionarNivelDolorEVABotonCDM(valor, btnEl) {
@@ -10818,6 +11151,7 @@ function abrirModalRegistrarSesionYEvolucionCDM(pacienteId, turnoId = null) {
     const infoEsp = catalogoEsp.find(e => e.clave === p.especialidad) || ESPECIALIDADES_PROFESIONALES_BASE_CDM[0];
     const mutuales = obtenerConfigMutualesCDM();
     const conv = mutuales.find(m => m.nombre === p.mutual) || mutuales[0];
+    const staff = obtenerStaffProfesionalesCDM();
 
     const ultSesion = Array.isArray(p.sesiones) && p.sesiones.length > 0 ? p.sesiones[p.sesiones.length - 1] : null;
     const evaInicialSug = ultSesion ? Math.max(0, Number(ultSesion.dolorEVA) - 2) : 3;
@@ -10832,11 +11166,11 @@ function abrirModalRegistrarSesionYEvolucionCDM(pacienteId, turnoId = null) {
 
     const modal = document.getElementById("modalVideoEjercicio");
     modal.innerHTML = `
-        <div class="modal-window" style="max-width:720px;">
+        <div class="modal-window" style="max-width:760px;">
             <div class="modal-top">
                 <div>
-                    <span class="badge badge-ok">${infoEsp.icono} ANOTAR SESIÓN #${sigSesionNum}${p.sesionesAutorizadas > 0 ? " DE " + p.sesionesAutorizadas : ""} EN EL HISTÓRICO</span>
-                    <h3 style="color:var(--ink-900); margin-top:4px;">✍️ ${p.apellido}, ${p.nombre} (${p.mutual})</h3>
+                    <span class="badge badge-ok">${infoEsp.icono} SESIÓN #${sigSesionNum}${p.sesionesAutorizadas > 0 ? " DE " + p.sesionesAutorizadas : ""} • ${p.especialidad.toUpperCase()}</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">✍️ Evolucionar a ${p.apellido}, ${p.nombre} (${p.mutual})</h3>
                 </div>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalVideoEjercicio()">✕</button>
             </div>
@@ -10867,12 +11201,20 @@ function abrirModalRegistrarSesionYEvolucionCDM(pacienteId, turnoId = null) {
                             </label>
                             <input type="range" id="sesEvolucionPct" min="0" max="100" step="5" value="${avanceInicialSug}" oninput="document.getElementById('lblValorSliderAvance').innerText=this.value+'%'" style="min-height:24px; padding:0;">
                         </div>
-                        <div class="field">
-                            <label>Fecha de la Sesión *</label>
-                            <input type="date" id="sesFecha" required value="${obtenerHoyISO()}" style="min-height:34px;">
+                        <div class="grid-2">
+                            <div class="field"><label>Fecha *</label><input type="date" id="sesFecha" required value="${obtenerHoyISO()}" style="min-height:34px;"></div>
+                            <div class="field">
+                                <label>Profesional Firmante *</label>
+                                <input type="text" id="sesProfesionalFirmante" list="dlProfFirmante" required value="${p.profesionalAsignado || (staff[0] ? `${staff[0].nombre} ${staff[0].apellido} (${staff[0].matricula})` : "Consultorio Oficial")}" style="min-height:34px;">
+                                <datalist id="dlProfFirmante">
+                                    ${staff.map(st => `<option value="${st.nombre} ${st.apellido} (${st.matricula})">${st.especialidad}</option>`).join("")}
+                                </datalist>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                ${construirSubFormularioEspecialidadHTML(p.especialidad)}
 
                 <div class="field" style="margin-bottom:0.75rem;">
                     <label>3. Evaluación / Zona Trabajada en esta Sesión *</label>
@@ -10924,7 +11266,7 @@ function abrirModalRegistrarSesionYEvolucionCDM(pacienteId, turnoId = null) {
                 <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
                     <button type="button" class="btn btn-ghost" onclick="cerrarModalVideoEjercicio()">Cancelar</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="ri-save-3-line"></i> Guardar Nota en el Histórico e Imputar Cobro
+                        <i class="ri-save-3-line"></i> Guardar Nota Clínica e Imputar Cobro
                     </button>
                 </div>
             </form>
@@ -10940,10 +11282,12 @@ function confirmarSesionClinicaYFinanzasCDM(e, pacienteId, turnoId = null) {
     if (!p) return;
 
     const fecha = document.getElementById("sesFecha").value || obtenerHoyISO();
+    const profesional = document.getElementById("sesProfesionalFirmante")?.value.trim() || p.profesionalAsignado || "Consultorio Oficial";
     const dolorEVA = parseInt(document.getElementById("sesDolorEVA").value) || 0;
     const evolucionPct = parseInt(document.getElementById("sesEvolucionPct").value) || 75;
     const zona = document.getElementById("sesZona").value.trim();
     const intervencion = document.getElementById("sesIntervencion").value.trim();
+    const datosEspecialidad = recoletarDatosSubFormularioEspecialidadCDM(p.especialidad);
 
     const montoMutual = parseFloat(document.getElementById("sesMontoMutual").value) || 0;
     const nroOrden = document.getElementById("sesNroOrden").value.trim() || "S/N";
@@ -10952,6 +11296,7 @@ function confirmarSesionClinicaYFinanzasCDM(e, pacienteId, turnoId = null) {
 
     if (!Array.isArray(p.sesiones)) p.sesiones = [];
     p.sesionesRealizadas = (p.sesionesRealizadas || p.sesiones.length) + 1;
+    p.profesionalAsignado = profesional;
 
     p.sesiones.push({
         id: Date.now(),
@@ -10962,8 +11307,9 @@ function confirmarSesionClinicaYFinanzasCDM(e, pacienteId, turnoId = null) {
         intervencion,
         dolorEVA,
         evolucionPct,
-        profesional: "Consultorio Oficial",
-        cobroDetalle: `${p.mutual} ($${montoMutual.toLocaleString("es-AR")}) + Paciente en ${medioCobroHoy} ($${montoPacienteHoy.toLocaleString("es-AR")})`
+        profesional,
+        cobroDetalle: `${p.mutual} ($${montoMutual.toLocaleString("es-AR")}) + Paciente en ${medioCobroHoy} ($${montoPacienteHoy.toLocaleString("es-AR")})`,
+        datosEspecialidad
     });
     guardarPacientesClinicosCDM(pacs);
 
@@ -10977,7 +11323,7 @@ function confirmarSesionClinicaYFinanzasCDM(e, pacienteId, turnoId = null) {
             origen: "Consultorio",
             areaDeporte: "Gimnasio",
             rubro: "Cuota Deportiva / Socio",
-            concepto: `Sesión ${p.especialidad} #${p.sesionesRealizadas} — ${p.apellido}, ${p.nombre} (${p.mutual})`,
+            concepto: `Sesión ${p.especialidad} #${p.sesionesRealizadas} — ${p.apellido}, ${p.nombre} (${profesional})`,
             medio: medioCobroHoy,
             monto: montoPacienteHoy,
             personaId: null,
@@ -11024,6 +11370,7 @@ function confirmarSesionClinicaYFinanzasCDM(e, pacienteId, turnoId = null) {
             pacienteId: p.id,
             pacienteNombre: `${p.apellido}, ${p.nombre}`,
             especialidad: p.especialidad,
+            profesional,
             mutual: p.mutual,
             motivo: `Sesión #${p.sesionesRealizadas + 1} (${p.especialidad})`,
             estado: "Reservado",
@@ -11035,7 +11382,312 @@ function confirmarSesionClinicaYFinanzasCDM(e, pacienteId, turnoId = null) {
 
     cerrarModalVideoEjercicio();
     renderizarModuloConsultorioCompletoCDM();
-    mostrarToast(`📓 Nota de la Sesión #${p.sesionesRealizadas} guardada en el histórico de ${p.apellido}.`);
+    mostrarToast(`📓 Sesión #${p.sesionesRealizadas} guardada en el expediente de ${p.apellido}.`);
+}
+
+function editarNotaSesionExistentePromptCDM(pacienteId, sesionId) {
+    const pacs = obtenerPacientesClinicosCDM();
+    const p = pacs.find(x => Number(x.id) === Number(pacienteId));
+    if (!p || !Array.isArray(p.sesiones)) return;
+    const s = p.sesiones.find(x => Number(x.id) === Number(sesionId));
+    if (!s) return;
+
+    const nuevaZona = prompt(`✏️ Editar Evaluación / Zona trabajada en Sesión #${s.numSesion} (${s.fecha}):`, s.zona);
+    if (nuevaZona === null) return;
+    const nuevaInterv = prompt(`📝 Editar Nota de la Sesión #${s.numSesion}:`, s.intervencion);
+    if (nuevaInterv === null) return;
+    const nuevoEVA = prompt(`📊 Dolor / Malestar EVA (0 a 10):`, s.dolorEVA);
+
+    s.zona = nuevaZona.trim() || s.zona;
+    s.intervencion = nuevaInterv.trim() || s.intervencion;
+    if (nuevoEVA !== null && !isNaN(parseInt(nuevoEVA))) {
+        s.dolorEVA = Math.max(0, Math.min(10, parseInt(nuevoEVA)));
+    }
+
+    guardarPacientesClinicosCDM(pacs);
+    if (!document.getElementById("modalVideoEjercicio")?.classList.contains("hidden")) {
+        abrirModalHistoriaClinicaPacienteCDM(p.id);
+    }
+    renderizarModuloConsultorioCompletoCDM();
+    mostrarToast(`✏️ Nota de la Sesión #${s.numSesion} actualizada.`);
+}
+
+function enviarHistorialClinicoWhatsAppCDM(pacienteId) {
+    const p = obtenerPacientesClinicosCDM().find(x => Number(x.id) === Number(pacienteId));
+    if (!p) return;
+    const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+    let msg = `📓 *INFORME DE EVOLUCIÓN CLÍNICA — ${(lic.nombreEntidad || "CONSULTORIO").toUpperCase()}*\n`;
+    msg += `👤 *Paciente:* ${p.apellido}, ${p.nombre} (DNI ${p.dni})\n`;
+    msg += `🩺 *Especialidad:* ${p.especialidad} • *Profesional:* ${p.profesionalAsignado || "Consultorio"}\n`;
+    msg += `🏥 *Cobertura:* ${p.mutual}\n`;
+    msg += `📋 *Diagnóstico:* ${p.diagnostico}\n`;
+    msg += `----------------------------------\n`;
+    (p.sesiones || []).forEach(s => {
+        msg += `📌 *Sesión #${s.numSesion} (${s.fecha}):*\n`;
+        msg += `   • Evaluación: ${s.zona}\n`;
+        msg += `   • Nota: ${s.intervencion}\n`;
+        msg += `   • EVA: ${s.dolorEVA}/10 | Avance: ${s.evolucionPct}%\n\n`;
+    });
+    window.open(`https://wa.me/${p.whatsapp || ""}?text=${encodeURIComponent(msg)}`, "_blank");
+}
+
+function abrirModalHistoriaClinicaPacienteCDM(pacienteId) {
+    const pacs = obtenerPacientesClinicosCDM();
+    const p = pacs.find(x => Number(x.id) === Number(pacienteId));
+    if (!p) return;
+    asegurarModalVideoEnPaginaActualCDM();
+
+    const sesiones = [...(p.sesiones || [])].sort((a, b) => b.numSesion - a.numSesion || new Date(b.fecha) - new Date(a.fecha));
+    const modal = document.getElementById("modalVideoEjercicio");
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:820px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-celeste">EXPEDIENTE COMPLETO DEL PACIENTE • ${p.especialidad.toUpperCase()}</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">📂 ${p.apellido}, ${p.nombre} (${p.edad || 30} años • DNI ${p.dni})</h3>
+                </div>
+                <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRegistrarSesionYEvolucionCDM(${p.id}, null)">
+                        ✍️ + Anotar Sesión
+                    </button>
+                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarHistorialClinicoWhatsAppCDM(${p.id})">
+                        <i class="ri-whatsapp-line"></i> Enviar Informe WA
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">
+                        <i class="ri-printer-line"></i> Imprimir PDF
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalVideoEjercicio()">✕</button>
+                </div>
+            </div>
+
+            <div style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem 1rem; margin-bottom:1rem; font-size:0.82rem; display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:0.65rem;">
+                <div><small style="color:var(--ink-500); display:block;">PROFESIÓN & PROFESIONAL</small><strong>${p.especialidad} — ${p.profesionalAsignado || "Oficial"}</strong></div>
+                <div><small style="color:var(--ink-500); display:block;">MUTUAL / AFILIADO</small><strong>${p.mutual} (${p.nroAfiliado || "-"})</strong></div>
+                <div><small style="color:var(--ink-500); display:block;">SESIONES REGISTRADAS</small><strong>${sesiones.length}${p.sesionesAutorizadas > 0 ? " de " + p.sesionesAutorizadas + " autorizadas" : " sesiones"}</strong></div>
+                <div style="grid-column:1/-1; border-top:1px dashed var(--line-strong); padding-top:0.45rem;">
+                    <small style="color:var(--ink-500);">DIAGNÓSTICO / MOTIVO INICIAL:</small>
+                    <div style="font-weight:700; color:var(--ink-900);">${p.diagnostico}</div>
+                </div>
+            </div>
+
+            <div class="app-panel" style="padding:0.95rem; margin-bottom:1rem;">
+                <h4 style="font-size:0.86rem; font-weight:800; color:var(--ink-900); margin-bottom:0.45rem;">
+                    📈 Curva Histórica de Evolución (Dolor/Malestar EVA 0-10 vs. Recuperación %)
+                </h4>
+                <div class="chart-canvas-box" style="height:195px;">
+                    <canvas id="canvasEvolucionClinicaPaciente"></canvas>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; flex-wrap:wrap; gap:0.5rem;">
+                <h4 style="font-size:0.94rem; font-weight:800; color:var(--ink-900); margin:0;">
+                    📑 Histórico Detallado Sesión por Sesión (${sesiones.length})
+                </h4>
+                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRegistrarSesionYEvolucionCDM(${p.id}, null)">
+                    + Agregar Nota de Sesión #${sesiones.length + 1}
+                </button>
+            </div>
+
+            <div class="clinical-session-timeline">
+                ${sesiones.length ? sesiones.map(s => {
+                    const evaCls = s.dolorEVA <= 3 ? "eva-low" : (s.dolorEVA <= 6 ? "eva-mid" : "eva-high");
+                    return `
+                        <div class="clinical-note-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                                <div class="clinical-metrics-strip">
+                                    <span class="badge badge-celeste" style="font-size:0.76rem; font-weight:800;">📌 SESIÓN #${s.numSesion}</span>
+                                    <span class="badge badge-purple">📅 ${s.fecha}</span>
+                                    <span class="eva-pain-pill ${evaCls}">EVA: ${s.dolorEVA}/10</span>
+                                    <span class="badge badge-ok">Avance: ${s.evolucionPct}%</span>
+                                    <span class="badge badge-celeste">👨‍⚕️ ${s.profesional || p.profesionalAsignado || "Consultorio"}</span>
+                                </div>
+                                <div style="display:flex; gap:0.3rem;">
+                                    <button type="button" class="btn btn-secondary btn-sm" style="min-height:26px; padding:0.1rem 0.55rem; font-size:0.7rem;" onclick="editarNotaSesionExistentePromptCDM(${p.id}, ${s.id})">
+                                        ✏️ Editar Nota
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm" style="min-height:26px; padding:0.1rem 0.5rem;" onclick="eliminarNotaSesionPacienteCDM(${p.id}, ${s.id})">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style="background:var(--surface-solid); border:1px solid var(--line-strong); border-radius:10px; padding:0.65rem 0.85rem; margin-top:0.2rem;">
+                                <div style="font-size:0.84rem; color:var(--ink-900); margin-bottom:0.3rem;">
+                                    <b>🔍 Zona / Evaluación de la Sesión:</b> ${s.zona}
+                                </div>
+                                <div style="font-size:0.84rem; color:var(--ink-700);">
+                                    <b>📝 Nota Clínica / Qué se realizó:</b> ${s.intervencion}
+                                </div>
+                                ${renderizarResumenMetricasEspecialidadSesionHTML(s)}
+                            </div>
+
+                            <small style="color:var(--ink-500); font-size:0.72rem;">💳 ${s.cobroDetalle || "Sesión registrada"}</small>
+                        </div>
+                    `;
+                }).join("") : `<div class="empty-box">Todavía no hay notas cargadas.</div>`}
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+
+    setTimeout(() => dibujarGraficoEvolucionPacienteClinicoCDM(p), 60);
+}
+
+function agregarNuevaProfesionPromptCDM() {
+    const nueva = prompt("🩺 Escribí el nombre de la nueva Profesión / Especialidad (Ej: Osteopatía, Podología, Fonoaudiología, Masoterapia):");
+    if (!nueva || !nueva.trim()) return;
+    asegurarProfesionEnCatalogoCDM(nueva.trim());
+    renderizarModuloConsultorioCompletoCDM();
+}
+
+function eliminarMutualConvenioCDM(idMutual) {
+    if (!confirm("🗑️ ¿Quitar esta mutual del listado?")) return;
+    guardarConfigMutualesCDM(obtenerConfigMutualesCDM().filter(x => Number(x.id) !== Number(idMutual)));
+    renderizarModuloConsultorioCompletoCDM();
+}
+
+function abrirModalNuevoPacienteClinicoCDM(idEditar = null, especialidadPredefinida = null) {
+    asegurarModalVideoEnPaginaActualCDM();
+    const pacs = obtenerPacientesClinicosCDM();
+    const p = idEditar ? pacs.find(x => Number(x.id) === Number(idEditar)) : null;
+    const mutuales = obtenerConfigMutualesCDM();
+    const especialidadesHab = obtenerEspecialidadesHabilitadasConsultorioCDM();
+    const staff = obtenerStaffProfesionalesCDM();
+    const espSeleccionada = p?.especialidad || especialidadPredefinida || especialidadesHab[0]?.clave || "Kinesiología";
+
+    const modal = document.getElementById("modalVideoEjercicio");
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:640px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-celeste">${p ? "✏️ EDITAR FICHA DE PACIENTE" : "🧑‍⚕️ ALTA DE PACIENTE"}</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">${p ? `${p.apellido}, ${p.nombre}` : `Nuevo Paciente`}</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalVideoEjercicio()">✕</button>
+            </div>
+
+            <form onsubmit="guardarPacienteClinicoModalCDM(event, ${p ? p.id : "null"})">
+                <div class="grid-3" style="margin-bottom:0.75rem;">
+                    <div class="field"><label>Nombre *</label><input type="text" id="pacNombre" required value="${(p?.nombre || "").replace(/"/g, "&quot;")}"></div>
+                    <div class="field"><label>Apellido *</label><input type="text" id="pacApellido" required value="${(p?.apellido || "").replace(/"/g, "&quot;")}"></div>
+                    <div class="field"><label>DNI *</label><input type="text" id="pacDni" required value="${(p?.dni || "").replace(/"/g, "&quot;")}"></div>
+                </div>
+
+                <div class="grid-3" style="margin-bottom:0.75rem;">
+                    <div class="field"><label>Edad</label><input type="number" id="pacEdad" value="${p?.edad || 32}"></div>
+                    <div class="field"><label>WhatsApp *</label><input type="text" id="pacWhatsapp" required value="${(p?.whatsapp || "5493584").replace(/"/g, "&quot;")}"></div>
+                    <div class="field">
+                        <label>Profesión *</label>
+                        <input type="text" id="pacEspecialidad" list="dlProfFichaPac" required value="${espSeleccionada.replace(/"/g, "&quot;")}">
+                        <datalist id="dlProfFichaPac">
+                            ${especialidadesHab.map(e => `<option value="${e.clave}">${e.icono} ${e.titulo}</option>`).join("")}
+                        </datalist>
+                    </div>
+                </div>
+
+                <div class="grid-4" style="margin-bottom:0.75rem;">
+                    <div class="field">
+                        <label>Profesional a Cargo</label>
+                        <input type="text" id="pacProfAsignado" list="dlStaffPac" value="${(p?.profesionalAsignado || (staff[0] ? `${staff[0].nombre} ${staff[0].apellido} (${staff[0].matricula})` : "")).replace(/"/g, "&quot;")}">
+                        <datalist id="dlStaffPac">
+                            ${staff.map(st => `<option value="${st.nombre} ${st.apellido} (${st.matricula})">${st.especialidad}</option>`).join("")}
+                        </datalist>
+                    </div>
+                    <div class="field">
+                        <label>Mutual *</label>
+                        <input type="text" id="pacMutual" list="dlMutFichaPac" required value="${(p?.mutual || mutuales[0].nombre).replace(/"/g, "&quot;")}">
+                        <datalist id="dlMutFichaPac">
+                            ${mutuales.map(m => `<option value="${m.nombre}">`).join("")}
+                        </datalist>
+                    </div>
+                    <div class="field"><label>N° Afiliado</label><input type="text" id="pacAfiliado" value="${(p?.nroAfiliado || "").replace(/"/g, "&quot;")}"></div>
+                    <div class="field"><label>Sesiones Autoriz.</label><input type="number" id="pacSesionesAut" min="0" value="${p?.sesionesAutorizadas || 0}"></div>
+                </div>
+
+                <div class="field" style="margin-bottom:1.1rem;">
+                    <label>Diagnóstico Médico / Motivo de Consulta *</label>
+                    <textarea id="pacDiagnostico" rows="2" required>${p?.diagnostico || ""}</textarea>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+                    <button type="button" class="btn btn-ghost" onclick="cerrarModalVideoEjercicio()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Paciente</button>
+                </div>
+            </form>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+}
+
+function guardarPacienteClinicoModalCDM(e, idEditar = null) {
+    e.preventDefault();
+    const pacs = obtenerPacientesClinicosCDM();
+    const profCanon = asegurarProfesionEnCatalogoCDM(document.getElementById("pacEspecialidad").value);
+    const mutCanon = asegurarMutualEnCatalogoCDM(document.getElementById("pacMutual").value);
+
+    const datos = {
+        nombre: document.getElementById("pacNombre").value.trim(),
+        apellido: document.getElementById("pacApellido").value.trim(),
+        dni: document.getElementById("pacDni").value.trim(),
+        edad: parseInt(document.getElementById("pacEdad").value) || 30,
+        whatsapp: document.getElementById("pacWhatsapp").value.trim(),
+        especialidad: profCanon,
+        profesionalAsignado: document.getElementById("pacProfAsignado")?.value.trim() || "Consultorio Oficial",
+        mutual: mutCanon.nombre,
+        nroAfiliado: document.getElementById("pacAfiliado").value.trim() || "Particular",
+        sesionesAutorizadas: parseInt(document.getElementById("pacSesionesAut").value) || 0,
+        diagnostico: document.getElementById("pacDiagnostico").value.trim()
+    };
+
+    if (idEditar) {
+        const idx = pacs.findIndex(x => Number(x.id) === Number(idEditar));
+        if (idx >= 0) pacs[idx] = { ...pacs[idx], ...datos };
+        mostrarToast(`✏️ Ficha de ${datos.apellido}, ${datos.nombre} actualizada.`);
+    } else {
+        pacs.unshift({
+            id: Date.now(),
+            codigoAcceso: `PAC-${Math.floor(100 + Math.random() * 899)}`,
+            sesionesRealizadas: 0,
+            sesiones: [],
+            ...datos
+        });
+        mostrarToast(`🧑‍⚕️ Paciente ${datos.apellido}, ${datos.nombre} guardado.`);
+    }
+
+    guardarPacientesClinicosCDM(pacs);
+    cerrarModalVideoEjercicio();
+    renderizarModuloConsultorioCompletoCDM();
+}
+
+function eliminarPacienteClinicoCDM(idPac) {
+    const pacs = obtenerPacientesClinicosCDM();
+    const p = pacs.find(x => Number(x.id) === Number(idPac));
+    if (!p || !confirm(`🗑️ ¿Eliminar la ficha clínica de ${p.apellido}, ${p.nombre}?`)) return;
+    guardarPacientesClinicosCDM(pacs.filter(x => Number(x.id) !== Number(idPac)));
+    renderizarModuloConsultorioCompletoCDM();
+}
+
+function eliminarTurnoAgendaCDM(idTurno) {
+    if (!confirm("🗑️ ¿Cancelar y quitar este turno del calendario?")) return;
+    guardarTurnosAgendaCDM(obtenerTurnosAgendaCDM().filter(x => Number(x.id) !== Number(idTurno)));
+    renderizarModuloConsultorioCompletoCDM();
+}
+
+function enviarRecordatorioTurnoWhatsAppCDM(idTurno) {
+    const t = obtenerTurnosAgendaCDM().find(x => Number(x.id) === Number(idTurno));
+    if (!t) return;
+    const p = obtenerPacientesClinicosCDM().find(x => Number(x.id) === Number(t.pacienteId));
+    const tel = p?.whatsapp || "";
+    const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+    let msg = `🩺 *RECORDATORIO DE TURNO — ${(lic.nombreEntidad || "CONSULTORIO OFICIAL").toUpperCase()}*\n`;
+    msg += `Hola *${p ? p.nombre : t.pacienteNombre}*, te recordamos tu turno programado:\n\n`;
+    msg += `📅 *Fecha:* ${t.fecha}\n`;
+    msg += `⏰ *Hora:* ${t.hora} hs\n`;
+    msg += `🧑‍⚕️ *Especialidad:* ${t.especialidad} (${t.profesional || "Consultorio"})\n`;
+    msg += `🏥 *Cobertura:* ${t.mutual}\n\n`;
+    msg += `Por favor confirmá tu asistencia respondiendo este mensaje. ¡Te esperamos!`;
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
 }
 
 function dibujarGraficoEvolucionPacienteClinicoCDM(p) {
@@ -11123,7 +11775,7 @@ function liquidarOrdenIndividualMutualABancoCDM(idOrden) {
 
 function liquidarTodasLasOrdenesMutualesAlBancoCDM() {
     const ordenes = obtenerOrdenesMutualPendientesCDM();
-    const pendientes = ordenes.filter(o => o.estado === "Pendiente");
+    const pendientes = ordenes.filter(o => o.estado === "Pendiente" && (filtroMutualLiquidacionCDM === "TODAS" || o.mutual === filtroMutualLiquidacionCDM));
     if (pendientes.length === 0) return;
 
     const total = pendientes.reduce((a, o) => a + Number(o.montoMutual || 0), 0);
@@ -11163,33 +11815,6 @@ function eliminarOrdenMutualCDM(idOrden) {
     renderizarModuloConsultorioCompletoCDM();
 }
 
-function agregarNuevaMutualConvenioPromptCDM() {
-    const nombre = prompt("🏥 Nombre de la nueva Obra Social / Mutual / Prepaga:");
-    if (!nombre || !nombre.trim()) return;
-    const arancel = parseFloat(prompt(`💰 Monto que cubre "${nombre.trim()}" por sesión ($):`, "14000")) || 0;
-    const coseguro = parseFloat(prompt(`💵 Coseguro / Copago que abona el paciente en consultorio ($):`, "3000")) || 0;
-
-    asegurarMutualEnCatalogoCDM(nombre.trim(), arancel, coseguro);
-    renderizarModuloConsultorioCompletoCDM();
-}
-
-function editarArancelMutualPromptCDM(idMutual) {
-    const lista = obtenerConfigMutualesCDM();
-    const m = lista.find(x => Number(x.id) === Number(idMutual));
-    if (!m) return;
-
-    const nuevoArancel = prompt(`💰 Monto cubierto por "${m.nombre}" ($):`, m.arancelMutual);
-    if (nuevoArancel === null) return;
-    const nuevoCos = prompt(`💵 Coseguro / Importe abonado por el paciente ($):`, m.coseguroPaciente);
-    if (nuevoCos === null) return;
-
-    m.arancelMutual = parseFloat(nuevoArancel) || 0;
-    m.coseguroPaciente = parseFloat(nuevoCos) || 0;
-    guardarConfigMutualesCDM(lista);
-    renderizarModuloConsultorioCompletoCDM();
-    mostrarToast(`✏️ Aranceles de ${m.nombre} actualizados.`);
-}
-
 document.addEventListener("click", function (e) {
     const sideLink = e.target.closest(".app-sidebar .side-link");
     if (sideLink && sideLink.dataset.nav !== "consultorio" && sideLink.dataset.nav !== "contabilidad") {
@@ -11202,3 +11827,11274 @@ document.addEventListener("DOMContentLoaded", () => {
     inyectarAccesoConsultorioEnSidebarEIndexCDM();
 });
 setTimeout(inyectarAccesoConsultorioEnSidebarEIndexCDM, 250);
+// =========================================================================
+// 18. REEMPLAZO ROBUSTO DE #modalEventoCancha (abrirModalPuestoCancha) Y
+//     CIERRE LIBRE DE PARTIDOS 0 A 0 (finalizarYGuardarPartido)
+// Sincronizado 100% con los IDs y variables reales de app.js
+// =========================================================================
+
+let tabActivaModalPuestoCanchaCDM = "acciones"; // 'acciones' | 'cambio' | 'lesion' | 'score'
+let detalleRapidoSeleccionadoCanchaCDM = "";
+
+function asegurarEstilosModalCanchaRobustoCDM() {
+    if (document.getElementById("cdmEstilosModalCanchaRobusto")) return;
+    const st = document.createElement("style");
+    st.id = "cdmEstilosModalCanchaRobusto";
+    st.textContent = `
+        .pitch-modal-player-banner {
+            background: linear-gradient(135deg, #0c192c 0%, #0369a1 100%);
+            color: #ffffff;
+            border-radius: 16px;
+            padding: 0.9rem 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.85rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.9rem;
+            box-shadow: var(--shadow-card);
+        }
+        .pitch-modal-tabs {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.35rem;
+            background: var(--surface-subtle);
+            padding: 0.35rem;
+            border-radius: 13px;
+            border: 1px solid var(--line-strong);
+            margin-bottom: 0.95rem;
+        }
+        @media (max-width: 560px) {
+            .pitch-modal-tabs {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        .pitch-modal-tab-btn {
+            border: none;
+            background: transparent;
+            color: var(--ink-500);
+            font-weight: 700;
+            font-size: 0.75rem;
+            padding: 0.52rem 0.35rem;
+            border-radius: 9px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+            transition: all 0.18s ease;
+            white-space: nowrap;
+        }
+        .pitch-modal-tab-btn.active {
+            background: var(--cdm-500);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.28);
+        }
+        .pitch-modal-tab-btn.tab-danger.active {
+            background: #e11d48;
+            box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
+        }
+        .pitch-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 0.85rem;
+        }
+        .pitch-action-card-btn {
+            background: var(--surface-solid);
+            border: 1.5px solid var(--line-strong);
+            border-radius: 13px;
+            padding: 0.65rem 0.7rem;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.18rem;
+            text-align: left;
+            transition: all 0.15s ease;
+            box-shadow: var(--shadow-sm);
+        }
+        .pitch-action-card-btn:hover {
+            transform: translateY(-2px);
+            border-color: var(--cdm-500);
+            background: var(--cdm-50);
+            box-shadow: var(--shadow-card);
+        }
+        .pitch-action-card-btn.act-goal { border-left: 4.5px solid #0284c7; background: var(--cdm-50); }
+        .pitch-action-card-btn.act-pos { border-left: 4.5px solid var(--ok); }
+        .pitch-action-card-btn.act-warn { border-left: 4.5px solid var(--warn); }
+        .pitch-action-card-btn.act-err { border-left: 4.5px solid var(--err); }
+        .pitch-action-card-btn strong {
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: var(--ink-900);
+            line-height: 1.2;
+        }
+        .pitch-action-card-btn small {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--ink-500);
+        }
+        .sub-players-pick-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+            gap: 0.5rem;
+            max-height: 230px;
+            overflow-y: auto;
+            padding: 0.2rem;
+            margin-bottom: 0.8rem;
+        }
+        .sub-player-pick-card {
+            background: var(--surface-solid);
+            border: 1.5px solid var(--line-strong);
+            border-radius: 12px;
+            padding: 0.55rem 0.7rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: left;
+        }
+        .sub-player-pick-card:hover {
+            border-color: var(--cdm-500);
+            background: var(--cdm-50);
+            transform: translateY(-1px);
+        }
+        .pitch-detail-chip {
+            border: 1px solid var(--line-celeste);
+            background: var(--cdm-50);
+            color: var(--cdm-600);
+            font-size: 0.69rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .pitch-detail-chip.active,
+        .pitch-detail-chip:hover {
+            background: var(--cdm-500);
+            color: #ffffff;
+        }
+        .injury-zone-pill {
+            border: 1.5px solid var(--line-strong);
+            background: var(--surface-solid);
+            color: var(--ink-700);
+            font-size: 0.73rem;
+            font-weight: 700;
+            padding: 0.34rem 0.68rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .injury-zone-pill.active {
+            background: #e11d48;
+            border-color: #be123c;
+            color: #ffffff;
+        }
+    `;
+    document.head.appendChild(st);
+}
+
+function obtenerCatalogoAccionesDeporteModalCDM() {
+    const d = normalizarTextoEjercicioCDM(deportePagina || "Futbol");
+
+    if (d.includes("hockey")) {
+        return {
+            detallesRapidos: ["Jugada colectiva", "Córner Corto", "Arrastrada / Flick", "Desvío en el área", "Recuperación en 23m", "Contragolpe"],
+            acciones: [
+                { tipo: "🏑 Gol de Jugada", pts: 0.5, golLocal: 1, cls: "act-goal", sub: "+1 Gol al marcador • +0.5 pts" },
+                { tipo: "📐 Gol de Córner Corto", pts: 0.5, golLocal: 1, cls: "act-goal", sub: "+1 Gol al marcador • +0.5 pts" },
+                { tipo: "🎯 Asistencia en Círculo", pts: 0.3, golLocal: 0, cls: "act-pos", sub: "Pase de gol • +0.3 pts" },
+                { tipo: "⚡ Provocó Córner Corto", pts: 0.3, golLocal: 0, cls: "act-pos", sub: "Falta ganada en área • +0.3 pts" },
+                { tipo: "🛡️ Quite Clave / Barrida", pts: 0.2, golLocal: 0, cls: "act-pos", sub: "Recuperación limpia • +0.2 pts" },
+                { tipo: "🧤 Atajada / Despeje Bocha", pts: 0.4, golLocal: 0, cls: "act-pos", sub: "Salvada en el círculo • +0.4 pts" },
+                { tipo: "🟩 Tarjeta Verde (2')", pts: -0.1, golLocal: 0, cls: "act-warn", sub: "Suspensión 2 min • -0.1 pts" },
+                { tipo: "🟨 Tarjeta Amarilla (5')", pts: -0.3, golLocal: 0, cls: "act-warn", sub: "Suspensión 5 min • -0.3 pts" },
+                { tipo: "🟥 Tarjeta Roja", pts: -0.5, golLocal: 0, cls: "act-err", sub: "Expulsión • -0.5 pts" },
+                { tipo: "⚠️ Pérdida Peligrosa / Pie", pts: -0.2, golLocal: 0, cls: "act-err", sub: "Infracción o pérdida • -0.2 pts" }
+            ]
+        };
+    }
+
+    if (d.includes("basquet") || d.includes("basket")) {
+        return {
+            detallesRapidos: ["En transición", "Desde la esquina", "En la pintura", "Pick & Roll", "Rebote ofensivo"],
+            acciones: [
+                { tipo: "🏀 Triple Convertido (Gol)", pts: 0.4, golLocal: 3, cls: "act-goal", sub: "+3 Puntos • +0.4 pts" },
+                { tipo: "🏀 Doble Convertido (Gol)", pts: 0.3, golLocal: 2, cls: "act-goal", sub: "+2 Puntos • +0.3 pts" },
+                { tipo: "🎯 Tiro Libre Convertido (Gol)", pts: 0.1, golLocal: 1, cls: "act-goal", sub: "+1 Punto • +0.1 pts" },
+                { tipo: "🖐️ Rebote Ganado (Quite)", pts: 0.2, golLocal: 0, cls: "act-pos", sub: "Tablero dominado • +0.2 pts" },
+                { tipo: "⚡ Asistencia / Robo (Pase)", pts: 0.3, golLocal: 0, cls: "act-pos", sub: "Creación / Defensa • +0.3 pts" },
+                { tipo: "🧱 Tapa / Bloqueo (Quite)", pts: 0.3, golLocal: 0, cls: "act-pos", sub: "Tapón defensivo • +0.3 pts" },
+                { tipo: "⚠️ Pérdida / Falta Personal", pts: -0.2, golLocal: 0, cls: "act-warn", sub: "Falta o pérdida • -0.2 pts" }
+            ]
+        };
+    }
+
+    if (d.includes("voley") || d.includes("volley")) {
+        return {
+            detallesRapidos: ["Diagonal corta", "Paralela", "Primer tiempo", "Saque flotado", "Defensa en zona 6"],
+            acciones: [
+                { tipo: "🏐 Punto de Ataque (Gol)", pts: 0.4, golLocal: 1, cls: "act-goal", sub: "+1 Punto • +0.4 pts" },
+                { tipo: "🧱 Punto de Bloqueo (Gol)", pts: 0.4, golLocal: 1, cls: "act-goal", sub: "+1 Punto • +0.4 pts" },
+                { tipo: "🚀 Saque Directo Ace (Gol)", pts: 0.4, golLocal: 1, cls: "act-goal", sub: "+1 Punto • +0.4 pts" },
+                { tipo: "🛡️ Recepción / Defensa (Quite)", pts: 0.2, golLocal: 0, cls: "act-pos", sub: "Pase doble positivo • +0.2 pts" },
+                { tipo: "🎯 Armado Preciso (Pase)", pts: 0.2, golLocal: 0, cls: "act-pos", sub: "Habilitación limpia • +0.2 pts" },
+                { tipo: "⚠️ Error de Saque / Red", pts: -0.2, golLocal: 0, cls: "act-err", sub: "Punto cedido • -0.2 pts" }
+            ]
+        };
+    }
+
+    if (d.includes("rugby")) {
+        return {
+            detallesRapidos: ["Maul", "Scrum", "Jugada de backs", "Ruck defensivo", "A los palos"],
+            acciones: [
+                { tipo: "🏉 Try Apoyado (Gol)", pts: 0.5, golLocal: 5, cls: "act-goal", sub: "+5 Puntos • +0.5 pts" },
+                { tipo: "🎯 Conversión (+2)", pts: 0.2, golLocal: 2, cls: "act-goal", sub: "+2 Puntos • +0.2 pts" },
+                { tipo: "🎯 Penal a los Palos (+3)", pts: 0.3, golLocal: 3, cls: "act-goal", sub: "+3 Puntos • +0.3 pts" },
+                { tipo: "🛡️ Tackle Dominante (Quite)", pts: 0.3, golLocal: 0, cls: "act-pos", sub: "Defensa firme • +0.3 pts" },
+                { tipo: "💪 Pesca en el Ruck (Quite)", pts: 0.3, golLocal: 0, cls: "act-pos", sub: "Recuperación • +0.3 pts" },
+                { tipo: "🟨 Tarjeta Amarilla (Sin Bin)", pts: -0.3, golLocal: 0, cls: "act-warn", sub: "10 min afuera • -0.3 pts" },
+                { tipo: "⚠️ Penal / Knock-on", pts: -0.2, golLocal: 0, cls: "act-err", sub: "Infracción • -0.2 pts" }
+            ]
+        };
+    }
+
+    // FÚTBOL y deportes de campo por defecto
+    return {
+        detallesRapidos: ["Jugada colectiva", "Pelota parada", "De cabeza", "Penal", "Contragolpe", "Mano a mano", "Media distancia"],
+        acciones: [
+            { tipo: "⚽ Gol Convertido", pts: 0.5, golLocal: 1, cls: "act-goal", sub: "+1 Gol al marcador • +0.5 pts" },
+            { tipo: "🎯 Asistencia de Gol", pts: 0.3, golLocal: 0, cls: "act-pos", sub: "Pase de gol • +0.3 pts" },
+            { tipo: "🛡️ Quite Clave / Recuperación", pts: 0.2, golLocal: 0, cls: "act-pos", sub: "Corte defensivo • +0.2 pts" },
+            { tipo: "⚡ Pase Filtrado / Desborde", pts: 0.2, golLocal: 0, cls: "act-pos", sub: "Ruptura ofensiva • +0.2 pts" },
+            { tipo: "🧤 Atajada / Cierre Salvado", pts: 0.4, golLocal: 0, cls: "act-pos", sub: "Evitó gol rival • +0.4 pts" },
+            { tipo: "🚀 Remate Peligroso al Arco", pts: 0.2, golLocal: 0, cls: "act-pos", sub: "Llegada clara • +0.2 pts" },
+            { tipo: "🟨 Tarjeta Amarilla", pts: -0.2, golLocal: 0, cls: "act-warn", sub: "Amonestación • -0.2 pts" },
+            { tipo: "🟥 Tarjeta Roja", pts: -0.5, golLocal: 0, cls: "act-err", sub: "Expulsión • -0.5 pts" },
+            { tipo: "⚠️ Pérdida Peligrosa / Error", pts: -0.2, golLocal: 0, cls: "act-err", sub: "Pérdida en salida • -0.2 pts" }
+        ]
+    };
+}
+
+function cambiarTabModalPuestoCanchaCDM(nuevaTab) {
+    tabActivaModalPuestoCanchaCDM = nuevaTab;
+    renderizarContenidoModalPuestoCanchaCDM();
+}
+
+function seleccionarChipDetalleRapidoCanchaCDM(texto, btnEl) {
+    const inp = document.getElementById("evCanchaDetalle");
+    if (!inp) return;
+    if (inp.value === texto) {
+        inp.value = "";
+        btnEl?.classList.remove("active");
+    } else {
+        inp.value = texto;
+        document.querySelectorAll(".pitch-detail-chip").forEach(b => b.classList.remove("active"));
+        btnEl?.classList.add("active");
+    }
+}
+
+// =========================================================================
+// SOBRESCRITURA DIRECTA DE abrirModalPuestoCancha (SOBRE #modalEventoCancha)
+// =========================================================================
+
+abrirModalPuestoCancha = function (slotIdx) {
+    asegurarEstilosModalCanchaRobustoCDM();
+    slotCanchaSeleccionadoIndex = slotIdx;
+    tabActivaModalPuestoCanchaCDM = "acciones";
+    detalleRapidoSeleccionadoCanchaCDM = "";
+    renderizarContenidoModalPuestoCanchaCDM();
+    document.getElementById("modalEventoCancha")?.classList.remove("hidden");
+};
+
+function renderizarContenidoModalPuestoCanchaCDM() {
+    const modal = document.getElementById("modalEventoCancha");
+    if (!modal || slotCanchaSeleccionadoIndex === null) return;
+
+    const coords = obtenerCatalogoFormacionActual();
+    const info = coords[slotCanchaSeleccionadoIndex];
+    if (!info) return;
+
+    const mapa = obtenerMapaAlineacionActual();
+    const idAct = mapa[slotCanchaSeleccionadoIndex] || null;
+    const activos = obtenerPersonasFiltradasDeporte(true);
+    const jAct = idAct ? activos.find(x => Number(x.id) === Number(idAct)) : null;
+    const minStr = `${periodoPartidoActual} • ${String(minutoPartidoActual).padStart(2, "0")}'`;
+
+    // A) SI EL PUESTO ESTÁ VACÍO: GRILLA DE 1 CLIC PARA UBICAR JUGADOR AL INSTANTE
+    if (!jAct) {
+        const idsTitulares = Object.values(mapa).map(Number);
+        const libresBanco = activos.filter(p => !idsTitulares.includes(Number(p.id)));
+        const yaEnCancha = activos.filter(p => idsTitulares.includes(Number(p.id)));
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:620px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">Puesto #${info.num} • ${info.sigla} (Vacante)</span>
+                        <h3 style="color:var(--ink-900); margin-top:4px;">📍 Asignar Titular en: ${info.nombrePuesto}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalEventoCancha').classList.add('hidden')">✕</button>
+                </div>
+
+                <label style="font-size:0.72rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.45rem;">
+                    🪑 Tocá un jugador disponible para ubicarlo en este puesto en 1 clic (${libresBanco.length}):
+                </label>
+                <div class="sub-players-pick-grid">
+                    ${libresBanco.length ? libresBanco.map(p => `
+                        <button type="button" class="sub-player-pick-card" onclick="ubicarJugadorDirectoEnSlotCanchaCDM(${p.id})">
+                            ${renderAvatarPersonaCDM(p, 38, "0.8rem", false)}
+                            <div style="min-width:0;">
+                                <strong style="font-size:0.84rem; color:var(--ink-900); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.apellido}, ${p.nombre}</strong>
+                                <small style="font-size:0.7rem; color:var(--cdm-600); font-weight:700;">${p.puesto} • ⭐${p.puntosCategoria}</small>
+                            </div>
+                        </button>
+                    `).join("") : `<div class="empty-box" style="grid-column:1/-1; padding:1rem;">Todos los jugadores de ${categoriaActiva} ya están ubicados en la cancha.</div>`}
+                </div>
+
+                ${yaEnCancha.length ? `
+                    <label style="font-size:0.7rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.4rem;">
+                        🔄 O mover a este puesto un jugador que ya está en cancha:
+                    </label>
+                    <div class="sub-players-pick-grid" style="max-height:130px;">
+                        ${yaEnCancha.map(p => `
+                            <button type="button" class="sub-player-pick-card" onclick="ubicarJugadorDirectoEnSlotCanchaCDM(${p.id})">
+                                <div style="min-width:0;">
+                                    <strong style="font-size:0.8rem; color:var(--ink-900); display:block;">🔄 ${p.apellido}, ${p.nombre}</strong>
+                                    <small style="font-size:0.68rem; color:var(--ink-500);">Mover a #${info.num} ${info.sigla}</small>
+                                </div>
+                            </button>
+                        `).join("")}
+                    </div>
+                ` : ""}
+            </div>
+        `;
+        return;
+    }
+
+    // B) SI EL PUESTO TIENE UN JUGADOR ASIGNADO: CONSOLA TÁCTICA COMPLETA DE 4 PESTAÑAS
+    asegurarPilaresPersona(jAct);
+    const eventosDeEsteJugador = eventosPartidoActual.filter(e => Number(e.jugadorId) === Number(jAct.id));
+    const catAcciones = obtenerCatalogoAccionesDeporteModalCDM();
+    const idsEnCancha = Object.values(mapa).map(Number);
+    const suplentesLibres = activos.filter(p => !idsEnCancha.includes(Number(p.id)));
+    const otrosTitulares = activos.filter(p => idsEnCancha.includes(Number(p.id)) && Number(p.id) !== Number(jAct.id));
+
+    let contenidoPestanaHTML = "";
+
+    // ---------------------------------------------------------------------
+    // PESTAÑA 1: ACCIONES EN 1 CLIC (SIN OBLIGAR A ESCRIBIR DETALLE)
+    // ---------------------------------------------------------------------
+    if (tabActivaModalPuestoCanchaCDM === "acciones") {
+        contenidoPestanaHTML = `
+            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; background:var(--surface-subtle); border:1px solid var(--line-strong); padding:0.6rem 0.75rem; border-radius:12px; margin-bottom:0.75rem;">
+                <div style="display:flex; align-items:center; gap:0.35rem;">
+                    <label style="font-size:0.68rem; font-weight:800; color:var(--ink-500); text-transform:uppercase;">⏱️ Min:</label>
+                    <input type="text" id="evCanchaMinuto" value="${minStr}" style="width:92px; min-height:32px; padding:0.2rem 0.5rem; font-weight:800; text-align:center;">
+                </div>
+                <div style="flex:1; min-width:180px;">
+                    <input type="text" id="evCanchaDetalle" placeholder="💡 Detalle opcional (o tocá una etiqueta rápida abajo)..." style="min-height:32px; font-size:0.78rem;">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:0.8rem;">
+                ${catAcciones.detallesRapidos.map(d => `
+                    <button type="button" class="pitch-detail-chip" onclick="seleccionarChipDetalleRapidoCanchaCDM('${d}', this)">
+                        + ${d}
+                    </button>
+                `).join("")}
+            </div>
+
+            <label style="font-size:0.68rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.4rem;">
+                ⚡ Tocá la acción para registrarla automáticamente en 1 clic:
+            </label>
+            <div class="pitch-actions-grid">
+                ${catAcciones.acciones.map((ac, i) => `
+                    <button type="button" class="pitch-action-card-btn ${ac.cls}" onclick="ejecutarAccionDirecta1ClicCanchaCDM(${i})">
+                        <strong>${ac.tipo}</strong>
+                        <small>${ac.sub}</small>
+                    </button>
+                `).join("")}
+            </div>
+
+            <!-- Anotación Libre Personalizada -->
+            <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; padding-top:0.65rem; border-top:1px dashed var(--line-strong);">
+                <input type="text" id="inputNotaLibreJugadorCancha" placeholder="✍️ Otra observación táctica libre para ${jAct.nombre}..." style="flex:1; min-height:34px; font-size:0.78rem;">
+                <select id="selectImpactoLibreJugadorCancha" style="width:auto; min-height:34px; font-size:0.75rem; font-weight:700;">
+                    <option value="0.3">🔥 +0.3 pts</option>
+                    <option value="0.2" selected>✅ +0.2 pts</option>
+                    <option value="0">⚪ 0 pts</option>
+                    <option value="-0.2">⚠️ -0.2 pts</option>
+                </select>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="guardarNotaLibreJugadorEnCanchaCDM()">
+                    Anotar
+                </button>
+            </div>
+
+            ${eventosDeEsteJugador.length > 0 ? `
+                <div style="margin-top:0.8rem; background:var(--surface-subtle); border:1px solid var(--line); border-radius:12px; padding:0.6rem 0.75rem;">
+                    <small style="font-size:0.66rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.35rem;">
+                        📋 Intervenciones de ${jAct.apellido} en este partido (${eventosDeEsteJugador.length}):
+                    </small>
+                    <div style="display:flex; flex-direction:column; gap:0.3rem; max-height:110px; overflow-y:auto;">
+                        ${eventosDeEsteJugador.map(ev => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.76rem; background:var(--surface-solid); padding:0.3rem 0.55rem; border-radius:8px; border:1px solid var(--line);">
+                                <span><b>${ev.minutoDisplay}</b> — ${ev.tipo} <i style="color:var(--ink-500);">(${ev.detalle})</i></span>
+                                <button type="button" class="btn btn-danger btn-sm" style="min-height:22px; padding:0 6px; font-size:0.65rem;" onclick="quitarEventoEnVivo(${ev.id}); renderizarContenidoModalPuestoCanchaCDM();">✕</button>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            ` : ""}
+        `;
+    }
+
+    // ---------------------------------------------------------------------
+    // PESTAÑA 2: HACER CAMBIO / ENROQUE EN 1 CLIC
+    // ---------------------------------------------------------------------
+    else if (tabActivaModalPuestoCanchaCDM === "cambio") {
+        contenidoPestanaHTML = `
+            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; background:var(--cdm-50); border:1px solid var(--line-celeste); padding:0.65rem 0.85rem; border-radius:12px; margin-bottom:0.8rem;">
+                <div style="flex:1; min-width:170px;">
+                    <label style="font-size:0.65rem; font-weight:800; color:var(--cdm-900); text-transform:uppercase; display:block;">Motivo de la Sustitución</label>
+                    <select id="selectMotivoCambioModal" style="min-height:32px; font-size:0.78rem; font-weight:700; margin-top:2px;">
+                        <option value="Cambio Táctico">🔄 Cambio Táctico</option>
+                        <option value="Dosificar Carga / Cansancio">🔋 Dosificar Carga / Cansancio</option>
+                        <option value="Precaución por Tarjeta">🟨 Precaución por Tarjeta</option>
+                        <option value="Molestia Física">🚑 Molestia Física</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:0.65rem; font-weight:800; color:var(--cdm-900); text-transform:uppercase; display:block;">Minuto</label>
+                    <input type="text" id="inputMinutoCambioModal" value="${minStr}" style="width:90px; min-height:32px; text-align:center; font-weight:800; margin-top:2px;">
+                </div>
+                <button type="button" class="btn btn-danger btn-sm" style="margin-top:14px;" onclick="dejarPuestoLibreEnCanchaCDM()">
+                    Sacar y Dejar Libre
+                </button>
+            </div>
+
+            <label style="font-size:0.7rem; font-weight:800; color:var(--ok-ink); text-transform:uppercase; display:block; margin-bottom:0.4rem;">
+                🪑 Tocá el suplente del banco que ENTRA por ${jAct.apellido} (${suplentesLibres.length} disponibles):
+            </label>
+            <div class="sub-players-pick-grid">
+                ${suplentesLibres.length ? suplentesLibres.map(s => `
+                    <button type="button" class="sub-player-pick-card" onclick="ejecutarCambioDirectoEnCanchaCDM(${s.id})">
+                        ${renderAvatarPersonaCDM(s, 36, "0.78rem", false)}
+                        <div style="min-width:0;">
+                            <strong style="font-size:0.82rem; color:var(--ink-900); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">⬆️ ${s.apellido}, ${s.nombre}</strong>
+                            <small style="font-size:0.68rem; color:var(--ok-ink); font-weight:700;">${s.puesto} • ⭐${s.puntosCategoria}</small>
+                        </div>
+                    </button>
+                `).join("") : `<div class="empty-box" style="grid-column:1/-1; padding:0.8rem;">No hay suplentes libres fuera de la cancha en ${categoriaActiva}.</div>`}
+            </div>
+
+            ${otrosTitulares.length ? `
+                <label style="font-size:0.68rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.4rem;">
+                    🔄 O intercambiar posición en cancha con otro titular:
+                </label>
+                <div class="sub-players-pick-grid" style="max-height:125px;">
+                    ${otrosTitulares.map(ot => `
+                        <button type="button" class="sub-player-pick-card" onclick="ejecutarCambioDirectoEnCanchaCDM(${ot.id})">
+                            <div style="min-width:0;">
+                                <strong style="font-size:0.78rem; color:var(--ink-900); display:block;">⇄ ${ot.apellido}, ${ot.nombre}</strong>
+                                <small style="font-size:0.66rem; color:var(--ink-500);">Enrocar puesto con ${jAct.apellido}</small>
+                            </div>
+                        </button>
+                    `).join("")}
+                </div>
+            ` : ""}
+        `;
+    }
+
+    // ---------------------------------------------------------------------
+    // PESTAÑA 3: LESIÓN / PARTE MÉDICO EN CANCHA + REEMPLAZO OPCIONAL
+    // ---------------------------------------------------------------------
+    else if (tabActivaModalPuestoCanchaCDM === "lesion") {
+        const zonas = ["Isquiotibial", "Rodilla", "Tobillo", "Cuádriceps", "Aductor", "Gemelo / Sóleo", "Hombro", "Zona Lumbar", "Golpe / Contusión", "Calambre"];
+        contenidoPestanaHTML = `
+            <div style="background:var(--err-bg); border:1.5px solid rgba(244,63,94,0.32); border-radius:16px; padding:0.95rem;">
+                <label style="font-size:0.68rem; font-weight:800; color:var(--err-ink); text-transform:uppercase; display:block; margin-bottom:0.35rem;">
+                    1. Zona Afectada o Motivo de Atención Médica (Tocá una etiqueta o escribí):
+                </label>
+                <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:0.6rem;">
+                    ${zonas.map((z, idx) => `
+                        <button type="button" class="injury-zone-pill ${idx === 0 ? "active" : ""}" onclick="document.getElementById('inputDetalleLesionCancha').value='${z}'; document.querySelectorAll('.injury-zone-pill').forEach(b=>b.classList.remove('active')); this.classList.add('active');">
+                            ${z}
+                        </button>
+                    `).join("")}
+                </div>
+                <input type="text" id="inputDetalleLesionCancha" value="Isquiotibial" placeholder="Describí la lesión o molestia..." style="margin-bottom:0.75rem;">
+
+                <div class="grid-2" style="margin-bottom:0.85rem;">
+                    <div class="field">
+                        <label>2. Estado Médico del Jugador *</label>
+                        <select id="selectEstadoMedicoLesionCancha">
+                            <option value="Óptimo">🟢 Atención Leve — Sigue en estado Óptimo</option>
+                            <option value="Sobrecarga / Precaución" selected>🟡 Sobrecarga / Precaución (Sale por cuidado)</option>
+                            <option value="Lesionado (Rehabilitación)">🔴 Lesionado (Pasa a Rehabilitación)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>3. Reemplazo en Cancha (Opcional)</label>
+                        <select id="selectSuplentePorLesionCancha">
+                            <option value="">-- Mantener en cancha / Sin cambio --</option>
+                            <option value="SACAR">-- Sacar de la cancha sin reemplazo --</option>
+                            ${suplentesLibres.map(s => `<option value="${s.id}" selected>⬆️ Entra ${s.apellido}, ${s.nombre} (${s.puesto})</option>`).join("")}
+                        </select>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-danger" style="width:100%; background:#e11d48; color:#ffffff;" onclick="guardarParteMedicoYCambioEnCanchaCDM()">
+                    <i class="ri-heart-pulse-fill"></i> Guardar Parte Médico y Actualizar Partido
+                </button>
+            </div>
+        `;
+    }
+
+    // ---------------------------------------------------------------------
+    // PESTAÑA 4: CALIFICACIÓN DIRECTA DE PILARES Y SCORE (1 A 10)
+    // ---------------------------------------------------------------------
+    else {
+        contenidoPestanaHTML = `
+            <div style="background:var(--surface-subtle); border:1.5px solid var(--line-celeste); border-radius:16px; padding:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                    <strong style="font-size:0.86rem; color:var(--ink-900);">⭐ Ajustar Pilares de Rendimiento (Escala 1.0 a 10.0)</strong>
+                    <span class="badge badge-purple" style="font-size:0.82rem;">Score Actual: ${jAct.puntosCategoria} / 10</span>
+                </div>
+                <div class="grid-4" style="margin-bottom:0.75rem;">
+                    <div class="field"><label>🏃 Físico (30%)</label><input type="number" step="0.1" min="1" max="10" id="modPilarFisico" value="${jAct.pilares.fisico}"></div>
+                    <div class="field"><label>🏋️ Gym (25%)</label><input type="number" step="0.1" min="1" max="10" id="modPilarGym" value="${jAct.pilares.gym}"></div>
+                    <div class="field"><label>⚽ Técnico (25%)</label><input type="number" step="0.1" min="1" max="10" id="modPilarTecnico" value="${jAct.pilares.tecnico}"></div>
+                    <div class="field"><label>🔥 Actitud (20%)</label><input type="number" step="0.1" min="1" max="10" id="modPilarActitud" value="${jAct.pilares.actitud}"></div>
+                </div>
+                <div class="field" style="margin-bottom:0.85rem;">
+                    <label>Motivo de la Calificación</label>
+                    <input type="text" id="modPilarMotivo" placeholder="Ej: Gran despliegue táctico hoy..." value="${(jAct.motivoPuntos || "").replace(/"/g, "&quot;")}">
+                </div>
+                <button type="button" class="btn btn-primary" style="width:100%;" onclick="guardarScoreDirectoDesdeModalCanchaCDM()">
+                    <i class="ri-award-fill"></i> Actualizar Score Oficial de ${jAct.nombre}
+                </button>
+            </div>
+        `;
+    }
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:650px;">
+            <div class="pitch-modal-player-banner">
+                <div style="display:flex; align-items:center; gap:0.85rem;">
+                    ${renderAvatarPersonaCDM(jAct, 52, "1.05rem", false)}
+                    <div>
+                        <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap;">
+                            <span class="badge badge-celeste" style="background:rgba(255,255,255,0.2); color:#fff; border:none;">#${info.num} • ${info.sigla} (${info.nombrePuesto})</span>
+                            <span class="badge badge-ok">⭐ ${jAct.puntosCategoria}/10</span>
+                            ${jAct.estadoMedico && jAct.estadoMedico !== "Óptimo" ? `<span class="badge badge-danger">🏥 ${jAct.estadoMedico}</span>` : ""}
+                        </div>
+                        <h3 style="color:#ffffff; font-size:1.18rem; font-weight:800; margin:3px 0 0 0;">
+                            ${jAct.apellido}, ${jAct.nombre}
+                        </h3>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,0.14); color:#fff; border:none;" onclick="document.getElementById('modalEventoCancha').classList.add('hidden')">✕</button>
+            </div>
+
+            <div class="pitch-modal-tabs">
+                <button type="button" class="pitch-modal-tab-btn ${tabActivaModalPuestoCanchaCDM === "acciones" ? "active" : ""}" onclick="cambiarTabModalPuestoCanchaCDM('acciones')">
+                    ⚡ 1. Acciones (${eventosDeEsteJugador.length})
+                </button>
+                <button type="button" class="pitch-modal-tab-btn ${tabActivaModalPuestoCanchaCDM === "cambio" ? "active" : ""}" onclick="cambiarTabModalPuestoCanchaCDM('cambio')">
+                    🔄 2. Hacer Cambio
+                </button>
+                <button type="button" class="pitch-modal-tab-btn tab-danger ${tabActivaModalPuestoCanchaCDM === "lesion" ? "active" : ""}" onclick="cambiarTabModalPuestoCanchaCDM('lesion')">
+                    🚑 3. Lesión / Médico
+                </button>
+                <button type="button" class="pitch-modal-tab-btn ${tabActivaModalPuestoCanchaCDM === "score" ? "active" : ""}" onclick="cambiarTabModalPuestoCanchaCDM('score')">
+                    ⭐ 4. Score (1-10)
+                </button>
+            </div>
+
+            ${contenidoPestanaHTML}
+        </div>
+    `;
+}
+
+// Acciones operativas del nuevo Modal Robusto
+function ubicarJugadorDirectoEnSlotCanchaCDM(idJugador) {
+    const mapa = obtenerMapaAlineacionActual();
+    const idNum = Number(idJugador);
+    Object.keys(mapa).forEach(k => {
+        if (Number(mapa[k]) === idNum) delete mapa[k];
+    });
+    mapa[slotCanchaSeleccionadoIndex] = idNum;
+    guardarDatosCDM();
+    renderizarCanchaInteractiva();
+    const j = basePersonas.find(x => Number(x.id) === idNum);
+    if (j) mostrarToast(`📌 ${j.apellido} ubicado en cancha.`);
+    renderizarContenidoModalPuestoCanchaCDM();
+}
+
+function dejarPuestoLibreEnCanchaCDM() {
+    const mapa = obtenerMapaAlineacionActual();
+    delete mapa[slotCanchaSeleccionadoIndex];
+    guardarDatosCDM();
+    renderizarCanchaInteractiva();
+    renderizarContenidoModalPuestoCanchaCDM();
+}
+
+function ejecutarAccionDirecta1ClicCanchaCDM(idxAccion) {
+    const mapa = obtenerMapaAlineacionActual();
+    const j = basePersonas.find(x => Number(x.id) === Number(mapa[slotCanchaSeleccionadoIndex]));
+    if (!j) return;
+
+    const info = obtenerCatalogoFormacionActual()[slotCanchaSeleccionadoIndex];
+    const cat = obtenerCatalogoAccionesDeporteModalCDM();
+    const ac = cat.acciones[idxAccion];
+    if (!ac) return;
+
+    const minDisplay = (document.getElementById("evCanchaMinuto")?.value || "").trim() || `${periodoPartidoActual} • ${minutoPartidoActual}'`;
+    const detalleInput = (document.getElementById("evCanchaDetalle")?.value || "").trim();
+    const detalleFinal = detalleInput || `Intervención en puesto #${info.num} (${info.sigla})`;
+
+    if (ac.golLocal && ac.golLocal > 0) {
+        golesLocalActual += ac.golLocal;
+        const inpRes = document.getElementById("matchResultado");
+        if (inpRes) inpRes.value = `${golesLocalActual} - ${golesVisitaActual}`;
+    }
+
+    eventosPartidoActual.push({
+        id: Date.now(),
+        minuto: minutoPartidoActual,
+        minutoDisplay: minDisplay,
+        jugadorId: j.id,
+        jugadorNombre: `${j.apellido}, ${j.nombre}`,
+        puestoEnCancha: `#${info.num} ${info.sigla}`,
+        tipo: ac.tipo,
+        detalle: detalleFinal,
+        impactoPuntos: ac.pts
+    });
+    eventosPartidoActual.sort((a, b) => a.minuto - b.minuto);
+
+    document.getElementById("modalEventoCancha")?.classList.add("hidden");
+    mostrarToast(`✓ ${ac.tipo}: ${j.apellido} (${minDisplay})`);
+    renderizarCanchaInteractiva();
+}
+
+function guardarNotaLibreJugadorEnCanchaCDM() {
+    const txt = (document.getElementById("inputNotaLibreJugadorCancha")?.value || "").trim();
+    if (!txt) {
+        alert("Escribí la observación o tocá cualquiera de los botones de acción rápida de arriba.");
+        return;
+    }
+    const pts = parseFloat(document.getElementById("selectImpactoLibreJugadorCancha")?.value) || 0;
+    const minDisplay = (document.getElementById("evCanchaMinuto")?.value || "").trim() || `${periodoPartidoActual} • ${minutoPartidoActual}'`;
+
+    const mapa = obtenerMapaAlineacionActual();
+    const j = basePersonas.find(x => Number(x.id) === Number(mapa[slotCanchaSeleccionadoIndex]));
+    if (!j) return;
+    const info = obtenerCatalogoFormacionActual()[slotCanchaSeleccionadoIndex];
+
+    eventosPartidoActual.push({
+        id: Date.now(),
+        minuto: minutoPartidoActual,
+        minutoDisplay: minDisplay,
+        jugadorId: j.id,
+        jugadorNombre: `${j.apellido}, ${j.nombre}`,
+        puestoEnCancha: `#${info.num} ${info.sigla}`,
+        tipo: "📝 Nota Táctica",
+        detalle: txt,
+        impactoPuntos: pts
+    });
+    eventosPartidoActual.sort((a, b) => a.minuto - b.minuto);
+
+    document.getElementById("modalEventoCancha")?.classList.add("hidden");
+    mostrarToast(`📝 Nota registrada para ${j.apellido}.`);
+    renderizarCanchaInteractiva();
+}
+
+function ejecutarCambioDirectoEnCanchaCDM(idJugadorEntra) {
+    const mapa = obtenerMapaAlineacionActual();
+    const idSale = mapa[slotCanchaSeleccionadoIndex];
+    const jSale = basePersonas.find(x => Number(x.id) === Number(idSale));
+    const jEntra = basePersonas.find(x => Number(x.id) === Number(idJugadorEntra));
+    if (!jEntra) return;
+
+    const info = obtenerCatalogoFormacionActual()[slotCanchaSeleccionadoIndex];
+    const motivo = document.getElementById("selectMotivoCambioModal")?.value || "Cambio Táctico";
+    const minDisplay = (document.getElementById("inputMinutoCambioModal")?.value || "").trim() || `${periodoPartidoActual} • ${minutoPartidoActual}'`;
+
+    // Si el que entra estaba en otro puesto de la cancha, hacen enroque de posición
+    Object.keys(mapa).forEach(k => {
+        if (Number(mapa[k]) === Number(jEntra.id)) {
+            if (jSale) mapa[k] = jSale.id;
+            else delete mapa[k];
+        }
+    });
+
+    mapa[slotCanchaSeleccionadoIndex] = jEntra.id;
+
+    eventosPartidoActual.push({
+        id: Date.now(),
+        minuto: minutoPartidoActual,
+        minutoDisplay: minDisplay,
+        jugadorId: jEntra.id,
+        jugadorNombre: `${jEntra.apellido}, ${jEntra.nombre}`,
+        puestoEnCancha: `#${info.num} ${info.sigla}`,
+        tipo: "🔄 Cambio / Sustitución",
+        detalle: `Entra por ${jSale ? `${jSale.apellido}, ${jSale.nombre}` : "Vacante"} (${motivo})`,
+        impactoPuntos: 0
+    });
+    eventosPartidoActual.sort((a, b) => a.minuto - b.minuto);
+
+    guardarDatosCDM();
+    document.getElementById("modalEventoCancha")?.classList.add("hidden");
+    renderizarCanchaInteractiva();
+    mostrarToast(`🔄 Cambio en #${info.num}: Entra ${jEntra.apellido} por ${jSale ? jSale.apellido : "Vacante"}.`);
+}
+
+function guardarParteMedicoYCambioEnCanchaCDM() {
+    const mapa = obtenerMapaAlineacionActual();
+    const j = basePersonas.find(x => Number(x.id) === Number(mapa[slotCanchaSeleccionadoIndex]));
+    if (!j) return;
+
+    const info = obtenerCatalogoFormacionActual()[slotCanchaSeleccionadoIndex];
+    const zona = (document.getElementById("inputDetalleLesionCancha")?.value || "").trim() || "Molestia física";
+    const nuevoEstadoMed = document.getElementById("selectEstadoMedicoLesionCancha")?.value || "Sobrecarga / Precaución";
+    const reemplazoVal = document.getElementById("selectSuplentePorLesionCancha")?.value || "";
+    const minDisplay = `${periodoPartidoActual} • ${minutoPartidoActual}'`;
+    const hoy = obtenerHoyISO();
+
+    // 1. Actualizar estado médico en la ficha oficial del deportista y en su historial clínico
+    j.estadoMedico = nuevoEstadoMed;
+    if (!Array.isArray(j.clinico)) j.clinico = [];
+    j.clinico.push({
+        id: Date.now() - 2,
+        fecha: hoy,
+        peso: j.peso || 70,
+        rpe: 8,
+        sueno: 4,
+        dolor: `[Partido ${minDisplay}] ${nuevoEstadoMed}: ${zona}`
+    });
+
+    // 2. Ejecutar reemplazo en cancha si corresponde
+    let textoReemplazo = "Continúa en cancha";
+    if (reemplazoVal === "SACAR") {
+        delete mapa[slotCanchaSeleccionadoIndex];
+        textoReemplazo = "Sale del campo para atención médica";
+    } else if (reemplazoVal) {
+        const jSup = basePersonas.find(x => Number(x.id) === Number(reemplazoVal));
+        if (jSup) {
+            mapa[slotCanchaSeleccionadoIndex] = jSup.id;
+            textoReemplazo = `Sale reemplazado por ${jSup.apellido}, ${jSup.nombre}`;
+        }
+    }
+
+    // 3. Registrar el evento en la línea de tiempo del partido
+    eventosPartidoActual.push({
+        id: Date.now(),
+        minuto: minutoPartidoActual,
+        minutoDisplay: minDisplay,
+        jugadorId: j.id,
+        jugadorNombre: `${j.apellido}, ${j.nombre}`,
+        puestoEnCancha: `#${info.num} ${info.sigla}`,
+        tipo: `🚑 Parte Médico (${nuevoEstadoMed})`,
+        detalle: `Zona: ${zona} — ${textoReemplazo}`,
+        impactoPuntos: 0
+    });
+    eventosPartidoActual.sort((a, b) => a.minuto - b.minuto);
+
+    guardarDatosCDM();
+    document.getElementById("modalEventoCancha")?.classList.add("hidden");
+    renderizarPaginaDeporte();
+    mostrarToast(`🚑 Parte médico guardado para ${j.apellido} (${nuevoEstadoMed}).`);
+}
+
+function guardarScoreDirectoDesdeModalCanchaCDM() {
+    const mapa = obtenerMapaAlineacionActual();
+    const j = basePersonas.find(x => Number(x.id) === Number(mapa[slotCanchaSeleccionadoIndex]));
+    if (!j) return;
+
+    asegurarPilaresPersona(j);
+    j.pilares.fisico = normalizarNota1a10(document.getElementById("modPilarFisico")?.value, j.pilares.fisico);
+    j.pilares.gym = normalizarNota1a10(document.getElementById("modPilarGym")?.value, j.pilares.gym);
+    j.pilares.tecnico = normalizarNota1a10(document.getElementById("modPilarTecnico")?.value, j.pilares.tecnico);
+    j.pilares.actitud = normalizarNota1a10(document.getElementById("modPilarActitud")?.value, j.pilares.actitud);
+    recalcularPuntajePonderado(j);
+    j.motivoPuntos = (document.getElementById("modPilarMotivo")?.value || "").trim() || "Calificación en partido";
+
+    guardarDatosCDM();
+    document.getElementById("modalEventoCancha")?.classList.add("hidden");
+    renderizarPaginaDeporte();
+    mostrarToast(`⭐ Score de ${j.apellido} actualizado a ${j.puntosCategoria}/10.`);
+}
+
+// =========================================================================
+// SOBRESCRITURA DE finalizarYGuardarPartido (PERMITE CERRAR 0 A 0 SIN BLOQUEOS)
+// =========================================================================
+
+finalizarYGuardarPartido = function () {
+    const rival = document.getElementById("matchRival")?.value.trim() || "Partido Oficial";
+    const resultado = document.getElementById("matchResultado")?.value.trim() || `${golesLocalActual} - ${golesVisitaActual}`;
+    const formacion = document.getElementById("matchFormacion")?.value || "4-3-3";
+
+    const coords = obtenerCatalogoFormacionActual();
+    const mapa = obtenerMapaAlineacionActual();
+    const activos = obtenerPersonasFiltradasDeporte(true);
+
+    // Si terminó 0 a 0 y no hubo incidencias puntuales anotadas, generamos el cierre automático con los titulares en cancha
+    const eventosFinales = [...eventosPartidoActual];
+    if (eventosFinales.length === 0) {
+        const titulares = [];
+        coords.forEach((pos, idx) => {
+            const j = mapa[idx] ? activos.find(x => Number(x.id) === Number(mapa[idx])) : null;
+            if (j) titulares.push(`${j.apellido} (#${pos.num})`);
+        });
+        eventosFinales.push({
+            id: Date.now(),
+            minuto: minutoPartidoActual || 90,
+            minutoDisplay: "Final",
+            jugadorId: 0,
+            jugadorNombre: `Plantel ${categoriaActiva}`,
+            puestoEnCancha: formacion,
+            tipo: "🏁 Cierre de Acta Oficial",
+            detalle: `Resultado final ${resultado} vs. ${rival}. ${titulares.length ? "Titulares: " + titulares.slice(0, 7).join(", ") : "Partido cerrado sin incidencias individuales."}`,
+            impactoPuntos: 0
+        });
+    }
+
+    const { texto, resumenJugadores } = generarConclusionAutomaticaPartido(rival, resultado, eventosFinales);
+
+    basePartidos.unshift({
+        id: Date.now(),
+        fecha: obtenerHoyISO(),
+        deporte: deportePagina,
+        categoria: categoriaActiva,
+        rival,
+        resultado,
+        formacion,
+        eventos: eventosFinales,
+        conclusion: texto,
+        resumenJugadores,
+        puntosAplicadosAlRanking: false
+    });
+
+    guardarDatosCDM();
+    eventosPartidoActual = [];
+    golesLocalActual = 0;
+    golesVisitaActual = 0;
+    reiniciarCronometroPartido();
+    if (document.getElementById("matchRival")) document.getElementById("matchRival").value = "";
+    if (document.getElementById("matchResultado")) document.getElementById("matchResultado").value = "";
+
+    mostrarToast(`🏁 Partido guardado correctamente: ${rival} (${resultado}).`);
+    renderizarCanchaInteractiva();
+    renderizarHistorialPartidos();
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    asegurarEstilosModalCanchaRobustoCDM();
+});
+// =========================================================================
+// 18. SUITE PRO PARA PROFESIONALES Y CONSULTORIOS:
+//     - ALARMA AUTOMÁTICA DE TURNOS A 24HS CON ENVÍO AL WHATSAPP DEL PACIENTE ($0 GRATIS + WEBHOOK)
+//     - CONTROL DE PACKS DE SESIONES Y ÓRDENES DE MUTUAL (EJ: 4/10 SESIONES CON ALERTA DE RENOVACIÓN)
+//     - RECETARIO DIGITAL (RP/), INDICACIONES Y CERTIFICADO MÉDICO IMPRIMIBLE PDF A4 + WHATSAPP
+//     - MAPA CORPORAL INTERACTIVO, GONIOMETRÍA Y ALERTAS ROJAS CLÍNICAS (ANAMNESIS)
+//     - LISTA DE ESPERA INTELIGENTE ("CUBRE-HUECOS" ANTE CANCELACIONES)
+// Pegar al final de app.js
+// =========================================================================
+
+const STORAGE_PRO_SUITE_KEY_18 = "cdm_suite_profesionales_v18";
+
+function obtenerClaveComercioActiva18() {
+    return localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal";
+}
+
+function obtenerEstadoSuiteProfesionales18() {
+    const claveClub = obtenerClaveComercioActiva18();
+    let mapa = {};
+    try {
+        mapa = JSON.parse(localStorage.getItem(STORAGE_PRO_SUITE_KEY_18) || "{}");
+    } catch {
+        mapa = {};
+    }
+
+    if (!mapa[claveClub]) {
+        mapa[claveClub] = {
+            configAlarma: {
+                activa: true,
+                horasAntes: 24,
+                sonidoAlerta: true,
+                direccionConsultorio: "Consultorio Oficial",
+                plantillaMensaje: "Hola *{paciente}*, te recordamos desde *{consultorio}* que tenés turno mañana *{fecha}* a las *{hora} hs* con *{profesional}* ({especialidad}).\n\nPor favor respondé *SÍ* para confirmar tu asistencia o avisanos con anticipación si necesitás reprogramar. ¡Te esperamos!",
+                webhookUrl: ""
+            },
+            packsSesiones: [],
+            recetasEmitidas: [],
+            listaEspera: [],
+            fichasAnatomicas: {}
+        };
+        localStorage.setItem(STORAGE_PRO_SUITE_KEY_18, JSON.stringify(mapa));
+    }
+    return mapa[claveClub];
+}
+
+function guardarEstadoSuiteProfesionales18(estadoClubPro) {
+    const claveClub = obtenerClaveComercioActiva18();
+    let mapa = {};
+    try {
+        mapa = JSON.parse(localStorage.getItem(STORAGE_PRO_SUITE_KEY_18) || "{}");
+    } catch {
+        mapa = {};
+    }
+    mapa[claveClub] = estadoClubPro;
+    localStorage.setItem(STORAGE_PRO_SUITE_KEY_18, JSON.stringify(mapa));
+}
+
+// Conector universal que lee los turnos y pacientes del módulo de Consultorio (Sección 17) y de basePersonas
+function obtenerDatosConsultorioUnificados18() {
+    let estadoCons = null;
+    if (typeof obtenerEstadoConsultorioClubActualCDM === "function") {
+        estadoCons = obtenerEstadoConsultorioClubActualCDM();
+    } else {
+        try {
+            const raw = JSON.parse(localStorage.getItem("cdm_consultorio_pro_v1") || "{}");
+            estadoCons = raw[obtenerClaveComercioActiva18()] || null;
+        } catch {}
+    }
+
+    const pacientes = Array.isArray(estadoCons?.pacientes) ? estadoCons.pacientes : [];
+    const turnos = Array.isArray(estadoCons?.turnos) ? estadoCons.turnos : [];
+    const profesionales = Array.isArray(estadoCons?.profesionales) ? estadoCons.profesionales : [];
+    const mutuales = Array.isArray(estadoCons?.mutuales) ? estadoCons.mutuales : [];
+
+    return { estadoCons, pacientes, turnos, profesionales, mutuales };
+}
+
+function guardarDatosConsultorioUnificados18() {
+    if (typeof guardarEstadoConsultorioClubActualCDM === "function") {
+        guardarEstadoConsultorioClubActualCDM();
+    }
+    if (typeof guardarDatosCDM === "function") {
+        guardarDatosCDM();
+    }
+}
+
+// Normalizador inteligente de teléfonos para Argentina (si cargaron 3584112233 lo convierte en 5493584112233)
+function normalizarTelefonoPacienteWA18(telefonoRaw = "") {
+    let limpio = String(telefonoRaw || "").replace(/\D/g, "");
+    if (!limpio) return "";
+    if (limpio.startsWith("0")) limpio = limpio.slice(1);
+    if (limpio.length === 10 && !limpio.startsWith("54")) {
+        limpio = "549" + limpio;
+    } else if (limpio.length === 11 && limpio.startsWith("54") && !limpio.startsWith("549")) {
+        limpio = "549" + limpio.slice(2);
+    }
+    return limpio;
+}
+
+// Busca el teléfono que dejó el paciente en el turno, en el padrón de pacientes o en basePersonas
+function resolverDatosPacienteDeTurno18(turno) {
+    const { pacientes } = obtenerDatosConsultorioUnificados18();
+    const listaPersonas = typeof basePersonas !== "undefined" && Array.isArray(basePersonas) ? basePersonas : [];
+
+    let pac = null;
+    if (turno.pacienteId) {
+        pac = pacientes.find(x => Number(x.id) === Number(turno.pacienteId));
+    }
+    if (!pac && turno.pacienteNombre) {
+        const nomBuscado = String(turno.pacienteNombre).toLowerCase().trim();
+        pac = pacientes.find(x => `${x.nombre || ""} ${x.apellido || ""}`.toLowerCase().includes(nomBuscado) || `${x.apellido || ""}, ${x.nombre || ""}`.toLowerCase().includes(nomBuscado));
+    }
+
+    let per = null;
+    if (!pac && turno.pacienteNombre) {
+        const nomBuscado = String(turno.pacienteNombre).toLowerCase().trim();
+        per = listaPersonas.find(x => `${x.nombre || ""} ${x.apellido || ""}`.toLowerCase().includes(nomBuscado) || `${x.apellido || ""}, ${x.nombre || ""}`.toLowerCase().includes(nomBuscado));
+    }
+
+    const telefonoBruto =
+        turno.telefono ||
+        turno.whatsapp ||
+        pac?.telefono ||
+        pac?.whatsapp ||
+        pac?.contacto ||
+        per?.whatsapp ||
+        "";
+
+    const nombreCompleto =
+        turno.pacienteNombre ||
+        (pac ? `${pac.nombre} ${pac.apellido}` : "") ||
+        (per ? `${per.nombre} ${per.apellido}` : "Paciente");
+
+    const obraSocial = turno.mutual || pac?.mutual || pac?.obraSocial || per?.obraSocial || "Particular";
+
+    return {
+        pacienteObj: pac || per || null,
+        nombreCompleto: nombreCompleto.trim(),
+        telefonoBruto,
+        telefonoWA: normalizarTelefonoPacienteWA18(telefonoBruto),
+        obraSocial
+    };
+}
+
+// =========================================================================
+// 18.1 MOTOR DE ALARMA DE TURNOS A 24 HORAS (DETECCIÓN + ENVÍO WHATSAPP / WEBHOOK)
+// =========================================================================
+
+function obtenerFechaMananaISO18() {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+}
+
+function obtenerTurnosProximas24Horas18() {
+    const { turnos } = obtenerDatosConsultorioUnificados18();
+    const hoyISO = typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+    const mananaISO = obtenerFechaMananaISO18();
+
+    // Filtrar turnos activos de mañana (24hs antes) y los de hoy pendientes
+    const turnos24h = turnos.filter(t => {
+        if (!t || t.estado === "Cancelado" || t.estado === "Atendido") return false;
+        return t.fecha === mananaISO || t.fecha === hoyISO;
+    }).sort((a, b) => {
+        if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
+        return String(a.hora || "08:00").localeCompare(String(b.hora || "08:00"));
+    });
+
+    const pendientesAviso = turnos24h.filter(t => !t.recordatorio24hEnviado);
+    const yaAvisados = turnos24h.filter(t => Boolean(t.recordatorio24hEnviado));
+
+    return {
+        hoyISO,
+        mananaISO,
+        todos24h: turnos24h,
+        pendientesAviso,
+        yaAvisados
+    };
+}
+
+function construirTextoRecordatorio24h18(turno) {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const cfg = proState.configAlarma || {};
+    const infoPac = resolverDatosPacienteDeTurno18(turno);
+
+    let nombreEntidad = cfg.direccionConsultorio || "Consultorio Oficial";
+    try {
+        const lic = JSON.parse(localStorage.getItem("cdm_licencia_config_v1") || "null");
+        if (lic && lic.nombreEntidad) nombreEntidad = lic.nombreEntidad;
+    } catch {}
+
+    const fechaPartes = String(turno.fecha || "").split("-");
+    const fechaLegible = fechaPartes.length === 3 ? `${fechaPartes[2]}/${fechaPartes[1]}/${fechaPartes[0]}` : turno.fecha;
+
+    let plantilla = cfg.plantillaMensaje ||
+        "Hola *{paciente}*, te recordamos desde *{consultorio}* que tenés turno el día *{fecha}* a las *{hora} hs* con *{profesional}* ({especialidad}).\n\nPor favor respondé *SÍ* para confirmar tu asistencia.";
+
+    return plantilla
+        .replace(/\{paciente\}/gi, infoPac.nombreCompleto)
+        .replace(/\{consultorio\}/gi, nombreEntidad)
+        .replace(/\{fecha\}/gi, fechaLegible)
+        .replace(/\{hora\}/gi, turno.hora || "a confirmar")
+        .replace(/\{profesional\}/gi, turno.profesional || "el profesional")
+        .replace(/\{especialidad\}/gi, turno.especialidad || "Consultorio");
+}
+
+async function enviarRecordatorio24hPacienteWA18(idTurno, silencioso = false) {
+    const { turnos } = obtenerDatosConsultorioUnificados18();
+    const t = turnos.find(x => Number(x.id) === Number(idTurno));
+    if (!t) return;
+
+    const infoPac = resolverDatosPacienteDeTurno18(t);
+    let tel = infoPac.telefonoWA;
+
+    if (!tel) {
+        const ingresado = prompt(`📱 El paciente ${infoPac.nombreCompleto} no tiene teléfono cargado. Ingresá su WhatsApp (ej: 3584112233):`, "");
+        if (!ingresado) return;
+        tel = normalizarTelefonoPacienteWA18(ingresado);
+        t.telefono = ingresado.trim();
+        if (infoPac.pacienteObj) {
+            infoPac.pacienteObj.telefono = ingresado.trim();
+            infoPac.pacienteObj.whatsapp = ingresado.trim();
+        }
+    }
+
+    const mensaje = construirTextoRecordatorio24h18(t);
+    const proState = obtenerEstadoSuiteProfesionales18();
+
+    // Si el consultorio configuró un Webhook de Bot Automático, lo dispara por API además o en lugar de abrir ventana
+    if (proState.configAlarma?.webhookUrl) {
+        try {
+            fetch(proState.configAlarma.webhookUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    telefono: tel,
+                    paciente: infoPac.nombreCompleto,
+                    fecha: t.fecha,
+                    hora: t.hora,
+                    profesional: t.profesional,
+                    especialidad: t.especialidad,
+                    mensaje
+                })
+            }).catch(() => {});
+        } catch {}
+    }
+
+    // Marcar como avisado 24hs con fecha y hora exacta
+    t.recordatorio24hEnviado = true;
+    t.recordatorio24hFechaHora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    guardarDatosConsultorioUnificados18();
+
+    if (!silencioso) {
+        window.open(`https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`, "_blank");
+    }
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`📲 Recordatorio 24hs enviado a ${infoPac.nombreCompleto} (${tel})`);
+    }
+
+    refrescarInterfazSuiteProfesionales18();
+}
+
+function alternarConfirmacionPacienteTurno18(idTurno) {
+    const { turnos } = obtenerDatosConsultorioUnificados18();
+    const t = turnos.find(x => Number(x.id) === Number(idTurno));
+    if (!t) return;
+
+    t.confirmadoPorPaciente = !Boolean(t.confirmadoPorPaciente);
+    if (t.confirmadoPorPaciente) t.recordatorio24hEnviado = true;
+    guardarDatosConsultorioUnificados18();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(t.confirmadoPorPaciente
+            ? `👍 Turno confirmado por ${t.pacienteNombre}`
+            : `⏳ Confirmación quitada para ${t.pacienteNombre}`);
+    }
+    refrescarInterfazSuiteProfesionales18();
+}
+
+function emitirSonidoAlarma24h18() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        [587.33, 880].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.16);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.16 + 0.25);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + i * 0.16);
+            osc.stop(ctx.currentTime + i * 0.16 + 0.26);
+        });
+    } catch {}
+}
+
+// =========================================================================
+// 18.2 MODAL Y BANNER DE LA CENTRAL DE ALARMAS DE TURNOS A 24HS
+// =========================================================================
+
+function asegurarModalSuiteProfesionales18() {
+    let modal = document.getElementById("modalSuiteProfesionales18");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalSuiteProfesionales18";
+        modal.className = "modal-backdrop hidden";
+        document.body.appendChild(modal);
+    }
+    return modal;
+}
+
+function cerrarModalSuiteProfesionales18() {
+    document.getElementById("modalSuiteProfesionales18")?.classList.add("hidden");
+}
+
+function abrirCentralAlarmas24HorasModal18() {
+    const modal = asegurarModalSuiteProfesionales18();
+    const resumen = obtenerTurnosProximas24Horas18();
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const cfg = proState.configAlarma || {};
+
+    const filasHTML = resumen.todos24h.length === 0
+        ? `<div class="empty-box">No hay turnos agendados para hoy (${resumen.hoyISO}) ni para mañana (${resumen.mananaISO}).</div>`
+        : `<div class="table-wrap"><table class="app-table">
+            <thead>
+                <tr>
+                    <th>Día / Hora</th>
+                    <th>Paciente y Teléfono</th>
+                    <th>Profesional / Mutual</th>
+                    <th>Estado Alarma 24hs</th>
+                    <th style="text-align:right;">Acción Rápida ($0 Gratis)</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${resumen.todos24h.map(t => {
+                    const infoPac = resolverDatosPacienteDeTurno18(t);
+                    const esManana = t.fecha === resumen.mananaISO;
+                    const avisado = Boolean(t.recordatorio24hEnviado);
+                    const confirmado = Boolean(t.confirmadoPorPaciente);
+
+                    return `
+                        <tr>
+                            <td data-label="Día / Hora">
+                                <span class="badge ${esManana ? "badge-purple" : "badge-celeste"}">${esManana ? "⏰ MAÑANA (24hs)" : "📅 HOY"}</span>
+                                <strong style="display:block; margin-top:3px; font-size:0.95rem;">${t.hora} hs</strong>
+                            </td>
+                            <td data-label="Paciente y Teléfono">
+                                <strong>${infoPac.nombreCompleto}</strong>
+                                <small style="display:block; color:var(--ink-500);">
+                                    📱 ${infoPac.telefonoBruto ? infoPac.telefonoBruto : "<b style='color:var(--err)'>Sin teléfono (Click en Enviar para cargar)</b>"}
+                                </small>
+                            </td>
+                            <td data-label="Profesional / Mutual">
+                                <b>${t.profesional || "General"}</b>
+                                <small style="display:block; color:var(--ink-500);">${t.especialidad || ""} • ${infoPac.obraSocial}</small>
+                            </td>
+                            <td data-label="Estado Alarma 24hs">
+                                ${confirmado
+                                    ? `<span class="badge badge-ok">👍 Confirmado por Paciente</span>`
+                                    : (avisado
+                                        ? `<span class="badge badge-ok">✓ Avisado (${t.recordatorio24hFechaHora || "Hoy"})</span>`
+                                        : `<span class="badge badge-warn">🔔 Pendiente de Aviso 24hs</span>`)}
+                            </td>
+                            <td data-label="Acción Rápida" style="text-align:right;">
+                                <div style="display:flex; gap:0.35rem; justify-content:flex-end; flex-wrap:wrap;">
+                                    <button type="button" class="btn ${avisado ? "btn-secondary" : "btn-whatsapp"} btn-sm" onclick="enviarRecordatorio24hPacienteWA18(${t.id})">
+                                        <i class="ri-whatsapp-line"></i> ${avisado ? "Reenviar WA" : "Enviar Alarma 24hs"}
+                                    </button>
+                                    <button type="button" class="btn ${confirmado ? "btn-ok" : "btn-ghost"} btn-sm" onclick="alternarConfirmacionPacienteTurno18(${t.id})" title="Marcar que el paciente confirmó asistencia">
+                                        👍 ${confirmado ? "Confirmado" : "Confirmar"}
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join("")}
+            </tbody>
+           </table></div>`;
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:880px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-warn">⏰ CENTRAL DE ALARMAS DE TURNOS A 24 HORAS</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Recordatorios de Turnos al WhatsApp del Paciente</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalSuiteProfesionales18()">✕</button>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.75rem; margin-bottom:1rem;">
+                <div class="bento-kpi" style="padding:0.85rem 1rem;">
+                    <div class="kpi-icon warn"><i class="ri-notification-3-fill"></i></div>
+                    <div class="kpi-data"><span>Pendientes de Aviso (24hs)</span><strong>${resumen.pendientesAviso.length} turnos</strong></div>
+                </div>
+                <div class="bento-kpi" style="padding:0.85rem 1rem;">
+                    <div class="kpi-icon ok"><i class="ri-whatsapp-fill"></i></div>
+                    <div class="kpi-data"><span>Ya Avisados por WA</span><strong>${resumen.yaAvisados.length} pacientes</strong></div>
+                </div>
+                <div class="bento-kpi" style="padding:0.85rem 1rem;">
+                    <div class="kpi-icon purple"><i class="ri-Check-double-line"></i></div>
+                    <div class="kpi-data"><span>Costo por Mensaje</span><strong>$0 (Gratis)</strong></div>
+                </div>
+            </div>
+
+            ${filasHTML}
+
+            <details style="margin-top:1rem; background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem 1rem;">
+                <summary style="cursor:pointer; font-weight:800; font-size:0.82rem; color:var(--cdm-700);">
+                    ⚙️ Configurar Texto del Mensaje 24hs y Conector Bot Automático (Opcional)
+                </summary>
+                <form onsubmit="guardarConfigPlantillaAlarma24h18(event)" style="margin-top:0.8rem; display:flex; flex-direction:column; gap:0.75rem;">
+                    <div class="field">
+                        <label>Plantilla del Recordatorio (Podés usar {paciente}, {fecha}, {hora}, {profesional}, {especialidad}, {consultorio})</label>
+                        <textarea id="cfgPlantilla24hInput" rows="3" required>${cfg.plantillaMensaje || ""}</textarea>
+                    </div>
+                    <div class="grid-2">
+                        <div class="field">
+                            <label>Nombre / Dirección del Consultorio</label>
+                            <input type="text" id="cfgDireccion24hInput" value="${(cfg.direccionConsultorio || "").replace(/"/g, "&quot;")}" placeholder="Ej: Centro Clínico CDM - Av. San Martín 120">
+                        </div>
+                        <div class="field">
+                            <label>Webhook Bot WhatsApp Automático (Opcional - Dejar vacío para usar modo gratis a 1 clic)</label>
+                            <input type="url" id="cfgWebhook24hInput" value="${(cfg.webhookUrl || "").replace(/"/g, "&quot;")}" placeholder="https://tu-bot-whatsapp.com/api/send">
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Configuración de Alarma</button>
+                    </div>
+                </form>
+            </details>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+    abrirCentralAlarmas24HorasModal18.abierto = true;
+}
+
+function guardarConfigPlantillaAlarma24h18(e) {
+    e.preventDefault();
+    const proState = obtenerEstadoSuiteProfesionales18();
+    proState.configAlarma.plantillaMensaje = document.getElementById("cfgPlantilla24hInput").value.trim();
+    proState.configAlarma.direccionConsultorio = document.getElementById("cfgDireccion24hInput").value.trim();
+    proState.configAlarma.webhookUrl = document.getElementById("cfgWebhook24hInput").value.trim();
+    guardarEstadoSuiteProfesionales18(proState);
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast("✅ Configuración de Alarma 24hs guardada.");
+    }
+    abrirCentralAlarmas24HorasModal18();
+}
+
+// =========================================================================
+// 18.3 GESTOR DE PACKS / BONOS DE SESIONES Y ÓRDENES DE MUTUAL (EJ: 4/10 SESIONES)
+// =========================================================================
+
+function renderizarPanelPacksSesiones18() {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const { pacientes, profesionales, mutuales } = obtenerDatosConsultorioUnificados18();
+    const packs = Array.isArray(proState.packsSesiones) ? proState.packsSesiones : [];
+
+    return `
+        <div class="app-panel animate-in">
+            <div class="panel-head">
+                <div>
+                    <h3><i class="ri-coupon-3-fill"></i> Control de Packs de Sesiones y Órdenes de Obra Social</h3>
+                    <small style="color:var(--ink-500)">Llevá el conteo exacto de sesiones consumidas (ej: 10 sesiones de Kinesiología/Quiropraxia) y recibí alerta antes de que se venza la orden.</small>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalNuevoPackSesiones18()">
+                    + Nuevo Pack / Orden de Sesiones
+                </button>
+            </div>
+
+            ${packs.length === 0 ? `
+                <div class="empty-box">
+                    Todavía no hay packs u órdenes de sesiones cargadas. Tocá <b>"+ Nuevo Pack / Orden de Sesiones"</b> para asignar uno a un paciente.
+                </div>
+            ` : `
+                <div class="patients-quick-grid">
+                    ${packs.map(pk => {
+                        const usadas = Number(pk.sesionesUsadas) || 0;
+                        const totales = Math.max(1, Number(pk.sesionesTotales) || 10);
+                        const restantes = Math.max(0, totales - usadas);
+                        const pct = Math.min(100, Math.round((usadas / totales) * 100));
+                        const porVencer = restantes <= 2 && restantes > 0;
+                        const agotado = restantes === 0;
+
+                        return `
+                            <div class="patient-quick-card" style="cursor:default; border-top-color:${agotado ? "var(--err)" : (porVencer ? "var(--warn)" : "var(--ok)")};">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+                                    <div>
+                                        <span class="badge ${agotado ? "badge-danger" : (porVencer ? "badge-warn" : "badge-ok")}">
+                                            ${agotado ? "🔴 ORDEN AGOTADA" : (porVencer ? `⚠️ QUEDAN ${restantes} SESIONES` : `🟢 ACTIVO (${restantes} libres)`)}
+                                        </span>
+                                        <h4 style="font-size:1.05rem; font-weight:800; margin-top:5px;">${pk.pacienteNombre}</h4>
+                                        <small style="color:var(--ink-500); font-weight:600;">${pk.especialidad} • ${pk.mutual || "Particular"} ${pk.nroOrden ? `(Orden #${pk.nroOrden})` : ""}</small>
+                                    </div>
+                                    <strong style="font-size:1.25rem; font-weight:900; color:var(--cdm-600);">${usadas}/${totales}</strong>
+                                </div>
+
+                                <div>
+                                    <div style="height:8px; background:var(--line-strong); border-radius:99px; overflow:hidden;">
+                                        <div style="height:100%; width:${pct}%; background:${agotado ? "var(--err)" : (porVencer ? "var(--warn)" : "var(--cdm-500)")};"></div>
+                                    </div>
+                                    <small style="color:var(--ink-500); font-size:0.72rem; display:block; margin-top:4px;">
+                                        Diagnóstico / Motivo: <b>${pk.diagnostico || "Tratamiento general"}</b>
+                                    </small>
+                                </div>
+
+                                <div class="patient-quick-footer">
+                                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; width:100%;">
+                                        <button type="button" class="btn btn-primary btn-sm" style="flex:1;" onclick="sumarSesionConsumidaPack18(${pk.id}, 1)" ${agotado ? "disabled" : ""}>
+                                            ✓ Registrar Sesión (+1)
+                                        </button>
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="sumarSesionConsumidaPack18(${pk.id}, -1)" title="Descontar 1">-1</button>
+                                        <button type="button" class="btn btn-whatsapp btn-sm" onclick="avisarEstadoPackPacienteWA18(${pk.id})" title="Enviar estado de sesiones por WhatsApp">
+                                            <i class="ri-whatsapp-line"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="eliminarPackSesiones18(${pk.id})">🗑️</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            `}
+        </div>
+    `;
+}
+
+function abrirModalNuevoPackSesiones18() {
+    const modal = asegurarModalSuiteProfesionales18();
+    const { pacientes, mutuales } = obtenerDatosConsultorioUnificados18();
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:560px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-celeste">🎟️ NUEVO PACK U ORDEN KINESIOLOGÍA / SALUD</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Asignar Pack de Sesiones a Paciente</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalSuiteProfesionales18()">✕</button>
+            </div>
+            <form onsubmit="guardarNuevoPackSesiones18(event)">
+                <div class="grid-2" style="margin-bottom:0.75rem;">
+                    <div class="field">
+                        <label>Paciente *</label>
+                        <input type="text" id="pkPacienteNombre" list="dlPacientesPack18" required placeholder="Nombre y Apellido">
+                        <datalist id="dlPacientesPack18">
+                            ${pacientes.map(p => `<option value="${p.nombre} ${p.apellido}">`).join("")}
+                        </datalist>
+                    </div>
+                    <div class="field">
+                        <label>Teléfono WhatsApp *</label>
+                        <input type="tel" id="pkTelefono" required placeholder="Ej: 3584112233">
+                    </div>
+                </div>
+                <div class="grid-3" style="margin-bottom:0.75rem;">
+                    <div class="field">
+                        <label>Especialidad *</label>
+                        <select id="pkEspecialidad">
+                            <option value="Kinesiología">🦿 Kinesiología</option>
+                            <option value="Quiropraxia">🦴 Quiropraxia</option>
+                            <option value="Psicología">🧠 Psicología</option>
+                            <option value="Nutrición">🥗 Nutrición</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Obra Social / Mutual</label>
+                        <input type="text" id="pkMutual" value="APROSS / Particular">
+                    </div>
+                    <div class="field">
+                        <label>N° Orden Autorizada</label>
+                        <input type="text" id="pkNroOrden" placeholder="Ej: 0045892">
+                    </div>
+                </div>
+                <div class="grid-2" style="margin-bottom:0.75rem;">
+                    <div class="field">
+                        <label>Total de Sesiones Autorizadas *</label>
+                        <input type="number" id="pkTotales" required min="1" max="50" value="10">
+                    </div>
+                    <div class="field">
+                        <label>Sesiones Ya Realizadas</label>
+                        <input type="number" id="pkUsadas" min="0" max="50" value="0">
+                    </div>
+                </div>
+                <div class="field" style="margin-bottom:1.1rem;">
+                    <label>Diagnóstico / Zona a Tratar</label>
+                    <input type="text" id="pkDiagnostico" placeholder="Ej: Rehabilitación LCA Rodilla Derecha / Cervicalgia">
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+                    <button type="button" class="btn btn-ghost" onclick="cerrarModalSuiteProfesionales18()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Pack de Sesiones</button>
+                </div>
+            </form>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+}
+
+function guardarNuevoPackSesiones18(e) {
+    e.preventDefault();
+    const proState = obtenerEstadoSuiteProfesionales18();
+    if (!Array.isArray(proState.packsSesiones)) proState.packsSesiones = [];
+
+    proState.packsSesiones.unshift({
+        id: Date.now(),
+        pacienteNombre: document.getElementById("pkPacienteNombre").value.trim(),
+        telefono: document.getElementById("pkTelefono").value.trim(),
+        especialidad: document.getElementById("pkEspecialidad").value,
+        mutual: document.getElementById("pkMutual").value.trim(),
+        nroOrden: document.getElementById("pkNroOrden").value.trim(),
+        sesionesTotales: parseInt(document.getElementById("pkTotales").value) || 10,
+        sesionesUsadas: parseInt(document.getElementById("pkUsadas").value) || 0,
+        diagnostico: document.getElementById("pkDiagnostico").value.trim(),
+        fechaAlta: new Date().toISOString().split("T")[0]
+    });
+
+    guardarEstadoSuiteProfesionales18(proState);
+    cerrarModalSuiteProfesionales18();
+    if (typeof mostrarToast === "function") mostrarToast("🎟️ Pack de sesiones registrado.");
+    abrirSubherramientaProfesional18("packs");
+}
+
+function sumarSesionConsumidaPack18(idPack, delta) {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const pk = (proState.packsSesiones || []).find(x => Number(x.id) === Number(idPack));
+    if (!pk) return;
+
+    pk.sesionesUsadas = Math.max(0, Math.min(pk.sesionesTotales, (Number(pk.sesionesUsadas) || 0) + delta));
+    guardarEstadoSuiteProfesionales18(proState);
+
+    const restantes = pk.sesionesTotales - pk.sesionesUsadas;
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`🎟️ ${pk.pacienteNombre}: Sesión ${pk.sesionesUsadas}/${pk.sesionesTotales} (${restantes === 0 ? "¡Orden completada!" : `Quedan ${restantes}`})`);
+    }
+    abrirSubherramientaProfesional18("packs");
+}
+
+function avisarEstadoPackPacienteWA18(idPack) {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const pk = (proState.packsSesiones || []).find(x => Number(x.id) === Number(idPack));
+    if (!pk) return;
+
+    const tel = normalizarTelefonoPacienteWA18(pk.telefono);
+    const restantes = Math.max(0, pk.sesionesTotales - pk.sesionesUsadas);
+    const msg = `🩺 *ESTADO DE SESIONES — ${pk.especialidad.toUpperCase()}*\n\n` +
+                `Hola *${pk.pacienteNombre}*, te informamos el avance de tu tratamiento (${pk.diagnostico || "Sesiones"}):\n` +
+                `• *Sesiones realizadas:* ${pk.sesionesUsadas} de ${pk.sesionesTotales}\n` +
+                `• *Sesiones disponibles:* ${restantes}\n\n` +
+                `${restantes <= 2 ? "⚠️ _Recordá gestionar la renovación de tu orden o pack para continuar sin interrupciones._" : "¡Seguimos avanzando muy bien!"}`;
+
+    window.open(tel ? `https://wa.me/${tel}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+}
+
+function eliminarPackSesiones18(idPack) {
+    if (!confirm("🗑️ ¿Eliminar este pack de sesiones?")) return;
+    const proState = obtenerEstadoSuiteProfesionales18();
+    proState.packsSesiones = (proState.packsSesiones || []).filter(x => Number(x.id) !== Number(idPack));
+    guardarEstadoSuiteProfesionales18(proState);
+    abrirSubherramientaProfesional18("packs");
+}
+
+// =========================================================================
+// 18.4 RECETARIO DIGITAL (RP/), INDICACIONES Y CERTIFICADO IMPRIMIBLE PDF A4 + WA
+// =========================================================================
+
+function renderizarPanelRecetarioYCertificados18() {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const { pacientes, profesionales } = obtenerDatosConsultorioUnificados18();
+    const recetas = Array.isArray(proState.recetasEmitidas) ? proState.recetasEmitidas : [];
+    const hoy = new Date().toISOString().split("T")[0];
+
+    return `
+        <div class="split-equal animate-in">
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3><i class="ri-file-text-fill"></i> Emitir Indicación (RP/), Plan Casero o Certificado</h3>
+                        <small style="color:var(--ink-500)">Generá el documento oficial en PDF A4 o envialo directo al WhatsApp del paciente.</small>
+                    </div>
+                </div>
+                <form onsubmit="guardarYEmitirReceta18(event)">
+                    <div class="grid-2" style="margin-bottom:0.75rem;">
+                        <div class="field">
+                            <label>Tipo de Documento *</label>
+                            <select id="rpTipoDoc" required>
+                                <option value="RP / Plan de Cuidados e Indicaciones">📋 RP / Indicaciones y Ejercicios en Casa</option>
+                                <option value="Certificado de Asistencia Clínica">🏥 Certificado de Asistencia / Reposo</option>
+                                <option value="Plan Nutricional y Suplementación">🥗 Plan Nutricional y Pautas Diarias</option>
+                                <option value="Informe de Evolución Biomecánica / Alta">📈 Informe de Evolución / Alta Kinésica</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Fecha *</label>
+                            <input type="date" id="rpFecha" required value="${hoy}">
+                        </div>
+                    </div>
+
+                    <div class="grid-2" style="margin-bottom:0.75rem;">
+                        <div class="field">
+                            <label>Paciente *</label>
+                            <input type="text" id="rpPaciente" list="dlPacientesRP18" required placeholder="Nombre y Apellido">
+                            <datalist id="dlPacientesRP18">
+                                ${pacientes.map(p => `<option value="${p.nombre} ${p.apellido}">`).join("")}
+                            </datalist>
+                        </div>
+                        <div class="field">
+                            <label>DNI / Obra Social</label>
+                            <input type="text" id="rpDniMutual" placeholder="Ej: DNI 39.111.222 • APROSS">
+                        </div>
+                    </div>
+
+                    <div class="grid-2" style="margin-bottom:0.75rem;">
+                        <div class="field">
+                            <label>Profesional Firmante *</label>
+                            <input type="text" id="rpProfesional" required value="${profesionales[0]?.nombre || "Lic. en Salud / Especialista"}" placeholder="Nombre y Matrícula (MP)">
+                        </div>
+                        <div class="field">
+                            <label>WhatsApp del Paciente</label>
+                            <input type="tel" id="rpTelefono" placeholder="Ej: 3584112233">
+                        </div>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.75rem;">
+                        <label>Diagnóstico Clínico</label>
+                        <input type="text" id="rpDiagnostico" placeholder="Ej: Lumbociatalgia aguda / Tendinopatía rotuliana">
+                    </div>
+
+                    <div class="field" style="margin-bottom:1rem;">
+                        <label>Detalle de Indicaciones / Prescripción (RP/) *</label>
+                        <textarea id="rpCuerpo" rows="5" required placeholder="1) Aplicar frío local 15 min cada 6 hs.&#10;2) Movilidad pélvica suave 3 series de 10 reps sin dolor.&#10;3) Próximo control en 72 hs."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width:100%;">
+                        <i class="ri-printer-line"></i> Guardar y Abrir Documento Oficial
+                    </button>
+                </form>
+            </div>
+
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3><i class="ri-folder-history-line"></i> Historial de Indicaciones y Certificados Emitidos</h3>
+                        <small style="color:var(--ink-500)">Reimprimí en PDF o reenviá por WhatsApp con 1 clic.</small>
+                    </div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.65rem; max-height:460px; overflow-y:auto;">
+                    ${recetas.length === 0 ? `<div class="empty-box">Todavía no emitiste indicaciones o certificados.</div>` : recetas.map(r => `
+                        <div class="clinical-note-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem;">
+                                <span class="badge badge-celeste">${r.tipoDoc}</span>
+                                <small style="font-weight:700; color:var(--ink-500);">📅 ${r.fecha}</small>
+                            </div>
+                            <strong style="font-size:0.96rem; color:var(--ink-900);">👤 ${r.paciente} <small style="color:var(--ink-500);">(${r.dniMutual || "Particular"})</small></strong>
+                            <p style="font-size:0.8rem; color:var(--ink-700); white-space:pre-line; background:var(--surface-solid); padding:0.55rem 0.75rem; border-radius:10px; border:1px solid var(--line);">${r.cuerpo}</p>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                                <small style="color:var(--ink-500);">🩺 Firma: <b>${r.profesional}</b></small>
+                                <div style="display:flex; gap:0.35rem;">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="imprimirRecetaCertificadoPDF18(${r.id})">
+                                        🖨️ Imprimir / PDF
+                                    </button>
+                                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarRecetaPorWhatsApp18(${r.id})">
+                                        <i class="ri-whatsapp-line"></i> WA
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function guardarYEmitirReceta18(e) {
+    e.preventDefault();
+    const proState = obtenerEstadoSuiteProfesionales18();
+    if (!Array.isArray(proState.recetasEmitidas)) proState.recetasEmitidas = [];
+
+    const nueva = {
+        id: Date.now(),
+        tipoDoc: document.getElementById("rpTipoDoc").value,
+        fecha: document.getElementById("rpFecha").value,
+        paciente: document.getElementById("rpPaciente").value.trim(),
+        dniMutual: document.getElementById("rpDniMutual").value.trim(),
+        profesional: document.getElementById("rpProfesional").value.trim(),
+        telefono: document.getElementById("rpTelefono").value.trim(),
+        diagnostico: document.getElementById("rpDiagnostico").value.trim(),
+        cuerpo: document.getElementById("rpCuerpo").value.trim()
+    };
+
+    proState.recetasEmitidas.unshift(nueva);
+    guardarEstadoSuiteProfesionales18(proState);
+    abrirSubherramientaProfesional18("recetario");
+    imprimirRecetaCertificadoPDF18(nueva.id);
+}
+
+function imprimirRecetaCertificadoPDF18(idReceta) {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const r = (proState.recetasEmitidas || []).find(x => Number(x.id) === Number(idReceta));
+    if (!r) return;
+
+    const modal = asegurarModalSuiteProfesionales18();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:740px;">
+            <div class="modal-top no-print-pdf">
+                <h3>🖨️ Vista Previa Oficial A4 — ${r.tipoDoc}</h3>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarRecetaPorWhatsApp18(${r.id})"><i class="ri-whatsapp-line"></i> Enviar WA</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalSuiteProfesionales18()">✕</button>
+                </div>
+            </div>
+
+            <div class="tactical-pdf-sheet" style="padding:2rem;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2.5px solid #0284c7; padding-bottom:1rem; margin-bottom:1.25rem;">
+                    <div>
+                        <span style="font-size:0.72rem; font-weight:800; color:#0284c7; text-transform:uppercase;">DOCUMENTO CLÍNICO OFICIAL</span>
+                        <h2 style="font-size:1.45rem; font-weight:900; color:#0f172a; margin:2px 0;">${r.tipoDoc}</h2>
+                        <small style="color:#475569; font-weight:600;">Profesional: ${r.profesional}</small>
+                    </div>
+                    <div style="text-align:right;">
+                        <strong style="font-size:0.95rem; color:#0f172a; display:block;">Fecha: ${r.fecha}</strong>
+                        <small style="color:#64748b;">Ref. #${String(r.id).slice(-5)}</small>
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:0.9rem 1.1rem; margin-bottom:1.25rem; display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.88rem;">
+                    <div><b>Paciente:</b> ${r.paciente}</div>
+                    <div><b>DNI / Cobertura:</b> ${r.dniMutual || "Particular"}</div>
+                    <div style="grid-column:1/-1;"><b>Diagnóstico / Motivo:</b> ${r.diagnostico || "Evaluación y seguimiento clínico"}</div>
+                </div>
+
+                <div style="min-height:220px; border:1.5px solid #e2e8f0; border-radius:14px; padding:1.25rem; margin-bottom:2rem;">
+                    <strong style="color:#0284c7; font-size:0.9rem; display:block; margin-bottom:0.65rem;">RP / INDICACIONES PROFESIONALES:</strong>
+                    <div style="white-space:pre-line; font-size:0.95rem; line-height:1.65; color:#0f172a;">${r.cuerpo}</div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; padding-top:1.5rem; border-top:1px dashed #cbd5e1;">
+                    <small style="color:#64748b; font-size:0.75rem;">Emitido digitalmente por Plataforma Clínica Oficial</small>
+                    <div style="text-align:center; min-width:220px; border-top:1.5px solid #0f172a; padding-top:0.4rem;">
+                        <strong style="font-size:0.85rem; color:#0f172a; display:block;">${r.profesional}</strong>
+                        <small style="color:#64748b; font-size:0.72rem;">Firma y Sello Profesional</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+}
+
+function enviarRecetaPorWhatsApp18(idReceta) {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const r = (proState.recetasEmitidas || []).find(x => Number(x.id) === Number(idReceta));
+    if (!r) return;
+
+    const tel = normalizarTelefonoPacienteWA18(r.telefono);
+    let msg = `🩺 *${r.tipoDoc.toUpperCase()}*\n`;
+    msg += `📅 *Fecha:* ${r.fecha}\n`;
+    msg += `👤 *Paciente:* ${r.paciente}\n`;
+    msg += `👨‍⚕️ *Profesional:* ${r.profesional}\n`;
+    if (r.diagnostico) msg += `📌 *Diagnóstico:* ${r.diagnostico}\n`;
+    msg += `----------------------------------\n\n`;
+    msg += `*RP / INDICACIONES:*\n${r.cuerpo}\n\n`;
+    msg += `----------------------------------\n_Ante cualquier duda escribinos por este medio._`;
+
+    window.open(tel ? `https://wa.me/${tel}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+}
+
+// =========================================================================
+// 18.5 LISTA DE ESPERA INTELIGENTE ("CUBRE-HUECOS" ANTE CANCELACIONES)
+// =========================================================================
+
+function renderizarPanelListaEspera18() {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const espera = Array.isArray(proState.listaEspera) ? proState.listaEspera : [];
+
+    return `
+        <div class="split-view animate-in">
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3><i class="ri-time-line"></i> Anotar en Lista de Espera</h3>
+                        <small style="color:var(--ink-500)">Para pacientes que buscan sobre-turno o adelantar cita si alguien cancela.</small>
+                    </div>
+                </div>
+                <form onsubmit="guardarPacienteEnListaEspera18(event)">
+                    <div class="field" style="margin-bottom:0.7rem;">
+                        <label>Nombre y Apellido *</label>
+                        <input type="text" id="leNombre" required placeholder="Ej: Valeria Gómez">
+                    </div>
+                    <div class="field" style="margin-bottom:0.7rem;">
+                        <label>WhatsApp *</label>
+                        <input type="tel" id="leTelefono" required placeholder="Ej: 3584223344">
+                    </div>
+                    <div class="grid-2" style="margin-bottom:0.7rem;">
+                        <div class="field">
+                            <label>Especialidad *</label>
+                            <select id="leEspecialidad">
+                                <option value="Quiropraxia">🦴 Quiropraxia</option>
+                                <option value="Kinesiología">🦿 Kinesiología</option>
+                                <option value="Psicología">🧠 Psicología</option>
+                                <option value="Nutrición">🥗 Nutrición</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Prioridad / Urgencia</label>
+                            <select id="lePrioridad">
+                                <option value="Alta (Con dolor agudo)">🔴 Alta (Dolor agudo)</option>
+                                <option value="Media (Adelantar turno)" selected>🟡 Media (Adelantar)</option>
+                                <option value="Flexible">🟢 Flexible</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field" style="margin-bottom:1rem;">
+                        <label>Disponibilidad Horaria Preferida *</label>
+                        <input type="text" id="leDisponibilidad" required placeholder="Ej: Cualquier día después de las 16hs">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">+ Sumar a Lista de Espera</button>
+                </form>
+            </div>
+
+            <div class="app-panel">
+                <div class="panel-head">
+                    <div>
+                        <h3><i class="ri-user-received-2-line"></i> Pacientes Esperando Hueco Libre (${espera.length})</h3>
+                        <small style="color:var(--ink-500)">Tocá "Ofrecer Turno Liberado WA" cuando se desocupe un horario.</small>
+                    </div>
+                </div>
+                ${espera.length === 0 ? `<div class="empty-box">No hay pacientes en lista de espera actualmente.</div>` : `
+                    <div class="table-wrap">
+                        <table class="app-table">
+                            <thead>
+                                <tr>
+                                    <th>Prioridad</th>
+                                    <th>Paciente / WhatsApp</th>
+                                    <th>Especialidad</th>
+                                    <th>Franja Horaria</th>
+                                    <th style="text-align:right;">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${espera.map(item => `
+                                    <tr>
+                                        <td data-label="Prioridad"><span class="badge ${item.prioridad.includes("Alta") ? "badge-danger" : "badge-warn"}">${item.prioridad}</span></td>
+                                        <td data-label="Paciente"><strong>${item.nombre}</strong><br><small>📱 ${item.telefono}</small></td>
+                                        <td data-label="Especialidad">${item.especialidad}</td>
+                                        <td data-label="Franja Horaria"><b>${item.disponibilidad}</b></td>
+                                        <td data-label="Acción" style="text-align:right;">
+                                            <div style="display:flex; gap:0.35rem; justify-content:flex-end;">
+                                                <button type="button" class="btn btn-whatsapp btn-sm" onclick="ofrecerHuecoLibrePorWA18(${item.id})">
+                                                    <i class="ri-whatsapp-line"></i> Ofrecer Hueco WA
+                                                </button>
+                                                <button type="button" class="btn btn-danger btn-sm" onclick="quitarDeListaEspera18(${item.id})">✕</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        </div>
+    `;
+}
+
+function guardarPacienteEnListaEspera18(e) {
+    e.preventDefault();
+    const proState = obtenerEstadoSuiteProfesionales18();
+    if (!Array.isArray(proState.listaEspera)) proState.listaEspera = [];
+
+    proState.listaEspera.unshift({
+        id: Date.now(),
+        nombre: document.getElementById("leNombre").value.trim(),
+        telefono: document.getElementById("leTelefono").value.trim(),
+        especialidad: document.getElementById("leEspecialidad").value,
+        prioridad: document.getElementById("lePrioridad").value,
+        disponibilidad: document.getElementById("leDisponibilidad").value.trim()
+    });
+
+    guardarEstadoSuiteProfesionales18(proState);
+    abrirSubherramientaProfesional18("espera");
+    if (typeof mostrarToast === "function") mostrarToast("⏳ Paciente agregado a la Lista de Espera.");
+}
+
+function ofrecerHuecoLibrePorWA18(idItem) {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const item = (proState.listaEspera || []).find(x => Number(x.id) === Number(idItem));
+    if (!item) return;
+
+    const horarioLibre = prompt(`¿Qué día y horario se acaba de liberar para ofrecerle a ${item.nombre}?`, "Hoy a las 17:30 hs");
+    if (!horarioLibre) return;
+
+    const tel = normalizarTelefonoPacienteWA18(item.telefono);
+    const msg = `Hola *${item.nombre}*, te escribimos del consultorio de *${item.especialidad}*.\n\n` +
+                `⚡ Se acaba de liberar un turno para *${horarioLibre}*. Como estabas en nuestra lista de prioridad, queríamos saber si te queda bien tomarlo. ¡Avisanos por acá para reservártelo!`;
+
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
+}
+
+function quitarDeListaEspera18(idItem) {
+    const proState = obtenerEstadoSuiteProfesionales18();
+    proState.listaEspera = (proState.listaEspera || []).filter(x => Number(x.id) !== Number(idItem));
+    guardarEstadoSuiteProfesionales18(proState);
+    abrirSubherramientaProfesional18("espera");
+}
+
+// =========================================================================
+// 18.6 INYECCIÓN AUTOMÁTICA EN EL MÓDULO DE CONSULTORIO Y ALERTA AL INICIAR
+// =========================================================================
+
+let subherramientaActiva18 = null;
+
+function abrirSubherramientaProfesional18(clave) {
+    subherramientaActiva18 = clave;
+    let host = document.getElementById("contenedorSuiteProExtra18");
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+
+    if (!host && secCons) {
+        host = document.createElement("div");
+        host.id = "contenedorSuiteProExtra18";
+        host.style.marginTop = "1rem";
+        secCons.appendChild(host);
+    }
+    if (!host) return;
+
+    document.querySelectorAll(".btn-pro-tool-18").forEach(b => {
+        b.classList.toggle("active", b.dataset.tool18 === clave);
+    });
+
+    if (clave === "cerrar") {
+        host.innerHTML = "";
+        subherramientaActiva18 = null;
+        return;
+    }
+
+    if (clave === "packs") {
+        host.innerHTML = renderizarPanelPacksSesiones18();
+    } else if (clave === "recetario") {
+        host.innerHTML = renderizarPanelRecetarioYCertificados18();
+    } else if (clave === "espera") {
+        host.innerHTML = renderizarPanelListaEspera18();
+    }
+    host.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function inyectarBarraAlarma24hYHerramientasEnConsultorio18() {
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+    if (!secCons) return;
+
+    const resumen24h = obtenerTurnosProximas24Horas18();
+    const cantPend = resumen24h.pendientesAviso.length;
+
+    let banner = document.getElementById("bannerAlarma24hConsultorio18");
+    if (!banner) {
+        banner = document.createElement("div");
+        banner.id = "bannerAlarma24hConsultorio18";
+        const primerHijo = secCons.firstElementChild;
+        if (primerHijo && primerHijo.nextSibling) {
+            secCons.insertBefore(banner, primerHijo.nextSibling);
+        } else {
+            secCons.prepend(banner);
+        }
+    }
+
+    banner.innerHTML = `
+        <div style="background:${cantPend > 0 ? "linear-gradient(135deg, #7c2d12 0%, #b45309 60%, #d97706 100%)" : "linear-gradient(135deg, #064e3b 0%, #047857 100%)"}; color:#ffffff; border-radius:18px; padding:0.95rem 1.25rem; margin-bottom:1.15rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; box-shadow:var(--shadow-card);">
+            <div style="display:flex; align-items:center; gap:0.85rem;">
+                <div style="width:46px; height:46px; border-radius:13px; background:rgba(255,255,255,0.18); display:flex; align-items:center; justify-content:center; font-size:1.45rem;">
+                    ${cantPend > 0 ? "🔔" : "✅"}
+                </div>
+                <div>
+                    <span class="badge" style="background:rgba(255,255,255,0.22); color:#fff; font-size:0.66rem;">
+                        ALARMA AUTOMÁTICA DE TURNOS A 24 HORAS
+                    </span>
+                    <h4 style="font-size:1.02rem; font-weight:800; color:#ffffff; margin:2px 0 0 0;">
+                        ${cantPend > 0
+                            ? `Tenés ${cantPend} paciente(s) con turno en las próximas 24hs pendientes de recordatorio`
+                            : `Todos los pacientes de las próximas 24hs (${resumen24h.yaAvisados.length}) ya fueron notificados`}
+                    </h4>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap; align-items:center;">
+                <button type="button" class="btn btn-sm" style="background:#ffffff; color:#0f172a; font-weight:800;" onclick="abrirCentralAlarmas24HorasModal18()">
+                    🔔 Abrir Alarma 24hs (${resumen24h.todos24h.length})
+                </button>
+                <button type="button" class="btn btn-sm btn-pro-tool-18" data-tool18="packs" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.3);" onclick="abrirSubherramientaProfesional18('packs')">
+                    🎟️ Packs de Sesiones
+                </button>
+                <button type="button" class="btn btn-sm btn-pro-tool-18" data-tool18="recetario" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.3);" onclick="abrirSubherramientaProfesional18('recetario')">
+                    📄 Recetario RP / Certificados
+                </button>
+                <button type="button" class="btn btn-sm btn-pro-tool-18" data-tool18="espera" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.3);" onclick="abrirSubherramientaProfesional18('espera')">
+                    ⏳ Lista de Espera
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function refrescarInterfazSuiteProfesionales18() {
+    inyectarBarraAlarma24hYHerramientasEnConsultorio18();
+    if (typeof renderizarVistaConsultorioActivaCDM === "function") {
+        renderizarVistaConsultorioActivaCDM();
+    }
+    const modal = document.getElementById("modalSuiteProfesionales18");
+    if (modal && !modal.classList.contains("hidden") && abrirCentralAlarmas24HorasModal18.abierto) {
+        abrirCentralAlarmas24HorasModal18();
+    }
+}
+
+// Verificar automáticamente al entrar si hay turnos para mañana (24hs) sin avisar y mostrar aviso
+function verificarAlarmaAutomatica24HorasAlIniciar18() {
+    if (document.body.getAttribute("data-rol") === "usuario") return;
+    const resumen = obtenerTurnosProximas24Horas18();
+    if (resumen.pendientesAviso.length > 0 && !window.__cdmAlarma24hNotificadaHoy) {
+        window.__cdmAlarma24hNotificadaHoy = true;
+        emitirSonidoAlarma24h18();
+        if (typeof mostrarToast === "function") {
+            mostrarToast(`🔔 Alarma 24hs: Hay ${resumen.pendientesAviso.length} turno(s) próximos para recordar por WhatsApp.`);
+        }
+    }
+}
+
+const _obsConsultorioPro18 = new MutationObserver(() => {
+    if (document.getElementById("cdmSeccionConsultorioGlobal") && !document.getElementById("bannerAlarma24hConsultorio18")) {
+        inyectarBarraAlarma24hYHerramientasEnConsultorio18();
+    }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (document.body) {
+        _obsConsultorioPro18.observe(document.body, { childList: true, subtree: true });
+    }
+    setTimeout(() => {
+        inyectarBarraAlarma24hYHerramientasEnConsultorio18();
+        verificarAlarmaAutomatica24HorasAlIniciar18();
+    }, 650);
+});
+// =========================================================================
+// 19. PORTAL DEL PACIENTE Y CÓDIGO ÚNICO (PAC-XXXX) — VERSIÓN OPTIMIZADA
+//     SIN BUCLE DE MUTATIONOBSERVER NI ESCANEO PESADO DE LOCALSTORAGE
+// Pegar al final de app.js (reemplazando el Apartado 19 anterior)
+// =========================================================================
+
+const STORAGE_REGISTRO_PACIENTES_19 = "cdm_registro_universal_pacientes_v19";
+const CDM_IDB_ESTUDIOS_NAME_19 = "cdm_estudios_clinicos_db_v19";
+const CDM_IDB_ESTUDIOS_STORE_19 = "archivos_estudios";
+
+let _cacheMapaUniversalPacientes19 = null;
+let _timerDebouncePacientes19 = null;
+let _inyectandoDOM19 = false;
+
+function abrirBaseDatosEstudiosIDB19() {
+    return new Promise((resolve, reject) => {
+        if (!window.indexedDB) return reject(new Error("IndexedDB no disponible"));
+        const req = indexedDB.open(CDM_IDB_ESTUDIOS_NAME_19, 1);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(CDM_IDB_ESTUDIOS_STORE_19)) {
+                db.createObjectStore(CDM_IDB_ESTUDIOS_STORE_19, { keyPath: "id" });
+            }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function guardarArchivoEstudioEnIDB19(claveId, fileObj, dataUrlFallback = "") {
+    try {
+        const db = await abrirBaseDatosEstudiosIDB19();
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(CDM_IDB_ESTUDIOS_STORE_19, "readwrite");
+            tx.objectStore(CDM_IDB_ESTUDIOS_STORE_19).put({
+                id: claveId,
+                blob: fileObj,
+                dataUrl: dataUrlFallback,
+                nombreArchivo: fileObj.name || "estudio_clinico.pdf",
+                tipoMime: fileObj.type || "application/pdf",
+                fechaISO: new Date().toISOString()
+            });
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = (e) => reject(e.target.error);
+        });
+    } catch {
+        return false;
+    }
+}
+
+async function obtenerArchivoEstudioDesdeIDB19(claveId) {
+    try {
+        const db = await abrirBaseDatosEstudiosIDB19();
+        return await new Promise((resolve) => {
+            const req = db.transaction(CDM_IDB_ESTUDIOS_STORE_19, "readonly").objectStore(CDM_IDB_ESTUDIOS_STORE_19).get(claveId);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        });
+    } catch {
+        return null;
+    }
+}
+
+async function eliminarArchivoEstudioDesdeIDB19(claveId) {
+    if (!claveId) return;
+    try {
+        const db = await abrirBaseDatosEstudiosIDB19();
+        db.transaction(CDM_IDB_ESTUDIOS_STORE_19, "readwrite").objectStore(CDM_IDB_ESTUDIOS_STORE_19).delete(claveId);
+    } catch {}
+}
+
+function leerArchivoComoDataURL19(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+    });
+}
+
+// =========================================================================
+// 19.1 CACHÉ RÁPIDA EN MEMORIA (CERO BLOQUEO DEL NAVEGADOR)
+// =========================================================================
+
+function obtenerMapaUniversalPacientes19() {
+    if (_cacheMapaUniversalPacientes19) return _cacheMapaUniversalPacientes19;
+    try {
+        _cacheMapaUniversalPacientes19 = JSON.parse(localStorage.getItem(STORAGE_REGISTRO_PACIENTES_19) || "{}");
+    } catch {
+        _cacheMapaUniversalPacientes19 = {};
+    }
+    return _cacheMapaUniversalPacientes19;
+}
+
+function guardarMapaUniversalPacientes19(mapa) {
+    _cacheMapaUniversalPacientes19 = mapa;
+    localStorage.setItem(STORAGE_REGISTRO_PACIENTES_19, JSON.stringify(mapa));
+}
+
+function generarCodigoUnicoPaciente19(mapaActual = {}) {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let sufijo = "";
+    for (let i = 0; i < 4; i++) {
+        sufijo += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    let sigla = "PAC";
+    try {
+        const lic = JSON.parse(localStorage.getItem("cdm_licencia_config_v1") || "null");
+        if (lic && lic.siglaCodigo) sigla = String(lic.siglaCodigo).toUpperCase();
+    } catch {}
+    const codigo = `${sigla}-${sufijo}`;
+    const existentes = Object.values(mapaActual).map(x => x?.codigoAcceso);
+    if (existentes.includes(codigo)) return generarCodigoUnicoPaciente19(mapaActual);
+    return codigo;
+}
+
+function asegurarFichaUniversalPaciente19({ id, nombreCompleto, dni, especialidad, mutual, diagnostico, telefono }) {
+    const mapa = obtenerMapaUniversalPacientes19();
+    const dniSoloNumeros = String(dni || "").replace(/\D/g, "");
+    const clave = id
+        ? `id_${id}`
+        : (dniSoloNumeros ? `dni_${dniSoloNumeros}` : `nom_${String(nombreCompleto).toLowerCase().replace(/[^a-z0-9]/g, "")}`);
+
+    let existente = mapa[clave];
+    if (!existente && dniSoloNumeros) {
+        existente = Object.values(mapa).find(x => String(x.dni || "").replace(/\D/g, "") === dniSoloNumeros);
+    }
+
+    let cambiado = false;
+    if (!existente) {
+        existente = {
+            clave,
+            id: id || Date.now(),
+            codigoAcceso: generarCodigoUnicoPaciente19(mapa),
+            nombreCompleto: nombreCompleto || "Paciente",
+            dni: dni || "",
+            telefono: telefono || "",
+            especialidad: especialidad || "Consultorio",
+            mutual: mutual || "Particular",
+            diagnostico: diagnostico || "",
+            estudiosClinicos: [],
+            claveClub: localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal"
+        };
+        mapa[existente.clave] = existente;
+        cambiado = true;
+    } else {
+        if (nombreCompleto && existente.nombreCompleto !== nombreCompleto) {
+            existente.nombreCompleto = nombreCompleto;
+            cambiado = true;
+        }
+        if (dni && !existente.dni) {
+            existente.dni = dni;
+            cambiado = true;
+        }
+    }
+
+    if (cambiado) {
+        guardarMapaUniversalPacientes19(mapa);
+    }
+    return existente;
+}
+
+function obtenerPacienteUniversalPorClave19(clave) {
+    const mapa = obtenerMapaUniversalPacientes19();
+    if (mapa[clave]) return mapa[clave];
+    return Object.values(mapa).find(x => String(x.id) === String(clave) || x.clave === clave || x.codigoAcceso === clave) || null;
+}
+
+// =========================================================================
+// 19.2 ESTAMPADO SEGURO EN TARJETAS (.patient-quick-card) — 1 SOLA VEZ POR TARJETA
+// =========================================================================
+
+function extraerDatosDeTarjetaDOM19(card) {
+    const h4 = card.querySelector(".patient-quick-info h4") || card.querySelector("h4");
+    const smallInfo = card.querySelector(".patient-quick-info small") || card.querySelector("small");
+    const diagEl = card.querySelector(".patient-quick-diag");
+
+    const nombreCompleto = (h4?.innerText || "Paciente").trim();
+    const textoSub = (smallInfo?.innerText || "").trim();
+    const matchDni = textoSub.match(/DNI\s*([\d.]+)/i);
+    const dni = matchDni ? matchDni[1].trim() : "";
+
+    let idExtraido = null;
+    card.querySelectorAll("button[onclick]").forEach(btn => {
+        if (idExtraido) return;
+        const attr = btn.getAttribute("onclick") || "";
+        const m = attr.match(/\((\d+)/);
+        if (m && m[1]) idExtraido = m[1];
+    });
+
+    const badges = Array.from(card.querySelectorAll(".badge:not(.badge-codigo-paciente-19)")).map(b => (b.innerText || "").trim());
+    const especialidad = badges[0] || "Consultorio";
+    const mutual = badges.find(b => b.includes("Particular") || b.includes("Mutual") || b.includes("APROSS") || b.includes("OSDE")) || "Particular";
+    const diagnostico = (diagEl?.innerText || "").replace(/^🩺\s*/, "").trim();
+
+    return asegurarFichaUniversalPaciente19({
+        id: idExtraido,
+        nombreCompleto,
+        dni,
+        especialidad,
+        mutual,
+        diagnostico
+    });
+}
+
+function inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(forzarRefresco = false) {
+    if (_inyectandoDOM19) return;
+    _inyectandoDOM19 = true;
+
+    try {
+        const tarjetas = document.querySelectorAll(".patient-quick-card");
+        tarjetas.forEach(card => {
+            if (card.closest("#contenedorPortalClinicoPaciente19")) return;
+
+            // FRENO ANTI-TILDE: Si la tarjeta ya fue procesada y no pedimos refresco manual, salir de inmediato
+            if (card.dataset.codigo19Listo === "1" && !forzarRefresco) return;
+
+            const ficha = extraerDatosDeTarjetaDOM19(card);
+            if (!ficha) return;
+
+            card.dataset.codigo19Listo = "1";
+            const cantEstudios = Array.isArray(ficha.estudiosClinicos) ? ficha.estudiosClinicos.length : 0;
+
+            // A) Píldora del Código Personal
+            let badgeCod = card.querySelector(".badge-codigo-paciente-19");
+            if (!badgeCod) {
+                const primerBadge = card.querySelector(".badge");
+                const contenedorBadges = primerBadge ? primerBadge.parentElement : null;
+                if (contenedorBadges) {
+                    badgeCod = document.createElement("span");
+                    badgeCod.className = "badge badge-purple badge-codigo-paciente-19";
+                    badgeCod.style = "font-size:0.74rem; font-weight:800; cursor:pointer; border:1.5px solid rgba(99,102,241,0.45);";
+                    badgeCod.title = "Tocá para copiar el código del paciente";
+                    badgeCod.onclick = (e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(ficha.codigoAcceso);
+                        if (typeof mostrarToast === "function") {
+                            mostrarToast(`📋 Código copiado: ${ficha.codigoAcceso}`);
+                        }
+                    };
+                    contenedorBadges.appendChild(badgeCod);
+                }
+            }
+            if (badgeCod) {
+                const textoNuevo = `🔑 CÓDIGO: ${ficha.codigoAcceso}`;
+                if (badgeCod.textContent !== textoNuevo) badgeCod.textContent = textoNuevo;
+            }
+
+            // B) Barra inferior de Estudios y Envío de Código por WhatsApp
+            let barraEst = card.querySelector(".patient-card-portal-bar-19");
+            if (!barraEst) {
+                barraEst = document.createElement("div");
+                barraEst.className = "patient-card-portal-bar-19";
+                barraEst.style = "display:flex; gap:0.35rem; flex-wrap:wrap; padding-top:0.55rem; margin-top:0.2rem; border-top:1px dashed var(--line-strong);";
+                barraEst.onclick = (e) => e.stopPropagation();
+                card.appendChild(barraEst);
+            }
+
+            barraEst.innerHTML = `
+                <button type="button" class="btn btn-secondary btn-sm" style="flex:1; font-size:0.73rem; padding:0.32rem 0.5rem;" onclick="abrirModalGestionEstudiosDePaciente19('${ficha.clave}')">
+                    📎 Estudios (${cantEstudios})
+                </button>
+                <button type="button" class="btn btn-whatsapp btn-sm" style="font-size:0.73rem; padding:0.32rem 0.6rem;" onclick="enviarCodigoPacientePorWA19('${ficha.clave}')" title="Enviar código ${ficha.codigoAcceso} por WhatsApp">
+                    <i class="ri-whatsapp-line"></i> Código WA
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.73rem; padding:0.32rem 0.55rem;" onclick="abrirVistaPortalPaciente19('${ficha.clave}')" title="Ver portal de descargas del paciente">
+                    👁️ Portal
+                </button>
+            `;
+        });
+    } finally {
+        _inyectandoDOM19 = false;
+    }
+}
+
+// =========================================================================
+// 19.3 MODAL PARA SUBIR, VER Y DESCARGAR ESTUDIOS DEL PACIENTE
+// =========================================================================
+
+let archivoEstudioTempPac19 = null;
+
+function seleccionarArchivoEstudioDirecto19(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    archivoEstudioTempPac19 = file;
+    const kb = Math.round(file.size / 1024);
+    const lbl = document.getElementById("lblArchivoSeleccionadoPac19");
+    if (lbl) {
+        lbl.innerHTML = `<span class="badge badge-ok">✓ Archivo seleccionado: ${file.name} (${kb > 1024 ? (kb / 1024).toFixed(1) + " MB" : kb + " KB"})</span>`;
+    }
+}
+
+function abrirModalGestionEstudiosDePaciente19(clavePaciente) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha) return;
+
+    archivoEstudioTempPac19 = null;
+    const modal = asegurarModalSuiteProfesionales18();
+    const hoy = new Date().toISOString().split("T")[0];
+    const estudios = Array.isArray(ficha.estudiosClinicos) ? ficha.estudiosClinicos : [];
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:740px;">
+            <div class="modal-top">
+                <div>
+                    <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                        <span class="badge badge-purple" style="font-size:0.8rem;">🔑 CÓDIGO: ${ficha.codigoAcceso}</span>
+                        <span class="badge badge-celeste">${ficha.especialidad}</span>
+                    </div>
+                    <h3 style="color:var(--ink-900); margin-top:5px;">📎 Estudios y Archivos de ${ficha.nombreCompleto}</h3>
+                </div>
+                <div style="display:flex; gap:0.35rem;">
+                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarCodigoPacientePorWA19('${ficha.clave}')">
+                        <i class="ri-whatsapp-line"></i> Enviar Código WA
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalSuiteProfesionales18()">✕</button>
+                </div>
+            </div>
+
+            <form onsubmit="guardarEstudioEnFichaUniversal19(event, '${ficha.clave}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-celeste); border-radius:16px; padding:1rem; margin-bottom:1.1rem;">
+                <strong style="font-size:0.84rem; color:var(--cdm-700); display:block; margin-bottom:0.65rem;">
+                    ➕ CARGAR NUEVO ESTUDIO, INFORME, TEST O ARCHIVO PARA ESTE PACIENTE:
+                </strong>
+                <div class="grid-3" style="margin-bottom:0.65rem;">
+                    <div class="field">
+                        <label>Tipo de Estudio / Documento *</label>
+                        <select id="upEstCategoria19" required>
+                            <option value="🧠 Informe / Test / Material Psicología">🧠 Informe / Test / Material Psicología</option>
+                            <option value="🩻 Radiografía / Resonancia / Ecografía">🩻 Radiografía / Resonancia / Ecografía</option>
+                            <option value="🩸 Análisis de Laboratorio">🩸 Análisis de Laboratorio</option>
+                            <option value="🥗 Plan Nutricional / Antropometría">🥗 Plan Nutricional / Antropometría</option>
+                            <option value="🦿 Guía de Ejercicios / Kinesiología">🦿 Guía de Ejercicios / Kinesiología</option>
+                            <option value="📄 Certificado / Otro Documento">📄 Certificado / Otro Documento</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Título del Estudio *</label>
+                        <input type="text" id="upEstTitulo19" required placeholder="Ej: Informe Evolución / Guía / Rx">
+                    </div>
+                    <div class="field">
+                        <label>Fecha *</label>
+                        <input type="date" id="upEstFecha19" required value="${hoy}">
+                    </div>
+                </div>
+
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap; background:var(--surface-solid); border:1.5px dashed var(--line-celeste); border-radius:12px; padding:0.65rem 0.9rem; margin-bottom:0.65rem;">
+                    <div id="lblArchivoSeleccionadoPac19">
+                        <small style="color:var(--ink-500); font-weight:600;">📎 Seleccioná un PDF, Foto, Word o Excel de tu PC/Celular:</small>
+                    </div>
+                    <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                        <i class="ri-upload-cloud-2-line"></i> Elegir Archivo
+                        <input type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" onchange="seleccionarArchivoEstudioDirecto19(event)" style="display:none;">
+                    </label>
+                </div>
+
+                <div class="grid-2" style="margin-bottom:0.75rem;">
+                    <div class="field">
+                        <label>Indicación o Nota para el Paciente</label>
+                        <input type="text" id="upEstNotas19" placeholder="Ej: Descargá este material para trabajar en la semana...">
+                    </div>
+                    <div class="field">
+                        <label>O Link Externo (Drive / Laboratorio)</label>
+                        <input type="url" id="upEstLink19" placeholder="https://...">
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end;">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="ri-save-3-line"></i> Subir al Portal de ${ficha.nombreCompleto}
+                    </button>
+                </div>
+            </form>
+
+            <h4 style="font-size:0.9rem; font-weight:800; color:var(--ink-900); margin-bottom:0.55rem;">
+                📂 Archivos disponibles en el portal de ${ficha.nombreCompleto} (${estudios.length}):
+            </h4>
+            <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:260px; overflow-y:auto;">
+                ${estudios.length === 0
+                    ? `<div class="empty-box" style="padding:1.2rem;">Todavía no le cargaste estudios a ${ficha.nombreCompleto}.</div>`
+                    : estudios.map(est => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap; background:var(--surface-solid); border:1px solid var(--line-strong); border-radius:12px; padding:0.7rem 0.9rem;">
+                            <div style="min-width:0; flex:1;">
+                                <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                                    <span class="badge badge-celeste" style="font-size:0.65rem;">${est.categoria}</span>
+                                    <small style="color:var(--ink-500); font-weight:700;">📅 ${est.fecha}</small>
+                                </div>
+                                <strong style="font-size:0.92rem; color:var(--ink-900); display:block; margin-top:2px;">${est.titulo}</strong>
+                                ${est.notas ? `<small style="color:var(--ink-500); display:block;">💬 ${est.notas}</small>` : ""}
+                            </div>
+                            <div style="display:flex; gap:0.35rem;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="verODescargarArchivoUniversal19('${ficha.clave}', ${est.id}, 'ver')">
+                                    👁️ Ver
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="verODescargarArchivoUniversal19('${ficha.clave}', ${est.id}, 'descargar')">
+                                    📥 Descargar
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="borrarEstudioUniversal19('${ficha.clave}', ${est.id})">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    `).join("")}
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+}
+
+async function guardarEstudioEnFichaUniversal19(e, clavePaciente) {
+    e.preventDefault();
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+
+    const idEst = Date.now();
+    const claveIDB = `est_univ_${ficha.clave}_${idEst}`;
+    let tieneArchivoLocal = false;
+    let nombreArchivo = "";
+    let tipoMime = "";
+    let dataUrlCompacto = "";
+
+    if (archivoEstudioTempPac19) {
+        tieneArchivoLocal = true;
+        nombreArchivo = archivoEstudioTempPac19.name;
+        tipoMime = archivoEstudioTempPac19.type || "application/octet-stream";
+        if (archivoEstudioTempPac19.size <= 1850000) {
+            dataUrlCompacto = await leerArchivoComoDataURL19(archivoEstudioTempPac19);
+        }
+        await guardarArchivoEstudioEnIDB19(claveIDB, archivoEstudioTempPac19, dataUrlCompacto);
+    }
+
+    const linkExt = (document.getElementById("upEstLink19")?.value || "").trim();
+    const notasTxt = (document.getElementById("upEstNotas19")?.value || "").trim();
+
+    if (!tieneArchivoLocal && !linkExt && !notasTxt) {
+        alert("Seleccioná un archivo para subir, pegá un link o escribí una indicación.");
+        return;
+    }
+
+    if (!Array.isArray(ficha.estudiosClinicos)) ficha.estudiosClinicos = [];
+    ficha.estudiosClinicos.unshift({
+        id: idEst,
+        claveIDB: tieneArchivoLocal ? claveIDB : null,
+        tieneArchivoLocal,
+        nombreArchivo,
+        tipoMime,
+        dataUrlCompacto,
+        linkExterno: linkExt,
+        categoria: document.getElementById("upEstCategoria19").value,
+        titulo: document.getElementById("upEstTitulo19").value.trim(),
+        fecha: document.getElementById("upEstFecha19").value,
+        notas: notasTxt
+    });
+
+    archivoEstudioTempPac19 = null;
+    guardarMapaUniversalPacientes19(mapa);
+    inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(true);
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`✅ Estudio guardado en el portal de ${ficha.nombreCompleto}.`);
+    }
+    abrirModalGestionEstudiosDePaciente19(ficha.clave);
+}
+
+async function verODescargarArchivoUniversal19(clavePaciente, idEstudio, modo = "descargar") {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha || !Array.isArray(ficha.estudiosClinicos)) return;
+
+    const est = ficha.estudiosClinicos.find(x => Number(x.id) === Number(idEstudio));
+    if (!est) return;
+
+    let urlArchivo = est.dataUrlCompacto || "";
+    let nombreDescarga = est.nombreArchivo || `${est.titulo.replace(/[^a-z0-9]/gi, "_")}.pdf`;
+
+    if (est.claveIDB) {
+        const reg = await obtenerArchivoEstudioDesdeIDB19(est.claveIDB);
+        if (reg && reg.blob) {
+            urlArchivo = URL.createObjectURL(reg.blob);
+            nombreDescarga = reg.nombreArchivo || nombreDescarga;
+        } else if (reg && reg.dataUrl) {
+            urlArchivo = reg.dataUrl;
+        }
+    }
+
+    if (!urlArchivo && est.linkExterno) {
+        window.open(est.linkExterno, "_blank");
+        return;
+    }
+
+    if (!urlArchivo) {
+        alert(`Informe de "${est.titulo}":\n\n${est.notas || "Sin archivo adjunto."}`);
+        return;
+    }
+
+    if (modo === "ver") {
+        const modal = asegurarModalSuiteProfesionales18();
+        const esImg = (est.tipoMime || "").startsWith("image/") || /\.(jpg|jpeg|png|webp|gif)$/i.test(nombreDescarga);
+        const esPdf = (est.tipoMime || "").includes("pdf") || /\.pdf$/i.test(nombreDescarga);
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:850px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">${est.categoria} • 📅 ${est.fecha}</span>
+                        <h3 style="color:var(--ink-900); margin-top:4px;">🔬 ${est.titulo}</h3>
+                    </div>
+                    <div style="display:flex; gap:0.4rem;">
+                        <a href="${urlArchivo}" download="${nombreDescarga}" class="btn btn-primary btn-sm usr-action-allow">
+                            📥 Descargar Archivo
+                        </a>
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalSuiteProfesionales18()">✕</button>
+                    </div>
+                </div>
+                <div style="background:#0f172a; border-radius:16px; padding:0.75rem; text-align:center; min-height:360px; display:flex; align-items:center; justify-content:center;">
+                    ${esImg
+                        ? `<img src="${urlArchivo}" style="max-width:100%; max-height:65vh; border-radius:10px; object-fit:contain;">`
+                        : (esPdf
+                            ? `<iframe src="${urlArchivo}" style="width:100%; height:65vh; border:none; border-radius:10px; background:#fff;"></iframe>`
+                            : `<div style="color:#fff; padding:2rem;">
+                                   <p style="margin-bottom:1rem;">Archivo listo: <b>${nombreDescarga}</b></p>
+                                   <a href="${urlArchivo}" download="${nombreDescarga}" class="btn btn-primary usr-action-allow">📥 Descargar Ahora</a>
+                               </div>`)}
+                </div>
+                ${est.notas ? `<div style="margin-top:0.85rem; background:var(--cdm-50); border-left:4px solid var(--cdm-500); padding:0.75rem 1rem; border-radius:10px; font-size:0.85rem;"><b>💬 Indicación:</b> ${est.notas}</div>` : ""}
+            </div>
+        `;
+        modal.classList.remove("hidden");
+        return;
+    }
+
+    const a = document.createElement("a");
+    a.href = urlArchivo;
+    a.download = nombreDescarga;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+async function borrarEstudioUniversal19(clavePaciente, idEstudio) {
+    if (!confirm("🗑️ ¿Eliminar este estudio del portal del paciente?")) return;
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha || !Array.isArray(ficha.estudiosClinicos)) return;
+
+    const est = ficha.estudiosClinicos.find(x => Number(x.id) === Number(idEstudio));
+    if (est?.claveIDB) await eliminarArchivoEstudioDesdeIDB19(est.claveIDB);
+
+    ficha.estudiosClinicos = ficha.estudiosClinicos.filter(x => Number(x.id) !== Number(idEstudio));
+    guardarMapaUniversalPacientes19(mapa);
+    inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(true);
+    abrirModalGestionEstudiosDePaciente19(ficha.clave);
+}
+
+function enviarCodigoPacientePorWA19(clavePaciente) {
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+
+    let tel = normalizarTelefonoPacienteWA18(ficha.telefono);
+    if (!tel) {
+        const inp = prompt(`📱 Ingresá el WhatsApp de ${ficha.nombreCompleto} (ej: 3584112233):`, "");
+        if (!inp) return;
+        ficha.telefono = inp.trim();
+        guardarMapaUniversalPacientes19(mapa);
+        tel = normalizarTelefonoPacienteWA18(inp);
+    }
+
+    const cant = Array.isArray(ficha.estudiosClinicos) ? ficha.estudiosClinicos.length : 0;
+    let msg = `🩺 *CREDENCIAL DE PACIENTE — PORTAL DE ESTUDIOS Y TURNOS*\n`;
+    msg += `----------------------------------\n`;
+    msg += `Hola *${ficha.nombreCompleto}*, acá tenés tu código personal para entrar a tu Portal de Paciente:\n\n`;
+    msg += `🔑 *TU CÓDIGO PERSONAL:* *${ficha.codigoAcceso}*\n\n`;
+    msg += `📥 *Con tu código podés:*\n`;
+    msg += `• Ver y descargar tus *Estudios, Informes y Planes* (${cant} disponibles).\n`;
+    msg += `• Descargar tus *Indicaciones (RP/) y Certificados* en PDF.\n`;
+    msg += `----------------------------------\n`;
+    msg += `_Al abrir la plataforma, elegí "Deportista / Socio / Paciente" e ingresá el código ${ficha.codigoAcceso}._`;
+
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
+}
+
+function abrirVistaPortalPaciente19(clavePaciente) {
+    window.location.href = `jugador.html?pac=${encodeURIComponent(clavePaciente)}&modo=paciente`;
+}
+
+// =========================================================================
+// 19.4 PORTAL PRIVADO DEL PACIENTE EN JUGADOR.HTML
+// =========================================================================
+
+function renderizarPortalPacienteUniversalEnJugadorHTML19(claveOPacId) {
+    const ficha = obtenerPacienteUniversalPorClave19(claveOPacId);
+    if (!ficha) return false;
+
+    document.getElementById("cdmAntiCaptureShield")?.remove();
+    document.getElementById("cdmWatermarkOverlay")?.remove();
+    document.body.setAttribute("data-modo-portal", "paciente");
+
+    const subHeader = document.getElementById("subtituloHeaderJugador");
+    if (subHeader) subHeader.innerText = `Portal Clínico del Paciente • ${ficha.nombreCompleto}`;
+
+    const cabecera = document.getElementById("fichaCabeceraJugador");
+    const esAdmin = document.body.getAttribute("data-rol") === "admin";
+
+    if (cabecera) {
+        cabecera.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                <div style="display:flex; align-items:center; gap:1rem;">
+                    <div class="ath-avatar" style="width:66px; height:66px; font-size:1.35rem; background:linear-gradient(135deg, #10b981 0%, #0369a1 100%);">
+                        <span>🩺</span>
+                    </div>
+                    <div>
+                        <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.25rem;">
+                            <span class="badge badge-ok">🩺 PORTAL PRIVADO DEL PACIENTE</span>
+                            <span class="badge badge-celeste">🔑 Código: ${ficha.codigoAcceso}</span>
+                            <span class="badge badge-celeste">${ficha.especialidad} • ${ficha.mutual}</span>
+                        </div>
+                        <h2 style="font-size:1.4rem; font-weight:900; color:#ffffff;">${ficha.nombreCompleto}</h2>
+                        <small style="color:#e0f2fe; font-weight:600;">
+                            DNI ${ficha.dni || "-"} • Diagnóstico / Motivo: ${ficha.diagnostico || "Seguimiento clínico"}
+                        </small>
+                    </div>
+                </div>
+                <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                    ${esAdmin ? `
+                        <a href="index.html" class="btn btn-secondary btn-sm usr-action-allow">← Volver al Consultorio</a>
+                        <button type="button" class="btn btn-primary btn-sm usr-action-allow" onclick="abrirModalGestionEstudiosDePaciente19('${ficha.clave}')">
+                            + Subirle Estudio / PDF
+                        </button>
+                    ` : ""}
+                </div>
+            </div>
+        `;
+    }
+
+    const estudios = Array.isArray(ficha.estudiosClinicos) ? ficha.estudiosClinicos : [];
+    const proState = obtenerEstadoSuiteProfesionales18();
+    const partesNom = String(ficha.nombreCompleto || "").toLowerCase().split(/[,\s]+/).filter(Boolean);
+
+    const misRecetas = (proState.recetasEmitidas || []).filter(r => {
+        const pTxt = String(r.paciente || "").toLowerCase();
+        return partesNom.length > 0 && partesNom.every(part => pTxt.includes(part));
+    });
+
+    document.querySelectorAll(".jug-seccion").forEach(s => s.classList.add("hidden"));
+    const tabsBar = document.querySelector(".module-tabs");
+    if (tabsBar) {
+        tabsBar.innerHTML = `
+            <button type="button" class="mod-tab active">
+                <i class="ri-folder-download-fill"></i><span>Mis Estudios y Archivos (${estudios.length})</span>
+            </button>
+            <button type="button" class="mod-tab" onclick="document.getElementById('secPacRecetasUniv19')?.scrollIntoView({behavior:'smooth'})">
+                <i class="ri-file-text-fill"></i><span>Mis Indicaciones y Certificados (${misRecetas.length})</span>
+            </button>
+        `;
+    }
+
+    const main = document.querySelector(".app-content");
+    let portalBox = document.getElementById("contenedorPortalClinicoPaciente19");
+    if (!portalBox && main) {
+        portalBox = document.createElement("div");
+        portalBox.id = "contenedorPortalClinicoPaciente19";
+        main.appendChild(portalBox);
+    }
+    if (!portalBox) return true;
+
+    portalBox.innerHTML = `
+        <div class="app-panel animate-in">
+            <div class="panel-head">
+                <div>
+                    <h3><i class="ri-folder-download-line"></i> Mis Estudios, Informes y Material para Descargar</h3>
+                    <small style="color:var(--ink-500)">Tocá <b>"👁️ Ver en Pantalla"</b> o <b>"📥 Descargar"</b> para guardar el archivo en tu dispositivo.</small>
+                </div>
+            </div>
+            ${estudios.length === 0
+                ? `<div class="empty-box">Todavía no tenés estudios ni archivos cargados por tu profesional.</div>`
+                : `<div class="patients-quick-grid">
+                    ${estudios.map(est => `
+                        <div class="patient-quick-card" data-codigo19-listo="1" style="cursor:default; border-top-color:var(--cdm-500);">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span class="badge badge-celeste">${est.categoria}</span>
+                                <small style="font-weight:700; color:var(--ink-500);">📅 ${est.fecha}</small>
+                            </div>
+                            <h4 style="font-size:1.06rem; font-weight:800; color:var(--ink-900); margin:4px 0;">${est.titulo}</h4>
+                            ${est.notas ? `<div style="background:var(--surface-subtle); border:1px solid var(--line); padding:0.6rem 0.75rem; border-radius:10px; font-size:0.82rem; color:var(--ink-700);">💬 ${est.notas}</div>` : ""}
+                            <div class="patient-quick-footer" style="gap:0.4rem;">
+                                <button type="button" class="btn btn-secondary btn-sm usr-action-allow" style="flex:1;" onclick="verODescargarArchivoUniversal19('${ficha.clave}', ${est.id}, 'ver')">
+                                    👁️ Ver en Pantalla
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm usr-action-allow" style="flex:1;" onclick="verODescargarArchivoUniversal19('${ficha.clave}', ${est.id}, 'descargar')">
+                                    📥 Descargar
+                                </button>
+                            </div>
+                        </div>
+                    `).join("")}
+                   </div>`}
+        </div>
+
+        <div id="secPacRecetasUniv19" class="app-panel animate-in">
+            <div class="panel-head">
+                <h3><i class="ri-file-text-line"></i> Mis Indicaciones (RP/) y Certificados</h3>
+            </div>
+            ${misRecetas.length === 0
+                ? `<div class="empty-box">No tenés indicaciones ni certificados emitidos aún.</div>`
+                : `<div class="patients-quick-grid">
+                    ${misRecetas.map(r => `
+                        <div class="patient-quick-card" data-codigo19-listo="1" style="cursor:default; border-top-color:var(--ok);">
+                            <span class="badge badge-ok">${r.tipoDoc} • 📅 ${r.fecha}</span>
+                            <div style="white-space:pre-line; font-size:0.84rem; background:var(--surface-subtle); padding:0.65rem 0.8rem; border-radius:10px; margin:0.4rem 0;">${r.cuerpo}</div>
+                            <button type="button" class="btn btn-primary btn-sm usr-action-allow" style="width:100%;" onclick="imprimirRecetaCertificadoPDF18(${r.id})">
+                                📥 Abrir / Descargar PDF A4
+                            </button>
+                        </div>
+                    `).join("")}
+                   </div>`}
+        </div>
+    `;
+    return true;
+}
+
+// Observador ligero con debounce de 150ms (solo actúa cuando aparecen tarjetas nuevas sin procesar)
+const _obsTarjetasPacientes19 = new MutationObserver(() => {
+    if (_inyectandoDOM19) return;
+    if (!document.querySelector('.patient-quick-card:not([data-codigo19-listo="1"])')) return;
+
+    if (_timerDebouncePacientes19) clearTimeout(_timerDebouncePacientes19);
+    _timerDebouncePacientes19 = setTimeout(() => {
+        inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(false);
+    }, 150);
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (document.body) {
+        _obsTarjetasPacientes19.observe(document.body, { childList: true, subtree: true });
+    }
+    setTimeout(() => {
+        inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(false);
+        const params = new URLSearchParams(window.location.search);
+        let ses = null;
+        try { ses = JSON.parse(localStorage.getItem("cdm_sesion_activa_v1") || "null"); } catch {}
+
+        if (params.get("modo") === "paciente" || (ses && ses.esPacienteConsultorio)) {
+            const clavePac = params.get("pac") || ses?.clavePaciente || params.get("id") || ses?.personaId;
+            if (clavePac) renderizarPortalPacienteUniversalEnJugadorHTML19(clavePac);
+        }
+    }, 250);
+});
+// Pegar al final de login.js para que nunca cree el reloj en Login, Inicio ni Consultorio
+asegurarGotaRelojitoFlotanteCDM = function () {
+    const path = window.location.pathname.toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+    const enConsultorio = Boolean(secCons && !secCons.classList.contains("hidden"));
+    const enPaciente = params.get("modo") === "paciente" || Boolean(params.get("pac")) || document.body?.getAttribute("data-modo-portal") === "paciente";
+    const enDeporteOGym = (path.includes("gym.html") || path.includes("futbol.html") || path.includes("hockey.html") || path.includes("jugador.html")) && !enConsultorio && !enPaciente;
+
+    if (!enDeporteOGym) {
+        document.getElementById("cdmFloatingDropletClock")?.remove();
+        return;
+    }
+
+    let wrap = document.getElementById("cdmFloatingDropletClock");
+    if (!wrap) {
+        wrap = document.createElement("div");
+        wrap.id = "cdmFloatingDropletClock";
+        wrap.className = "cdm-droplet-clock-wrap usr-action-allow";
+        document.body.appendChild(wrap);
+    }
+    renderizarGotaRelojitoFlotanteCDM();
+};
+document.getElementById("cdmFloatingDropletClock")?.remove();
+setTimeout(() => asegurarGotaRelojitoFlotanteCDM(), 120);
+// =========================================================================
+// 21. MOTOR DEFINITIVO DE ELIMINACIÓN Y PERSISTENCIA EN CONSULTORIO
+//     (PROFESIONALES Y PACIENTES SIN RECARGA DEMO NI BUCLES)
+//     + SISTEMA COMPLETO DE TOKENS DE MUTUAL POR SESIÓN ("+ SESIÓN" Y TARJETA)
+// Pegar al final de app.js (reemplazando el Apartado 21 anterior)
+// =========================================================================
+
+const STORAGE_CONSULTORIO_KEY_22 = "cdm_consultorio_pro_v1";
+
+function obtenerClaveClubConsultorio22() {
+    return localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal";
+}
+
+// Limpiar por única vez cualquier lista vieja de pruebas anteriores que borraba los 4 juntos
+(function limpiarClavesViejasConflictivas22() {
+    if (sessionStorage.getItem("cdm_limpieza_v22_ok") === "1") return;
+    sessionStorage.setItem("cdm_limpieza_v22_ok", "1");
+    const borrar = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("cdm_profs_borrados_v21_") || k.startsWith("cdm_profs_excluidos_v21_"))) {
+            borrar.push(k);
+        }
+    }
+    borrar.forEach(k => localStorage.removeItem(k));
+})();
+
+function normalizarClaveTexto22(txt) {
+    return String(txt || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+// =========================================================================
+// 21.1 LISTA DE EXCLUSIÓN INDIVIDUAL POR PROFESIONAL Y POR PACIENTE
+// =========================================================================
+
+function obtenerClaveProfsEliminados22() {
+    return `cdm_profs_eliminados_v22_${obtenerClaveClubConsultorio22()}`;
+}
+
+function obtenerProfsEliminados22() {
+    try {
+        return JSON.parse(localStorage.getItem(obtenerClaveProfsEliminados22()) || "[]") || [];
+    } catch {
+        return [];
+    }
+}
+
+function guardarProfsEliminados22(lista) {
+    const unicos = [...new Set((lista || []).filter(Boolean))];
+    localStorage.setItem(obtenerClaveProfsEliminados22(), JSON.stringify(unicos));
+}
+
+function estaProfesionalEliminado22(nombre = "", matricula = "", id = "") {
+    const lista = obtenerProfsEliminados22();
+    if (!lista.length) return false;
+
+    const nomNorm = normalizarClaveTexto22(nombre);
+    const mpNorm = String(matricula || "").replace(/[^0-9a-zA-Z]/g, "").toLowerCase();
+    const idNorm = String(id || "").trim();
+
+    return (
+        (nomNorm && lista.includes(`nom:${nomNorm}`)) ||
+        (mpNorm && lista.includes(`mp:${mpNorm}`)) ||
+        (idNorm && lista.includes(`id:${idNorm}`))
+    );
+}
+
+// Purgar los profesionales eliminados de cualquier array en memoria (usando .splice sobre la misma referencia)
+function purgarProfesionalesDeEstado22(est) {
+    if (!est || !Array.isArray(est.profesionales)) return false;
+    let cambiado = false;
+    for (let i = est.profesionales.length - 1; i >= 0; i--) {
+        const p = est.profesionales[i];
+        if (!p) continue;
+        if (estaProfesionalEliminado22(p.nombre, p.matricula, p.id)) {
+            est.profesionales.splice(i, 1);
+            cambiado = true;
+        }
+    }
+    return cambiado;
+}
+
+function purgarProfesionalesEnStorageGlobal22() {
+    const lista = obtenerProfsEliminados22();
+    if (!lista.length) return;
+
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || k.startsWith("cdm_profs_eliminados_")) continue;
+        try {
+            const raw = localStorage.getItem(k);
+            if (!raw || !raw.includes("profesionales")) continue;
+            const data = JSON.parse(raw);
+            if (!data || typeof data !== "object") continue;
+
+            let mod = false;
+            if (Array.isArray(data.profesionales) && purgarProfesionalesDeEstado22(data)) mod = true;
+            Object.values(data).forEach(sub => {
+                if (sub && typeof sub === "object" && Array.isArray(sub.profesionales)) {
+                    if (purgarProfesionalesDeEstado22(sub)) mod = true;
+                }
+            });
+            if (mod) localStorage.setItem(k, JSON.stringify(data));
+        } catch {}
+    }
+}
+
+// =========================================================================
+// 21.2 HOOKS SEGUROS SOBRE EL ESTADO DEL CONSULTORIO
+// =========================================================================
+
+const _origObtenerCons17_v22 = window.__origObtenerCons17_v22 ||
+    (typeof obtenerEstadoConsultorioClubActualCDM === "function" ? obtenerEstadoConsultorioClubActualCDM : null);
+if (_origObtenerCons17_v22 && !window.__origObtenerCons17_v22) {
+    window.__origObtenerCons17_v22 = _origObtenerCons17_v22;
+}
+
+const _origGuardarCons17_v22 = window.__origGuardarCons17_v22 ||
+    (typeof guardarEstadoConsultorioClubActualCDM === "function" ? guardarEstadoConsultorioClubActualCDM : null);
+if (_origGuardarCons17_v22 && !window.__origGuardarCons17_v22) {
+    window.__origGuardarCons17_v22 = _origGuardarCons17_v22;
+}
+
+obtenerEstadoConsultorioClubActualCDM = function () {
+    const est = window.__origObtenerCons17_v22
+        ? window.__origObtenerCons17_v22.apply(this, arguments)
+        : { profesionales: [], pacientes: [], turnos: [], mutuales: [], ordenes: [], liquidaciones: [] };
+
+    if (est && typeof est === "object") {
+        purgarProfesionalesDeEstado22(est);
+    }
+    return est;
+};
+window.obtenerEstadoConsultorioClubActualCDM = obtenerEstadoConsultorioClubActualCDM;
+
+guardarEstadoConsultorioClubActualCDM = function (estadoOpt = null) {
+    const est = (estadoOpt && typeof estadoOpt === "object")
+        ? estadoOpt
+        : obtenerEstadoConsultorioClubActualCDM();
+
+    if (!est || typeof est !== "object") return;
+    purgarProfesionalesDeEstado22(est);
+
+    if (window.__origGuardarCons17_v22) {
+        try { window.__origGuardarCons17_v22(est); } catch {}
+    }
+
+    try {
+        const claveClub = obtenerClaveClubConsultorio22();
+        const mapa = JSON.parse(localStorage.getItem(STORAGE_CONSULTORIO_KEY_22) || "{}") || {};
+        mapa[claveClub] = est;
+        localStorage.setItem(STORAGE_CONSULTORIO_KEY_22, JSON.stringify(mapa));
+    } catch {}
+};
+window.guardarEstadoConsultorioClubActualCDM = guardarEstadoConsultorioClubActualCDM;
+
+guardarDatosConsultorioUnificados18 = function () {
+    const est = obtenerEstadoConsultorioClubActualCDM();
+    guardarEstadoConsultorioClubActualCDM(est);
+};
+
+// =========================================================================
+// 21.3 DETECTOR EXACTO DE TARJETA DE PROFESIONAL Y BORRADO INDIVIDUAL
+// =========================================================================
+
+function encontrarTarjetaProfesionalDOM22(el) {
+    let curr = el;
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal") || document.body;
+    let pasos = 0;
+
+    while (curr && curr !== secCons && curr !== document.body && pasos < 7) {
+        if (curr.tagName === "DIV") {
+            const styleDisp = window.getComputedStyle(curr).display;
+            const titulos = curr.querySelectorAll("h4, h3");
+            const txt = curr.innerText || "";
+            const pareceTarjetaProf =
+                styleDisp !== "grid" &&
+                titulos.length === 1 &&
+                (txt.includes("M.P.") || txt.includes("Honorario")) &&
+                (txt.includes("Ver Agenda") || txt.includes("Días y Horarios"));
+
+            if (pareceTarjetaProf) {
+                return curr;
+            }
+        }
+        curr = curr.parentElement;
+        pasos++;
+    }
+    return null;
+}
+
+function obtenerTodasTarjetasProfesionalesVista22() {
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+    if (!secCons) return [];
+    const setCards = new Set();
+
+    secCons.querySelectorAll("h4, h3").forEach(h => {
+        const card = encontrarTarjetaProfesionalDOM22(h);
+        if (card) setCards.add(card);
+    });
+    return Array.from(setCards);
+}
+
+// Eliminar 1 solo profesional (el que el usuario tocó)
+window.eliminarProfesionalIndividual22 = function (idProf = "", nombreProf = "", matriculaProf = "", cardDOM = null) {
+    let nom = String(nombreProf || "").trim();
+    let mp = String(matriculaProf || "").trim();
+    let idStr = idProf !== null && idProf !== undefined ? String(idProf).trim() : "";
+
+    if (cardDOM) {
+        if (!nom) {
+            const h = cardDOM.querySelector("h4, h3");
+            if (h) nom = (h.innerText || "").trim();
+        }
+        if (!mp) {
+            const m = (cardDOM.innerText || "").match(/M\.P\.\s*([0-9A-Za-z]+)/i);
+            if (m) mp = m[1].trim();
+        }
+    }
+
+    const est = obtenerEstadoConsultorioClubActualCDM();
+    if (!nom && idStr && Array.isArray(est?.profesionales)) {
+        const pObj = est.profesionales.find(p => String(p?.id).trim() === idStr);
+        if (pObj) {
+            nom = pObj.nombre || "";
+            mp = mp || pObj.matricula || "";
+        }
+    }
+
+    const nombreMostrar = nom || "este profesional";
+    if (!confirm(`🗑️ ¿Eliminar a ${nombreMostrar} del equipo de profesionales?`)) return;
+
+    // Agregar ÚNICAMENTE este profesional a la lista de eliminados
+    const eliminados = obtenerProfsEliminados22();
+    if (nom) eliminados.push(`nom:${normalizarClaveTexto22(nom)}`);
+    if (mp) {
+        const mpLimpia = mp.replace(/[^0-9a-zA-Z]/g, "").toLowerCase();
+        if (mpLimpia) eliminados.push(`mp:${mpLimpia}`);
+    }
+    if (idStr) eliminados.push(`id:${idStr}`);
+    guardarProfsEliminados22(eliminados);
+
+    // Purgar de memoria y de localStorage
+    purgarProfesionalesDeEstado22(est);
+    guardarEstadoConsultorioClubActualCDM(est);
+    purgarProfesionalesEnStorageGlobal22();
+
+    // Quitar solo esa tarjeta del DOM inmediatamente
+    if (cardDOM && cardDOM.parentNode) {
+        cardDOM.remove();
+    }
+    aplicarFiltroProfesionalesEnPantalla22();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`🗑️ ${nombreMostrar} eliminado permanentemente.`);
+    }
+};
+
+window.eliminarProfesionalConsultorioCDM = function (idProf) {
+    window.eliminarProfesionalIndividual22(idProf);
+};
+
+// Vaciar TODOS los profesionales en 1 clic
+window.vaciarTodosLosProfesionalesConsultorio22 = function () {
+    if (!confirm("🧹 ¿Eliminar todos los profesionales actuales para dejar la lista en 0?")) return;
+
+    const eliminados = obtenerProfsEliminados22();
+    [
+        { id: "prof_1", nom: "Lic. Martín Cabrera", mp: "4892" },
+        { id: "prof_2", nom: "Dr. Santiago Vega", mp: "3105" },
+        { id: "prof_3", nom: "Lic. Julieta Molina", mp: "2740" },
+        { id: "prof_4", nom: "Lic. Camila Rojas", mp: "6518" },
+        { id: "1", nom: "Lic. Martín Cabrera", mp: "4892" },
+        { id: "2", nom: "Dr. Santiago Vega", mp: "3105" },
+        { id: "3", nom: "Lic. Julieta Molina", mp: "2740" },
+        { id: "4", nom: "Lic. Camila Rojas", mp: "6518" }
+    ].forEach(d => {
+        eliminados.push(`id:${d.id}`);
+        eliminados.push(`nom:${normalizarClaveTexto22(d.nom)}`);
+        eliminados.push(`mp:${d.mp}`);
+    });
+
+    const est = obtenerEstadoConsultorioClubActualCDM();
+    (est?.profesionales || []).forEach(p => {
+        if (p.id) eliminados.push(`id:${String(p.id)}`);
+        if (p.nombre) eliminados.push(`nom:${normalizarClaveTexto22(p.nombre)}`);
+    });
+
+    obtenerTodasTarjetasProfesionalesVista22().forEach(card => {
+        const h = card.querySelector("h4, h3");
+        if (h) eliminados.push(`nom:${normalizarClaveTexto22(h.innerText)}`);
+        card.remove();
+    });
+
+    guardarProfsEliminados22(eliminados);
+    purgarProfesionalesDeEstado22(est);
+    guardarEstadoConsultorioClubActualCDM(est);
+    purgarProfesionalesEnStorageGlobal22();
+    aplicarFiltroProfesionalesEnPantalla22();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast("🧹 Lista de profesionales vaciada en 0.");
+    }
+};
+
+// Restaurar los 4 profesionales por defecto si el usuario quiere recuperarlos
+window.restaurarProfesionalesDemoConsultorio22 = function () {
+    if (!confirm("↺ ¿Restaurar los profesionales base del sistema?")) return;
+    localStorage.removeItem(obtenerClaveProfsEliminados22());
+
+    const est = obtenerEstadoConsultorioClubActualCDM();
+    if (Array.isArray(est.profesionales) && est.profesionales.length === 0) {
+        est.profesionales.push(
+            { id: "prof_1", nombre: "Lic. Martín Cabrera", especialidad: "Kinesiología", matricula: "M.P. 4892", rol: "Kinesiólogo y Fisioterapeuta Deportivo", horario: "Lun a Vie 08:00 a 13:00 y 16:00 a 20:00", whatsapp: "5493584102030", comision: 70 },
+            { id: "prof_2", nombre: "Dr. Santiago Vega", especialidad: "Quiropraxia", matricula: "M.P. 3105", rol: "Quiropráctico y Osteópata Estructural", horario: "Mar y Jue 09:00 a 19:00", whatsapp: "5493584203040", comision: 75 },
+            { id: "prof_3", nombre: "Lic. Julieta Molina", especialidad: "Nutrición", matricula: "M.P. 2740", rol: "Nutricionista Deportiva Certificada ISAK II", horario: "Lun, Mié y Vie 14:00 a 20:00", whatsapp: "5493584304050", comision: 70 },
+            { id: "prof_4", nombre: "Lic. Camila Rojas", especialidad: "Psicología", matricula: "M.P. 6518", rol: "Psicóloga Clínica y del Alto Rendimiento", horario: "Lun a Vie 09:00 a 18:00 (Presencial y Online)", whatsapp: "5493584405060", comision: 80 }
+        );
+        guardarEstadoConsultorioClubActualCDM(est);
+    }
+    if (typeof renderizarVistaConsultorioActivaCDM === "function") {
+        renderizarVistaConsultorioActivaCDM();
+    }
+    aplicarFiltroProfesionalesEnPantalla22();
+    if (typeof mostrarToast === "function") {
+        mostrarToast("↺ Profesionales restaurados.");
+    }
+};
+
+// Función ultraligera (sin MutationObserver) que limpia tarjetas y selects de profesionales eliminados al instante
+function aplicarFiltroProfesionalesEnPantalla22() {
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+    if (!secCons) return;
+
+    // 1. Inyectar botones "Vaciar Profesionales" y "Restaurar" al lado de "+ Agregar Profesional al Equipo"
+    const btnAddProf = Array.from(secCons.querySelectorAll("button")).find(b => (b.innerText || "").includes("Agregar Profesional"));
+    if (btnAddProf) {
+        const parent = btnAddProf.parentElement;
+        if (parent && !document.getElementById("btnVaciarProfs22")) {
+            parent.style.display = "flex";
+            parent.style.gap = "0.45rem";
+            parent.style.flexWrap = "wrap";
+
+            const btnVaciar = document.createElement("button");
+            btnVaciar.type = "button";
+            btnVaciar.id = "btnVaciarProfs22";
+            btnVaciar.className = "btn btn-danger btn-sm";
+            btnVaciar.onclick = window.vaciarTodosLosProfesionalesConsultorio22;
+            btnVaciar.innerHTML = `<i class="ri-delete-bin-6-line"></i> Vaciar Profesionales`;
+
+            const btnRest = document.createElement("button");
+            btnRest.type = "button";
+            btnRest.id = "btnRestaurarProfs22";
+            btnRest.className = "btn btn-ghost btn-sm";
+            btnRest.onclick = window.restaurarProfesionalesDemoConsultorio22;
+            btnRest.innerHTML = `↺ Restaurar Demo`;
+
+            parent.insertBefore(btnRest, btnAddProf);
+            parent.insertBefore(btnVaciar, btnRest);
+        }
+    }
+
+    // 2. Quitar del DOM únicamente las tarjetas de profesionales que estén en la lista de eliminados
+    const tarjetas = obtenerTodasTarjetasProfesionalesVista22();
+    let contenedorGrid = tarjetas[0] ? tarjetas[0].parentElement : null;
+    let cantVisibles = 0;
+
+    tarjetas.forEach(card => {
+        const h = card.querySelector("h4, h3");
+        const nom = h ? (h.innerText || "").trim() : "";
+        const m = (card.innerText || "").match(/M\.P\.\s*([0-9A-Za-z]+)/i);
+        const mp = m ? m[1].trim() : "";
+
+        if (estaProfesionalEliminado22(nom, mp, "")) {
+            card.remove();
+        } else {
+            cantVisibles++;
+        }
+    });
+
+    if (contenedorGrid && cantVisibles === 0 && !contenedorGrid.querySelector(".empty-box")) {
+        contenedorGrid.innerHTML = `
+            <div class="empty-box" style="grid-column:1/-1;">
+                No hay profesionales cargados en el equipo. Tocá <b>"+ Agregar Profesional al Equipo"</b> para agregar los tuyos.
+            </div>
+        `;
+    }
+
+    // 3. Quitar de cualquier desplegable <select> del consultorio los profesionales eliminados
+    const eliminados = obtenerProfsEliminados22();
+    if (eliminados.length > 0) {
+        secCons.querySelectorAll("select option").forEach(opt => {
+            const txtOpt = normalizarClaveTexto22(opt.textContent || opt.value || "");
+            if (txtOpt && eliminados.some(ex => ex.startsWith("nom:") && txtOpt.includes(ex.slice(4)))) {
+                opt.remove();
+            }
+        });
+    }
+
+    // 4. Actualizar contador del botón "3. Profesionales (X)"
+    const est = obtenerEstadoConsultorioClubActualCDM();
+    const totalProfsReal = btnAddProf ? cantVisibles : (Array.isArray(est?.profesionales) ? est.profesionales.length : cantVisibles);
+    secCons.querySelectorAll("button, .mod-tab, .seg-btn").forEach(b => {
+        const t = b.innerText || "";
+        if (/3\.\s*Profesionales\s*\(\d+\)/i.test(t)) {
+            const nuevoTxt = t.replace(/3\.\s*Profesionales\s*\(\d+\)/i, `3. Profesionales (${totalProfsReal})`);
+            if (b.innerText !== nuevoTxt) b.innerText = nuevoTxt;
+        }
+    });
+}
+
+// Interceptar renderizarVistaConsultorioActivaCDM si existe
+const _origRenderCons17_v22 = window.__origRenderCons17_v22 ||
+    (typeof renderizarVistaConsultorioActivaCDM === "function" ? renderizarVistaConsultorioActivaCDM : null);
+if (_origRenderCons17_v22 && !window.__origRenderCons17_v22) {
+    window.__origRenderCons17_v22 = _origRenderCons17_v22;
+}
+renderizarVistaConsultorioActivaCDM = function () {
+    const est = obtenerEstadoConsultorioClubActualCDM();
+    purgarProfesionalesDeEstado22(est);
+    if (window.__origRenderCons17_v22) {
+        window.__origRenderCons17_v22.apply(this, arguments);
+    }
+    aplicarFiltroProfesionalesEnPantalla22();
+};
+window.renderizarVistaConsultorioActivaCDM = renderizarVistaConsultorioActivaCDM;
+
+// =========================================================================
+// 21.4 SISTEMA DE TOKENS DE MUTUAL EN SESIONES, PACIENTES Y LIQUIDACIÓN
+// =========================================================================
+
+function obtenerTokensSesionesPaciente21(ficha) {
+    if (!Array.isArray(ficha.historialSesionesTokens)) {
+        ficha.historialSesionesTokens = [];
+    }
+    return ficha.historialSesionesTokens;
+}
+
+function sincronizarTokenConConsultorioYOrdenes21(ficha, registroSesion) {
+    const est = obtenerEstadoConsultorioClubActualCDM();
+    if (!est) return;
+
+    const nomNorm = String(ficha.nombreCompleto || "").toLowerCase().trim();
+    if (!Array.isArray(est.ordenes)) est.ordenes = [];
+    const esParticular = String(registroSesion.mutual || ficha.mutual || "").toLowerCase().includes("particular");
+
+    if (!esParticular || registroSesion.tokenMutual) {
+        const ordenExistente = est.ordenes.find(o =>
+            String(o.paciente || o.pacienteNombre || "").toLowerCase().includes(nomNorm.split(",")[0]) &&
+            (!registroSesion.nroOrdenMutual || o.nroOrden === registroSesion.nroOrdenMutual)
+        );
+
+        if (ordenExistente) {
+            if (!Array.isArray(ordenExistente.tokensSesiones)) ordenExistente.tokensSesiones = [];
+            if (registroSesion.tokenMutual && !ordenExistente.tokensSesiones.includes(registroSesion.tokenMutual)) {
+                ordenExistente.tokensSesiones.push(registroSesion.tokenMutual);
+            }
+            ordenExistente.tokenMutual = ordenExistente.tokensSesiones.join(" • ") || registroSesion.tokenMutual;
+        } else if (registroSesion.tokenMutual) {
+            est.ordenes.unshift({
+                id: Date.now(),
+                fecha: registroSesion.fecha,
+                paciente: ficha.nombreCompleto,
+                pacienteNombre: ficha.nombreCompleto,
+                mutual: registroSesion.mutual || ficha.mutual || "Mutual",
+                especialidad: ficha.especialidad || "Consultorio",
+                profesional: ficha.profesional || "Profesional",
+                nroOrden: registroSesion.nroOrdenMutual || `TOK-${registroSesion.tokenMutual}`,
+                tokenMutual: registroSesion.tokenMutual,
+                tokensSesiones: [registroSesion.tokenMutual],
+                monto: 12500,
+                estado: registroSesion.estadoToken === "Validado" ? "Autorizada (Con Token)" : "Pendiente Token"
+            });
+        }
+    }
+    guardarEstadoConsultorioClubActualCDM(est);
+}
+
+window.abrirModalTokensSesionesPaciente21 = function (clavePaciente) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha) return;
+
+    const modal = asegurarModalSuiteProfesionales18();
+    const listaTokens = obtenerTokensSesionesPaciente21(ficha);
+    const usadas = Number(ficha.sesionesUsadas) ?? 1;
+    const totales = Number(ficha.sesionesTotales) || 10;
+    const hoy = new Date().toISOString().split("T")[0];
+    const esParticular = String(ficha.mutual || "").toLowerCase().includes("particular");
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:760px;">
+            <div class="modal-top">
+                <div>
+                    <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                        <span class="badge badge-purple">🔑 ${ficha.codigoAcceso}</span>
+                        <span class="badge badge-celeste">🏥 ${ficha.mutual || "Particular"}</span>
+                        <span class="badge badge-ok">📋 ${usadas}/${totales} sesiones</span>
+                    </div>
+                    <h3 style="color:var(--ink-900); margin-top:5px;">🔐 Control de Sesiones y Tokens de Mutual — ${ficha.nombreCompleto}</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalSuiteProfesionales18()">✕</button>
+            </div>
+
+            <form onsubmit="guardarSesionConTokenMutual21(event, '${ficha.clave}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-celeste); border-radius:16px; padding:1rem; margin-bottom:1.1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.65rem;">
+                    <strong style="font-size:0.85rem; color:var(--cdm-700);">
+                        ➕ REGISTRAR SESIÓN Y TOKEN DE VALIDACIÓN (${ficha.mutual || "Obra Social"})
+                    </strong>
+                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="pedirTokenMutualAlPacienteWA21('${ficha.clave}')">
+                        <i class="ri-whatsapp-line"></i> Pedirle Token al Paciente por WA
+                    </button>
+                </div>
+
+                <div class="grid-4" style="margin-bottom:0.65rem;">
+                    <div class="field">
+                        <label>N° de Sesión *</label>
+                        <input type="number" id="tokNroSesion21" required min="1" max="200" value="${Math.min(totales, listaTokens.length + 1)}" style="font-weight:800;">
+                    </div>
+                    <div class="field">
+                        <label>Fecha de Sesión *</label>
+                        <input type="date" id="tokFecha21" required value="${hoy}">
+                    </div>
+                    <div class="field">
+                        <label>🔐 Token de la Mutual *</label>
+                        <input type="text" id="tokCodigo21" placeholder="${esParticular ? "Particular (Opcional)" : "Ej: 849201 / B-4412"}" style="font-weight:800; color:var(--cdm-700); text-transform:uppercase;">
+                    </div>
+                    <div class="field">
+                        <label>Estado del Token</label>
+                        <select id="tokEstado21">
+                            <option value="Validado" ${!esParticular ? "selected" : ""}>🟢 Token Validado</option>
+                            <option value="Pendiente Token">🟡 Pendiente (Debe enviarlo)</option>
+                            <option value="Particular" ${esParticular ? "selected" : ""}>⚪ Particular (Sin Token)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="margin-bottom:0.75rem;">
+                    <div class="field">
+                        <label>N° de Orden / Bono de Mutual (Opcional)</label>
+                        <input type="text" id="tokNroOrden21" placeholder="Ej: Orden #00458912">
+                    </div>
+                    <div class="field">
+                        <label>Evolución / Nota de la Sesión</label>
+                        <input type="text" id="tokNota21" placeholder="Ej: Sesión realizada con normalidad...">
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                    <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.78rem; font-weight:700; color:var(--ink-700); cursor:pointer;">
+                        <input type="checkbox" id="tokSumarContador21" checked style="width:17px; height:17px; min-height:auto;">
+                        <span>Sumar +1 al contador de sesiones del paciente (${usadas}/${totales})</span>
+                    </label>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="ri-save-3-line"></i> Guardar Sesión y Token
+                    </button>
+                </div>
+            </form>
+
+            <h4 style="font-size:0.9rem; font-weight:800; color:var(--ink-900); margin-bottom:0.55rem;">
+                📋 Historial de Sesiones y Tokens de ${ficha.nombreCompleto} (${listaTokens.length}):
+            </h4>
+
+            ${listaTokens.length === 0 ? `
+                <div class="empty-box" style="padding:1.2rem;">
+                    Todavía no hay tokens de sesión registrados para ${ficha.nombreCompleto}.
+                </div>
+            ` : `
+                <div class="table-wrap" style="max-height:260px; overflow-y:auto;">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th>Sesión</th>
+                                <th>Fecha</th>
+                                <th>Mutual / Orden</th>
+                                <th>🔐 Token Mutual</th>
+                                <th>Estado</th>
+                                <th style="text-align:right;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${listaTokens.map(item => `
+                                <tr>
+                                    <td data-label="Sesión"><strong>Sesión #${item.nroSesion}</strong></td>
+                                    <td data-label="Fecha">${item.fecha}</td>
+                                    <td data-label="Mutual">${item.mutual || ficha.mutual}<br><small style="color:var(--ink-500);">${item.nroOrdenMutual || "-"}</small></td>
+                                    <td data-label="🔐 Token Mutual">
+                                        <input type="text" value="${(item.tokenMutual || "").replace(/"/g, "&quot;")}"
+                                            placeholder="Escribir Token..."
+                                            onchange="actualizarCodigoTokenInline21('${ficha.clave}', ${item.id}, this.value)"
+                                            style="width:115px; min-height:28px; padding:0.15rem 0.45rem; font-size:0.78rem; font-weight:800; text-transform:uppercase; border:1.5px solid var(--line-celeste); border-radius:8px;">
+                                    </td>
+                                    <td data-label="Estado">
+                                        <span class="badge ${item.estadoToken === "Validado" ? "badge-ok" : (item.estadoToken === "Pendiente Token" ? "badge-warn" : "badge-celeste")}">
+                                            ${item.estadoToken === "Validado" ? "🟢 Validado" : (item.estadoToken === "Pendiente Token" ? "🟡 Debe Token" : "⚪ Particular")}
+                                        </span>
+                                    </td>
+                                    <td data-label="Acciones" style="text-align:right;">
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="eliminarRegistroTokenSesion21('${ficha.clave}', ${item.id})">🗑️</button>
+                                    </td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.guardarSesionConTokenMutual21 = function (e, clavePaciente) {
+    e.preventDefault();
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+
+    const nroSesion = parseInt(document.getElementById("tokNroSesion21")?.value) || 1;
+    const fecha = document.getElementById("tokFecha21")?.value || new Date().toISOString().split("T")[0];
+    const tokenMutual = (document.getElementById("tokCodigo21")?.value || "").trim().toUpperCase();
+    const estadoToken = document.getElementById("tokEstado21")?.value || (tokenMutual ? "Validado" : "Pendiente Token");
+    const nroOrdenMutual = (document.getElementById("tokNroOrden21")?.value || "").trim();
+    const nota = (document.getElementById("tokNota21")?.value || "").trim();
+    const sumarContador = Boolean(document.getElementById("tokSumarContador21")?.checked);
+
+    if (!Array.isArray(ficha.historialSesionesTokens)) ficha.historialSesionesTokens = [];
+
+    const nuevoRegistro = {
+        id: Date.now(),
+        nroSesion,
+        fecha,
+        mutual: ficha.mutual || "Particular",
+        tokenMutual,
+        estadoToken: tokenMutual && estadoToken === "Pendiente Token" ? "Validado" : estadoToken,
+        nroOrdenMutual,
+        nota
+    };
+
+    ficha.historialSesionesTokens.unshift(nuevoRegistro);
+
+    if (sumarContador) {
+        const totales = Math.max(1, Number(ficha.sesionesTotales) || 10);
+        const usadasActuales = Number(ficha.sesionesUsadas) || 0;
+        ficha.sesionesUsadas = Math.min(totales, Math.max(usadasActuales + 1, nroSesion));
+        ficha.sesionesBadge = `${ficha.sesionesUsadas}/${totales} sesiones`;
+        actualizarSesionesEnBaseConsultorioOriginal20(ficha, ficha.sesionesUsadas, totales);
+    }
+
+    ficha.ultimaVisita = fecha;
+    guardarMapaUniversalPacientes19(mapa);
+    sincronizarTokenConConsultorioYOrdenes21(ficha, nuevoRegistro);
+    inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(true);
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`🔐 Sesión #${nroSesion} guardada ${tokenMutual ? `(Token: ${tokenMutual})` : "(Pendiente de Token)"}.`);
+    }
+    abrirModalTokensSesionesPaciente21(clavePaciente);
+};
+
+window.actualizarCodigoTokenInline21 = function (clavePaciente, idRegistro, nuevoTokenRaw) {
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha || !Array.isArray(ficha.historialSesionesTokens)) return;
+
+    const reg = ficha.historialSesionesTokens.find(x => Number(x.id) === Number(idRegistro));
+    if (!reg) return;
+
+    reg.tokenMutual = String(nuevoTokenRaw || "").trim().toUpperCase();
+    reg.estadoToken = reg.tokenMutual ? "Validado" : "Pendiente Token";
+
+    guardarMapaUniversalPacientes19(mapa);
+    sincronizarTokenConConsultorioYOrdenes21(ficha, reg);
+    inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(true);
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(reg.tokenMutual ? `🟢 Token ${reg.tokenMutual} validado.` : `🟡 Marcado como pendiente de Token.`);
+    }
+    abrirModalTokensSesionesPaciente21(clavePaciente);
+};
+
+window.eliminarRegistroTokenSesion21 = function (clavePaciente, idRegistro) {
+    if (!confirm("🗑️ ¿Eliminar este registro de sesión/token?")) return;
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha || !Array.isArray(ficha.historialSesionesTokens)) return;
+
+    ficha.historialSesionesTokens = ficha.historialSesionesTokens.filter(x => Number(x.id) !== Number(idRegistro));
+    guardarMapaUniversalPacientes19(mapa);
+    inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(true);
+    abrirModalTokensSesionesPaciente21(clavePaciente);
+};
+
+window.pedirTokenMutualAlPacienteWA21 = function (clavePaciente) {
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+
+    let tel = normalizarTelefonoPacienteWA18(ficha.telefono);
+    if (!tel) {
+        const inp = prompt(`📱 Ingresá el WhatsApp de ${ficha.nombreCompleto} (ej: 3584112233):`, "");
+        if (!inp) return;
+        ficha.telefono = inp.trim();
+        guardarMapaUniversalPacientes19(mapa);
+        tel = normalizarTelefonoPacienteWA18(inp);
+    }
+
+    const msg = `Hola *${ficha.nombreCompleto}*, te escribimos del consultorio de *${ficha.especialidad || "Salud"}*.\n\n` +
+                `🔐 Para validar tu sesión de hoy en *${ficha.mutual || "tu Obra Social"}*, ¿nos podrías pasar por acá el *Código de Token / Autorización* que te genera la credencial digital de tu mutual? ¡Muchas gracias!`;
+
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+const _origInyectarTarjetasPac22 = inyectarCodigoYEstudiosEnTarjetasPacientesDOM19;
+inyectarCodigoYEstudiosEnTarjetasPacientesDOM19 = function (forzarRefresco = false) {
+    _origInyectarTarjetasPac22.apply(this, arguments);
+
+    document.querySelectorAll(".patient-quick-card").forEach(card => {
+        if (card.closest("#contenedorPortalClinicoPaciente19")) return;
+        const barra = card.querySelector(".patient-card-portal-bar-19");
+        if (!barra) return;
+
+        const btnEst = barra.querySelector("button[onclick*='abrirModalGestionEstudiosDePaciente19']");
+        const matchClave = (btnEst?.getAttribute("onclick") || "").match(/'([^']+)'/);
+        if (!matchClave) return;
+        const clave = matchClave[1];
+        const ficha = obtenerPacienteUniversalPorClave19(clave);
+        if (!ficha) return;
+
+        const listaTok = Array.isArray(ficha.historialSesionesTokens) ? ficha.historialSesionesTokens : [];
+        const pendientesTok = listaTok.filter(t => t.estadoToken === "Pendiente Token").length;
+        const ultimoTok = listaTok.find(t => t.tokenMutual)?.tokenMutual || "";
+
+        let badgeTok = card.querySelector(".badge-token-mutual-21");
+        const contenedorBadges = card.querySelector(".badge")?.parentElement;
+        if (contenedorBadges && (ultimoTok || pendientesTok > 0)) {
+            if (!badgeTok) {
+                badgeTok = document.createElement("span");
+                badgeTok.className = "badge badge-token-mutual-21";
+                badgeTok.style = "cursor:pointer; font-size:0.72rem; font-weight:800;";
+                badgeTok.onclick = (e) => {
+                    e.stopPropagation();
+                    abrirModalTokensSesionesPaciente21(clave);
+                };
+                contenedorBadges.appendChild(badgeTok);
+            }
+            if (pendientesTok > 0) {
+                badgeTok.className = "badge badge-warn badge-token-mutual-21";
+                badgeTok.textContent = `🔐 Debe ${pendientesTok} Token`;
+            } else {
+                badgeTok.className = "badge badge-celeste badge-token-mutual-21";
+                badgeTok.textContent = `🔐 Token: ${ultimoTok}`;
+            }
+        } else if (badgeTok) {
+            badgeTok.remove();
+        }
+
+        let btnTok = barra.querySelector(".btn-tokens-mutual-21");
+        if (!btnTok) {
+            btnTok = document.createElement("button");
+            btnTok.type = "button";
+            btnTok.className = "btn btn-ghost btn-sm btn-tokens-mutual-21";
+            btnTok.style = "font-size:0.73rem; padding:0.32rem 0.55rem; border-color:rgba(2,132,199,0.4); color:var(--cdm-700); font-weight:800;";
+            btnTok.title = "Registrar o consultar Tokens de Obra Social / Mutual por sesión";
+            btnTok.onclick = (e) => {
+                e.stopPropagation();
+                abrirModalTokensSesionesPaciente21(clave);
+            };
+            barra.insertBefore(btnTok, barra.children[1] || null);
+        }
+        btnTok.innerHTML = `🔐 Tokens${listaTok.length > 0 ? ` (${listaTok.length})` : ""}`;
+    });
+};
+
+function inyectarCampoTokenEnModalMasSesionAbierto21(clavePacienteHint = null) {
+    document.querySelectorAll(".modal-backdrop:not(.hidden) .modal-window form").forEach(form => {
+        if (form.querySelector("#inpTokenSesionModal17_21")) return;
+        const textoForm = (form.innerText || "").toLowerCase();
+        if (!textoForm.includes("evolución") && !textoForm.includes("sesión") && !textoForm.includes("dolor") && !textoForm.includes("eva")) {
+            return;
+        }
+        if (clavePacienteHint) {
+            form.dataset.clavePacienteToken21 = clavePacienteHint;
+        }
+
+        const boxToken = document.createElement("div");
+        boxToken.style = "background:var(--cdm-50); border:1.5px solid var(--line-celeste); border-radius:14px; padding:0.85rem 1rem; margin:0.75rem 0;";
+        boxToken.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem; flex-wrap:wrap; gap:0.4rem;">
+                <strong style="font-size:0.8rem; color:var(--cdm-800); text-transform:uppercase;">
+                    🔐 Validación de Obra Social / Mutual de esta Sesión
+                </strong>
+                <span class="badge badge-celeste" style="font-size:0.65rem;">Token / Orden</span>
+            </div>
+            <div class="grid-3">
+                <div class="field">
+                    <label>🔐 Código de Token Mutual</label>
+                    <input type="text" id="inpTokenSesionModal17_21" placeholder="Ej: 849201 (APROSS/Sancor/OSDE)" style="font-weight:800; text-transform:uppercase; background:#fff;">
+                </div>
+                <div class="field">
+                    <label>N° Orden / Bono (Opcional)</label>
+                    <input type="text" id="inpOrdenSesionModal17_21" placeholder="Ej: Orden #004512" style="background:#fff;">
+                </div>
+                <div class="field">
+                    <label>Estado del Token</label>
+                    <select id="selEstadoTokenModal17_21" style="background:#fff; font-weight:700;">
+                        <option value="Validado">🟢 Token Validado</option>
+                        <option value="Pendiente Token">🟡 Pendiente de Token</option>
+                        <option value="Particular">⚪ Particular (Sin Token)</option>
+                    </select>
+                </div>
+            </div>
+        `;
+        const ultimoDiv = form.querySelector("div:last-child");
+        if (ultimoDiv) form.insertBefore(boxToken, ultimoDiv);
+        else form.appendChild(boxToken);
+    });
+}
+
+// =========================================================================
+// 21.5 INTERCEPTOR CENTRAL DE CLICS Y SUBMITS (SIN BUCLES)
+// =========================================================================
+
+document.addEventListener("click", function (e) {
+    const btn = e.target.closest("button");
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+    if (!secCons) return;
+
+    if (btn && secCons.contains(btn)) {
+        // A) Si hizo clic en el botón 🗑️ de una tarjeta de profesional
+        if (btn.id !== "btnVaciarProfs22" && btn.id !== "btnRestaurarProfs22") {
+            const cardProf = encontrarTarjetaProfesionalDOM22(btn);
+            if (cardProf) {
+                const onclickAttr = btn.getAttribute("onclick") || "";
+                const tieneIconoTrash = Boolean(btn.querySelector(".ri-delete-bin-line, .ri-delete-bin-6-line")) ||
+                                        (btn.innerText || "").trim() === "🗑️" ||
+                                        /eliminar|borrar/i.test(onclickAttr);
+                const esLapizEditar = Boolean(btn.querySelector(".ri-edit-line, .ri-pencil-line")) || (btn.innerText || "").trim() === "✏️";
+                const esBotonAbajo = /Agenda|Pacientes/i.test(btn.innerText || "");
+
+                if (tieneIconoTrash && !esLapizEditar && !esBotonAbajo) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const h = cardProf.querySelector("h4, h3");
+                    const nomProf = (h?.innerText || "").trim();
+                    const mMp = (cardProf.innerText || "").match(/M\.P\.\s*([0-9A-Za-z]+)/i);
+                    const mpProf = mMp ? mMp[1].trim() : "";
+                    const mId = onclickAttr.match(/\(\s*['"]?([^)'",\s]+)['"]?\s*\)/);
+                    const idProf = (mId && mId[1] && mId[1] !== "event") ? mId[1] : "";
+
+                    window.eliminarProfesionalIndividual22(idProf, nomProf, mpProf, cardProf);
+                    return;
+                }
+            }
+        }
+
+        // B) Si hizo clic en "✍️ + Sesión" en una tarjeta de paciente
+        const txtBtn = (btn.innerText || "").trim();
+        const onclickBtn = btn.getAttribute("onclick") || "";
+        if (txtBtn.includes("+ Sesión") || /Sesion/i.test(onclickBtn)) {
+            let clavePac = null;
+            const cardPac = btn.closest(".patient-quick-card");
+            if (cardPac) {
+                const btnEst = cardPac.querySelector("button[onclick*='abrirModalGestionEstudiosDePaciente19']");
+                const m = (btnEst?.getAttribute("onclick") || "").match(/'([^']+)'/);
+                if (m) clavePac = m[1];
+            }
+            setTimeout(() => inyectarCampoTokenEnModalMasSesionAbierto21(clavePac), 40);
+        }
+    }
+
+    // C) Al cambiar de pestaña en el consultorio, filtrar en 0ms, 20ms y 80ms para que los eliminados nunca reaparezcan
+    if (secCons.contains(e.target)) {
+        requestAnimationFrame(aplicarFiltroProfesionalesEnPantalla22);
+        setTimeout(aplicarFiltroProfesionalesEnPantalla22, 25);
+        setTimeout(aplicarFiltroProfesionalesEnPantalla22, 90);
+    }
+}, true);
+
+// Si el usuario agrega o edita un profesional, desbloquear su nombre de la lista de eliminados
+document.addEventListener("submit", function (e) {
+    const form = e.target;
+    if (!form) return;
+
+    // 1. Si es el alta/edición de un Profesional
+    const onsubmitAttr = form.getAttribute("onsubmit") || "";
+    if (/Profesional/i.test(onsubmitAttr) || form.querySelector("#profConsNombre")) {
+        let eliminados = obtenerProfsEliminados22();
+        form.querySelectorAll('input[type="text"], input[type="hidden"]').forEach(inp => {
+            const val = (inp.value || "").trim();
+            if (!val) return;
+            const norm = normalizarClaveTexto22(val);
+            const mp = val.replace(/[^0-9a-zA-Z]/g, "").toLowerCase();
+            eliminados = eliminados.filter(x => x !== `nom:${norm}` && x !== `id:${val}` && x !== `mp:${mp}`);
+        });
+        guardarProfsEliminados22(eliminados);
+        setTimeout(aplicarFiltroProfesionalesEnPantalla22, 50);
+    }
+
+    // 2. Si es el formulario de "+ Sesión" con Token de Mutual
+    const inpTok = form.querySelector("#inpTokenSesionModal17_21");
+    if (inpTok) {
+        const tokenVal = (inpTok.value || "").trim().toUpperCase();
+        const ordenVal = (form.querySelector("#inpOrdenSesionModal17_21")?.value || "").trim();
+        const estadoVal = form.querySelector("#selEstadoTokenModal17_21")?.value || (tokenVal ? "Validado" : "Particular");
+        let clavePac = form.dataset.clavePacienteToken21 || "";
+
+        if (!clavePac) {
+            const tituloModal = (form.closest(".modal-window")?.querySelector("h3")?.innerText || "").toLowerCase();
+            const mapa = obtenerMapaUniversalPacientes19();
+            const match = Object.values(mapa).find(f => {
+                const partes = String(f.nombreCompleto || "").toLowerCase().split(/[,\s]+/).filter(Boolean);
+                return partes.length >= 2 && partes.every(p => tituloModal.includes(p));
+            });
+            if (match) clavePac = match.clave;
+        }
+
+        if (clavePac) {
+            const mapa = obtenerMapaUniversalPacientes19();
+            const ficha = mapa[clavePac];
+            if (ficha) {
+                if (!Array.isArray(ficha.historialSesionesTokens)) ficha.historialSesionesTokens = [];
+                const usadas = (Number(ficha.sesionesUsadas) || 0) + 1;
+                const totales = Math.max(1, Number(ficha.sesionesTotales) || 10);
+                ficha.sesionesUsadas = Math.min(totales, usadas);
+
+                const reg = {
+                    id: Date.now(),
+                    nroSesion: ficha.sesionesUsadas,
+                    fecha: new Date().toISOString().split("T")[0],
+                    mutual: ficha.mutual || "Particular",
+                    tokenMutual: tokenVal,
+                    estadoToken: tokenVal ? "Validado" : estadoVal,
+                    nroOrdenMutual: ordenVal,
+                    nota: "Registrado desde + Sesión"
+                };
+                ficha.historialSesionesTokens.unshift(reg);
+                guardarMapaUniversalPacientes19(mapa);
+                sincronizarTokenConConsultorioYOrdenes21(ficha, reg);
+                setTimeout(() => inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(true), 80);
+            }
+        }
+    }
+}, true);
+
+document.addEventListener("DOMContentLoaded", () => {
+    purgarProfesionalesEnStorageGlobal22();
+    setTimeout(aplicarFiltroProfesionalesEnPantalla22, 200);
+    setTimeout(aplicarFiltroProfesionalesEnPantalla22, 600);
+});
+// =========================================================================
+// 22. TARJETA DE PACIENTE MINIMALISTA (SOLO NOMBRE, CÓDIGO, EDITAR Y ELIMINAR)
+//     + DESPLIEGUE AL APRETAR LA TARJETA
+//     + TODAS LAS HERRAMIENTAS INTEGRADAS ADENTRO DE "📂 INGRESAR AL PACIENTE"
+// Pegar al final de app.js (reemplazando el Apartado 22 anterior)
+// =========================================================================
+
+(function inyectarCSSMinimalistaPacientes22() {
+    document.getElementById("cdmCssPacientesCompacto22")?.remove();
+    if (document.getElementById("cdmCssPacientesMinimal22")) return;
+
+    const st = document.createElement("style");
+    st.id = "cdmCssPacientesMinimal22";
+    st.textContent = `
+        /* 1. TARJETA CERRADA: SOLO CABECERA (NOMBRE, CÓDIGO, EDITAR Y ELIMINAR) */
+        .patient-quick-card:not(.pac-portal-item-22) {
+            padding: 0.9rem 1.05rem !important;
+            gap: 0 !important;
+            cursor: pointer !important;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease !important;
+            position: relative !important;
+        }
+
+        .patient-quick-card:not(.pac-portal-item-22):hover {
+            border-color: var(--cdm-400) !important;
+            box-shadow: var(--shadow-float) !important;
+        }
+
+        /* Ocultar todos los hijos directos excepto la cabecera (1° div) cuando NO está desplegada */
+        .patient-quick-card:not(.pac-portal-item-22):not(.pac-card-expanded-22) > *:not(:first-child) {
+            display: none !important;
+        }
+
+        /* Cuando se aprieta la tarjeta (.pac-card-expanded-22), mostrar el panel desplegable */
+        .patient-quick-card.pac-card-expanded-22 {
+            gap: 0.65rem !important;
+            border-color: var(--cdm-500) !important;
+        }
+
+        /* Chip del Código pegado debajo del nombre en la cabecera */
+        .pac-header-code-row-22 {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0.4rem !important;
+            flex-wrap: wrap !important;
+            margin-top: 0.28rem !important;
+        }
+
+        .pac-code-mini-pill-22 {
+            background: var(--purple-bg) !important;
+            color: var(--purple-ink) !important;
+            border: 1px solid rgba(99, 102, 241, 0.35) !important;
+            font-size: 0.72rem !important;
+            font-weight: 800 !important;
+            padding: 0.16rem 0.55rem !important;
+            border-radius: 999px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 0.25rem !important;
+        }
+
+        .pac-mutual-mini-pill-22 {
+            background: var(--surface-subtle) !important;
+            color: var(--ink-600) !important;
+            border: 1px solid var(--line-strong) !important;
+            font-size: 0.7rem !important;
+            font-weight: 700 !important;
+            padding: 0.15rem 0.5rem !important;
+            border-radius: 999px !important;
+        }
+
+        /* Botón indicador de desplegar (▾) al lado de Editar y Eliminar */
+        .pac-chevron-btn-22 {
+            width: 30px !important;
+            height: 30px !important;
+            min-height: 30px !important;
+            padding: 0 !important;
+            border-radius: 9px !important;
+            border: 1px solid var(--line-strong) !important;
+            background: var(--surface-subtle) !important;
+            color: var(--ink-600) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 0.85rem !important;
+            transition: transform 0.2s ease, background 0.2s ease !important;
+        }
+
+        .patient-quick-card.pac-card-expanded-22 .pac-chevron-btn-22 {
+            transform: rotate(180deg) !important;
+            background: var(--cdm-50) !important;
+            color: var(--cdm-600) !important;
+            border-color: var(--line-celeste) !important;
+        }
+
+        /* En vista desplegada: ocultar cajas vacías ("🩺 -", "👨‍⚕️ -") y EVA 0/10 */
+        .patient-quick-card .diag-empty-22,
+        .patient-quick-card .prof-empty-22,
+        .patient-quick-card .badge-eva-hidden-22,
+        .patient-quick-card .badge-codigo-paciente-19 {
+            display: none !important;
+        }
+
+        /* Barra inferior dentro del desplegable: 4 botones compactos en 1 sola línea */
+        .patient-quick-card .patient-card-portal-bar-19 {
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            gap: 0.35rem !important;
+            width: 100% !important;
+            padding-top: 0.45rem !important;
+            border-top: 1px dashed var(--line-strong) !important;
+        }
+
+        .patient-quick-card .patient-card-portal-bar-19 .btn {
+            width: 100% !important;
+            min-height: 30px !important;
+            padding: 0.22rem 0.25rem !important;
+            font-size: 0.71rem !important;
+            font-weight: 700 !important;
+            justify-content: center !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        .patient-quick-card .patient-card-portal-bar-19 .btn-ajustar-sesiones-20,
+        .patient-quick-card .patient-card-portal-bar-19 .btn-plan-casa-20 {
+            display: none !important;
+        }
+    `;
+    document.head.appendChild(st);
+})();
+
+// 1. Transformar cada tarjeta en formato Minimalista (Nombre + Código + Editar/Eliminar) con despliegue al apretar
+function aplicarDisenoMinimalistaTarjetasPacientes22() {
+    document.querySelectorAll(".patient-quick-card").forEach(card => {
+        if (card.closest("#contenedorPortalClinicoPaciente19")) {
+            card.classList.add("pac-portal-item-22");
+            return;
+        }
+
+        const btnEst = card.querySelector("button[onclick*='abrirModalGestionEstudiosDePaciente19']");
+        const matchClave = (btnEst?.getAttribute("onclick") || "").match(/'([^']+)'/);
+        const clave = matchClave ? matchClave[1] : "";
+        const ficha = clave ? obtenerPacienteUniversalPorClave19(clave) : extraerDatosDeTarjetaDOM19(card);
+        if (!ficha) return;
+
+        // A) Poner el Código (🔑 PSI-ZMMY) directamente en la cabecera debajo del nombre
+        const cabecera = card.firstElementChild;
+        const h4 = cabecera?.querySelector("h4");
+        const cajaTextoNombre = h4?.parentElement;
+
+        if (cajaTextoNombre) {
+            let filaCodigo = cajaTextoNombre.querySelector(".pac-header-code-row-22");
+            if (!filaCodigo) {
+                filaCodigo = document.createElement("div");
+                filaCodigo.className = "pac-header-code-row-22";
+                cajaTextoNombre.appendChild(filaCodigo);
+            }
+
+            const usadas = Number(ficha.sesionesUsadas) ?? 1;
+            const totales = Number(ficha.sesionesTotales) || 10;
+            const renderSignature = `${ficha.codigoAcceso}_${ficha.mutual}_${usadas}_${totales}`;
+
+            if (filaCodigo.dataset.sig !== renderSignature) {
+                filaCodigo.dataset.sig = renderSignature;
+                filaCodigo.innerHTML = `
+                    <span class="pac-code-mini-pill-22" onclick="event.stopPropagation(); navigator.clipboard.writeText('${ficha.codigoAcceso}'); if(typeof mostrarToast==='function') mostrarToast('📋 Código copiado: ${ficha.codigoAcceso}');" title="Tocá para copiar el código">
+                        🔑 ${ficha.codigoAcceso}
+                    </span>
+                    <span class="pac-mutual-mini-pill-22">${ficha.mutual || "Particular"} • ${usadas}/${totales} ses.</span>
+                `;
+            }
+        }
+
+        // B) Agregar flecha desplegable (▾) al lado de los botones Editar (✏️) y Eliminar (🗑️)
+        if (cabecera) {
+            const btnEdit = cabecera.querySelector("button");
+            const cajaBotonesTop = btnEdit?.parentElement;
+            if (cajaBotonesTop && !cajaBotonesTop.querySelector(".pac-chevron-btn-22")) {
+                const btnChevron = document.createElement("button");
+                btnChevron.type = "button";
+                btnChevron.className = "pac-chevron-btn-22";
+                btnChevron.title = "Desplegar / Ocultar opciones del paciente";
+                btnChevron.innerHTML = `▾`;
+                btnChevron.onclick = (e) => {
+                    e.stopPropagation();
+                    card.classList.toggle("pac-card-expanded-22");
+                };
+                cajaBotonesTop.appendChild(btnChevron);
+            }
+        }
+
+        // C) Hacer que al apretar la tarjeta se despliegue/pliegue suavemente (en vez de tener todo amontonado)
+        if (card.dataset.clickAccordion22 !== "1") {
+            card.dataset.clickAccordion22 = "1";
+            card.removeAttribute("onclick");
+            card.addEventListener("click", function (e) {
+                if (e.target.closest("button, a, input, select, .pac-code-mini-pill-22, .badge-sesiones-editable-20")) {
+                    return;
+                }
+                card.classList.toggle("pac-card-expanded-22");
+            });
+        }
+
+        // D) Limpiar cajas vacías ("🩺 -", "👨‍⚕️ -", "EVA 0/10") dentro de la parte desplegable
+        card.querySelectorAll("div, p, small, span").forEach(el => {
+            if (el.children.length === 0) {
+                const t = (el.textContent || "").trim();
+                if (t === "🩺 -" || t === "🩺" || t === "-") el.classList.add("diag-empty-22");
+                if (t === "👨‍⚕️ -" || t === "🧑‍⚕️ -") el.classList.add("prof-empty-22");
+            }
+        });
+        const diagBox = card.querySelector(".patient-quick-diag");
+        if (diagBox) {
+            const limpio = (diagBox.textContent || "").replace("🩺", "").trim();
+            if (!limpio || limpio === "-") diagBox.classList.add("diag-empty-22");
+        }
+
+        card.querySelectorAll(".badge").forEach(b => {
+            const txt = (b.textContent || "").trim();
+            if (/^EVA\s+\d+/i.test(txt)) b.classList.add("badge-eva-hidden-22");
+        });
+
+        // E) Dejar los 4 botones secundarios del desplegable cortos y prolijos
+        const barra = card.querySelector(".patient-card-portal-bar-19");
+        if (barra) {
+            if (btnEst) {
+                const cantEst = Array.isArray(ficha.estudiosClinicos) ? ficha.estudiosClinicos.length : 0;
+                btnEst.innerHTML = `📎 Estudios (${cantEst})`;
+            }
+            const btnTok = barra.querySelector(".btn-tokens-mutual-21");
+            if (btnTok) {
+                const cantTok = Array.isArray(ficha.historialSesionesTokens) ? ficha.historialSesionesTokens.length : 0;
+                btnTok.innerHTML = `🔐 Tokens${cantTok ? ` (${cantTok})` : ""}`;
+            }
+            const btnWa = barra.querySelector("button[onclick*='enviarCodigoPacientePorWA19']");
+            if (btnWa) btnWa.innerHTML = `<i class="ri-whatsapp-line"></i> Código WA`;
+            const btnPortal = barra.querySelector("button[onclick*='abrirVistaPortalPaciente19']");
+            if (btnPortal) btnPortal.innerHTML = `👁️ Portal`;
+        }
+    });
+}
+
+// 2. ADENTRO DEL PACIENTE ("📂 Ingresar al Paciente"):
+//    Inyectar la barra completa con Estudios, Tokens, Sesiones, Notas/RP, Código WA y Portal
+function inyectarCentralCompletaAdentroDelPaciente22() {
+    document.querySelectorAll(".modal-backdrop:not(.hidden) .modal-window").forEach(win => {
+        if (win.closest("#modalSuiteProfesionales18")) return;
+
+        const textoWin = win.innerText || "";
+        const esExpedientePaciente =
+            win.querySelector(".clinical-session-timeline, .evo-pain-scale-bar, .specialty-clinical-panel") ||
+            (textoWin.includes("DNI") && (textoWin.includes("Sesión") || textoWin.includes("Historia") || textoWin.includes("Evolución")));
+
+        if (!esExpedientePaciente) return;
+
+        const mapa = obtenerMapaUniversalPacientes19();
+        let ficha = null;
+
+        const matchDni = textoWin.match(/DNI[:\s]*([\d.]{6,12})/i);
+        if (matchDni) {
+            const dniBuscado = matchDni[1].replace(/\D/g, "");
+            ficha = Object.values(mapa).find(x => String(x.dni || "").replace(/\D/g, "") === dniBuscado);
+        }
+        if (!ficha) {
+            const h3 = win.querySelector(".modal-top h3, h3, h2");
+            const titulo = (h3?.innerText || "").toLowerCase();
+            ficha = Object.values(mapa).find(x => {
+                const partes = String(x.nombreCompleto || "").toLowerCase().split(/[,\s]+/).filter(Boolean);
+                return partes.length >= 2 && partes.every(p => titulo.includes(p));
+            });
+        }
+        if (!ficha) return;
+
+        const top = win.querySelector(".modal-top");
+        if (!top) return;
+
+        let barraInterna = win.querySelector(".barra-herramientas-interna-paciente-22");
+        if (!barraInterna) {
+            barraInterna = document.createElement("div");
+            barraInterna.className = "barra-herramientas-interna-paciente-22";
+            barraInterna.style = "background:linear-gradient(135deg, #0c192c 0%, #0369a1 100%); color:#ffffff; border-radius:16px; padding:0.9rem 1.1rem; margin-bottom:1.1rem; display:flex; justify-content:space-between; align-items:center; gap:0.8rem; flex-wrap:wrap; box-shadow:var(--shadow-card);";
+            top.insertAdjacentElement("afterend", barraInterna);
+        }
+
+        const usadas = Number(ficha.sesionesUsadas) ?? 1;
+        const totales = Number(ficha.sesionesTotales) || 10;
+        const cantEst = Array.isArray(ficha.estudiosClinicos) ? ficha.estudiosClinicos.length : 0;
+        const cantTok = Array.isArray(ficha.historialSesionesTokens) ? ficha.historialSesionesTokens.length : 0;
+        const cantNotas = Array.isArray(ficha.anotacionesProfesional) ? ficha.anotacionesProfesional.length : 0;
+
+        const firmaEstado = `${ficha.clave}_${usadas}_${totales}_${cantEst}_${cantTok}_${cantNotas}`;
+        if (barraInterna.dataset.sig === firmaEstado) return;
+        barraInterna.dataset.sig = firmaEstado;
+
+        barraInterna.innerHTML = `
+            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                <span class="badge" style="background:#6366f1; color:#fff; font-size:0.78rem; font-weight:800; cursor:pointer;" onclick="navigator.clipboard.writeText('${ficha.codigoAcceso}'); if(typeof mostrarToast==='function') mostrarToast('📋 Código copiado: ${ficha.codigoAcceso}');">
+                    🔑 ${ficha.codigoAcceso}
+                </span>
+                <span class="badge" style="background:rgba(255,255,255,0.16); color:#fff; font-size:0.75rem;">
+                    🏥 ${ficha.mutual || "Particular"}
+                </span>
+                <button type="button" class="btn btn-sm" style="background:#10b981; color:#fff; border:none; min-height:28px; padding:0.2rem 0.6rem; font-size:0.74rem; font-weight:800;" onclick="abrirModalConfigurarSesionesPaciente20('${ficha.clave}')">
+                    🎟️ Sesiones: ${usadas}/${totales} ✏️
+                </button>
+            </div>
+
+            <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                <button type="button" class="btn btn-sm" style="background:#38bdf8; color:#0f172a; font-weight:800; min-height:30px;" onclick="abrirModalGestionEstudiosDePaciente19('${ficha.clave}')">
+                    📎 Estudios (${cantEst})
+                </button>
+                <button type="button" class="btn btn-sm" style="background:#ffffff; color:#0f172a; font-weight:800; min-height:30px;" onclick="abrirModalTokensSesionesPaciente21('${ficha.clave}')">
+                    🔐 Tokens (${cantTok})
+                </button>
+                <button type="button" class="btn btn-sm" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.3); min-height:30px;" onclick="abrirModalAnotacionesYRecetasProf20('${ficha.clave}')">
+                    📝 Notas / RP (${cantNotas})
+                </button>
+                <button type="button" class="btn btn-whatsapp btn-sm" style="min-height:30px;" onclick="enviarCodigoPacientePorWA19('${ficha.clave}')">
+                    <i class="ri-whatsapp-line"></i> Código WA
+                </button>
+                <button type="button" class="btn btn-sm" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.3); min-height:30px;" onclick="abrirVistaPortalPaciente19('${ficha.clave}')">
+                    👁️ Portal
+                </button>
+            </div>
+        `;
+    });
+}
+
+// Conectar al flujo existente de tarjetas
+const _origInyectarTarjetasMinimal22 = inyectarCodigoYEstudiosEnTarjetasPacientesDOM19;
+inyectarCodigoYEstudiosEnTarjetasPacientesDOM19 = function (forzarRefresco = false) {
+    _origInyectarTarjetasMinimal22.apply(this, arguments);
+    aplicarDisenoMinimalistaTarjetasPacientes22();
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(aplicarDisenoMinimalistaTarjetasPacientes22, 240);
+    setTimeout(aplicarDisenoMinimalistaTarjetasPacientes22, 600);
+});
+
+document.addEventListener("click", () => {
+    setTimeout(() => {
+        aplicarDisenoMinimalistaTarjetasPacientes22();
+        inyectarCentralCompletaAdentroDelPaciente22();
+    }, 50);
+});
+// =========================================================================
+// 23. BLOC DE NOTAS RÁPIDAS PRO (SLIDE-OVER MODERNO CON AUTOGUARDADO EN VIVO)
+//     - ACCESO DESDE LA BARRA SUPERIOR ("📝 Notas") O ATAJO ALT + N
+//     - TARJETAS POR COLORES, FIJADO (📌), CHECKLIST DE TAREAS Y BUSCADOR
+//     - AISLADO POR COMERCIO/CONSULTORIO Y COMPATIBLE CON MODO DÍA / NOCHE
+// Pegar al final de app.js
+// =========================================================================
+
+const STORAGE_NOTAS_RAPIDAS_KEY_23 = "cdm_notas_rapidas_pro_v23";
+let filtroColorNotas23 = "todos";
+
+function obtenerClaveComercioNotas23() {
+    return localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal";
+}
+
+function obtenerNotasRapidasClub23() {
+    const claveClub = obtenerClaveComercioNotas23();
+    let mapa = {};
+    try {
+        mapa = JSON.parse(localStorage.getItem(STORAGE_NOTAS_RAPIDAS_KEY_23) || "{}") || {};
+    } catch {
+        mapa = {};
+    }
+
+    if (!Array.isArray(mapa[claveClub])) {
+        mapa[claveClub] = [
+            {
+                id: Date.now(),
+                titulo: "📌 Recordatorios rápidos del día",
+                texto: "Escribí acá teléfonos, recordatorios de turnos, pendientes de mutuales o ideas. Todo se guarda solo mientras escribís.",
+                color: "amber",
+                fijada: true,
+                fecha: new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
+                checks: [
+                    { id: 1, texto: "Revisar turnos de mañana", hecho: false },
+                    { id: 2, texto: "Controlar órdenes y tokens pendientes", hecho: false }
+                ]
+            }
+        ];
+        localStorage.setItem(STORAGE_NOTAS_RAPIDAS_KEY_23, JSON.stringify(mapa));
+    }
+    return mapa[claveClub];
+}
+
+function guardarNotasRapidasClub23(listaNotas) {
+    const claveClub = obtenerClaveComercioNotas23();
+    let mapa = {};
+    try {
+        mapa = JSON.parse(localStorage.getItem(STORAGE_NOTAS_RAPIDAS_KEY_23) || "{}") || {};
+    } catch {
+        mapa = {};
+    }
+    mapa[claveClub] = listaNotas;
+    localStorage.setItem(STORAGE_NOTAS_RAPIDAS_KEY_23, JSON.stringify(mapa));
+    actualizarContadorBotonNotas23(listaNotas.length);
+}
+
+(function inyectarEstilosNotasRapidas23() {
+    if (document.getElementById("cdmCssNotasRapidas23")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssNotasRapidas23";
+    st.textContent = `
+        /* Ocultar el bloc de notas del administrador cuando entra un deportista o paciente */
+        body[data-rol="usuario"] #btnTopbarNotasRapidas23,
+        body[data-rol="usuario"] #cdmQuickNotesDrawer23,
+        body.login-page #btnTopbarNotasRapidas23,
+        body.login-page #cdmQuickNotesDrawer23 {
+            display: none !important;
+        }
+
+        #cdmQuickNotesBackdrop23 {
+            position: fixed;
+            inset: 0;
+            background: rgba(12, 25, 44, 0.45);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 9998;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.24s ease;
+        }
+        #cdmQuickNotesBackdrop23.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #cdmQuickNotesDrawer23 {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: min(440px, 94vw);
+            background: var(--surface-solid, #ffffff);
+            border-left: 1.5px solid var(--line-strong, #cbd5e1);
+            box-shadow: -20px 0 50px rgba(12, 25, 44, 0.28);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(104%);
+            transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #cdmQuickNotesDrawer23.open {
+            transform: translateX(0);
+        }
+
+        .qn-header-23 {
+            padding: 1.15rem 1.25rem;
+            background: linear-gradient(135deg, #0c192c 0%, #0369a1 100%);
+            color: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .qn-toolbar-23 {
+            padding: 0.85rem 1.1rem;
+            background: var(--surface-subtle, #f8fafc);
+            border-bottom: 1px solid var(--line-strong, #e2e8f0);
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+
+        .qn-color-filters-23 {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .qn-color-dot-23 {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .qn-color-dot-23:hover,
+        .qn-color-dot-23.active {
+            transform: scale(1.16);
+            border-color: var(--ink-900, #0f172a);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.18);
+        }
+
+        .qn-body-list-23 {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem 1.1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+
+        /* Tarjetas de Notas Modernas */
+        .qn-card-23 {
+            border-radius: 18px;
+            padding: 0.95rem 1.05rem;
+            border: 1.5px solid var(--line-strong, #e2e8f0);
+            border-left-width: 5px;
+            background: var(--surface-solid, #ffffff);
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .qn-card-23:hover {
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+        }
+
+        .qn-card-23.theme-blue { border-left-color: #0284c7; background: linear-gradient(to bottom right, var(--surface-solid, #fff), rgba(2, 132, 199, 0.05)); }
+        .qn-card-23.theme-amber { border-left-color: #f59e0b; background: linear-gradient(to bottom right, var(--surface-solid, #fff), rgba(245, 158, 11, 0.07)); }
+        .qn-card-23.theme-emerald { border-left-color: #10b981; background: linear-gradient(to bottom right, var(--surface-solid, #fff), rgba(16, 185, 129, 0.06)); }
+        .qn-card-23.theme-purple { border-left-color: #6366f1; background: linear-gradient(to bottom right, var(--surface-solid, #fff), rgba(99, 102, 241, 0.06)); }
+
+        .qn-title-input-23 {
+            border: none !important;
+            background: transparent !important;
+            font-weight: 800 !important;
+            font-size: 0.95rem !important;
+            color: var(--ink-900, #0f172a) !important;
+            padding: 0 !important;
+            min-height: auto !important;
+            width: 100% !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+
+        .qn-text-area-23 {
+            border: none !important;
+            background: rgba(255, 255, 255, 0.45) !important;
+            border-radius: 10px !important;
+            font-size: 0.83rem !important;
+            line-height: 1.5 !important;
+            color: var(--ink-700, #334155) !important;
+            padding: 0.45rem 0.6rem !important;
+            width: 100% !important;
+            resize: vertical !important;
+            min-height: 58px !important;
+            outline: none !important;
+            border: 1px dashed rgba(148, 163, 184, 0.35) !important;
+        }
+        body[data-theme="dark"] .qn-text-area-23 {
+            background: rgba(15, 23, 42, 0.4) !important;
+        }
+        .qn-text-area-23:focus {
+            border-color: #0284c7 !important;
+        }
+
+        .qn-checklist-box-23 {
+            display: flex;
+            flex-direction: column;
+            gap: 0.32rem;
+        }
+        .qn-check-row-23 {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.8rem;
+            color: var(--ink-800, #1e293b);
+        }
+        .qn-check-row-23.done span {
+            text-decoration: line-through;
+            opacity: 0.55;
+        }
+
+        .qn-card-footer-23 {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 0.35rem;
+            border-top: 1px dashed var(--line, #e2e8f0);
+            font-size: 0.7rem;
+            color: var(--ink-400, #94a3b8);
+        }
+
+        .qn-icon-btn-23 {
+            border: none;
+            background: transparent;
+            color: var(--ink-500, #64748b);
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 7px;
+            font-size: 0.85rem;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+        .qn-icon-btn-23:hover {
+            background: var(--surface-subtle, #f1f5f9);
+            color: var(--ink-900, #0f172a);
+        }
+        .qn-icon-btn-23.pinned {
+            color: #f59e0b;
+            font-weight: 800;
+        }
+    `;
+    document.head.appendChild(st);
+})();
+
+function actualizarContadorBotonNotas23(cantidad = null) {
+    const badge = document.getElementById("badgeCantNotas23");
+    if (!badge) return;
+    const total = cantidad !== null ? cantidad : obtenerNotasRapidasClub23().length;
+    badge.textContent = total;
+}
+
+function inyectarBotonYDrawerNotasRapidas23() {
+    if (document.body?.getAttribute("data-rol") === "usuario" || document.body?.classList.contains("login-page")) {
+        return;
+    }
+
+    // 1. Inyectar botón "📝 Notas" en la barra superior
+    const topRight = document.getElementById("cdmBarraSesionActiva") || document.querySelector(".topbar-right") || document.querySelector(".topbar-actions");
+    if (topRight && !document.getElementById("btnTopbarNotasRapidas23")) {
+        const cant = obtenerNotasRapidasClub23().length;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "btnTopbarNotasRapidas23";
+        btn.className = "btn btn-secondary btn-sm";
+        btn.style = "background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color:#92400e; border-color:#f59e0b; font-weight:800;";
+        btn.title = "Abrir Bloc de Notas Rápidas (Atajo: Alt + N)";
+        btn.onclick = alternarDrawerNotasRapidas23;
+        btn.innerHTML = `<i class="ri-sticky-note-fill"></i><span>Notas</span><span id="badgeCantNotas23" class="badge" style="background:#92400e; color:#fff; font-size:0.65rem; padding:1px 6px; margin-left:2px;">${cant}</span>`;
+        topRight.insertBefore(btn, topRight.firstChild);
+    }
+
+    // 2. Crear el Drawer lateral deslizable si aún no existe
+    if (!document.getElementById("cdmQuickNotesDrawer23")) {
+        const backdrop = document.createElement("div");
+        backdrop.id = "cdmQuickNotesBackdrop23";
+        backdrop.onclick = cerrarDrawerNotasRapidas23;
+        document.body.appendChild(backdrop);
+
+        const drawer = document.createElement("aside");
+        drawer.id = "cdmQuickNotesDrawer23";
+        drawer.innerHTML = `
+            <div class="qn-header-23">
+                <div>
+                    <span class="badge" style="background:rgba(255,255,255,0.2); color:#fff; font-size:0.64rem;">⚡ AUTOGUARDADO EN VIVO</span>
+                    <h3 style="font-size:1.1rem; font-weight:800; color:#ffffff; margin:2px 0 0 0;">📝 Bloc de Notas Rápidas</h3>
+                </div>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-primary btn-sm" style="background:#38bdf8; color:#0f172a; font-weight:800;" onclick="crearNuevaNotaRapida23('blue')">
+                        + Nueva Nota
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" style="color:#fff; border-color:rgba(255,255,255,0.25);" onclick="cerrarDrawerNotasRapidas23()">✕</button>
+                </div>
+            </div>
+
+            <div class="qn-toolbar-23">
+                <div class="search-box" style="min-height:36px;">
+                    <i class="ri-search-line"></i>
+                    <input type="text" id="inpBuscarNotasRapidas23" placeholder="Buscar en mis notas..." oninput="renderizarListaNotasRapidas23()" style="min-height:34px; font-size:0.8rem;">
+                </div>
+
+                <div class="qn-color-filters-23">
+                    <div style="display:flex; align-items:center; gap:0.45rem;">
+                        <small style="font-size:0.72rem; font-weight:700; color:var(--ink-500);">Crear por color:</small>
+                        <button type="button" class="qn-color-dot-23" style="background:#0284c7;" onclick="crearNuevaNotaRapida23('blue')" title="+ Nota Celeste (General / Turnos)"></button>
+                        <button type="button" class="qn-color-dot-23" style="background:#f59e0b;" onclick="crearNuevaNotaRapida23('amber')" title="+ Nota Ámbar (Importante / Urgente)"></button>
+                        <button type="button" class="qn-color-dot-23" style="background:#10b981;" onclick="crearNuevaNotaRapida23('emerald')" title="+ Nota Esmeralda (Cobros / Mutual)"></button>
+                        <button type="button" class="qn-color-dot-23" style="background:#6366f1;" onclick="crearNuevaNotaRapida23('purple')" title="+ Nota Violeta (Ideas / Recordatorio)"></button>
+                    </div>
+                    <select id="selFiltroColorNotas23" onchange="filtroColorNotas23=this.value; renderizarListaNotasRapidas23();" style="width:auto; min-height:28px; padding:0.15rem 0.5rem; font-size:0.73rem; font-weight:700;">
+                        <option value="todos">Todas</option>
+                        <option value="fijadas">📌 Fijadas</option>
+                        <option value="blue">🔵 Celestes</option>
+                        <option value="amber">🟡 Ámbar</option>
+                        <option value="emerald">🟢 Esmeralda</option>
+                        <option value="purple">🟣 Violetas</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="contenedorTarjetasNotasRapidas23" class="qn-body-list-23"></div>
+        `;
+        document.body.appendChild(drawer);
+    }
+}
+
+function alternarDrawerNotasRapidas23() {
+    inyectarBotonYDrawerNotasRapidas23();
+    const drawer = document.getElementById("cdmQuickNotesDrawer23");
+    const backdrop = document.getElementById("cdmQuickNotesBackdrop23");
+    if (!drawer) return;
+
+    const abrir = !drawer.classList.contains("open");
+    drawer.classList.toggle("open", abrir);
+    backdrop?.classList.toggle("open", abrir);
+    if (abrir) {
+        renderizarListaNotasRapidas23();
+    }
+}
+
+function cerrarDrawerNotasRapidas23() {
+    document.getElementById("cdmQuickNotesDrawer23")?.classList.remove("open");
+    document.getElementById("cdmQuickNotesBackdrop23")?.classList.remove("open");
+}
+
+function crearNuevaNotaRapida23(color = "blue") {
+    const notas = obtenerNotasRapidasClub23();
+    notas.unshift({
+        id: Date.now(),
+        titulo: "",
+        texto: "",
+        color: color || "blue",
+        fijada: false,
+        fecha: new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
+        checks: []
+    });
+    guardarNotasRapidasClub23(notas);
+    renderizarListaNotasRapidas23();
+
+    setTimeout(() => {
+        const primerInput = document.querySelector("#contenedorTarjetasNotasRapidas23 .qn-title-input-23");
+        if (primerInput) primerInput.focus();
+    }, 60);
+}
+
+// Autoguardado silencioso mientras escribe (sin re-renderizar para no perder el cursor)
+function actualizarCampoNotaEnVivo23(idNota, campo, valor) {
+    const notas = obtenerNotasRapidasClub23();
+    const nota = notas.find(n => Number(n.id) === Number(idNota));
+    if (!nota) return;
+    nota[campo] = valor;
+    nota.fecha = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    guardarNotasRapidasClub23(notas);
+}
+
+function alternarFijarNota23(idNota) {
+    const notas = obtenerNotasRapidasClub23();
+    const nota = notas.find(n => Number(n.id) === Number(idNota));
+    if (!nota) return;
+    nota.fijada = !Boolean(nota.fijada);
+    guardarNotasRapidasClub23(notas);
+    renderizarListaNotasRapidas23();
+}
+
+function cambiarColorNota23(idNota, nuevoColor) {
+    const notas = obtenerNotasRapidasClub23();
+    const nota = notas.find(n => Number(n.id) === Number(idNota));
+    if (!nota) return;
+    nota.color = nuevoColor;
+    guardarNotasRapidasClub23(notas);
+    renderizarListaNotasRapidas23();
+}
+
+function agregarItemChecklistNota23(idNota) {
+    const textoItem = prompt("➕ Escribí la tarea o ítem para tildar:", "");
+    if (!textoItem || !textoItem.trim()) return;
+
+    const notas = obtenerNotasRapidasClub23();
+    const nota = notas.find(n => Number(n.id) === Number(idNota));
+    if (!nota) return;
+
+    if (!Array.isArray(nota.checks)) nota.checks = [];
+    nota.checks.push({
+        id: Date.now(),
+        texto: textoItem.trim(),
+        hecho: false
+    });
+    guardarNotasRapidasClub23(notas);
+    renderizarListaNotasRapidas23();
+}
+
+function alternarCheckItemNota23(idNota, idCheck) {
+    const notas = obtenerNotasRapidasClub23();
+    const nota = notas.find(n => Number(n.id) === Number(idNota));
+    if (!nota || !Array.isArray(nota.checks)) return;
+
+    const item = nota.checks.find(c => Number(c.id) === Number(idCheck));
+    if (!item) return;
+    item.hecho = !Boolean(item.hecho);
+    guardarNotasRapidasClub23(notas);
+    renderizarListaNotasRapidas23();
+}
+
+function quitarCheckItemNota23(idNota, idCheck) {
+    const notas = obtenerNotasRapidasClub23();
+    const nota = notas.find(n => Number(n.id) === Number(idNota));
+    if (!nota || !Array.isArray(nota.checks)) return;
+
+    nota.checks = nota.checks.filter(c => Number(c.id) !== Number(idCheck));
+    guardarNotasRapidasClub23(notas);
+    renderizarListaNotasRapidas23();
+}
+
+function eliminarNotaRapida23(idNota) {
+    if (!confirm("🗑️ ¿Eliminar esta nota rápida?")) return;
+    let notas = obtenerNotasRapidasClub23();
+    notas = notas.filter(n => Number(n.id) !== Number(idNota));
+    guardarNotasRapidasClub23(notas);
+    renderizarListaNotasRapidas23();
+}
+
+function compartirNotaPorWA23(idNota) {
+    const notas = obtenerNotasRapidasClub23();
+    const n = notas.find(x => Number(x.id) === Number(idNota));
+    if (!n) return;
+
+    const checksTxt = Array.isArray(n.checks) && n.checks.length > 0
+        ? "\n" + n.checks.map(c => `${c.hecho ? "✅" : "⬜"} ${c.texto}`).join("\n")
+        : "";
+    const msg = `📝 *${n.titulo || "Nota Rápida"}*\n${n.texto || ""}${checksTxt}`.trim();
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+}
+
+function copiarNotaPortapapeles23(idNota) {
+    const notas = obtenerNotasRapidasClub23();
+    const n = notas.find(x => Number(x.id) === Number(idNota));
+    if (!n) return;
+
+    const checksTxt = Array.isArray(n.checks) && n.checks.length > 0
+        ? "\n" + n.checks.map(c => `${c.hecho ? "[x]" : "[ ]"} ${c.texto}`).join("\n")
+        : "";
+    const msg = `${n.titulo || "Nota"}\n${n.texto || ""}${checksTxt}`.trim();
+    navigator.clipboard.writeText(msg);
+    if (typeof mostrarToast === "function") mostrarToast("📋 Nota copiada al portapapeles.");
+}
+
+function renderizarListaNotasRapidas23() {
+    const cont = document.getElementById("contenedorTarjetasNotasRapidas23");
+    if (!cont) return;
+
+    const q = (document.getElementById("inpBuscarNotasRapidas23")?.value || "").toLowerCase().trim();
+    let notas = [...obtenerNotasRapidasClub23()];
+
+    // Ordenar: primero las fijadas (📌)
+    notas.sort((a, b) => (b.fijada ? 1 : 0) - (a.fijada ? 1 : 0));
+
+    if (filtroColorNotas23 === "fijadas") {
+        notas = notas.filter(n => n.fijada);
+    } else if (filtroColorNotas23 !== "todos") {
+        notas = notas.filter(n => n.color === filtroColorNotas23);
+    }
+
+    if (q) {
+        notas = notas.filter(n =>
+            (n.titulo || "").toLowerCase().includes(q) ||
+            (n.texto || "").toLowerCase().includes(q) ||
+            (n.checks || []).some(c => (c.texto || "").toLowerCase().includes(q))
+        );
+    }
+
+    if (notas.length === 0) {
+        cont.innerHTML = `
+            <div class="empty-box" style="margin-top:1rem;">
+                <p style="margin-bottom:0.65rem;">No hay notas en este filtro.</p>
+                <button type="button" class="btn btn-primary btn-sm" onclick="crearNuevaNotaRapida23('blue')">+ Crear Nota Rápida</button>
+            </div>
+        `;
+        return;
+    }
+
+    const coloresDisponibles = ["blue", "amber", "emerald", "purple"];
+    const hexMapa = { blue: "#0284c7", amber: "#f59e0b", emerald: "#10b981", purple: "#6366f1" };
+
+    cont.innerHTML = notas.map(n => {
+        const checks = Array.isArray(n.checks) ? n.checks : [];
+        return `
+            <div class="qn-card-23 theme-${n.color || "blue"}">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem;">
+                    <input type="text" class="qn-title-input-23"
+                        placeholder="Título de la nota..."
+                        value="${(n.titulo || "").replace(/"/g, "&quot;")}"
+                        oninput="actualizarCampoNotaEnVivo23(${n.id}, 'titulo', this.value)">
+                    <button type="button" class="qn-icon-btn-23 ${n.fijada ? "pinned" : ""}" onclick="alternarFijarNota23(${n.id})" title="${n.fijada ? "Quitar fijado" : "Fijar nota arriba"}">
+                        📌
+                    </button>
+                </div>
+
+                <textarea class="qn-text-area-23"
+                    placeholder="Escribí acá tu nota rápida..."
+                    oninput="actualizarCampoNotaEnVivo23(${n.id}, 'texto', this.value)">${n.texto || ""}</textarea>
+
+                ${checks.length > 0 ? `
+                    <div class="qn-checklist-box-23">
+                        ${checks.map(c => `
+                            <div class="qn-check-row-23 ${c.hecho ? "done" : ""}">
+                                <input type="checkbox" ${c.hecho ? "checked" : ""} onchange="alternarCheckItemNota23(${n.id}, ${c.id})" style="width:16px; height:16px; min-height:auto; cursor:pointer;">
+                                <span style="flex:1; cursor:pointer;" onclick="alternarCheckItemNota23(${n.id}, ${c.id})">${c.texto}</span>
+                                <button type="button" class="qn-icon-btn-23" style="font-size:0.72rem; padding:1px 4px;" onclick="quitarCheckItemNota23(${n.id}, ${c.id})">✕</button>
+                            </div>
+                        `).join("")}
+                    </div>
+                ` : ""}
+
+                <div class="qn-card-footer-23">
+                    <div style="display:flex; align-items:center; gap:0.35rem;">
+                        ${coloresDisponibles.map(col => `
+                            <span onclick="cambiarColorNota23(${n.id}, '${col}')"
+                                style="width:13px; height:13px; border-radius:50%; background:${hexMapa[col]}; cursor:pointer; display:inline-block; border:${n.color === col ? "2px solid var(--ink-900)" : "none"};"
+                                title="Cambiar color"></span>
+                        `).join("")}
+                        <small style="margin-left:4px;">${n.fecha || ""}</small>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:0.15rem;">
+                        <button type="button" class="qn-icon-btn-23" onclick="agregarItemChecklistNota23(${n.id})" title="Agregar tarea tildable (+ Check)">
+                            ☑️ +Tarea
+                        </button>
+                        <button type="button" class="qn-icon-btn-23" onclick="copiarNotaPortapapeles23(${n.id})" title="Copiar nota">
+                            📋
+                        </button>
+                        <button type="button" class="qn-icon-btn-23" onclick="compartirNotaPorWA23(${n.id})" title="Enviar por WhatsApp">
+                            <i class="ri-whatsapp-line" style="color:#10b981;"></i>
+                        </button>
+                        <button type="button" class="qn-icon-btn-23" onclick="eliminarNotaRapida23(${n.id})" title="Eliminar nota">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+// Atajo de teclado rápido: Alt + N para abrir o cerrar las Notas Rápidas desde cualquier pantalla
+window.addEventListener("keydown", (e) => {
+    if (e.altKey && (e.key === "n" || e.key === "N")) {
+        e.preventDefault();
+        alternarDrawerNotasRapidas23();
+    }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(inyectarBotonYDrawerNotasRapidas23, 220);
+    setTimeout(inyectarBotonYDrawerNotasRapidas23, 650);
+});
+// =========================================================================
+// 24. APLICADOR DE BLOQUEOS GRANULARES (SALUD Y DEPORTES)
+//     + MÓDULO DE GENOGRAMA / ÁRBOL GENEALÓGICO Y RED VINCULAR POR PACIENTE
+//     - 4 RAMAS: ABUELOS, PADRES, HERMANOS/PAREJA/HIJOS Y AMIGOS/APOYO
+//     - ESQUEMA VISUAL INTERACTIVO POR TIPO DE VÍNCULO + NOTAS SISTÉMICAS + PDF A4
+// Pegar al final de app.js (debajo del Apartado 23)
+// =========================================================================
+
+function obtenerFuncionesActivasApp24() {
+    if (typeof obtenerLicenciaConfigCDM === "function") {
+        const lic = obtenerLicenciaConfigCDM();
+        if (lic && lic.funciones) return lic.funciones;
+    }
+    try {
+        const lic = JSON.parse(localStorage.getItem("cdm_licencia_config_v1") || "null");
+        if (lic && lic.funciones) return lic.funciones;
+    } catch {}
+    return {
+        salud: { agenda: true, mutuales: true, genograma: true, evolucion: true, eva: true, portalEstudios: true, equipo: true },
+        deporte: { cobranza: true, rutinasVideos: true, evaluaciones1RM: true, partidosPizarra: true, ranking: true, planSemanal: true },
+        general: { notasRapidas: true }
+    };
+}
+
+// 24.1 ESTILOS DE BLOQUEO INSTANTÁNEO + ESTILOS VISUALES DEL GENOGRAMA
+(function inyectarCSSBloqueosYGenograma24() {
+    if (document.getElementById("cdmCssBloqueosYGenograma24")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssBloqueosYGenograma24";
+    st.textContent = `
+        /* 1. REGLAS CSS DE BLOQUEO POR INTERRUPTOR (CERO PARPADEO) */
+        body[data-feat-gen-notas="off"] #btnTopbarNotasRapidas23,
+        body[data-feat-gen-notas="off"] #cdmQuickNotesDrawer23 {
+            display: none !important;
+        }
+
+        body[data-feat-sal-portal="off"] .pac-code-mini-pill-22,
+        body[data-feat-sal-portal="off"] .badge-codigo-paciente-19,
+        body[data-feat-sal-portal="off"] button[onclick*="abrirModalGestionEstudiosDePaciente19"],
+        body[data-feat-sal-portal="off"] button[onclick*="enviarCodigoPacientePorWA19"],
+        body[data-feat-sal-portal="off"] button[onclick*="abrirVistaPortalPaciente19"],
+        body[data-feat-sal-portal="off"] button[onclick*="abrirModalAnotacionesYRecetasProf20"],
+        body[data-feat-sal-portal="off"] #btnToolEstudiosPacientes19 {
+            display: none !important;
+        }
+
+        body[data-feat-sal-mutuales="off"] .btn-tokens-mutual-21,
+        body[data-feat-sal-mutuales="off"] .badge-token-mutual-21,
+        body[data-feat-sal-mutuales="off"] .pac-mutual-mini-pill-22 {
+            display: none !important;
+        }
+
+        body[data-feat-sal-genograma="off"] .btn-genograma-24 {
+            display: none !important;
+        }
+
+        body[data-feat-sal-eva="off"] .evo-pain-scale-bar,
+        body[data-feat-sal-eva="off"] .badge-eva-hidden-22 {
+            display: none !important;
+        }
+
+        body[data-feat-sal-agenda="off"] #bannerAlarma24hConsultorio18 {
+            display: none !important;
+        }
+
+        /* Bloqueos en Deportes / Gimnasio */
+        body[data-feat-dep-ranking="off"] .ovr-score-badge,
+        body[data-feat-dep-ranking="off"] button[onclick*="calificarJugador"],
+        body[data-feat-dep-ranking="off"] #dep-sec-ranking,
+        body[data-feat-dep-ranking="off"] #jug-sec-ranking-user,
+        body[data-feat-dep-ranking="off"] .mod-tab[data-user-tab="ranking-user"] {
+            display: none !important;
+        }
+
+        body[data-feat-dep-partidos="off"] #dep-sec-partido {
+            display: none !important;
+        }
+
+        body[data-feat-dep-plan="off"] #dep-sec-microciclo {
+            display: none !important;
+        }
+
+        body[data-feat-dep-evals="off"] #jug-sec-calculadora,
+        body[data-feat-dep-evals="off"] .mod-tab[data-user-tab="calculadora"] {
+            display: none !important;
+        }
+
+        body[data-feat-dep-rutinas="off"] #dep-sec-rutinas,
+        body[data-feat-dep-rutinas="off"] #gym-sec-rutinas,
+        body[data-feat-dep-rutinas="off"] #gym-sec-videoteca,
+        body[data-feat-dep-rutinas="off"] #jug-sec-rutinas,
+        body[data-feat-dep-rutinas="off"] #jug-sec-videoteca-user {
+            display: none !important;
+        }
+
+        body[data-feat-dep-cobranza="off"] button[onclick*="alternarEstadoPago"],
+        body[data-feat-dep-cobranza="off"] button[onclick*="enviarReciboPago"],
+        body[data-feat-dep-cobranza="off"] .badge-cobranza-oculta-24 {
+            display: none !important;
+        }
+
+        /* Botonera flexible en la tarjeta del paciente desplegada para que se adapte a 1, 2, 3 o 5 botones visibles */
+        .patient-quick-card .patient-card-portal-bar-19 {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 0.35rem !important;
+        }
+        .patient-quick-card .patient-card-portal-bar-19 .btn {
+            flex: 1 1 92px !important;
+            width: auto !important;
+        }
+
+        /* 2. ESTILOS MODERNOS DEL ÁRBOL GENEALÓGICO / GENOGRAMA */
+        .geno-tree-canvas-24 {
+            background: linear-gradient(180deg, var(--surface-subtle, #f8fafc) 0%, var(--cdm-50, #f0f9ff) 100%);
+            border: 1.5px solid var(--line-celeste, #bae6fd);
+            border-radius: 18px;
+            padding: 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            position: relative;
+        }
+
+        .geno-level-24 {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.45rem;
+            position: relative;
+        }
+
+        .geno-level-title-24 {
+            font-size: 0.67rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--ink-500, #64748b);
+            background: var(--surface-solid, #ffffff);
+            padding: 0.16rem 0.65rem;
+            border-radius: 999px;
+            border: 1px solid var(--line-strong, #cbd5e1);
+        }
+
+        .geno-nodes-row-24 {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+            width: 100%;
+        }
+
+        .geno-connector-down-24 {
+            width: 2px;
+            height: 16px;
+            background: #94a3b8;
+            margin: -0.45rem auto;
+            opacity: 0.55;
+        }
+
+        .geno-node-card-24 {
+            background: var(--surface-solid, #ffffff);
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            border-top: 4px solid #0284c7;
+            border-radius: 13px;
+            padding: 0.5rem 0.75rem;
+            min-width: 132px;
+            max-width: 195px;
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            text-align: left;
+        }
+        .geno-node-card-24:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+        }
+
+        .geno-node-card-24.vinc-cercano { border-top-color: #10b981; }
+        .geno-node-card-24.vinc-normal { border-top-color: #0284c7; }
+        .geno-node-card-24.vinc-distante { border-top-color: #94a3b8; }
+        .geno-node-card-24.vinc-conflictivo { border-top-color: #ef4444; background: rgba(254, 242, 242, 0.65); }
+        .geno-node-card-24.vinc-fallecido { border-top-color: #475569; border-style: dashed; opacity: 0.85; }
+
+        .geno-patient-center-24 {
+            background: linear-gradient(135deg, #0c192c 0%, #0369a1 100%);
+            color: #ffffff;
+            border: 2px solid #38bdf8;
+            border-radius: 16px;
+            padding: 0.6rem 1.05rem;
+            min-width: 165px;
+            text-align: center;
+            box-shadow: 0 8px 20px rgba(2, 132, 199, 0.3);
+        }
+
+        .geno-friends-band-24 {
+            border-top: 1.5px dashed var(--line-celeste, #7dd3fc);
+            padding-top: 0.75rem;
+            margin-top: 0.15rem;
+        }
+    `;
+    document.head.appendChild(st);
+})();
+
+// 24.2 MOTOR QUE OCULTA PESTAÑAS BLOQUEADAS EN CONSULTORIO Y DEPORTES/GYM
+function aplicarBloqueosPestanasYControles24() {
+    const f = obtenerFuncionesActivasApp24();
+
+    // A) CONSULTORIO: Ocultar pestañas apagadas y redirigir si la activa está bloqueada
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+    if (secCons && !secCons.classList.contains("hidden")) {
+        const tabs = Array.from(secCons.querySelectorAll(".mod-tab, .seg-btn, button")).filter(b =>
+            /^[1-5]\.\s*(Calendario|Pacientes|Profesionales|Mutuales|Liquidaci)/i.test((b.innerText || "").trim())
+        );
+
+        let tabActivaQuedoOculta = false;
+        let primerTabVisible = null;
+
+        tabs.forEach(tab => {
+            const txt = (tab.innerText || "").toLowerCase();
+            let permitido = true;
+            if (txt.includes("calendario")) permitido = f.salud.agenda !== false;
+            else if (txt.includes("profesionales")) permitido = f.salud.equipo !== false;
+            else if (txt.includes("mutuales") || txt.includes("liquidaci")) permitido = f.salud.mutuales !== false;
+
+            tab.style.display = permitido ? "" : "none";
+
+            if (permitido && !primerTabVisible) {
+                primerTabVisible = tab;
+            }
+            if (!permitido && tab.classList.contains("active")) {
+                tabActivaQuedoOculta = true;
+            }
+        });
+
+        // Ocultar también las tarjetas KPI superiores que correspondan a módulos bloqueados
+        secCons.querySelectorAll(".bento-kpi").forEach(kpi => {
+            const kTxt = (kpi.innerText || "").toLowerCase();
+            if (f.salud.agenda === false && kTxt.includes("turnos del mes")) kpi.style.display = "none";
+            else if (f.salud.mutuales === false && (kTxt.includes("convenios") || kTxt.includes("órdenes"))) kpi.style.display = "none";
+            else kpi.style.display = "";
+        });
+
+        // Si el cliente arrancó en "1. Calendario" pero tiene la agenda bloqueada, llevarlo directo a "2. Pacientes"
+        if (tabActivaQuedoOculta && primerTabVisible) {
+            primerTabVisible.click();
+        }
+    }
+
+    // B) DEPORTES Y GIMNASIO: Ocultar pestañas apagadas en futbol.html, hockey.html, gym.html y jugador.html
+    document.querySelectorAll(".module-tabs .mod-tab").forEach(tab => {
+        if (tab.closest("#cdmSeccionConsultorioGlobal") || tab.closest("#barraTabsPortalPaciente20")) return;
+        const txt = (tab.innerText || "").toLowerCase();
+        const onclickAttr = (tab.getAttribute("onclick") || "").toLowerCase();
+        let permitido = true;
+
+        if (txt.includes("partido") || txt.includes("pizarra") || onclickAttr.includes("partido")) {
+            permitido = f.deporte.partidosPizarra !== false;
+        } else if (txt.includes("ranking") || onclickAttr.includes("ranking")) {
+            permitido = f.deporte.ranking !== false;
+        } else if (txt.includes("plan semanal") || onclickAttr.includes("microciclo")) {
+            permitido = f.deporte.planSemanal !== false;
+        } else if (txt.includes("rutina") || txt.includes("video") || onclickAttr.includes("rutina") || onclickAttr.includes("videoteca")) {
+            permitido = f.deporte.rutinasVideos !== false;
+        } else if (txt.includes("1rm") || txt.includes("progreso") || onclickAttr.includes("calculadora")) {
+            permitido = f.deporte.evaluaciones1RM !== false;
+        }
+        tab.style.display = permitido ? "" : "none";
+    });
+
+    // Ocultar botón de "+ Sesión" en tarjetas de pacientes si evolución está desactivada
+    if (f.salud.evolucion === false) {
+        document.querySelectorAll(".patient-quick-card button").forEach(b => {
+            if ((b.innerText || "").includes("+ Sesión")) b.style.display = "none";
+        });
+    }
+}
+
+// =========================================================================
+// 24.3 MÓDULO INTERACTIVO DE GENOGRAMA / ÁRBOL GENEALÓGICO Y RED VINCULAR
+// =========================================================================
+
+const RAMAS_GENOGRAMA_24 = {
+    abuelos: { titulo: "👴👵 Abuelos / Familia Extensa", orden: 1 },
+    padres: { titulo: "👨‍👩‍👦 Padres / Crianza", orden: 2 },
+    nucleo: { titulo: "🧑‍🤝‍🧑 Hermanos, Pareja e Hijos", orden: 3 },
+    amigos: { titulo: "🤝 Amigos / Red de Apoyo", orden: 4 }
+};
+
+const VINCULOS_GENOGRAMA_24 = {
+    cercano: { badge: "🟢 Cercano / Sostén", color: "#10b981" },
+    normal: { badge: "🔵 Estable / Cotidiano", color: "#0284c7" },
+    distante: { badge: "⚪ Distante", color: "#64748b" },
+    conflictivo: { badge: "🔴 Tenso / Conflictivo", color: "#ef4444" },
+    fallecido: { badge: "🕊️ Fallecido", color: "#475569" }
+};
+
+function asegurarDatosGenograma24(ficha) {
+    if (!Array.isArray(ficha.genogramaNodos)) ficha.genogramaNodos = [];
+    if (typeof ficha.genogramaNotas !== "string") ficha.genogramaNotas = "";
+    return ficha.genogramaNodos;
+}
+
+function renderTarjetaNodoGenograma24(nodo, clavePaciente) {
+    const infoV = VINCULOS_GENOGRAMA_24[nodo.vinculo] || VINCULOS_GENOGRAMA_24.normal;
+    return `
+        <div class="geno-node-card-24 vinc-${nodo.vinculo || "normal"}" onclick="abrirModalGenogramaPaciente24('${clavePaciente}', ${nodo.id})" title="Tocá para editar o quitar">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.35rem; margin-bottom:2px;">
+                <strong style="font-size:0.84rem; color:var(--ink-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${nodo.nombre}</strong>
+                ${nodo.convive ? `<span title="Convive con el paciente" style="font-size:0.75rem;">🏠</span>` : ""}
+            </div>
+            <small style="display:block; font-size:0.71rem; font-weight:700; color:var(--cdm-700);">${nodo.parentesco}</small>
+            <span style="display:inline-block; font-size:0.64rem; font-weight:700; color:${infoV.color}; margin-top:3px;">${infoV.badge}</span>
+            ${nodo.observacion ? `<small style="display:block; font-size:0.67rem; color:var(--ink-500); margin-top:3px; line-height:1.25;">${nodo.observacion}</small>` : ""}
+        </div>
+    `;
+}
+
+window.abrirModalGenogramaPaciente24 = function (clavePaciente, idNodoEditar = null) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha) return;
+
+    const nodos = asegurarDatosGenograma24(ficha);
+    const nodoEdit = idNodoEditar ? nodos.find(n => Number(n.id) === Number(idNodoEditar)) : null;
+    const modal = asegurarModalSuiteProfesionales18();
+
+    const abuelos = nodos.filter(n => n.rama === "abuelos");
+    const padres = nodos.filter(n => n.rama === "padres");
+    const nucleo = nodos.filter(n => n.rama === "nucleo");
+    const amigos = nodos.filter(n => n.rama === "amigos");
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:860px;">
+            <div class="modal-top">
+                <div>
+                    <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                        <span class="badge badge-ok">🌳 GENOGRAMA Y RED VINCULAR</span>
+                        <span class="badge badge-celeste">${ficha.especialidad || "Psicología"} • ${ficha.mutual || "Particular"}</span>
+                    </div>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Árbol Familiar y Vínculos — ${ficha.nombreCompleto}</h3>
+                </div>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="imprimirGenogramaPDF24('${ficha.clave}')">
+                        🖨️ Imprimir / PDF A4
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalSuiteProfesionales18()">✕</button>
+                </div>
+            </div>
+
+            <!-- 1. MAPA VISUAL GENERACIONAL INTERACTIVO -->
+            <div class="geno-tree-canvas-24">
+                <!-- NIVEL 1: ABUELOS -->
+                <div class="geno-level-24">
+                    <span class="geno-level-title-24">👴👵 Abuelos / Familia Extensa (${abuelos.length})</span>
+                    <div class="geno-nodes-row-24">
+                        ${abuelos.length === 0
+                            ? `<small style="color:var(--ink-400); font-size:0.75rem;">Sin abuelos / familia extensa cargados aún</small>`
+                            : abuelos.map(n => renderTarjetaNodoGenograma24(n, ficha.clave)).join("")}
+                    </div>
+                </div>
+
+                <div class="geno-connector-down-24"></div>
+
+                <!-- NIVEL 2: PADRES -->
+                <div class="geno-level-24">
+                    <span class="geno-level-title-24">👨‍👩‍👦 Padres / Referentes de Crianza (${padres.length})</span>
+                    <div class="geno-nodes-row-24">
+                        ${padres.length === 0
+                            ? `<small style="color:var(--ink-400); font-size:0.75rem;">Sin padres cargados aún</small>`
+                            : padres.map(n => renderTarjetaNodoGenograma24(n, ficha.clave)).join("")}
+                    </div>
+                </div>
+
+                <div class="geno-connector-down-24"></div>
+
+                <!-- NIVEL 3: PACIENTE EN EL CENTRO + HERMANOS, PAREJA E HIJOS -->
+                <div class="geno-level-24">
+                    <span class="geno-level-title-24">🧑‍🤝‍🧑 Núcleo Actual (Paciente, Hermanos, Pareja e Hijos)</span>
+                    <div class="geno-nodes-row-24" style="align-items:center;">
+                        <div class="geno-patient-center-24">
+                            <span style="font-size:0.62rem; text-transform:uppercase; font-weight:800; color:#bae6fd; display:block;">PACIENTE</span>
+                            <strong style="font-size:0.95rem; display:block; margin-top:2px;">${ficha.nombreCompleto}</strong>
+                            <small style="font-size:0.68rem; color:#e0f2fe;">DNI ${ficha.dni || "-"}</small>
+                        </div>
+                        ${nucleo.map(n => renderTarjetaNodoGenograma24(n, ficha.clave)).join("")}
+                    </div>
+                </div>
+
+                <!-- RAMA 4: AMIGOS Y RED DE APOYO -->
+                <div class="geno-level-24 geno-friends-band-24">
+                    <span class="geno-level-title-24">🤝 Amigos y Red de Apoyo Social (${amigos.length})</span>
+                    <div class="geno-nodes-row-24">
+                        ${amigos.length === 0
+                            ? `<small style="color:var(--ink-400); font-size:0.75rem;">Sin amigos o red social cargados aún</small>`
+                            : amigos.map(n => renderTarjetaNodoGenograma24(n, ficha.clave)).join("")}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. FORMULARIO RÁPIDO PARA AGREGAR O EDITAR INTEGRANTE -->
+            <form onsubmit="guardarNodoGenograma24(event, '${ficha.clave}', ${nodoEdit ? nodoEdit.id : "null"})"
+                style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:16px; padding:1rem; margin-bottom:0.9rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; flex-wrap:wrap; gap:0.4rem;">
+                    <strong style="font-size:0.84rem; color:var(--ink-900);">
+                        ${nodoEdit ? `✏️ Editando a: ${nodoEdit.nombre} (${nodoEdit.parentesco})` : "➕ Agregar Familiar, Pareja o Amigo al Árbol"}
+                    </strong>
+                    ${nodoEdit ? `
+                        <div style="display:flex; gap:0.35rem;">
+                            <button type="button" class="btn btn-danger btn-sm" onclick="eliminarNodoGenograma24('${ficha.clave}', ${nodoEdit.id})">🗑️ Quitar del Árbol</button>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalGenogramaPaciente24('${ficha.clave}')">Cancelar Edición</button>
+                        </div>
+                    ` : ""}
+                </div>
+
+                <div class="grid-4" style="margin-bottom:0.65rem;">
+                    <div class="field">
+                        <label>Nombre / Apodo *</label>
+                        <input type="text" id="genoNombre24" required placeholder="Ej: Marta / Lucas" value="${(nodoEdit?.nombre || "").replace(/"/g, "&quot;")}">
+                    </div>
+                    <div class="field">
+                        <label>Rama del Árbol *</label>
+                        <select id="genoRama24" required>
+                            <option value="padres" ${(!nodoEdit || nodoEdit.rama === "padres") ? "selected" : ""}>👨‍👩‍👦 Padres / Crianza</option>
+                            <option value="abuelos" ${nodoEdit?.rama === "abuelos" ? "selected" : ""}>👴👵 Abuelos / Extensa</option>
+                            <option value="nucleo" ${nodoEdit?.rama === "nucleo" ? "selected" : ""}>🧑‍🤝‍🧑 Hermanos / Pareja / Hijos</option>
+                            <option value="amigos" ${nodoEdit?.rama === "amigos" ? "selected" : ""}>🤝 Amigos / Red de Apoyo</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Parentesco / Rol *</label>
+                        <input type="text" id="genoParentesco24" list="dlParentescosGeno24" required placeholder="Ej: Madre / Hermano / Amigo" value="${(nodoEdit?.parentesco || "").replace(/"/g, "&quot;")}">
+                        <datalist id="dlParentescosGeno24">
+                            <option value="Madre"><option value="Padre"><option value="Abuela Materna"><option value="Abuelo Materno">
+                            <option value="Abuela Paterna"><option value="Abuelo Paterno"><option value="Hermano"><option value="Hermana">
+                            <option value="Pareja"><option value="Ex-pareja"><option value="Hijo/a"><option value="Mejor Amigo/a">
+                            <option value="Amigo/a"><option value="Tío/a"><option value="Padrastro / Madrastra">
+                        </datalist>
+                    </div>
+                    <div class="field">
+                        <label>Tipo de Vínculo *</label>
+                        <select id="genoVinculo24" required>
+                            <option value="cercano" ${nodoEdit?.vinculo === "cercano" ? "selected" : ""}>🟢 Cercano / Sostén</option>
+                            <option value="normal" ${(!nodoEdit || nodoEdit.vinculo === "normal") ? "selected" : ""}>🔵 Estable / Cotidiano</option>
+                            <option value="distante" ${nodoEdit?.vinculo === "distante" ? "selected" : ""}>⚪ Distante / Poco trato</option>
+                            <option value="conflictivo" ${nodoEdit?.vinculo === "conflictivo" ? "selected" : ""}>🔴 Tenso / Conflictivo</option>
+                            <option value="fallecido" ${nodoEdit?.vinculo === "fallecido" ? "selected" : ""}>🕊️ Fallecido</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:flex; align-items:flex-end; gap:0.75rem; flex-wrap:wrap;">
+                    <div class="field" style="flex:1; min-width:220px;">
+                        <label>Observación Clínica Breve (Opcional)</label>
+                        <input type="text" id="genoObs24" placeholder="Ej: Principal sostén afectivo / Falleció hace 3 años / Vive en otra ciudad..." value="${(nodoEdit?.observacion || "").replace(/"/g, "&quot;")}">
+                    </div>
+                    <label style="display:flex; align-items:center; gap:0.4rem; background:#ffffff; border:1px solid var(--line-strong); border-radius:10px; padding:0.48rem 0.75rem; font-size:0.78rem; font-weight:700; cursor:pointer;">
+                        <input type="checkbox" id="genoConvive24" style="width:17px; height:17px; min-height:auto;" ${nodoEdit?.convive ? "checked" : ""}>
+                        <span>🏠 Convive</span>
+                    </label>
+                    <button type="submit" class="btn btn-primary btn-sm" style="min-height:38px;">
+                        <i class="ri-save-3-line"></i> ${nodoEdit ? "Guardar Cambios" : "+ Sumar al Árbol"}
+                    </button>
+                </div>
+            </form>
+
+            <!-- 3. NOTAS GENERALES DE DINÁMICA FAMILIAR (AUTOGUARDADO) -->
+            <div class="field">
+                <label>📝 Notas Generales de Dinámica Familiar y Vínculos (Autoguardado)</label>
+                <textarea rows="2" placeholder="Anotaciones generales sobre la estructura familiar, convivientes o red de contención..."
+                    oninput="guardarNotasGeneralesGenograma24('${ficha.clave}', this.value)">${ficha.genogramaNotas || ""}</textarea>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.guardarNodoGenograma24 = function (e, clavePaciente, idEditar = null) {
+    e.preventDefault();
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+
+    const nodos = asegurarDatosGenograma24(ficha);
+    const datos = {
+        id: idEditar ? Number(idEditar) : Date.now(),
+        nombre: document.getElementById("genoNombre24").value.trim(),
+        rama: document.getElementById("genoRama24").value,
+        parentesco: document.getElementById("genoParentesco24").value.trim(),
+        vinculo: document.getElementById("genoVinculo24").value,
+        convive: Boolean(document.getElementById("genoConvive24")?.checked),
+        observacion: (document.getElementById("genoObs24")?.value || "").trim()
+    };
+
+    if (idEditar) {
+        const idx = nodos.findIndex(n => Number(n.id) === Number(idEditar));
+        if (idx >= 0) nodos[idx] = datos;
+    } else {
+        nodos.push(datos);
+    }
+
+    guardarMapaUniversalPacientes19(mapa);
+    inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(true);
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`🌳 ${datos.nombre} (${datos.parentesco}) guardado en el genograma.`);
+    }
+    abrirModalGenogramaPaciente24(clavePaciente, null);
+};
+
+window.eliminarNodoGenograma24 = function (clavePaciente, idNodo) {
+    if (!confirm("🗑️ ¿Quitar esta persona del genograma del paciente?")) return;
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+
+    ficha.genogramaNodos = (ficha.genogramaNodos || []).filter(n => Number(n.id) !== Number(idNodo));
+    guardarMapaUniversalPacientes19(mapa);
+    inyectarCodigoYEstudiosEnTarjetasPacientesDOM19(true);
+    abrirModalGenogramaPaciente24(clavePaciente, null);
+};
+
+window.guardarNotasGeneralesGenograma24 = function (clavePaciente, texto) {
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+    ficha.genogramaNotas = texto;
+    guardarMapaUniversalPacientes19(mapa);
+};
+
+window.imprimirGenogramaPDF24 = function (clavePaciente) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha) return;
+    const nodos = asegurarDatosGenograma24(ficha);
+    const hoy = new Date().toLocaleDateString("es-AR");
+    const modal = asegurarModalSuiteProfesionales18();
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:760px;">
+            <div class="modal-top no-print-pdf">
+                <h3>🖨️ Genograma y Red Vincular — ${ficha.nombreCompleto}</h3>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalGenogramaPaciente24('${ficha.clave}')">← Volver al Editor</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalSuiteProfesionales18()">✕</button>
+                </div>
+            </div>
+            <div class="tactical-pdf-sheet" style="padding:2rem;">
+                <div style="display:flex; justify-content:space-between; border-bottom:2.5px solid #0284c7; padding-bottom:0.9rem; margin-bottom:1.1rem;">
+                    <div>
+                        <span style="font-size:0.72rem; font-weight:800; color:#0284c7;">HISTORIA CLÍNICA — MAPA FAMILIAR Y VINCULAR</span>
+                        <h2 style="font-size:1.35rem; font-weight:900; color:#0f172a; margin:2px 0;">${ficha.nombreCompleto}</h2>
+                        <small style="color:#475569; font-weight:600;">DNI ${ficha.dni || "-"} • Cobertura: ${ficha.mutual || "Particular"}</small>
+                    </div>
+                    <div style="text-align:right;">
+                        <strong style="color:#0f172a; display:block;">Fecha: ${hoy}</strong>
+                        <small style="color:#64748b;">${nodos.length} vínculo(s) registrados</small>
+                    </div>
+                </div>
+
+                <table class="app-table" style="margin-bottom:1.25rem;">
+                    <thead>
+                        <tr>
+                            <th>Rama</th>
+                            <th>Nombre</th>
+                            <th>Parentesco / Rol</th>
+                            <th>Vínculo</th>
+                            <th>Convive</th>
+                            <th>Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${nodos.length === 0
+                            ? `<tr><td colspan="6" style="text-align:center;">Sin vínculos cargados.</td></tr>`
+                            : nodos.map(n => `
+                                <tr>
+                                    <td>${RAMAS_GENOGRAMA_24[n.rama]?.titulo || n.rama}</td>
+                                    <td><strong>${n.nombre}</strong></td>
+                                    <td>${n.parentesco}</td>
+                                    <td>${VINCULOS_GENOGRAMA_24[n.vinculo]?.badge || n.vinculo}</td>
+                                    <td>${n.convive ? "Sí 🏠" : "No"}</td>
+                                    <td>${n.observacion || "-"}</td>
+                                </tr>
+                            `).join("")}
+                    </tbody>
+                </table>
+
+                ${ficha.genogramaNotas ? `
+                    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:0.95rem 1.1rem;">
+                        <strong style="font-size:0.84rem; color:#0f172a; display:block; margin-bottom:4px;">📝 Notas de Dinámica Familiar y Contexto:</strong>
+                        <div style="white-space:pre-line; font-size:0.88rem; color:#334155;">${ficha.genogramaNotas}</div>
+                    </div>
+                ` : ""}
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+// =========================================================================
+// 24.4 CONECTAR EL BOTÓN "🌳 GENOGRAMA" EN TARJETAS Y ADENTRO DEL PACIENTE
+// =========================================================================
+
+function inyectarBotonGenogramaEnTarjetasYExpediente24() {
+    const f = obtenerFuncionesActivasApp24();
+
+    // 1. En cada tarjeta desplegable de paciente
+    document.querySelectorAll(".patient-quick-card").forEach(card => {
+        if (card.closest("#contenedorPortalClinicoPaciente19")) return;
+        const barra = card.querySelector(".patient-card-portal-bar-19");
+        if (!barra) return;
+
+        const btnEst = barra.querySelector("button[onclick*='abrirModalGestionEstudiosDePaciente19']");
+        const matchClave = (btnEst?.getAttribute("onclick") || "").match(/'([^']+)'/);
+        if (!matchClave) return;
+        const clave = matchClave[1];
+        const ficha = obtenerPacienteUniversalPorClave19(clave);
+        if (!ficha) return;
+
+        const cantGeno = Array.isArray(ficha.genogramaNodos) ? ficha.genogramaNodos.length : 0;
+
+        let btnGeno = barra.querySelector(".btn-genograma-24");
+        if (!btnGeno) {
+            btnGeno = document.createElement("button");
+            btnGeno.type = "button";
+            btnGeno.className = "btn btn-secondary btn-sm btn-genograma-24";
+            btnGeno.style = "border-color:rgba(16,185,129,0.45); color:#047857; background:rgba(16,185,129,0.1); font-weight:800;";
+            btnGeno.title = "Abrir Genograma / Árbol Familiar y Vínculos";
+            btnGeno.onclick = (e) => {
+                e.stopPropagation();
+                abrirModalGenogramaPaciente24(clave);
+            };
+            barra.insertBefore(btnGeno, barra.firstChild);
+        }
+        btnGeno.innerHTML = `🌳 Genograma${cantGeno > 0 ? ` (${cantGeno})` : ""}`;
+    });
+
+    // 2. Adentro del modal "📂 Ingresar al Paciente"
+    document.querySelectorAll(".barra-herramientas-interna-paciente-22").forEach(barraInt => {
+        const btnEstInt = barraInt.querySelector("button[onclick*='abrirModalGestionEstudiosDePaciente19']");
+        const m = (btnEstInt?.getAttribute("onclick") || "").match(/'([^']+)'/);
+        if (!m) return;
+        const clave = m[1];
+        const ficha = obtenerPacienteUniversalPorClave19(clave);
+        if (!ficha) return;
+
+        const cantGeno = Array.isArray(ficha.genogramaNodos) ? ficha.genogramaNodos.length : 0;
+        const contBotones = barraInt.querySelector("div:last-child");
+        if (!contBotones) return;
+
+        let btnGenoInt = contBotones.querySelector(".btn-genograma-24");
+        if (!btnGenoInt) {
+            btnGenoInt = document.createElement("button");
+            btnGenoInt.type = "button";
+            btnGenoInt.className = "btn btn-sm btn-genograma-24";
+            btnGenoInt.style = "background:#10b981; color:#ffffff; font-weight:800; min-height:30px;";
+            btnGenoInt.onclick = () => abrirModalGenogramaPaciente24(clave);
+            contBotones.prepend(btnGenoInt);
+        }
+        btnGenoInt.innerHTML = `🌳 Genograma (${cantGeno})`;
+    });
+
+    // 3. Reaplicar bloqueos de pestañas y controles
+    aplicarBloqueosPestanasYControles24();
+}
+
+const _origInyectarTarjetas22_24 = inyectarCodigoYEstudiosEnTarjetasPacientesDOM19;
+inyectarCodigoYEstudiosEnTarjetasPacientesDOM19 = function (forzarRefresco = false) {
+    _origInyectarTarjetas22_24.apply(this, arguments);
+    inyectarBotonGenogramaEnTarjetasYExpediente24();
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        if (typeof sincronizarAtributosFuncionesBody14 === "function") sincronizarAtributosFuncionesBody14();
+        inyectarBotonGenogramaEnTarjetasYExpediente24();
+    }, 260);
+    setTimeout(inyectarBotonGenogramaEnTarjetasYExpediente24, 650);
+});
+
+document.addEventListener("click", () => {
+    setTimeout(() => {
+        inyectarBotonGenogramaEnTarjetasYExpediente24();
+    }, 65);
+});
+// =========================================================================
+// 25. PAQUETE 1 — GESTIÓN FINANCIERA Y FACTURACIÓN PRO:
+//     1) 📊 LOTE MENSUAL POR MUTUAL (EXCEL CSV + PDF A4 CON TOKENS)
+//     2) 📈 ACTUALIZACIÓN MASIVA DE CUOTAS (% O MONTO) + ALIAS/CBU EN WHATSAPP
+//     3) 💵 CIERRE DE CAJA POR MEDIO DE PAGO (EFECTIVO / TRANSFERENCIA / MUTUALES)
+// Pegar al final de app.js (debajo del Apartado 24)
+// =========================================================================
+
+function obtenerClaveClubFinanzas25() {
+    return localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal";
+}
+
+function obtenerMesActualYYYYMM25() {
+    return new Date().toISOString().slice(0, 7);
+}
+
+function obtenerLicenciaSafe25() {
+    if (typeof obtenerLicenciaConfigCDM === "function") return obtenerLicenciaConfigCDM();
+    try {
+        return JSON.parse(localStorage.getItem("cdm_licencia_config_v1") || "{}") || {};
+    } catch {
+        return {};
+    }
+}
+
+function guardarAliasYTitularComercio25(alias, titular) {
+    const clave = obtenerClaveClubFinanzas25();
+    const lic = obtenerLicenciaSafe25();
+    lic.aliasTransferencia = String(alias || "").trim();
+    lic.titularTransferencia = String(titular || "").trim();
+    localStorage.setItem("cdm_licencia_config_v1", JSON.stringify(lic));
+
+    try {
+        const mapa = JSON.parse(localStorage.getItem("cdm_mapa_multiclubes_v1") || "{}");
+        if (mapa[clave]?.licenciaConfig) {
+            mapa[clave].licenciaConfig.aliasTransferencia = lic.aliasTransferencia;
+            mapa[clave].licenciaConfig.titularTransferencia = lic.titularTransferencia;
+            localStorage.setItem("cdm_mapa_multiclubes_v1", JSON.stringify(mapa));
+        }
+    } catch {}
+    if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+}
+
+// Modal universal del Paquete 1 (funciona en index, gym, futbol, hockey y consultorio)
+function asegurarModalPaquete1_25() {
+    let modal = document.getElementById("modalFinanzasPro25");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalFinanzasPro25";
+        modal.className = "modal-backdrop hidden";
+        modal.style.zIndex = "9995";
+        document.body.appendChild(modal);
+    }
+    return modal;
+}
+
+window.cerrarModalPaquete1_25 = function () {
+    document.getElementById("modalFinanzasPro25")?.classList.add("hidden");
+};
+
+function descargarCSVExcel25(nombreArchivo, encabezados, filas) {
+    const escapar = (val) => {
+        const str = String(val === undefined || val === null ? "" : val).replace(/"/g, '""');
+        return `"${str}"`;
+    };
+    const lineas = [
+        encabezados.map(escapar).join(";"),
+        ...filas.map(f => f.map(escapar).join(";"))
+    ];
+    // BOM UTF-8 (\uFEFF) + separador punto y coma para que Excel en español abra acentos y columnas perfecto
+    const blob = new Blob(["\uFEFF" + lineas.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nombreArchivo.endsWith(".csv") ? nombreArchivo : `${nombreArchivo}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+// Inyectar estilos de bloqueo para los botones del Paquete 1
+(function inyectarCSSPaquete1_25() {
+    if (document.getElementById("cdmCssPaquete1_25")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssPaquete1_25";
+    st.textContent = `
+        body[data-rol="usuario"] #btnTopbarCaja25,
+        body.login-page #btnTopbarCaja25,
+        body[data-feat-gen-caja="off"] #btnTopbarCaja25,
+        body[data-feat-sal-lote="off"] .btn-lote-mutual-25,
+        body[data-feat-sal-mutuales="off"] .btn-lote-mutual-25,
+        body[data-feat-dep-aumento="off"] .btn-aumento-masivo-25,
+        body[data-feat-dep-cobranza="off"] .btn-aumento-masivo-25 {
+            display: none !important;
+        }
+        .caja-badge-medio-25 {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.18rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 800;
+        }
+        .caja-badge-medio-25.efectivo { background: rgba(16, 185, 129, 0.15); color: #047857; }
+        .caja-badge-medio-25.transferencia { background: rgba(2, 132, 199, 0.15); color: #0369a1; }
+        .caja-badge-medio-25.tarjeta { background: rgba(99, 102, 241, 0.15); color: #4338ca; }
+        .caja-badge-medio-25.mutual { background: rgba(245, 158, 11, 0.18); color: #b45309; }
+    `;
+    document.head.appendChild(st);
+})();
+
+// =========================================================================
+// 25.1 MÓDULO 1: LOTE MENSUAL POR MUTUAL (EXCEL CSV + PDF A4 PARA FACTURAR)
+// =========================================================================
+
+function obtenerArancelesMutualesMapa25() {
+    const clave = `cdm_aranceles_lote_v25_${obtenerClaveClubFinanzas25()}`;
+    let guardados = {};
+    try { guardados = JSON.parse(localStorage.getItem(clave) || "{}") || {}; } catch {}
+
+    // Leer valores base del consultorio si existen
+    if (typeof obtenerEstadoConsultorioClubActualCDM === "function") {
+        try {
+            const est = obtenerEstadoConsultorioClubActualCDM();
+            (est?.mutuales || []).forEach(m => {
+                const nom = String(m.nombre || m.mutual || "").trim();
+                const val = parseFloat(m.arancel || m.valor || m.valorSesion || m.monto);
+                if (nom && !isNaN(val) && val > 0 && !guardados[nom.toLowerCase()]) {
+                    guardados[nom.toLowerCase()] = val;
+                }
+            });
+        } catch {}
+    }
+    return guardados;
+}
+
+function guardarArancelMutualLote25(nombreMutual, valor) {
+    const clave = `cdm_aranceles_lote_v25_${obtenerClaveClubFinanzas25()}`;
+    const mapa = obtenerArancelesMutualesMapa25();
+    mapa[String(nombreMutual || "").toLowerCase().trim()] = Math.max(0, parseFloat(valor) || 0);
+    localStorage.setItem(clave, JSON.stringify(mapa));
+}
+
+function recopilarFilasLoteMutuales25(mesFiltro = "", mutualFiltro = "TODAS", arancelOverride = null) {
+    const filas = [];
+    const clavesDedupe = new Set();
+    const mapaAranceles = obtenerArancelesMutualesMapa25();
+
+    const obtenerValorSesion = (nomMutual, montoOriginal = 0) => {
+        if (arancelOverride !== null && arancelOverride !== "" && !isNaN(parseFloat(arancelOverride))) {
+            return parseFloat(arancelOverride);
+        }
+        if (montoOriginal > 0) return montoOriginal;
+        const k = String(nomMutual || "").toLowerCase().trim();
+        return mapaAranceles[k] || 15000;
+    };
+
+    // 1. Recolectar sesiones y tokens cargados desde las tarjetas/modal de cada paciente
+    if (typeof obtenerMapaUniversalPacientes19 === "function") {
+        const mapaPac = obtenerMapaUniversalPacientes19();
+        Object.values(mapaPac).forEach(ficha => {
+            if (!ficha) return;
+            const historial = Array.isArray(ficha.historialSesionesTokens) ? ficha.historialSesionesTokens : [];
+            historial.forEach(reg => {
+                const mutual = String(reg.mutual || ficha.mutual || "Particular").trim();
+                const fecha = String(reg.fecha || "").trim();
+                const token = String(reg.tokenMutual || "").trim().toUpperCase();
+                const orden = String(reg.nroOrdenMutual || `Ses. #${reg.nroSesion || 1}`).trim();
+                const dedupeKey = `${fecha}|${String(ficha.dni || ficha.nombreCompleto).toLowerCase()}|${token || orden}`;
+                if (clavesDedupe.has(dedupeKey)) return;
+                clavesDedupe.add(dedupeKey);
+
+                filas.push({
+                    fecha,
+                    paciente: ficha.nombreCompleto || "Paciente",
+                    dni: ficha.dni || "-",
+                    mutual,
+                    especialidad: ficha.especialidad || "Consultorio",
+                    profesional: ficha.profesional || "Profesional",
+                    nroOrden: orden,
+                    token,
+                    estado: token ? "Validado" : (reg.estadoToken || "Pendiente Token"),
+                    monto: obtenerValorSesion(mutual, 0)
+                });
+            });
+        });
+    }
+
+    // 2. Recolectar órdenes registradas en la pestaña 5. Liquidación de Órdenes del consultorio
+    if (typeof obtenerEstadoConsultorioClubActualCDM === "function") {
+        try {
+            const est = obtenerEstadoConsultorioClubActualCDM();
+            (est?.ordenes || []).forEach(o => {
+                const mutual = String(o.mutual || o.obraSocial || "Mutual").trim();
+                const fecha = String(o.fecha || "").trim();
+                const paciente = String(o.paciente || o.pacienteNombre || "Paciente").trim();
+                const token = String(o.tokenMutual || o.ultimoToken || "").trim().toUpperCase();
+                const orden = String(o.nroOrden || o.codigo || "-").trim();
+                const dedupeKey = `${fecha}|${paciente.toLowerCase()}|${token || orden}`;
+                if (clavesDedupe.has(dedupeKey)) return;
+                clavesDedupe.add(dedupeKey);
+
+                filas.push({
+                    fecha,
+                    paciente,
+                    dni: o.dni || "-",
+                    mutual,
+                    especialidad: o.especialidad || "Consultorio",
+                    profesional: o.profesional || "Profesional",
+                    nroOrden: orden,
+                    token,
+                    estado: token ? "Validado" : (o.estado || "Pendiente Token"),
+                    monto: obtenerValorSesion(mutual, parseFloat(o.monto || o.valor || 0))
+                });
+            });
+        } catch {}
+    }
+
+    // Obtener catálogo único de mutuales disponibles
+    const mutualesSet = new Set();
+    filas.forEach(f => { if (f.mutual) mutualesSet.add(f.mutual); });
+    if (typeof obtenerEstadoConsultorioClubActualCDM === "function") {
+        try {
+            const est = obtenerEstadoConsultorioClubActualCDM();
+            (est?.mutuales || []).forEach(m => { if (m?.nombre) mutualesSet.add(m.nombre); });
+        } catch {}
+    }
+    if (typeof obtenerMapaUniversalPacientes19 === "function") {
+        Object.values(obtenerMapaUniversalPacientes19()).forEach(f => {
+            if (f?.mutual) mutualesSet.add(f.mutual);
+        });
+    }
+
+    const filtradas = filas.filter(f => {
+        const cumpleMes = !mesFiltro || mesFiltro === "TODOS" || String(f.fecha || "").startsWith(mesFiltro);
+        const cumpleMutual = !mutualFiltro || mutualFiltro === "TODAS" ||
+            String(f.mutual || "").toLowerCase() === String(mutualFiltro).toLowerCase();
+        return cumpleMes && cumpleMutual;
+    });
+
+    filtradas.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    return { filas: filtradas, mutualesDisponibles: Array.from(mutualesSet).sort() };
+}
+
+window.abrirModalLoteMensualMutuales25 = function (mesOpt = null, mutualOpt = "TODAS", arancelOpt = null) {
+    const mesSel = mesOpt || obtenerMesActualYYYYMM25();
+    const { filas, mutualesDisponibles } = recopilarFilasLoteMutuales25(mesSel, mutualOpt, arancelOpt);
+
+    const totalMonto = filas.reduce((acc, f) => acc + (Number(f.monto) || 0), 0);
+    const validadas = filas.filter(f => Boolean(f.token)).length;
+    const sinToken = filas.filter(f => !f.token && !String(f.mutual).toLowerCase().includes("particular")).length;
+
+    const arancelMapa = obtenerArancelesMutualesMapa25();
+    const arancelInputVal = arancelOpt !== null
+        ? arancelOpt
+        : (mutualOpt !== "TODAS" ? (arancelMapa[String(mutualOpt).toLowerCase()] || "") : "");
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:880px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-ok">🏥 FACTURACIÓN DE OBRAS SOCIALES Y MUTUALES</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">📊 Lote Mensual por Mutual (Excel / PDF A4)</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+            </div>
+
+            <!-- FILTROS DEL LOTE -->
+            <div style="background:var(--surface-subtle); border:1.5px solid var(--line-celeste); border-radius:16px; padding:0.95rem 1.05rem; margin-bottom:1rem;">
+                <div class="grid-4" style="align-items:end;">
+                    <div class="field">
+                        <label>Mes de Facturación</label>
+                        <input type="month" id="loteMes25" value="${mesSel === "TODOS" ? obtenerMesActualYYYYMM25() : mesSel}"
+                            onchange="abrirModalLoteMensualMutuales25(this.value, document.getElementById('loteMutual25').value)">
+                    </div>
+                    <div class="field">
+                        <label>Obra Social / Mutual</label>
+                        <select id="loteMutual25" onchange="abrirModalLoteMensualMutuales25(document.getElementById('loteMes25').value, this.value)">
+                            <option value="TODAS" ${mutualOpt === "TODAS" ? "selected" : ""}>🏥 Todas las Mutuales (${mutualesDisponibles.length})</option>
+                            ${mutualesDisponibles.map(m => `<option value="${m.replace(/"/g, "&quot;")}" ${m === mutualOpt ? "selected" : ""}>${m}</option>`).join("")}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Valor Arancel Sesión ($)</label>
+                        <input type="number" id="loteArancelOverride25" placeholder="Ej: 18500" value="${arancelInputVal}">
+                    </div>
+                    <div style="display:flex; gap:0.35rem;">
+                        <button type="button" class="btn btn-secondary btn-sm" style="flex:1; min-height:38px;"
+                            onclick="const m=document.getElementById('loteMutual25').value; const a=document.getElementById('loteArancelOverride25').value; if(m!=='TODAS' && a) guardarArancelMutualLote25(m, a); abrirModalLoteMensualMutuales25(document.getElementById('loteMes25').value, m, a);">
+                            🔄 Aplicar Valor
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-sm" style="min-height:38px;"
+                            onclick="abrirModalLoteMensualMutuales25('TODOS', document.getElementById('loteMutual25').value)" title="Ver historial completo sin filtro de mes">
+                            Todo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESUMEN DEL LOTE -->
+            <div class="bento-kpis" style="margin-bottom:1rem;">
+                <div class="bento-kpi">
+                    <div class="kpi-icon"><i class="ri-file-list-3-fill"></i></div>
+                    <div class="kpi-data"><span>Prestaciones en Lote</span><strong>${filas.length} sesiones</strong></div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon ok"><i class="ri-shield-check-fill"></i></div>
+                    <div class="kpi-data"><span>Con Token Validado</span><strong>${validadas} sesiones</strong></div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon warn"><i class="ri-error-warning-fill"></i></div>
+                    <div class="kpi-data"><span>Falta Token Mutual</span><strong>${sinToken} pendientes</strong></div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon purple"><i class="ri-money-dollar-circle-fill"></i></div>
+                    <div class="kpi-data"><span>Total a Facturar</span><strong>$${totalMonto.toLocaleString("es-AR")}</strong></div>
+                </div>
+            </div>
+
+            <!-- TABLA DEL LOTE -->
+            ${filas.length === 0 ? `
+                <div class="empty-box" style="margin-bottom:1rem;">
+                    No hay prestaciones ni tokens cargados para <b>${mutualOpt === "TODAS" ? "ninguna mutual" : mutualOpt}</b> en <b>${mesSel}</b>.<br>
+                    <small>Cargá sesiones con el botón <b>"🔐 Tokens"</b> o <b>"✍️ + Sesión"</b> en la ficha de cada paciente para que aparezcan automáticamente acá.</small>
+                </div>
+            ` : `
+                <div class="table-wrap" style="max-height:300px; overflow-y:auto; margin-bottom:1rem;">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Paciente / DNI</th>
+                                <th>Mutual</th>
+                                <th>Orden / Sesión</th>
+                                <th>🔐 Token</th>
+                                <th>Arancel ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filas.map(f => `
+                                <tr>
+                                    <td data-label="Fecha"><b>${f.fecha || "-"}</b></td>
+                                    <td data-label="Paciente"><strong>${f.paciente}</strong><br><small style="color:var(--ink-500);">DNI ${f.dni}</small></td>
+                                    <td data-label="Mutual"><span class="badge badge-celeste">${f.mutual}</span></td>
+                                    <td data-label="Orden">${f.nroOrden}</td>
+                                    <td data-label="Token">
+                                        ${f.token
+                                            ? `<span class="badge badge-ok" style="font-weight:800;">🔐 ${f.token}</span>`
+                                            : `<span class="badge badge-warn">⚠️ Sin Token</span>`}
+                                    </td>
+                                    <td data-label="Arancel"><strong>$${Number(f.monto || 0).toLocaleString("es-AR")}</strong></td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+
+            <!-- BOTONES DE EXPORTACIÓN -->
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                <small style="color:var(--ink-500);">El archivo Excel (.csv) abre directo en Microsoft Excel y Google Sheets con columnas separadas.</small>
+                <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-ok btn-sm" onclick="exportarLoteMutualExcel25('${mesSel}', '${String(mutualOpt).replace(/'/g, "\\'")}', document.getElementById('loteArancelOverride25').value)">
+                        📥 Descargar Excel (.csv)
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="imprimirLoteMutualPDF25('${mesSel}', '${String(mutualOpt).replace(/'/g, "\\'")}', document.getElementById('loteArancelOverride25').value)">
+                        🖨️ Imprimir / PDF A4
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.exportarLoteMutualExcel25 = function (mesSel, mutualOpt, arancelVal) {
+    const { filas } = recopilarFilasLoteMutuales25(mesSel, mutualOpt, arancelVal || null);
+    if (!filas.length) {
+        alert("No hay filas en este lote para exportar.");
+        return;
+    }
+    const total = filas.reduce((a, f) => a + (Number(f.monto) || 0), 0);
+    const headers = ["Fecha", "Paciente", "DNI", "Obra Social / Mutual", "Especialidad", "Profesional", "Nro Orden / Sesion", "Token Validacion", "Estado", "Arancel ($)"];
+    const rows = filas.map(f => [
+        f.fecha, f.paciente, f.dni, f.mutual, f.especialidad, f.profesional, f.nroOrden, f.token || "PENDIENTE", f.estado, Number(f.monto || 0)
+    ]);
+    rows.push(["", "", "", "", "", "", "", "TOTAL LOTE", `${filas.length} sesiones`, total]);
+
+    const slugMutual = String(mutualOpt).toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    descargarCSVExcel25(`lote_facturacion_${slugMutual}_${mesSel}.csv`, headers, rows);
+    if (typeof mostrarToast === "function") mostrarToast("📥 Planilla Excel (.csv) del lote descargada.");
+};
+
+window.imprimirLoteMutualPDF25 = function (mesSel, mutualOpt, arancelVal) {
+    const { filas } = recopilarFilasLoteMutuales25(mesSel, mutualOpt, arancelVal || null);
+    const total = filas.reduce((a, f) => a + (Number(f.monto) || 0), 0);
+    const lic = obtenerLicenciaSafe25();
+    const hoy = new Date().toLocaleDateString("es-AR");
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:820px;">
+            <div class="modal-top no-print-pdf">
+                <h3>🖨️ Planilla Oficial de Facturación — ${mutualOpt} (${mesSel})</h3>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalLoteMensualMutuales25('${mesSel}', '${String(mutualOpt).replace(/'/g, "\\'")}', '${arancelVal || ""}')">← Volver</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+            <div class="tactical-pdf-sheet" style="padding:1.8rem;">
+                <div style="display:flex; justify-content:space-between; border-bottom:2.5px solid #0284c7; padding-bottom:0.9rem; margin-bottom:1.1rem;">
+                    <div>
+                        <span style="font-size:0.72rem; font-weight:800; color:#0284c7;">LOTE DE PRESENTACIÓN PARA FACTURACIÓN</span>
+                        <h2 style="font-size:1.35rem; font-weight:900; color:#0f172a; margin:2px 0;">${lic.nombreEntidad || "Consultorio Profesional"}</h2>
+                        <small style="color:#475569; font-weight:700;">Obra Social / Mutual: ${mutualOpt} • Período: ${mesSel}</small>
+                    </div>
+                    <div style="text-align:right;">
+                        <strong style="color:#0f172a; display:block;">Emitido: ${hoy}</strong>
+                        <strong style="color:#047857; font-size:1.05rem;">TOTAL: $${total.toLocaleString("es-AR")}</strong>
+                    </div>
+                </div>
+                <table class="app-table" style="font-size:0.8rem;">
+                    <thead>
+                        <tr><th>Fecha</th><th>Paciente</th><th>DNI</th><th>Mutual</th><th>Orden</th><th>Token</th><th style="text-align:right;">Arancel</th></tr>
+                    </thead>
+                    <tbody>
+                        ${filas.map(f => `
+                            <tr>
+                                <td>${f.fecha}</td>
+                                <td><strong>${f.paciente}</strong></td>
+                                <td>${f.dni}</td>
+                                <td>${f.mutual}</td>
+                                <td>${f.nroOrden}</td>
+                                <td><strong>${f.token || "PENDIENTE"}</strong></td>
+                                <td style="text-align:right;">$${Number(f.monto || 0).toLocaleString("es-AR")}</td>
+                            </tr>
+                        `).join("")}
+                        <tr style="background:#f1f5f9; font-weight:900;">
+                            <td colspan="6" style="text-align:right;">TOTAL DEL LOTE (${filas.length} prestaciones):</td>
+                            <td style="text-align:right; color:#047857;">$${total.toLocaleString("es-AR")}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+// =========================================================================
+// 25.2 MÓDULO 2: AUMENTO MASIVO DE CUOTAS + RADAR VENCIMIENTOS + ALIAS WA
+// =========================================================================
+
+function calcularDiasDesdeUltimoPago25(p) {
+    if (!p?.ultimoPagoFecha) return null;
+    const diff = Date.now() - new Date(p.ultimoPagoFecha).getTime();
+    if (isNaN(diff)) return null;
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+function redondearImporte25(monto, paso) {
+    const p = parseInt(paso) || 0;
+    if (p <= 0) return Math.round(monto);
+    return Math.round(monto / p) * p;
+}
+
+// Mejorar enviarReciboPagoWhatsApp para que SIEMPRE incluya Alias/CBU cuando la cuota está pendiente
+const _origEnviarReciboWA25 = typeof enviarReciboPagoWhatsApp === "function" ? enviarReciboPagoWhatsApp : null;
+window.enviarReciboPagoWhatsApp = function (idPersona) {
+    const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(idPersona));
+    if (!p) return _origEnviarReciboWA25 ? _origEnviarReciboWA25(idPersona) : null;
+
+    const lic = obtenerLicenciaSafe25();
+    const entidad = (lic.nombreEntidad || "CLUB / GIMNASIO").toUpperCase();
+    const alias = lic.aliasTransferencia || "";
+    const titular = lic.titularTransferencia || "";
+    const tel = (p.whatsapp || "").replace(/\D/g, "");
+    const monto = Number(p.montoCuota || 25000).toLocaleString("es-AR");
+    const hoy = new Date().toLocaleDateString("es-AR");
+
+    let msg = "";
+    if ((p.pagoEstado || "Al Día") === "Al Día") {
+        msg = `✅ *COMPROBANTE OFICIAL DE PAGO — ${entidad}*\n` +
+              `----------------------------------\n` +
+              `👤 *Socio/a:* ${p.nombre} ${p.apellido} (DNI ${p.dni})\n` +
+              `🏋️ *Plan:* ${p.deporte} (${p.puesto})\n` +
+              `💳 *Monto Abonado:* $${monto}\n` +
+              `📅 *Fecha:* ${hoy}\n` +
+              `✅ *Estado:* CUOTA AL DÍA`;
+    } else {
+        msg = `💳 *RECORDATORIO DE CUOTA — ${entidad}*\n\n` +
+              `Hola *${p.nombre}*, te recordamos el vencimiento de tu cuota mensual de *${p.deporte}* (${p.puesto}).\n` +
+              `💰 *Importe actual:* *$${monto}*\n`;
+        if (alias) {
+            msg += `\n🏦 *Datos para Transferencia:*\n• *Alias / CBU:* \`${alias}\`\n`;
+            if (titular) msg += `• *Titular:* ${titular}\n`;
+            msg += `_Una vez transferido, envianos el comprobante por acá. ¡Muchas gracias!_`;
+        } else {
+            msg += `\nPodés abonarla en recepción o por transferencia. ¡Muchas gracias!`;
+        }
+    }
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+window.abrirModalAumentoMasivoYAlias25 = function () {
+    const personas = (typeof basePersonas !== "undefined" ? basePersonas : []).filter(p => p && p.activo);
+    const lic = obtenerLicenciaSafe25();
+    const deportesUnicos = [...new Set(personas.map(p => p.deporte).filter(Boolean))];
+    const planesUnicos = [...new Set(personas.map(p => p.puesto).filter(Boolean))];
+
+    const vencidos = personas.filter(p => p.pagoEstado === "Pendiente");
+    const porVencer = personas.filter(p => {
+        if ((p.pagoEstado || "Al Día") !== "Al Día") return false;
+        const d = calcularDiasDesdeUltimoPago25(p);
+        return d !== null && d >= 25 && d <= 30;
+    });
+
+    const tieneBackupAumento = Boolean(localStorage.getItem(`cdm_backup_aumento_v25_${obtenerClaveClubFinanzas25()}`));
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:820px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-purple">💳 ACTUALIZACIÓN DE TARIFAS Y COBRANZA</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">📈 Aumento Masivo de Cuotas, Alias y Vencimientos</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+            </div>
+
+            <!-- 1. DATOS DE TRANSFERENCIA (ALIAS / CBU) -->
+            <div style="background:var(--cdm-50); border:1.5px solid var(--line-celeste); border-radius:15px; padding:0.9rem 1rem; margin-bottom:1rem;">
+                <strong style="font-size:0.8rem; color:var(--cdm-800); display:block; margin-bottom:0.45rem;">
+                    🏦 Tu Alias / CBU para Cobros por WhatsApp (Se adjunta automáticamente al cobrar)
+                </strong>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end;">
+                    <div class="field" style="flex:1; min-width:190px;">
+                        <label>Alias o CBU / CVU</label>
+                        <input type="text" id="cfgAliasRapido25" placeholder="Ej: gym.olympo.mp" value="${(lic.aliasTransferencia || "").replace(/"/g, "&quot;")}" style="background:#fff; font-weight:700;">
+                    </div>
+                    <div class="field" style="flex:1; min-width:190px;">
+                        <label>Titular / Billetera</label>
+                        <input type="text" id="cfgTitularRapido25" placeholder="Ej: Gonzalo Adanchú (Mercado Pago)" value="${(lic.titularTransferencia || "").replace(/"/g, "&quot;")}" style="background:#fff;">
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" style="min-height:38px;"
+                        onclick="guardarAliasYTitularComercio25(document.getElementById('cfgAliasRapido25').value, document.getElementById('cfgTitularRapido25').value); if(typeof mostrarToast==='function') mostrarToast('🏦 Alias guardado para todos los avisos de WhatsApp.');">
+                        💾 Guardar Alias
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. FORMULARIO DE ACTUALIZACIÓN MASIVA DE CUOTAS -->
+            <form onsubmit="aplicarAumentoMasivoCuotas25(event)" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:16px; padding:1rem; margin-bottom:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.65rem;">
+                    <strong style="font-size:0.85rem; color:var(--ink-900);">⚡ Actualizar Cuotas en 1 Clic (${personas.length} personas activas)</strong>
+                    ${tieneBackupAumento ? `
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="deshacerUltimoAumentoMasivo25()" title="Volver a los precios anteriores">
+                            ↺ Deshacer Último Aumento
+                        </button>
+                    ` : ""}
+                </div>
+
+                <div class="grid-4" style="margin-bottom:0.7rem;">
+                    <div class="field">
+                        <label>Aplicar a qué Grupo *</label>
+                        <select id="aumGrupo25" onchange="actualizarPreviewAumento25()">
+                            <option value="TODOS">👥 Todos los Activos (${personas.length})</option>
+                            ${deportesUnicos.map(d => `<option value="DEP|${d}">🏆 Área: ${d}</option>`).join("")}
+                            ${planesUnicos.map(pl => `<option value="PLAN|${pl}">📋 Plan/Puesto: ${pl}</option>`).join("")}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Tipo de Ajuste *</label>
+                        <select id="aumTipo25" onchange="actualizarPreviewAumento25()">
+                            <option value="porcentaje">📈 Aumentar por % (Ej: +15%)</option>
+                            <option value="fijo">📌 Fijar Precio Exacto ($)</option>
+                            <option value="sumar">➕ Sumar Monto Fijo (+$)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Valor (% o $) *</label>
+                        <input type="number" step="0.5" id="aumValor25" required value="15" oninput="actualizarPreviewAumento25()" style="font-weight:800;">
+                    </div>
+                    <div class="field">
+                        <label>Redondeo Prolijo</label>
+                        <select id="aumRedondeo25" onchange="actualizarPreviewAumento25()">
+                            <option value="500" selected>Al $500 más cercano</option>
+                            <option value="1000">Al $1.000 más cercano</option>
+                            <option value="100">Al $100 más cercano</option>
+                            <option value="0">Sin redondeo</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.65rem;">
+                    <div id="previewAumentoMasivo25" style="font-size:0.8rem; color:var(--cdm-700); font-weight:700;"></div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        ✅ Aplicar Nuevo Valor Ahora
+                    </button>
+                </div>
+            </form>
+
+            <!-- 3. RADAR DE VENCIMIENTOS (PENDIENTES Y POR VENCER EN 5 DÍAS) -->
+            <div class="split-equal">
+                <div style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem;">
+                    <strong style="font-size:0.82rem; color:var(--err); display:block; margin-bottom:0.5rem;">
+                        🔴 Cuotas Vencidas / Pendientes (${vencidos.length})
+                    </strong>
+                    <div style="max-height:190px; overflow-y:auto; display:flex; flex-direction:column; gap:0.4rem;">
+                        ${vencidos.length === 0
+                            ? `<small style="color:var(--ok); font-weight:700;">✓ ¡Todos al día!</small>`
+                            : vencidos.map(p => `
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; background:var(--surface-solid); padding:0.45rem 0.65rem; border-radius:10px; border:1px solid var(--line); font-size:0.77rem;">
+                                    <div><strong>${p.apellido}, ${p.nombre}</strong><br><small style="color:var(--ink-500);">$${Number(p.montoCuota || 0).toLocaleString("es-AR")} • ${p.deporte}</small></div>
+                                    <button type="button" class="btn btn-whatsapp btn-sm" style="min-height:28px; padding:0.15rem 0.5rem;" onclick="enviarReciboPagoWhatsApp(${p.id})"><i class="ri-whatsapp-line"></i> Cobrar</button>
+                                </div>
+                            `).join("")}
+                    </div>
+                </div>
+
+                <div style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem;">
+                    <strong style="font-size:0.82rem; color:#b45309; display:block; margin-bottom:0.5rem;">
+                        🟡 Por Vencer en los Próximos 5 Días (${porVencer.length})
+                    </strong>
+                    <div style="max-height:190px; overflow-y:auto; display:flex; flex-direction:column; gap:0.4rem;">
+                        ${porVencer.length === 0
+                            ? `<small style="color:var(--ink-500);">Sin vencimientos próximos en los siguientes 5 días.</small>`
+                            : porVencer.map(p => {
+                                const faltan = Math.max(0, 30 - (calcularDiasDesdeUltimoPago25(p) || 25));
+                                return `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; background:var(--surface-solid); padding:0.45rem 0.65rem; border-radius:10px; border:1px solid var(--line); font-size:0.77rem;">
+                                        <div><strong>${p.apellido}, ${p.nombre}</strong><br><small style="color:var(--ink-500);">Vence en ${faltan} día(s) • $${Number(p.montoCuota || 0).toLocaleString("es-AR")}</small></div>
+                                        <button type="button" class="btn btn-secondary btn-sm" style="min-height:28px; padding:0.15rem 0.5rem;" onclick="enviarAvisoProximoVencimientoWA25(${p.id}, ${faltan})">📲 Avisar</button>
+                                    </div>
+                                `;
+                            }).join("")}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+    actualizarPreviewAumento25();
+};
+
+function filtrarPersonasObjetivoAumento25(grupoVal) {
+    const activos = (typeof basePersonas !== "undefined" ? basePersonas : []).filter(p => p && p.activo);
+    if (!grupoVal || grupoVal === "TODOS") return activos;
+    if (grupoVal.startsWith("DEP|")) {
+        const dep = grupoVal.slice(4);
+        return activos.filter(p => p.deporte === dep);
+    }
+    if (grupoVal.startsWith("PLAN|")) {
+        const plan = grupoVal.slice(5);
+        return activos.filter(p => p.puesto === plan);
+    }
+    return activos;
+}
+
+window.actualizarPreviewAumento25 = function () {
+    const box = document.getElementById("previewAumentoMasivo25");
+    if (!box) return;
+    const grupo = document.getElementById("aumGrupo25")?.value || "TODOS";
+    const tipo = document.getElementById("aumTipo25")?.value || "porcentaje";
+    const valor = parseFloat(document.getElementById("aumValor25")?.value) || 0;
+    const red = parseInt(document.getElementById("aumRedondeo25")?.value) || 0;
+
+    const lista = filtrarPersonasObjetivoAumento25(grupo);
+    const ejemploAntes = lista[0] ? Number(lista[0].montoCuota || 25000) : 25000;
+    let ejemploDespues = ejemploAntes;
+    if (tipo === "porcentaje") ejemploDespues = redondearImporte25(ejemploAntes * (1 + valor / 100), red);
+    else if (tipo === "fijo") ejemploDespues = redondearImporte25(valor, red);
+    else ejemploDespues = redondearImporte25(ejemploAntes + valor, red);
+
+    box.innerHTML = `🎯 Alcanza a <b>${lista.length} persona(s)</b> • Ejemplo: $${ejemploAntes.toLocaleString("es-AR")} ➔ <b>$${ejemploDespues.toLocaleString("es-AR")}</b>`;
+};
+
+window.aplicarAumentoMasivoCuotas25 = function (e) {
+    e.preventDefault();
+    const grupo = document.getElementById("aumGrupo25")?.value || "TODOS";
+    const tipo = document.getElementById("aumTipo25")?.value || "porcentaje";
+    const valor = parseFloat(document.getElementById("aumValor25")?.value);
+    const red = parseInt(document.getElementById("aumRedondeo25")?.value) || 0;
+    if (isNaN(valor)) return;
+
+    const lista = filtrarPersonasObjetivoAumento25(grupo);
+    if (!lista.length) {
+        alert("No hay personas activas en el grupo seleccionado.");
+        return;
+    }
+    if (!confirm(`⚡ ¿Confirmar la actualización de cuota para ${lista.length} persona(s)?`)) return;
+
+    // Guardar copia de seguridad para poder deshacer en 1 clic
+    const snapshot = lista.map(p => ({ id: p.id, montoAnterior: Number(p.montoCuota || 0) }));
+    localStorage.setItem(`cdm_backup_aumento_v25_${obtenerClaveClubFinanzas25()}`, JSON.stringify(snapshot));
+
+    lista.forEach(p => {
+        const actual = Number(p.montoCuota || 25000);
+        let nuevo = actual;
+        if (tipo === "porcentaje") nuevo = redondearImporte25(actual * (1 + valor / 100), red);
+        else if (tipo === "fijo") nuevo = redondearImporte25(valor, red);
+        else nuevo = redondearImporte25(actual + valor, red);
+        p.montoCuota = Math.max(0, nuevo);
+    });
+
+    if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+    if (typeof renderizarPaginaDeporte === "function" && typeof deportePagina !== "undefined" && deportePagina) renderizarPaginaDeporte();
+    if (typeof inicializarIndex === "function" && document.getElementById("countFutbol")) inicializarIndex();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`📈 Cuotas actualizadas correctamente para ${lista.length} persona(s).`);
+    }
+    abrirModalAumentoMasivoYAlias25();
+};
+
+window.deshacerUltimoAumentoMasivo25 = function () {
+    const key = `cdm_backup_aumento_v25_${obtenerClaveClubFinanzas25()}`;
+    let snap = [];
+    try { snap = JSON.parse(localStorage.getItem(key) || "[]"); } catch {}
+    if (!snap.length) return;
+    if (!confirm("↺ ¿Restaurar los valores de cuota que tenían antes del último aumento?")) return;
+
+    snap.forEach(item => {
+        const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(item.id));
+        if (p) p.montoCuota = item.montoAnterior;
+    });
+
+    localStorage.removeItem(key);
+    if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+    if (typeof renderizarPaginaDeporte === "function" && typeof deportePagina !== "undefined" && deportePagina) renderizarPaginaDeporte();
+    if (typeof mostrarToast === "function") mostrarToast("↺ Se restauraron los valores anteriores.");
+    abrirModalAumentoMasivoYAlias25();
+};
+
+window.enviarAvisoProximoVencimientoWA25 = function (idPersona, diasFaltantes) {
+    const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(idPersona));
+    if (!p) return;
+    const lic = obtenerLicenciaSafe25();
+    const alias = lic.aliasTransferencia || "";
+    const tel = (p.whatsapp || "").replace(/\D/g, "");
+    const monto = Number(p.montoCuota || 25000).toLocaleString("es-AR");
+
+    let msg = `Hola *${p.nombre}*, te avisamos con anticipación que en *${diasFaltantes} día(s)* vence tu cuota mensual de *${lic.nombreEntidad || p.deporte}* ($${monto}).`;
+    if (alias) msg += `\n\n🏦 *Alias para transferencia:* \`${alias}\``;
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+// =========================================================================
+// 25.3 MÓDULO 3: CIERRE DE CAJA POR MEDIO DE PAGO (EFECTIVO / TRANSF / MUTUAL)
+// =========================================================================
+
+function obtenerMovimientosManualesCaja25() {
+    const key = `cdm_caja_movs_v25_${obtenerClaveClubFinanzas25()}`;
+    try {
+        return JSON.parse(localStorage.getItem(key) || "[]") || [];
+    } catch {
+        return [];
+    }
+}
+
+function guardarMovimientosManualesCaja25(lista) {
+    const key = `cdm_caja_movs_v25_${obtenerClaveClubFinanzas25()}`;
+    localStorage.setItem(key, JSON.stringify(lista));
+}
+
+function normalizarMedioPagoCaja25(medioRaw = "") {
+    const m = String(medioRaw || "").toLowerCase();
+    if (m.includes("transf") || m.includes("mp") || m.includes("mercado") || m.includes("banco")) return "Transferencia / MP";
+    if (m.includes("tarj") || m.includes("deb") || m.includes("cred")) return "Tarjeta";
+    if (m.includes("mutual") || m.includes("obra")) return "Mutual";
+    return "Efectivo";
+}
+
+function recopilarMovimientosCajaMes25(mesYYYYMM) {
+    const movimientos = [];
+
+    // 1. Movimientos manuales cargados en el libro de caja
+    obtenerMovimientosManualesCaja25().forEach(m => {
+        if (!mesYYYYMM || mesYYYYMM === "TODOS" || String(m.fecha || "").startsWith(mesYYYYMM)) {
+            movimientos.push({ ...m, origen: "Manual", borrable: true });
+        }
+    });
+
+    // 2. Pagos de cuotas registrados automáticamente en basePersonas (Gym / Deportes)
+    (typeof basePersonas !== "undefined" ? basePersonas : []).forEach(p => {
+        if (!p || !Array.isArray(p.historialPagos)) return;
+        p.historialPagos.forEach(hp => {
+            if (!mesYYYYMM || mesYYYYMM === "TODOS" || String(hp.fecha || "").startsWith(mesYYYYMM)) {
+                movimientos.push({
+                    id: `cuota_${p.id}_${hp.id}`,
+                    fecha: hp.fecha,
+                    tipo: "ingreso",
+                    concepto: `Cuota ${p.deporte} — ${p.apellido}, ${p.nombre}`,
+                    medio: normalizarMedioPagoCaja25(hp.medio),
+                    monto: Number(hp.monto || 0),
+                    origen: "Cuotas",
+                    borrable: false
+                });
+            }
+        });
+    });
+
+    // 3. Recibos particulares / coseguros emitidos en el consultorio
+    if (typeof obtenerMapaUniversalPacientes19 === "function") {
+        Object.values(obtenerMapaUniversalPacientes19()).forEach(f => {
+            (f?.recibosPago || []).forEach(rec => {
+                if (!mesYYYYMM || mesYYYYMM === "TODOS" || String(rec.fecha || "").startsWith(mesYYYYMM)) {
+                    movimientos.push({
+                        id: `rec_${f.clave}_${rec.id}`,
+                        fecha: rec.fecha,
+                        tipo: "ingreso",
+                        concepto: `${rec.concepto} — ${f.nombreCompleto}`,
+                        medio: normalizarMedioPagoCaja25(rec.medio || "Efectivo"),
+                        monto: Number(rec.monto || 0),
+                        origen: "Consultorio",
+                        borrable: false
+                    });
+                }
+            });
+        });
+    }
+
+    movimientos.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+
+    // Calcular totales por medio de pago
+    const tot = {
+        efectivoIn: 0, efectivoOut: 0,
+        transfIn: 0, transfOut: 0,
+        tarjetaIn: 0, tarjetaOut: 0,
+        totalIngresos: 0, totalEgresos: 0
+    };
+
+    movimientos.forEach(m => {
+        const val = Number(m.monto || 0);
+        const esIn = m.tipo !== "egreso";
+        if (esIn) tot.totalIngresos += val;
+        else tot.totalEgresos += val;
+
+        if (m.medio === "Efectivo") {
+            if (esIn) tot.efectivoIn += val; else tot.efectivoOut += val;
+        } else if (m.medio === "Transferencia / MP") {
+            if (esIn) tot.transfIn += val; else tot.transfOut += val;
+        } else {
+            if (esIn) tot.tarjetaIn += val; else tot.tarjetaOut += val;
+        }
+    });
+
+    // Calcular pendiente de mutuales del mes
+    const { filas: filasMutuales } = recopilarFilasLoteMutuales25(mesYYYYMM, "TODAS");
+    const pendienteMutuales = filasMutuales.reduce((a, f) => a + (Number(f.monto) || 0), 0);
+
+    return {
+        movimientos,
+        efectivoNeto: tot.efectivoIn - tot.efectivoOut,
+        transfNeto: tot.transfIn - tot.transfOut,
+        tarjetaNeto: tot.tarjetaIn - tot.tarjetaOut,
+        balanceNeto: tot.totalIngresos - tot.totalEgresos,
+        totalIngresos: tot.totalIngresos,
+        totalEgresos: tot.totalEgresos,
+        pendienteMutuales
+    };
+}
+
+window.abrirModalCierreCaja25 = function (mesOpt = null) {
+    const mesSel = mesOpt || obtenerMesActualYYYYMM25();
+    const hoy = new Date().toISOString().split("T")[0];
+    const data = recopilarMovimientosCajaMes25(mesSel);
+    const lic = obtenerLicenciaSafe25();
+    const f = typeof obtenerFuncionesActivasApp24 === "function" ? obtenerFuncionesActivasApp24() : { salud: {}, deporte: {} };
+
+    const tieneSalud = Boolean(lic.modulos?.consultorio && (lic.profesionesHabilitadas || []).length > 0);
+    const tieneDeporte = Boolean(lic.modulos?.futbol || lic.modulos?.hockey || lic.modulos?.gym || (lic.deportesExtra || []).length > 0);
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:880px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-ok">💵 TESORERÍA Y ARQUEO POR MEDIO DE PAGO</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Cierre de Caja — ${lic.nombreEntidad || "Mi Comercio"}</h3>
+                </div>
+                <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                    <input type="month" id="cajaMesFiltro25" value="${mesSel}" onchange="abrirModalCierreCaja25(this.value)" style="width:auto; min-height:32px; font-weight:800; font-size:0.78rem;">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+
+            <!-- ACCESOS DIRECTOS A LOTE MUTUALES Y AUMENTO MASIVO -->
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-bottom:0.95rem;">
+                ${tieneSalud && f.salud?.loteMutuales !== false ? `
+                    <button type="button" class="btn btn-secondary btn-sm btn-lote-mutual-25" onclick="abrirModalLoteMensualMutuales25('${mesSel}')">
+                        📊 Ir a Lote Mensual por Mutual (Excel/PDF)
+                    </button>
+                ` : ""}
+                ${tieneDeporte && f.deporte?.aumentoMasivo !== false ? `
+                    <button type="button" class="btn btn-secondary btn-sm btn-aumento-masivo-25" onclick="abrirModalAumentoMasivoYAlias25()">
+                        📈 Aumento Masivo de Cuotas & Alias WA
+                    </button>
+                ` : ""}
+                <button type="button" class="btn btn-ok btn-sm" style="margin-left:auto;" onclick="exportarCajaExcel25('${mesSel}')">
+                    📥 Excel (.csv)
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="imprimirCierreCajaPDF25('${mesSel}')">
+                    🖨️ Imprimir Cierre PDF
+                </button>
+            </div>
+
+            <!-- 4 KPIs DE CAJA POR MEDIO DE PAGO -->
+            <div class="bento-kpis" style="margin-bottom:1rem;">
+                <div class="bento-kpi">
+                    <div class="kpi-icon ok"><i class="ri-cash-line"></i></div>
+                    <div class="kpi-data">
+                        <span>💵 Efectivo en Mano</span>
+                        <strong>$${data.efectivoNeto.toLocaleString("es-AR")}</strong>
+                    </div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon"><i class="ri-bank-card-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>🏦 Transferencia / MP</span>
+                        <strong>$${data.transfNeto.toLocaleString("es-AR")}</strong>
+                    </div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon warn"><i class="ri-hospital-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>🏥 Pendiente Mutuales</span>
+                        <strong>$${data.pendienteMutuales.toLocaleString("es-AR")}</strong>
+                    </div>
+                </div>
+                <div class="bento-kpi">
+                    <div class="kpi-icon purple"><i class="ri-scales-3-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>📊 Balance Neto Caja</span>
+                        <strong style="color:${data.balanceNeto >= 0 ? "var(--ok)" : "var(--err)"};">$${data.balanceNeto.toLocaleString("es-AR")}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARGA RÁPIDA DE INGRESO O EGRESO -->
+            <form onsubmit="guardarMovimientoManualCaja25(event, '${mesSel}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:15px; padding:0.9rem 1rem; margin-bottom:1rem;">
+                <strong style="font-size:0.8rem; color:var(--ink-900); display:block; margin-bottom:0.5rem;">➕ Registrar Movimiento de Caja (Particular, Coseguro, Gasto o Honorario)</strong>
+                <div style="display:grid; grid-template-columns:125px 1fr 145px 115px auto; gap:0.45rem; align-items:end;" class="grid-caja-rapida-25">
+                    <div class="field">
+                        <label>Tipo</label>
+                        <select id="cajaTipo25" style="font-weight:700;">
+                            <option value="ingreso">🟢 Ingreso (+)</option>
+                            <option value="egreso">🔴 Egreso (-)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Concepto *</label>
+                        <input type="text" id="cajaConcepto25" required placeholder="Ej: Sesión Particular / Coseguro / Alquiler...">
+                    </div>
+                    <div class="field">
+                        <label>Medio de Pago</label>
+                        <select id="cajaMedio25">
+                            <option value="Efectivo">💵 Efectivo</option>
+                            <option value="Transferencia / MP">🏦 Transferencia / MP</option>
+                            <option value="Tarjeta">💳 Tarjeta</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Monto ($) *</label>
+                        <input type="number" id="cajaMonto25" required min="1" placeholder="15000" style="font-weight:800;">
+                    </div>
+                    <input type="hidden" id="cajaFecha25" value="${hoy}">
+                    <button type="submit" class="btn btn-primary btn-sm" style="min-height:38px;">+ Sumar</button>
+                </div>
+            </form>
+
+            <!-- TABLA DE MOVIMIENTOS DEL MES -->
+            ${data.movimientos.length === 0 ? `
+                <div class="empty-box" style="padding:1.2rem;">Todavía no hay movimientos registrados en <b>${mesSel}</b>.</div>
+            ` : `
+                <div class="table-wrap" style="max-height:260px; overflow-y:auto;">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Concepto</th>
+                                <th>Medio de Pago</th>
+                                <th>Monto</th>
+                                <th style="text-align:right;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.movimientos.map(m => {
+                                const esIn = m.tipo !== "egreso";
+                                const claseMedio = m.medio === "Efectivo" ? "efectivo" : (m.medio.includes("Transf") ? "transferencia" : "tarjeta");
+                                return `
+                                    <tr>
+                                        <td data-label="Fecha"><b>${m.fecha}</b></td>
+                                        <td data-label="Concepto"><strong>${m.concepto}</strong> <small style="color:var(--ink-400);">(${m.origen})</small></td>
+                                        <td data-label="Medio"><span class="caja-badge-medio-25 ${claseMedio}">${m.medio}</span></td>
+                                        <td data-label="Monto">
+                                            <strong style="color:${esIn ? "var(--ok)" : "var(--err)"};">
+                                                ${esIn ? "+" : "-"}$${Number(m.monto || 0).toLocaleString("es-AR")}
+                                            </strong>
+                                        </td>
+                                        <td style="text-align:right;">
+                                            ${m.borrable ? `<button type="button" class="btn btn-danger btn-sm" onclick="eliminarMovimientoManualCaja25(${m.id}, '${mesSel}')">🗑️</button>` : ""}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.guardarMovimientoManualCaja25 = function (e, mesActual) {
+    e.preventDefault();
+    const lista = obtenerMovimientosManualesCaja25();
+    lista.unshift({
+        id: Date.now(),
+        fecha: document.getElementById("cajaFecha25")?.value || new Date().toISOString().split("T")[0],
+        tipo: document.getElementById("cajaTipo25").value,
+        concepto: document.getElementById("cajaConcepto25").value.trim(),
+        medio: document.getElementById("cajaMedio25").value,
+        monto: parseFloat(document.getElementById("cajaMonto25").value) || 0
+    });
+    guardarMovimientosManualesCaja25(lista);
+    if (typeof mostrarToast === "function") mostrarToast("💵 Movimiento registrado en caja.");
+    abrirModalCierreCaja25(mesActual);
+};
+
+window.eliminarMovimientoManualCaja25 = function (idMov, mesActual) {
+    if (!confirm("🗑️ ¿Eliminar este movimiento de caja?")) return;
+    const nueva = obtenerMovimientosManualesCaja25().filter(x => Number(x.id) !== Number(idMov));
+    guardarMovimientosManualesCaja25(nueva);
+    abrirModalCierreCaja25(mesActual);
+};
+
+window.exportarCajaExcel25 = function (mesSel) {
+    const data = recopilarMovimientosCajaMes25(mesSel);
+    const headers = ["Fecha", "Tipo", "Concepto", "Origen", "Medio de Pago", "Monto ($)"];
+    const rows = data.movimientos.map(m => [
+        m.fecha, m.tipo === "egreso" ? "EGRESO" : "INGRESO", m.concepto, m.origen, m.medio,
+        m.tipo === "egreso" ? -Number(m.monto || 0) : Number(m.monto || 0)
+    ]);
+    rows.push(["", "", "EFECTIVO NETO", "", "Efectivo", data.efectivoNeto]);
+    rows.push(["", "", "TRANSFERENCIA / MP NETO", "", "Transferencia / MP", data.transfNeto]);
+    rows.push(["", "", "PENDIENTE MUTUALES", "", "Mutual", data.pendienteMutuales]);
+    rows.push(["", "", "BALANCE NETO CAJA", "", "TOTAL", data.balanceNeto]);
+
+    descargarCSVExcel25(`cierre_caja_${mesSel}.csv`, headers, rows);
+    if (typeof mostrarToast === "function") mostrarToast("📥 Cierre de caja descargado en Excel (.csv).");
+};
+
+window.imprimirCierreCajaPDF25 = function (mesSel) {
+    const data = recopilarMovimientosCajaMes25(mesSel);
+    const lic = obtenerLicenciaSafe25();
+    const modal = asegurarModalPaquete1_25();
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:780px;">
+            <div class="modal-top no-print-pdf">
+                <h3>🖨️ Cierre de Caja Oficial — ${mesSel}</h3>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalCierreCaja25('${mesSel}')">← Volver</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+            <div class="tactical-pdf-sheet" style="padding:1.8rem;">
+                <div style="display:flex; justify-content:space-between; border-bottom:2.5px solid #10b981; padding-bottom:0.9rem; margin-bottom:1.1rem;">
+                    <div>
+                        <span style="font-size:0.72rem; font-weight:800; color:#047857;">ARQUEO Y CIERRE DE CAJA MENSUAL</span>
+                        <h2 style="font-size:1.35rem; font-weight:900; color:#0f172a; margin:2px 0;">${lic.nombreEntidad || "Plataforma Oficial"}</h2>
+                        <small style="color:#475569; font-weight:700;">Período: ${mesSel}</small>
+                    </div>
+                    <div style="text-align:right;">
+                        <strong style="color:#0f172a; display:block;">Balance Neto: $${data.balanceNeto.toLocaleString("es-AR")}</strong>
+                        <small style="color:#64748b;">Efectivo: $${data.efectivoNeto.toLocaleString("es-AR")} | Transf: $${data.transfNeto.toLocaleString("es-AR")}</small>
+                    </div>
+                </div>
+                <table class="app-table" style="font-size:0.8rem;">
+                    <thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Medio</th><th style="text-align:right;">Importe</th></tr></thead>
+                    <tbody>
+                        ${data.movimientos.map(m => `
+                            <tr>
+                                <td>${m.fecha}</td>
+                                <td>${m.tipo === "egreso" ? "Egreso" : "Ingreso"}</td>
+                                <td><strong>${m.concepto}</strong></td>
+                                <td>${m.medio}</td>
+                                <td style="text-align:right; font-weight:700;">${m.tipo === "egreso" ? "-" : "+"}$${Number(m.monto || 0).toLocaleString("es-AR")}</td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+// =========================================================================
+// 25.4 INYECCIÓN LIMPIA DE BOTONES DE ACCESO EN TOPBAR, CONSULTORIO Y GYM/DEPORTES
+// =========================================================================
+
+function inyectarBotonesPaquete1DOM25() {
+    if (document.body?.getAttribute("data-rol") === "usuario" || document.body?.classList.contains("login-page")) {
+        return;
+    }
+
+    // 1. Botón "💵 Caja" en la barra superior de administración
+    const topRight = document.getElementById("cdmBarraSesionActiva") || document.querySelector(".topbar-right") || document.querySelector(".topbar-actions");
+    if (topRight && !document.getElementById("btnTopbarCaja25")) {
+        const btnCaja = document.createElement("button");
+        btnCaja.type = "button";
+        btnCaja.id = "btnTopbarCaja25";
+        btnCaja.className = "btn btn-secondary btn-sm";
+        btnCaja.style = "background:linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); color:#065f46; border-color:#10b981; font-weight:800;";
+        btnCaja.title = "Abrir Cierre de Caja por Medio de Pago (Efectivo, Transferencia y Mutuales)";
+        btnCaja.onclick = () => abrirModalCierreCaja25();
+        btnCaja.innerHTML = `<i class="ri-safe-2-fill"></i><span>Caja</span>`;
+        topRight.insertBefore(btnCaja, topRight.firstChild);
+    }
+
+    // 2. Botón "📊 Lote Mutual (Excel/PDF)" dentro del Consultorio (cuando está abierta Mutuales o Liquidación)
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+    if (secCons && !secCons.classList.contains("hidden")) {
+        secCons.querySelectorAll(".panel-head").forEach(head => {
+            const txt = (head.innerText || "").toLowerCase();
+            if ((txt.includes("liquidaci") || txt.includes("mutual") || txt.includes("convenio")) && !head.querySelector(".btn-lote-mutual-25")) {
+                const btnLote = document.createElement("button");
+                btnLote.type = "button";
+                btnLote.className = "btn btn-ok btn-sm btn-lote-mutual-25";
+                btnLote.onclick = () => abrirModalLoteMensualMutuales25();
+                btnLote.innerHTML = `📊 Lote Mensual (Excel / PDF)`;
+                head.appendChild(btnLote);
+            }
+        });
+    }
+
+    // 3. Botón "📈 Aumento Cuotas & Alias" en Gimnasio y Deportes (panel de Asistencias/Cuotas o Padrón)
+    if (typeof deportePagina !== "undefined" && deportePagina) {
+        const panelHead = document.querySelector("#gym-sec-asistencias .panel-head, #dep-sec-plantel .panel-head, .app-content > .app-panel .panel-head");
+        if (panelHead && !document.querySelector(".btn-aumento-masivo-25")) {
+            const btnAum = document.createElement("button");
+            btnAum.type = "button";
+            btnAum.className = "btn btn-secondary btn-sm btn-aumento-masivo-25";
+            btnAum.style = "border-color:#6366f1; color:#4338ca; font-weight:800;";
+            btnAum.onclick = () => abrirModalAumentoMasivoYAlias25();
+            btnAum.innerHTML = `📈 Aumento Cuotas & Alias`;
+            panelHead.appendChild(btnAum);
+        }
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(inyectarBotonesPaquete1DOM25, 280);
+    setTimeout(inyectarBotonesPaquete1DOM25, 700);
+});
+
+document.addEventListener("click", () => {
+    setTimeout(inyectarBotonesPaquete1DOM25, 70);
+});
+// =========================================================================
+// 26. LIMPIEZA DE BARRA SUPERIOR (REUBICAR CAJA A CONTABILIDAD/FINANZAS)
+//     + PAQUETE 2 — HERRAMIENTAS DIFERENCIALES POR RUBRO:
+//     1) ✍️ CONSENTIMIENTO INFORMADO CON FIRMA TÁCTIL (CANVAS) + PDF A4 (SALUD)
+//     2) 🧍 MAPA CORPORAL INTERACTIVO FRENTE/ESPALDA + PDF A4 (KINE/QUIRO)
+//     3) 🖥️ MODO TÓTEM RECEPCIÓN + 🕒 CONTROL DE CUPOS POR HORARIO (GIMNASIO)
+//     4) 🏥 SEMÁFORO APTO MÉDICO (EMMAC) + 🏆 ESTADÍSTICAS TEMPORADA (DEPORTES)
+// Pegar al final de app.js (debajo del Apartado 25)
+// =========================================================================
+
+(function inyectarCSSPaquete2YLimpiezaTopbar26() {
+    if (document.getElementById("cdmCssPaquete2_26")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssPaquete2_26";
+    st.textContent = `
+        /* 1. QUITAR CAJA DE LA BARRA SUPERIOR (PASA A CONTABILIDAD / FINANZAS / MUTUALES / CUOTAS) */
+        #btnTopbarCaja25 {
+            display: none !important;
+        }
+
+        /* Reglas de bloqueo por interruptor del Paquete 2 */
+        body[data-feat-sal-consentimiento="off"] .btn-consentimiento-26,
+        body[data-feat-sal-mapa="off"] .btn-mapa-corporal-26,
+        body[data-feat-dep-totem="off"] .btn-totem-gym-26,
+        body[data-feat-dep-totem="off"] .btn-cupos-gym-26,
+        body[data-feat-dep-emmac="off"] .btn-emmac-dep-26,
+        body[data-feat-dep-emmac="off"] .btn-stats-temp-26,
+        body[data-feat-gen-caja="off"] .btn-abrir-caja-contab-26 {
+            display: none !important;
+        }
+
+        /* 2. FIRMA TÁCTIL CANVAS */
+        .firma-pad-wrap-26 {
+            background: #ffffff;
+            border: 2px dashed #0284c7;
+            border-radius: 14px;
+            position: relative;
+            overflow: hidden;
+            touch-action: none;
+        }
+        .firma-pad-canvas-26 {
+            width: 100%;
+            height: 165px;
+            display: block;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        /* 3. MAPA CORPORAL INTERACTIVO */
+        .body-map-stage-26 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .body-figure-box-26 {
+            background: linear-gradient(180deg, var(--surface-subtle, #f8fafc), var(--cdm-50, #f0f9ff));
+            border: 1.5px solid var(--line-celeste, #bae6fd);
+            border-radius: 18px;
+            padding: 0.75rem;
+            text-align: center;
+            position: relative;
+        }
+        .body-svg-wrap-26 {
+            position: relative;
+            width: 175px;
+            height: 315px;
+            margin: 0.35rem auto 0;
+            cursor: crosshair;
+            user-select: none;
+        }
+        .body-marker-dot-26 {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            border: 2.5px solid #ffffff;
+            color: #ffffff;
+            font-size: 0.65rem;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+            cursor: pointer;
+            transition: transform 0.15s ease;
+            z-index: 3;
+        }
+        .body-marker-dot-26:hover { transform: translate(-50%, -50%) scale(1.22); }
+        .body-marker-dot-26.lvl-leve { background: #10b981; }
+        .body-marker-dot-26.lvl-mod { background: #f59e0b; }
+        .body-marker-dot-26.lvl-agudo { background: #ef4444; }
+
+        /* 4. MODO TÓTEM PANTALLA COMPLETA (GIMNASIO RECEPCIÓN) */
+        #cdmTotemOverlay26 {
+            position: fixed;
+            inset: 0;
+            z-index: 10080;
+            background: radial-gradient(circle at top right, #0369a1 0%, #0c192c 55%, #020617 100%);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .totem-card-26 {
+            width: min(560px, 95vw);
+            background: rgba(15, 23, 42, 0.84);
+            backdrop-filter: blur(18px);
+            border: 1.5px solid rgba(56, 189, 248, 0.35);
+            border-radius: 28px;
+            padding: 2.2rem 2rem;
+            text-align: center;
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.65);
+        }
+        .totem-big-input-26 {
+            width: 100%;
+            min-height: 62px !important;
+            font-size: 1.55rem !important;
+            font-weight: 800 !important;
+            text-align: center !important;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border-radius: 16px !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            border: 3px solid #38bdf8 !important;
+        }
+        .totem-result-banner-26 {
+            margin-top: 1.25rem;
+            padding: 1.25rem;
+            border-radius: 18px;
+            animation: slideUpFade 0.22s ease forwards;
+        }
+        .totem-result-banner-26.ok { background: linear-gradient(135deg, #059669, #10b981); border: 2px solid #a7f3d0; }
+        .totem-result-banner-26.warn { background: linear-gradient(135deg, #b45309, #f59e0b); border: 2px solid #fde68a; }
+        .totem-result-banner-26.err { background: linear-gradient(135deg, #9f1239, #e11d48); border: 2px solid #fecdd3; }
+    `;
+    document.head.appendChild(st);
+})();
+
+// =========================================================================
+// 26.1 SALUD A: CONSENTIMIENTO INFORMADO CON FIRMA TÁCTIL + PDF A4
+// =========================================================================
+
+const PLANTILLAS_CONSENTIMIENTO_26 = {
+    psico_adulto: {
+        titulo: "Consentimiento Informado — Psicoterapia (Adultos)",
+        cuerpo: `Por medio del presente documento manifiesto haber sido informado/a sobre los alcances, encuadre de trabajo, frecuencia de sesiones, honorarios/cobertura de obra social y el carácter estrictamente confidencial de los datos compartidos bajo el Secreto Profesional (Ley Nacional de Salud Mental N° 26.657). Comprendo que puedo realizar preguntas en cualquier momento y suspender el proceso terapéutico cuando lo considere oportuno.`
+    },
+    psico_menor: {
+        titulo: "Consentimiento Informado — Atención de Menores (Padre/Madre/Tutor)",
+        cuerpo: `En mi carácter de madre/padre/tutor responsable legal del menor mencionado, autorizo expresamente el inicio del proceso de evaluación y acompañamiento psicológico. He sido informado/a sobre el encuadre, la modalidad de devoluciones a adultos responsables y la protección de la confidencialidad clínica del menor conforme a la normativa vigente.`
+    },
+    kine_quiro: {
+        titulo: "Consentimiento Informado — Kinesiología / Quiropraxia",
+        cuerpo: `Declaro haber brindado información veraz sobre mis antecedentes médicos, cirugías previas y patologías actuales. Autorizo la realización de evaluaciones físicas, terapia manual, ejercicios terapéuticos y/o agentes físicos indicados por el profesional, comprendiendo los objetivos de rehabilitación y comprometiéndome a informar cualquier molestia inusual durante las sesiones.`
+    },
+    nutricion: {
+        titulo: "Consentimiento Informado — Evaluación y Plan Nutricional",
+        cuerpo: `Autorizo la realización de mediciones antropométricas, seguimiento nutricional y diseño de plan alimentario personalizado. Manifiesto haber informado alergias, intolerancias y antecedentes clínicos relevantes para mi seguimiento.`
+    }
+};
+
+let _firmaCtx26 = null;
+let _firmaDibujando26 = false;
+let _firmaTieneTrazos26 = false;
+
+function inicializarCanvasFirma26() {
+    const canvas = document.getElementById("canvasFirmaConsentimiento26");
+    if (!canvas) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(300, Math.round(rect.width * dpr));
+    canvas.height = Math.round(165 * dpr);
+
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = "#0f172a";
+    _firmaCtx26 = ctx;
+    _firmaTieneTrazos26 = false;
+
+    const getPos = (ev) => {
+        const r = canvas.getBoundingClientRect();
+        const pt = ev.touches && ev.touches[0] ? ev.touches[0] : ev;
+        return { x: pt.clientX - r.left, y: pt.clientY - r.top };
+    };
+
+    const start = (ev) => {
+        ev.preventDefault();
+        _firmaDibujando26 = true;
+        _firmaTieneTrazos26 = true;
+        const p = getPos(ev);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+    };
+    const move = (ev) => {
+        if (!_firmaDibujando26) return;
+        ev.preventDefault();
+        const p = getPos(ev);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+    };
+    const end = () => { _firmaDibujando26 = false; };
+
+    canvas.onmousedown = start;
+    canvas.onmousemove = move;
+    window.addEventListener("mouseup", end);
+    canvas.ontouchstart = start;
+    canvas.ontouchmove = move;
+    canvas.ontouchend = end;
+}
+
+window.limpiarCanvasFirma26 = function () {
+    const canvas = document.getElementById("canvasFirmaConsentimiento26");
+    if (!canvas || !_firmaCtx26) return;
+    _firmaCtx26.clearRect(0, 0, canvas.width, canvas.height);
+    _firmaTieneTrazos26 = false;
+};
+
+window.cargarPlantillaConsentimiento26 = function (clave) {
+    const pl = PLANTILLAS_CONSENTIMIENTO_26[clave];
+    if (!pl) return;
+    const t = document.getElementById("consTitulo26");
+    const c = document.getElementById("consCuerpo26");
+    if (t) t.value = pl.titulo;
+    if (c) c.value = pl.cuerpo;
+};
+
+window.abrirModalConsentimientoPaciente26 = function (clavePaciente) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha) return;
+    if (!Array.isArray(ficha.consentimientos)) ficha.consentimientos = [];
+
+    const espLow = String(ficha.especialidad || "").toLowerCase();
+    const defKey = espLow.includes("psic") ? "psico_adulto" : (espLow.includes("nutr") ? "nutricion" : "kine_quiro");
+    const defPl = PLANTILLAS_CONSENTIMIENTO_26[defKey];
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:780px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-purple">✍️ DOCUMENTACIÓN LEGAL Y ADMISIÓN</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Consentimiento Informado — ${ficha.nombreCompleto}</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+            </div>
+
+            <form onsubmit="guardarConsentimientoFirmado26(event, '${ficha.clave}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:16px; padding:1rem; margin-bottom:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.45rem; margin-bottom:0.7rem;">
+                    <strong style="font-size:0.84rem; color:var(--ink-900);">📋 Plantilla Rápida:</strong>
+                    <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                        <button type="button" class="badge badge-celeste" style="cursor:pointer; padding:0.25rem 0.6rem;" onclick="cargarPlantillaConsentimiento26('psico_adulto')">🧠 Psicología Adulto</button>
+                        <button type="button" class="badge badge-purple" style="cursor:pointer; padding:0.25rem 0.6rem;" onclick="cargarPlantillaConsentimiento26('psico_menor')">🧒 Psicología Menor</button>
+                        <button type="button" class="badge badge-ok" style="cursor:pointer; padding:0.25rem 0.6rem;" onclick="cargarPlantillaConsentimiento26('kine_quiro')">🦿 Kine / Quiro</button>
+                        <button type="button" class="badge badge-warn" style="cursor:pointer; padding:0.25rem 0.6rem;" onclick="cargarPlantillaConsentimiento26('nutricion')">🥗 Nutrición</button>
+                    </div>
+                </div>
+
+                <div class="grid-3" style="margin-bottom:0.65rem;">
+                    <div class="field">
+                        <label>Título del Documento *</label>
+                        <input type="text" id="consTitulo26" required value="${defPl.titulo.replace(/"/g, "&quot;")}">
+                    </div>
+                    <div class="field">
+                        <label>Nombre del Firmante *</label>
+                        <input type="text" id="consFirmante26" required value="${(ficha.nombreCompleto || "").replace(/"/g, "&quot;")}" placeholder="Paciente o Padre/Madre/Tutor">
+                    </div>
+                    <div class="field">
+                        <label>DNI del Firmante *</label>
+                        <input type="text" id="consDniFirmante26" required value="${(ficha.dni || "").replace(/"/g, "&quot;")}">
+                    </div>
+                </div>
+
+                <div class="field" style="margin-bottom:0.75rem;">
+                    <label>Texto del Consentimiento (Editable) *</label>
+                    <textarea id="consCuerpo26" rows="3" required>${defPl.cuerpo}</textarea>
+                </div>
+
+                <div style="margin-bottom:0.85rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                        <label style="font-size:0.74rem; font-weight:800; color:var(--cdm-700); text-transform:uppercase;">
+                            ✍️ Firma Táctil en Pantalla (Con dedo o mouse) *
+                        </label>
+                        <button type="button" class="btn btn-ghost btn-sm" style="min-height:26px; padding:0.1rem 0.55rem; font-size:0.72rem;" onclick="limpiarCanvasFirma26()">
+                            🧹 Limpiar Firma
+                        </button>
+                    </div>
+                    <div class="firma-pad-wrap-26">
+                        <canvas id="canvasFirmaConsentimiento26" class="firma-pad-canvas-26"></canvas>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end;">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="ri-save-3-line"></i> Guardar Consentimiento Firmado
+                    </button>
+                </div>
+            </form>
+
+            <h4 style="font-size:0.88rem; font-weight:800; color:var(--ink-900); margin-bottom:0.5rem;">
+                📂 Consentimientos Firmados de ${ficha.nombreCompleto} (${ficha.consentimientos.length}):
+            </h4>
+            ${ficha.consentimientos.length === 0
+                ? `<div class="empty-box" style="padding:1rem;">Aún no hay consentimientos firmados guardados para este paciente.</div>`
+                : `<div style="display:flex; flex-direction:column; gap:0.5rem; max-height:200px; overflow-y:auto;">
+                    ${ficha.consentimientos.map(c => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; background:var(--surface-solid); border:1px solid var(--line-strong); border-radius:12px; padding:0.65rem 0.9rem; flex-wrap:wrap;">
+                            <div>
+                                <span class="badge badge-ok" style="font-size:0.66rem;">✓ FIRMADO • 📅 ${c.fecha}</span>
+                                <strong style="display:block; font-size:0.86rem; color:var(--ink-900); margin-top:3px;">${c.titulo}</strong>
+                                <small style="color:var(--ink-500);">Firmante: ${c.firmante} (DNI ${c.dniFirmante})</small>
+                            </div>
+                            <div style="display:flex; gap:0.35rem;">
+                                <button type="button" class="btn btn-primary btn-sm" onclick="imprimirConsentimientoPDF26('${ficha.clave}', ${c.id})">🖨️ Ver / PDF A4</button>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="eliminarConsentimiento26('${ficha.clave}', ${c.id})">🗑️</button>
+                            </div>
+                        </div>
+                    `).join("")}
+                   </div>`}
+        </div>
+    `;
+    modal.classList.remove("hidden");
+    setTimeout(inicializarCanvasFirma26, 60);
+};
+
+window.guardarConsentimientoFirmado26 = function (e, clavePaciente) {
+    e.preventDefault();
+    if (!_firmaTieneTrazos26) {
+        alert("✍️ Por favor realizá la firma en el recuadro antes de guardar.");
+        return;
+    }
+    const canvas = document.getElementById("canvasFirmaConsentimiento26");
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha || !canvas) return;
+
+    if (!Array.isArray(ficha.consentimientos)) ficha.consentimientos = [];
+    ficha.consentimientos.unshift({
+        id: Date.now(),
+        fecha: new Date().toLocaleDateString("es-AR"),
+        titulo: document.getElementById("consTitulo26").value.trim(),
+        firmante: document.getElementById("consFirmante26").value.trim(),
+        dniFirmante: document.getElementById("consDniFirmante26").value.trim(),
+        cuerpo: document.getElementById("consCuerpo26").value.trim(),
+        firmaDataUrl: canvas.toDataURL("image/png")
+    });
+
+    guardarMapaUniversalPacientes19(mapa);
+    if (typeof mostrarToast === "function") mostrarToast("✅ Consentimiento firmado y archivado en la ficha.");
+    abrirModalConsentimientoPaciente26(clavePaciente);
+};
+
+window.eliminarConsentimiento26 = function (clavePaciente, idCons) {
+    if (!confirm("🗑️ ¿Eliminar este consentimiento firmado?")) return;
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+    ficha.consentimientos = (ficha.consentimientos || []).filter(c => Number(c.id) !== Number(idCons));
+    guardarMapaUniversalPacientes19(mapa);
+    abrirModalConsentimientoPaciente26(clavePaciente);
+};
+
+window.imprimirConsentimientoPDF26 = function (clavePaciente, idCons) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    const c = (ficha?.consentimientos || []).find(x => Number(x.id) === Number(idCons));
+    if (!ficha || !c) return;
+    const lic = obtenerLicenciaSafe25();
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:740px;">
+            <div class="modal-top no-print-pdf">
+                <h3>🖨️ Documento Firmado — ${c.titulo}</h3>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalConsentimientoPaciente26('${ficha.clave}')">← Volver</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+            <div class="tactical-pdf-sheet" style="padding:2rem;">
+                <div style="display:flex; justify-content:space-between; border-bottom:2.5px solid #0284c7; padding-bottom:1rem; margin-bottom:1.25rem;">
+                    <div>
+                        <span style="font-size:0.72rem; font-weight:800; color:#0284c7;">DOCUMENTO CLÍNICO CON CONFORMIDAD DIGITAL</span>
+                        <h2 style="font-size:1.35rem; font-weight:900; color:#0f172a; margin:3px 0;">${c.titulo}</h2>
+                        <small style="color:#475569; font-weight:600;">${lic.nombreEntidad || "Consultorio Profesional"} • ${ficha.profesional || "Profesional a cargo"}</small>
+                    </div>
+                    <div style="text-align:right;">
+                        <strong style="color:#0f172a; display:block;">Fecha: ${c.fecha}</strong>
+                    </div>
+                </div>
+                <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:0.9rem 1.1rem; margin-bottom:1.25rem; font-size:0.88rem;">
+                    <div><b>Paciente:</b> ${ficha.nombreCompleto} (DNI ${ficha.dni || "-"}) • <b>Cobertura:</b> ${ficha.mutual || "Particular"}</div>
+                    <div><b>Firmante responsable:</b> ${c.firmante} (DNI ${c.dniFirmante})</div>
+                </div>
+                <div style="font-size:0.94rem; line-height:1.75; color:#0f172a; white-space:pre-line; margin-bottom:2rem;">${c.cuerpo}</div>
+                <div style="display:flex; justify-content:space-around; align-items:flex-end; gap:2rem; padding-top:1rem;">
+                    <div style="text-align:center; min-width:220px;">
+                        <img src="${c.firmaDataUrl}" alt="Firma digital" style="max-height:90px; max-width:220px; display:block; margin:0 auto 4px;">
+                        <div style="border-top:1.5px solid #0f172a; padding-top:4px;">
+                            <strong style="font-size:0.84rem; color:#0f172a; display:block;">${c.firmante}</strong>
+                            <small style="color:#64748b;">DNI ${c.dniFirmante} • Firma del Paciente / Tutor</small>
+                        </div>
+                    </div>
+                    <div style="text-align:center; min-width:200px; border-top:1.5px solid #0f172a; padding-top:4px;">
+                        <strong style="font-size:0.84rem; color:#0f172a; display:block;">${ficha.profesional || "Profesional Tratante"}</strong>
+                        <small style="color:#64748b;">Sello y Firma Profesional</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+
+// =========================================================================
+// 26.3 GIMNASIO A: MODO TÓTEM / CHECK-IN DE RECEPCIÓN (PANTALLA COMPLETA)
+// =========================================================================
+
+let _timerResetTotem26 = null;
+
+function emitirSonidoTotem26(tipo = "ok") {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const freqs = tipo === "ok" ? [587.33, 880] : (tipo === "warn" ? [440, 349.23] : [220, 180]);
+        freqs.forEach((f, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = tipo === "ok" ? "sine" : "triangle";
+            osc.frequency.value = f;
+            gain.gain.setValueAtTime(0.18, ctx.currentTime + idx * 0.14);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.14 + 0.22);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + idx * 0.14);
+            osc.stop(ctx.currentTime + idx * 0.14 + 0.24);
+        });
+    } catch {}
+}
+
+window.abrirModoTotemRecepcion26 = function () {
+    const lic = obtenerLicenciaSafe25();
+    let overlay = document.getElementById("cdmTotemOverlay26");
+    if (overlay) overlay.remove();
+
+    overlay = document.createElement("div");
+    overlay.id = "cdmTotemOverlay26";
+    overlay.innerHTML = `
+        <button type="button" class="btn btn-ghost btn-sm"
+            style="position:absolute; top:1.25rem; right:1.25rem; color:#cbd5e1; border-color:rgba(255,255,255,0.2);"
+            onclick="cerrarModoTotemRecepcion26()">
+            ✕ Salir del Modo Tótem
+        </button>
+
+        <div class="totem-card-26">
+            <span class="badge badge-celeste" style="font-size:0.75rem; margin-bottom:0.6rem;">🖥️ CONTROL DE ACCESO EN RECEPCIÓN</span>
+            <h1 style="font-size:1.75rem; font-weight:900; color:#ffffff; margin:0 0 0.25rem 0;">${lic.nombreEntidad || "Gimnasio Oficial"}</h1>
+            <p style="color:#94a3b8; font-size:0.9rem; margin-bottom:1.4rem;">Ingresá tu DNI o Código Personal y tocá <b>Confirmar Ingreso</b></p>
+
+            <form onsubmit="procesarCheckinTotem26(event)">
+                <input type="text" id="inpTotemDniCodigo26" class="totem-big-input-26" autocomplete="off" required placeholder="DNI O CÓDIGO...">
+                <button type="submit" class="btn btn-primary" style="width:100%; min-height:52px; font-size:1.05rem; font-weight:800; margin-top:0.85rem; border-radius:14px;">
+                    ✓ Confirmar Mi Ingreso
+                </button>
+            </form>
+
+            <div id="totemFeedbackBox26"></div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => document.getElementById("inpTotemDniCodigo26")?.focus(), 80);
+};
+
+window.cerrarModoTotemRecepcion26 = function () {
+    if (_timerResetTotem26) clearTimeout(_timerResetTotem26);
+    document.getElementById("cdmTotemOverlay26")?.remove();
+    if (typeof renderizarPaginaDeporte === "function" && typeof deportePagina !== "undefined" && deportePagina) {
+        renderizarPaginaDeporte();
+    }
+};
+
+window.procesarCheckinTotem26 = function (e) {
+    e.preventDefault();
+    const inp = document.getElementById("inpTotemDniCodigo26");
+    const box = document.getElementById("totemFeedbackBox26");
+    if (!inp || !box) return;
+
+    const raw = (inp.value || "").trim().toUpperCase();
+    const soloNum = raw.replace(/\D/g, "");
+    const limpio = raw.replace(/[^A-Z0-9]/g, "");
+    const personas = (typeof basePersonas !== "undefined" ? basePersonas : []).filter(p => p && p.activo);
+
+    const socio = personas.find(p => {
+        const dni = String(p.dni || "").replace(/\D/g, "");
+        const cod = String(p.codigoAcceso || "").toUpperCase();
+        const codLimpio = cod.replace(/[^A-Z0-9]/g, "");
+        const sufijo = cod.split("-")[1] || cod;
+        return (soloNum.length >= 6 && dni === soloNum) || cod === raw || codLimpio === limpio || sufijo === raw;
+    });
+
+    if (_timerResetTotem26) clearTimeout(_timerResetTotem26);
+
+    if (!socio) {
+        emitirSonidoTotem26("err");
+        box.innerHTML = `
+            <div class="totem-result-banner-26 err">
+                <h2 style="margin:0; font-size:1.35rem;">❌ No encontrado</h2>
+                <p style="margin:4px 0 0; font-size:0.9rem;">No encontramos ningún socio activo con "${raw}". Consultá en recepción.</p>
+            </div>
+        `;
+    } else {
+        const hoy = typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+        if (!Array.isArray(socio.asistencias)) socio.asistencias = [];
+        if (!socio.asistencias.includes(hoy)) {
+            socio.asistencias.push(hoy);
+            socio.asistencias.sort();
+            if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+        }
+        const sem = typeof contarAsistenciasUltimos7Dias === "function" ? contarAsistenciasUltimos7Dias(socio) : socio.asistencias.length;
+        const alDia = (socio.pagoEstado || "Al Día") === "Al Día";
+
+        if (alDia) {
+            emitirSonidoTotem26("ok");
+            box.innerHTML = `
+                <div class="totem-result-banner-26 ok">
+                    <h2 style="margin:0; font-size:1.45rem;">✅ ¡Bienvenido/a, ${socio.nombre}!</h2>
+                    <p style="margin:6px 0 0; font-size:0.95rem; font-weight:700;">
+                        ${socio.puesto || socio.deporte} • Cuota Al Día • Asistencia: ${sem}/${socio.frecuenciaSemanal || 3} días esta semana
+                    </p>
+                </div>
+            `;
+        } else {
+            emitirSonidoTotem26("warn");
+            box.innerHTML = `
+                <div class="totem-result-banner-26 warn">
+                    <h2 style="margin:0; font-size:1.4rem;">⚠️ ¡Hola ${socio.nombre}! Presente Registrado</h2>
+                    <p style="margin:6px 0 0; font-size:0.95rem; font-weight:700;">
+                        Tu cuota mensual ($${Number(socio.montoCuota || 25000).toLocaleString("es-AR")}) figura vencida. Por favor pasá por recepción.
+                    </p>
+                </div>
+            `;
+        }
+    }
+
+    inp.value = "";
+    inp.focus();
+    _timerResetTotem26 = setTimeout(() => {
+        if (box) box.innerHTML = "";
+        inp?.focus();
+    }, 4500);
+};
+
+// =========================================================================
+// 26.4 GIMNASIO B: CONTROL DE CUPOS POR TURNO / HORARIO
+// =========================================================================
+
+function obtenerCuposHorariosGym26() {
+    const key = `cdm_gym_cupos_v26_${obtenerClaveClubFinanzas25()}`;
+    try {
+        const guardado = JSON.parse(localStorage.getItem(key) || "null");
+        if (Array.isArray(guardado)) return guardado;
+    } catch {}
+    const defecto = [
+        { id: 1, dias: "Lun / Mié / Vie", hora: "08:00 hs", sala: "Musculación Mañana", cupoMax: 15, sociosIds: [] },
+        { id: 2, dias: "Lun / Mié / Vie", hora: "18:00 hs", sala: "Musculación / Funcional", cupoMax: 15, sociosIds: [] },
+        { id: 3, dias: "Lun / Mié / Vie", hora: "19:00 hs", sala: "Hora Pico Tarde", cupoMax: 15, sociosIds: [] },
+        { id: 4, dias: "Mar / Jue", hora: "19:30 hs", sala: "Funcional y Core", cupoMax: 12, sociosIds: [] }
+    ];
+    localStorage.setItem(key, JSON.stringify(defecto));
+    return defecto;
+}
+
+function guardarCuposHorariosGym26(lista) {
+    localStorage.setItem(`cdm_gym_cupos_v26_${obtenerClaveClubFinanzas25()}`, JSON.stringify(lista));
+}
+
+window.abrirModalCuposHorariosGym26 = function () {
+    const turnos = obtenerCuposHorariosGym26();
+    const sociosGym = (typeof basePersonas !== "undefined" ? basePersonas : []).filter(p => p && p.activo && p.deporte === "Gimnasio");
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:860px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-celeste">🕒 GESTIÓN DE SALA Y CAPACIDAD</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Control de Cupos por Turno / Horario</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+            </div>
+
+            <form onsubmit="agregarTurnoCupoGym26(event)" style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:14px; padding:0.85rem 1rem; margin-bottom:1rem;">
+                <strong style="font-size:0.8rem; color:var(--ink-900); display:block; margin-bottom:0.45rem;">➕ Crear Nuevo Horario / Turno de Sala</strong>
+                <div class="grid-4" style="align-items:end;">
+                    <div class="field"><label>Días *</label><input type="text" id="cupoDias26" required placeholder="Ej: Lun a Vie / Mar y Jue" value="Lun / Mié / Vie"></div>
+                    <div class="field"><label>Horario *</label><input type="text" id="cupoHora26" required placeholder="Ej: 20:00 hs"></div>
+                    <div class="field"><label>Actividad / Sala *</label><input type="text" id="cupoSala26" required placeholder="Ej: Pilates / Musculación"></div>
+                    <div style="display:flex; gap:0.4rem; align-items:end;">
+                        <div class="field" style="width:82px;"><label>Cupo</label><input type="number" id="cupoMax26" required min="1" max="100" value="15"></div>
+                        <button type="submit" class="btn btn-primary btn-sm" style="min-height:38px;">+ Crear</button>
+                    </div>
+                </div>
+            </form>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:0.85rem; max-height:430px; overflow-y:auto;">
+                ${turnos.map(t => {
+                    const anotados = (t.sociosIds || []).map(id => sociosGym.find(s => Number(s.id) === Number(id))).filter(Boolean);
+                    const ocupados = anotados.length;
+                    const max = Math.max(1, Number(t.cupoMax) || 15);
+                    const pct = Math.min(100, Math.round((ocupados / max) * 100));
+                    const lleno = ocupados >= max;
+                    const disponibles = sociosGym.filter(s => !(t.sociosIds || []).includes(s.id));
+
+                    return `
+                        <div style="background:var(--surface-solid); border:1.5px solid ${lleno ? "var(--err)" : "var(--line-strong)"}; border-radius:16px; padding:0.9rem 1rem; display:flex; flex-direction:column; gap:0.6rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+                                <div>
+                                    <span class="badge badge-celeste">📅 ${t.dias} • ⏰ ${t.hora}</span>
+                                    <h4 style="font-size:0.96rem; font-weight:800; color:var(--ink-900); margin:4px 0 0;">${t.sala}</h4>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:0.35rem;">
+                                    <span class="badge ${lleno ? "badge-danger" : (pct >= 75 ? "badge-warn" : "badge-ok")}">
+                                        ${lleno ? "LLENO" : `${ocupados}/${max}`}
+                                    </span>
+                                    <button type="button" class="btn btn-danger btn-sm" style="min-height:26px; padding:0 6px;" onclick="eliminarTurnoCupoGym26(${t.id})">✕</button>
+                                </div>
+                            </div>
+
+                            <div style="height:7px; background:var(--line-strong); border-radius:99px; overflow:hidden;">
+                                <div style="height:100%; width:${pct}%; background:${lleno ? "#ef4444" : (pct >= 75 ? "#f59e0b" : "#10b981")};"></div>
+                            </div>
+
+                            <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                                ${anotados.length === 0
+                                    ? `<small style="color:var(--ink-400);">Sin socios asignados a este turno todavía.</small>`
+                                    : anotados.map(s => `
+                                        <span class="badge badge-purple" style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.7rem;">
+                                            ${s.apellido}, ${s.nombre}
+                                            <span style="cursor:pointer; font-weight:900;" onclick="quitarSocioDeTurnoCupo26(${t.id}, ${s.id})" title="Sacar del turno">×</span>
+                                        </span>
+                                    `).join("")}
+                            </div>
+
+                            ${!lleno && disponibles.length > 0 ? `
+                                <div style="display:flex; gap:0.35rem; margin-top:auto;">
+                                    <select id="selAddSocioCupo26_${t.id}" style="flex:1; min-height:32px; font-size:0.76rem;">
+                                        ${disponibles.map(s => `<option value="${s.id}">${s.apellido}, ${s.nombre}</option>`).join("")}
+                                    </select>
+                                    <button type="button" class="btn btn-secondary btn-sm" style="min-height:32px;" onclick="asignarSocioATurnoCupo26(${t.id})">+ Anotar</button>
+                                </div>
+                            ` : ""}
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.agregarTurnoCupoGym26 = function (e) {
+    e.preventDefault();
+    const lista = obtenerCuposHorariosGym26();
+    lista.push({
+        id: Date.now(),
+        dias: document.getElementById("cupoDias26").value.trim(),
+        hora: document.getElementById("cupoHora26").value.trim(),
+        sala: document.getElementById("cupoSala26").value.trim(),
+        cupoMax: Math.max(1, parseInt(document.getElementById("cupoMax26").value) || 15),
+        sociosIds: []
+    });
+    guardarCuposHorariosGym26(lista);
+    abrirModalCuposHorariosGym26();
+};
+
+window.eliminarTurnoCupoGym26 = function (idTurno) {
+    if (!confirm("🗑️ ¿Eliminar este horario?")) return;
+    guardarCuposHorariosGym26(obtenerCuposHorariosGym26().filter(t => Number(t.id) !== Number(idTurno)));
+    abrirModalCuposHorariosGym26();
+};
+
+window.asignarSocioATurnoCupo26 = function (idTurno) {
+    const idSocio = parseInt(document.getElementById(`selAddSocioCupo26_${idTurno}`)?.value);
+    if (!idSocio) return;
+    const lista = obtenerCuposHorariosGym26();
+    const t = lista.find(x => Number(x.id) === Number(idTurno));
+    if (!t) return;
+    if (!Array.isArray(t.sociosIds)) t.sociosIds = [];
+    if (!t.sociosIds.includes(idSocio)) t.sociosIds.push(idSocio);
+    guardarCuposHorariosGym26(lista);
+    abrirModalCuposHorariosGym26();
+};
+
+window.quitarSocioDeTurnoCupo26 = function (idTurno, idSocio) {
+    const lista = obtenerCuposHorariosGym26();
+    const t = lista.find(x => Number(x.id) === Number(idTurno));
+    if (!t) return;
+    t.sociosIds = (t.sociosIds || []).filter(id => Number(id) !== Number(idSocio));
+    guardarCuposHorariosGym26(lista);
+    abrirModalCuposHorariosGym26();
+};
+
+// =========================================================================
+// 26.5 DEPORTES A: SEMÁFORO DE APTO MÉDICO ANUAL (EMMAC / FICHA MÉDICA)
+// =========================================================================
+
+function calcularEstadoEmmac26(fechaVencISO) {
+    if (!fechaVencISO) return { codigo: "sin", badge: "⚪ Sin Cargar", clase: "badge-celeste", dias: null };
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const venc = new Date(fechaVencISO + "T00:00:00");
+    if (isNaN(venc.getTime())) return { codigo: "sin", badge: "⚪ Sin Cargar", clase: "badge-celeste", dias: null };
+    const dias = Math.round((venc - hoy) / (1000 * 60 * 60 * 24));
+
+    if (dias < 0) return { codigo: "vencido", badge: `🔴 Vencido (${Math.abs(dias)}d)`, clase: "badge-danger", dias };
+    if (dias <= 30) return { codigo: "alerta", badge: `🟡 Vence en ${dias}d`, clase: "badge-warn", dias };
+    return { codigo: "ok", badge: `🟢 Vigente (${dias}d)`, clase: "badge-ok", dias };
+}
+
+window.abrirModalSemaforoEmmacDeporte26 = function (soloCatActiva = true) {
+    const dep = (typeof deportePagina !== "undefined" && deportePagina) ? deportePagina : "Futbol";
+    const cat = (typeof categoriaActiva !== "undefined" && categoriaActiva) ? categoriaActiva : "Sub 13";
+
+    const jugadores = (typeof basePersonas !== "undefined" ? basePersonas : []).filter(p =>
+        p && p.activo && p.deporte === dep && (!soloCatActiva || p.categoria === cat)
+    );
+
+    const contadores = { ok: 0, alerta: 0, vencido: 0, sin: 0 };
+    jugadores.forEach(p => {
+        contadores[calcularEstadoEmmac26(p.emmacVencimiento).codigo]++;
+    });
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:860px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-ok">🏥 HABILITACIÓN MÉDICA OBLIGATORIA</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Semáforo Apto Médico Anual (EMMAC) — ${dep} ${soloCatActiva ? `(${cat})` : "(Todas)"}</h3>
+                </div>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalSemaforoEmmacDeporte26(${!soloCatActiva})">
+                        ${soloCatActiva ? "Ver Todo el Club" : `Solo ${cat}`}
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+
+            <div class="bento-kpis" style="margin-bottom:1rem;">
+                <div class="bento-kpi"><div class="kpi-icon ok"><i class="ri-shield-check-fill"></i></div><div class="kpi-data"><span>🟢 Aptos Vigentes</span><strong>${contadores.ok}</strong></div></div>
+                <div class="bento-kpi"><div class="kpi-icon warn"><i class="ri-alarm-warning-fill"></i></div><div class="kpi-data"><span>🟡 Vencen en ≤30 días</span><strong>${contadores.alerta}</strong></div></div>
+                <div class="bento-kpi"><div class="kpi-icon" style="background:var(--err-bg); color:var(--err);"><i class="ri-close-circle-fill"></i></div><div class="kpi-data"><span>🔴 Vencidos</span><strong>${contadores.vencido}</strong></div></div>
+                <div class="bento-kpi"><div class="kpi-icon purple"><i class="ri-question-fill"></i></div><div class="kpi-data"><span>⚪ Sin Cargar</span><strong>${contadores.sin}</strong></div></div>
+            </div>
+
+            ${jugadores.length === 0
+                ? `<div class="empty-box">No hay deportistas activos en esta vista.</div>`
+                : `<div class="table-wrap" style="max-height:390px; overflow-y:auto;">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th>Deportista</th>
+                                <th>Estado EMMAC</th>
+                                <th>Fecha Vencimiento</th>
+                                <th>N° Certificado / Nota</th>
+                                <th style="text-align:right;">Aviso</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${jugadores.map(p => {
+                                const est = calcularEstadoEmmac26(p.emmacVencimiento);
+                                return `
+                                    <tr>
+                                        <td data-label="Deportista"><strong>${p.apellido}, ${p.nombre}</strong><br><small style="color:var(--ink-500);">${p.categoria} • DNI ${p.dni}</small></td>
+                                        <td data-label="Estado"><span class="badge ${est.clase}">${est.badge}</span></td>
+                                        <td data-label="Vencimiento">
+                                            <input type="date" value="${p.emmacVencimiento || ""}"
+                                                onchange="actualizarEmmacJugador26(${p.id}, 'emmacVencimiento', this.value, ${soloCatActiva})"
+                                                style="min-height:32px; font-size:0.78rem; font-weight:700;">
+                                        </td>
+                                        <td data-label="Certificado">
+                                            <input type="text" placeholder="N° EMMAC / Médico..." value="${(p.emmacNro || "").replace(/"/g, "&quot;")}"
+                                                onchange="actualizarEmmacJugador26(${p.id}, 'emmacNro', this.value, ${soloCatActiva})"
+                                                style="min-height:32px; font-size:0.78rem;">
+                                        </td>
+                                        <td data-label="Aviso" style="text-align:right;">
+                                            ${est.codigo !== "ok" ? `
+                                                <button type="button" class="btn btn-whatsapp btn-sm" onclick="pedirAptoMedicoEmmacWA26(${p.id})">
+                                                    <i class="ri-whatsapp-line"></i> Pedir Apto
+                                                </button>
+                                            ` : `<span style="color:var(--ok); font-weight:800; font-size:0.78rem;">✓ Habilitado</span>`}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join("")}
+                        </tbody>
+                    </table>
+                   </div>`}
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.actualizarEmmacJugador26 = function (idPersona, campo, valor, soloCatActiva) {
+    const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(idPersona));
+    if (!p) return;
+    p[campo] = valor;
+    if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+    if (typeof mostrarToast === "function") mostrarToast(`🏥 Apto Médico actualizado para ${p.apellido}.`);
+    abrirModalSemaforoEmmacDeporte26(soloCatActiva);
+};
+
+window.pedirAptoMedicoEmmacWA26 = function (idPersona) {
+    const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(idPersona));
+    if (!p) return;
+    const lic = obtenerLicenciaSafe25();
+    const tel = (p.whatsapp || "").replace(/\D/g, "");
+    const msg = `🏥 *RECORDATORIO DE APTO MÉDICO (EMMAC) — ${lic.nombreEntidad || "CLUB"}*\n\n` +
+                `Hola *${p.nombre}*, te recordamos presentar el certificado de *Apto Médico Anual (EMMAC)* actualizado para quedar habilitado/a en *${p.deporte} (${p.categoria})*. ¡Muchas gracias!`;
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+// =========================================================================
+// 26.6 DEPORTES B: TABLA DE ESTADÍSTICAS ACUMULADAS DE LA TEMPORADA
+// =========================================================================
+
+function calcularEstadisticasTemporada26(dep, catFiltro = "TODAS") {
+    const partidos = (typeof basePartidos !== "undefined" ? basePartidos : []).filter(m =>
+        m && m.deporte === dep && (catFiltro === "TODAS" || m.categoria === catFiltro)
+    );
+
+    const mapaJug = {};
+    const asegurarJug = (id, nombre) => {
+        const k = String(id || nombre);
+        if (!mapaJug[k]) {
+            const pReal = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => String(x.id) === String(id));
+            mapaJug[k] = {
+                id,
+                nombre: pReal ? `${pReal.apellido}, ${pReal.nombre}` : (nombre || "Jugador"),
+                categoria: pReal?.categoria || "-",
+                puesto: pReal?.puesto || "-",
+                partidosSet: new Set(),
+                goles: 0,
+                asistencias: 0,
+                quites: 0,
+                tarjetas: 0,
+                eventosTotales: 0
+            };
+        }
+        return mapaJug[k];
+    };
+
+    partidos.forEach(m => {
+        (m.eventos || []).forEach(ev => {
+            const j = asegurarJug(ev.jugadorId, ev.jugadorNombre);
+            j.partidosSet.add(m.id);
+            j.eventosTotales++;
+            const t = String(ev.tipo || "").toLowerCase();
+            if (t.includes("gol") || t.includes("try") || t.includes("triple") || t.includes("doble") || t.includes("punto") || t.includes("winner")) j.goles++;
+            else if (t.includes("asistencia") || t.includes("armado")) j.asistencias++;
+            else if (t.includes("quite") || t.includes("barrida") || t.includes("atajada") || t.includes("tackle") || t.includes("bloqueo") || t.includes("rebote")) j.quites++;
+            else if (t.includes("tarjeta") || t.includes("exclusi")) j.tarjetas++;
+        });
+    });
+
+    const lista = Object.values(mapaJug).map(j => ({
+        ...j,
+        partidosJugados: j.partidosSet.size
+    }));
+
+    lista.sort((a, b) => (b.goles - a.goles) || (b.asistencias - a.asistencias) || (b.quites - a.quites));
+    return { lista, totalPartidos: partidos.length };
+}
+
+window.abrirModalEstadisticasTemporada26 = function (catFiltroOpt = null) {
+    const dep = (typeof deportePagina !== "undefined" && deportePagina) ? deportePagina : "Futbol";
+    const catAct = (typeof categoriaActiva !== "undefined" && categoriaActiva) ? categoriaActiva : "Sub 13";
+    const catFiltro = catFiltroOpt || catAct;
+
+    const { lista, totalPartidos } = calcularEstadisticasTemporada26(dep, catFiltro);
+    const goleador = lista[0] || null;
+    const asistidor = [...lista].sort((a, b) => b.asistencias - a.asistencias)[0] || null;
+    const defensor = [...lista].sort((a, b) => b.quites - a.quites)[0] || null;
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:860px;">
+            <div class="modal-top no-print-pdf">
+                <div>
+                    <span class="badge badge-purple">🏆 ANUARIO Y RENDIMIENTO ACUMULADO</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Estadísticas de la Temporada — ${dep} (${catFiltro})</h3>
+                </div>
+                <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                    <select onchange="abrirModalEstadisticasTemporada26(this.value)" style="width:auto; min-height:32px; font-weight:700; font-size:0.78rem;">
+                        <option value="${catAct}" ${catFiltro === catAct ? "selected" : ""}>Categoría ${catAct}</option>
+                        <option value="TODAS" ${catFiltro === "TODAS" ? "selected" : ""}>Todas las Categorías</option>
+                    </select>
+                    <button type="button" class="btn btn-ok btn-sm" onclick="exportarEstadisticasTemporadaExcel26('${dep}', '${catFiltro}')">📥 Excel</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ PDF</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+
+            <div class="bento-kpis" style="margin-bottom:1rem;">
+                <div class="bento-kpi"><div class="kpi-icon"><i class="ri-calendar-check-fill"></i></div><div class="kpi-data"><span>Partidos Analizados</span><strong>${totalPartidos} partidos</strong></div></div>
+                <div class="bento-kpi"><div class="kpi-icon ok"><i class="ri-trophy-fill"></i></div><div class="kpi-data"><span>⚽ Máx. Goleador/Anotador</span><strong>${goleador && goleador.goles > 0 ? `${goleador.nombre.split(",")[0]} (${goleador.goles})` : "-"}</strong></div></div>
+                <div class="bento-kpi"><div class="kpi-icon purple"><i class="ri-focus-3-line"></i></div><div class="kpi-data"><span>🎯 Líder Asistencias</span><strong>${asistidor && asistidor.asistencias > 0 ? `${asistidor.nombre.split(",")[0]} (${asistidor.asistencias})` : "-"}</strong></div></div>
+                <div class="bento-kpi"><div class="kpi-icon warn"><i class="ri-shield-star-fill"></i></div><div class="kpi-data"><span>🛡️ Líder Quites / Defensa</span><strong>${defensor && defensor.quites > 0 ? `${defensor.nombre.split(",")[0]} (${defensor.quites})` : "-"}</strong></div></div>
+            </div>
+
+            ${lista.length === 0
+                ? `<div class="empty-box">Todavía no hay partidos finalizados en <b>${dep} (${catFiltro})</b>. Registrá jugadas en la <b>Pizarra de Partido en Vivo</b> y tocá <i>Finalizar Partido</i> para alimentar esta tabla automáticamente.</div>`
+                : `<div class="table-wrap" style="max-height:370px; overflow-y:auto;">
+                    <table class="app-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Deportista</th>
+                                <th>PJ</th>
+                                <th>⚽ Goles / Pts</th>
+                                <th>🎯 Asist.</th>
+                                <th>🛡️ Quites / Def.</th>
+                                <th>🟨 Tarjetas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${lista.map((j, i) => `
+                                <tr>
+                                    <td><strong>${i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "#" + (i + 1)}</strong></td>
+                                    <td><strong>${j.nombre}</strong><br><small style="color:var(--ink-500);">${j.puesto} • ${j.categoria}</small></td>
+                                    <td><b>${j.partidosJugados}</b></td>
+                                    <td><span class="badge badge-ok" style="font-weight:800;">${j.goles}</span></td>
+                                    <td><span class="badge badge-celeste">${j.asistencias}</span></td>
+                                    <td><span class="badge badge-purple">${j.quites}</span></td>
+                                    <td><span class="badge ${j.tarjetas > 0 ? "badge-warn" : "badge-celeste"}">${j.tarjetas}</span></td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                   </div>`}
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.exportarEstadisticasTemporadaExcel26 = function (dep, catFiltro) {
+    const { lista } = calcularEstadisticasTemporada26(dep, catFiltro);
+    if (!lista.length) return alert("Sin estadísticas para exportar.");
+    const headers = ["Puesto", "Deportista", "Categoria", "Puesto Campo", "Partidos Jugados", "Goles / Puntos", "Asistencias", "Quites / Defensas", "Tarjetas"];
+    const rows = lista.map((j, i) => [i + 1, j.nombre, j.categoria, j.puesto, j.partidosJugados, j.goles, j.asistencias, j.quites, j.tarjetas]);
+    descargarCSVExcel25(`estadisticas_${dep.toLowerCase()}_${catFiltro.toLowerCase().replace(/\s+/g, "_")}.csv`, headers, rows);
+};
+
+// =========================================================================
+// 26.7 REUBICACIÓN DE CAJA + INYECCIÓN LIMPIA DE BOTONES DEL PAQUETE 2
+// =========================================================================
+
+function inyectarBotonesPaquete2YReubicarCaja26() {
+    if (document.body?.getAttribute("data-rol") === "usuario" || document.body?.classList.contains("login-page")) {
+        return;
+    }
+
+    // 1. Eliminar definitivamente el botón de Caja de la barra superior (topbar)
+    document.getElementById("btnTopbarCaja25")?.remove();
+
+    // 2. Reubicar "💵 Cierre de Caja" DENTRO de la sección de Contabilidad/Finanzas, Mutuales/Liquidación y Cuotas de Gym
+    document.querySelectorAll(".panel-head").forEach(head => {
+        const txt = (head.innerText || "").toLowerCase();
+        const esContabOFinanzas =
+            txt.includes("contabil") || txt.includes("finanz") || txt.includes("tesorer") ||
+            txt.includes("libro mayor") || txt.includes("liquidaci") || txt.includes("asistencia diaria y cuotas");
+
+        if (esContabOFinanzas && !head.querySelector(".btn-abrir-caja-contab-26")) {
+            const btnCaja = document.createElement("button");
+            btnCaja.type = "button";
+            btnCaja.className = "btn btn-ok btn-sm btn-abrir-caja-contab-26";
+            btnCaja.onclick = () => abrirModalCierreCaja25();
+            btnCaja.innerHTML = `💵 Cierre de Caja`;
+            head.appendChild(btnCaja);
+        }
+    });
+
+    // 3. SALUD: Inyectar "✍️ Consentimiento" y "🧍 Mapa Corporal" ADENTRO de la ficha del paciente (.barra-herramientas-interna-paciente-22)
+    document.querySelectorAll(".barra-herramientas-interna-paciente-22").forEach(barraInt => {
+        const btnEst = barraInt.querySelector("button[onclick*='abrirModalGestionEstudiosDePaciente19']");
+        const m = (btnEst?.getAttribute("onclick") || "").match(/'([^']+)'/);
+        if (!m) return;
+        const clave = m[1];
+        const ficha = obtenerPacienteUniversalPorClave19(clave);
+        if (!ficha) return;
+
+        const contBotones = barraInt.querySelector("div:last-child");
+        if (!contBotones) return;
+
+        const cantCons = Array.isArray(ficha.consentimientos) ? ficha.consentimientos.length : 0;
+        const cantPts = Array.isArray(ficha.mapaCorporalPuntos) ? ficha.mapaCorporalPuntos.length : 0;
+
+        let btnCons = contBotones.querySelector(".btn-consentimiento-26");
+        if (!btnCons) {
+            btnCons = document.createElement("button");
+            btnCons.type = "button";
+            btnCons.className = "btn btn-sm btn-consentimiento-26";
+            btnCons.style = "background:#f59e0b; color:#0f172a; font-weight:800; min-height:30px;";
+            btnCons.onclick = () => abrirModalConsentimientoPaciente26(clave);
+            contBotones.appendChild(btnCons);
+        }
+        btnCons.innerHTML = `✍️ Consentimiento${cantCons ? ` (${cantCons})` : ""}`;
+
+        let btnMapa = contBotones.querySelector(".btn-mapa-corporal-26");
+        if (!btnMapa) {
+            btnMapa = document.createElement("button");
+            btnMapa.type = "button";
+            btnMapa.className = "btn btn-sm btn-mapa-corporal-26";
+            btnMapa.style = "background:#ec4899; color:#ffffff; font-weight:800; min-height:30px;";
+            btnMapa.onclick = () => abrirModalMapaCorporalPaciente26(clave);
+            contBotones.appendChild(btnMapa);
+        }
+        btnMapa.innerHTML = `🧍 Mapa Corporal${cantPts ? ` (${cantPts})` : ""}`;
+    });
+
+    // 4. GIMNASIO: Inyectar "🖥️ Modo Tótem" y "🕒 Cupos por Horario" dentro de la pantalla de Gimnasio
+    if (typeof deportePagina !== "undefined" && deportePagina === "Gimnasio") {
+        const headGym = document.querySelector("#gym-sec-asistencias .panel-head") || document.querySelector(".app-content > .app-panel .panel-head");
+        if (headGym && !headGym.querySelector(".btn-totem-gym-26")) {
+            const btnTotem = document.createElement("button");
+            btnTotem.type = "button";
+            btnTotem.className = "btn btn-primary btn-sm btn-totem-gym-26";
+            btnTotem.onclick = abrirModoTotemRecepcion26;
+            btnTotem.innerHTML = `🖥️ Modo Tótem`;
+
+            const btnCupos = document.createElement("button");
+            btnCupos.type = "button";
+            btnCupos.className = "btn btn-secondary btn-sm btn-cupos-gym-26";
+            btnCupos.onclick = abrirModalCuposHorariosGym26;
+            btnCupos.innerHTML = `🕒 Cupos Horarios`;
+
+            headGym.appendChild(btnTotem);
+            headGym.appendChild(btnCupos);
+        }
+    }
+
+    // 5. DEPORTES: Inyectar "🏥 Semáforo EMMAC" y "🏆 Estadísticas Temporada" dentro de Plantel y Partidos
+    if (typeof deportePagina !== "undefined" && deportePagina && deportePagina !== "Gimnasio") {
+        const headPlantel = document.querySelector("#dep-sec-plantel .panel-head") || document.querySelector(".app-content > .app-panel .panel-head");
+        if (headPlantel && !headPlantel.querySelector(".btn-emmac-dep-26")) {
+            const btnEmmac = document.createElement("button");
+            btnEmmac.type = "button";
+            btnEmmac.className = "btn btn-secondary btn-sm btn-emmac-dep-26";
+            btnEmmac.style = "border-color:#10b981; color:#047857; font-weight:800;";
+            btnEmmac.onclick = () => abrirModalSemaforoEmmacDeporte26(true);
+            btnEmmac.innerHTML = `🏥 Apto EMMAC`;
+
+            const btnStats = document.createElement("button");
+            btnStats.type = "button";
+            btnStats.className = "btn btn-secondary btn-sm btn-stats-temp-26";
+            btnStats.style = "border-color:#6366f1; color:#4338ca; font-weight:800;";
+            btnStats.onclick = () => abrirModalEstadisticasTemporada26();
+            btnStats.innerHTML = `🏆 Estadísticas Temporada`;
+
+            headPlantel.appendChild(btnEmmac);
+            headPlantel.appendChild(btnStats);
+        }
+
+        const headPartidos = document.querySelector("#dep-sec-partido .panel-head");
+        if (headPartidos && !headPartidos.querySelector(".btn-stats-temp-26")) {
+            const btnStats2 = document.createElement("button");
+            btnStats2.type = "button";
+            btnStats2.className = "btn btn-secondary btn-sm btn-stats-temp-26";
+            btnStats2.onclick = () => abrirModalEstadisticasTemporada26();
+            btnStats2.innerHTML = `🏆 Tabla Temporada`;
+            headPartidos.appendChild(btnStats2);
+        }
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(inyectarBotonesPaquete2YReubicarCaja26, 300);
+    setTimeout(inyectarBotonesPaquete2YReubicarCaja26, 750);
+});
+
+document.addEventListener("click", () => {
+    setTimeout(inyectarBotonesPaquete2YReubicarCaja26, 80);
+});
+// =========================================================================
+// 27. PAQUETE 3 — COMODIDAD DIARIA SIN RECARGAR LA BARRA SUPERIOR:
+//     1) 🔎 BUSCADOR UNIVERSAL RÁPIDO (CTRL + K) PARA PERSONAS, PACIENTES Y ACCIONES
+//     2) 🎂 AVISADOR DE CUMPLEAÑOS DEL DÍA / PRÓXIMOS 7 DÍAS + SALUDO WHATSAPP
+//     3) CAMPO FECHA DE NACIMIENTO EN ALTA/EDICIÓN DE PERSONAS Y PACIENTES
+// Pegar al final de app.js (debajo del Apartado 26)
+// =========================================================================
+
+(function inyectarCSSPaquete3_27() {
+    if (document.getElementById("cdmCssPaquete3_27")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssPaquete3_27";
+    st.textContent = `
+        body[data-rol="usuario"] #cdmSpotlightBackdrop27,
+        body[data-rol="usuario"] #btnSidebarSpotlight27,
+        body[data-rol="usuario"] #bannerCumpleanosHoy27,
+        body.login-page #cdmSpotlightBackdrop27 {
+            display: none !important;
+        }
+
+        /* 1. PALETA DE COMANDOS / BUSCADOR UNIVERSAL (CTRL + K) */
+        #cdmSpotlightBackdrop27 {
+            position: fixed;
+            inset: 0;
+            z-index: 10090;
+            background: rgba(12, 25, 44, 0.58);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 9vh 1rem 2rem;
+        }
+        #cdmSpotlightBackdrop27.open {
+            display: flex !important;
+        }
+        .spot-window-27 {
+            width: min(620px, 96vw);
+            background: var(--surface-solid, #ffffff);
+            border: 1.5px solid var(--line-celeste, #7dd3fc);
+            border-radius: 22px;
+            box-shadow: 0 28px 65px rgba(12, 25, 44, 0.45);
+            overflow: hidden;
+            animation: slideUpFade 0.18s ease forwards;
+        }
+        .spot-input-bar-27 {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            padding: 0.9rem 1.15rem;
+            border-bottom: 1.5px solid var(--line-strong, #e2e8f0);
+            background: var(--surface-subtle, #f8fafc);
+        }
+        .spot-input-bar-27 i {
+            font-size: 1.3rem;
+            color: #0284c7;
+        }
+        #inpSpotlightUniversal27 {
+            flex: 1;
+            border: none !important;
+            background: transparent !important;
+            font-size: 1.02rem !important;
+            font-weight: 700 !important;
+            color: var(--ink-900, #0f172a) !important;
+            outline: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            min-height: 32px !important;
+        }
+        .spot-kbd-27 {
+            background: var(--surface-solid, #ffffff);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            border-radius: 7px;
+            padding: 0.18rem 0.5rem;
+            font-size: 0.68rem;
+            font-weight: 800;
+            color: var(--ink-500, #64748b);
+        }
+        .spot-results-list-27 {
+            max-height: 390px;
+            overflow-y: auto;
+            padding: 0.55rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .spot-item-27 {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.65rem 0.85rem;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.14s ease;
+            border: 1px solid transparent;
+        }
+        .spot-item-27:hover,
+        .spot-item-27.active-sel {
+            background: var(--cdm-50, #f0f9ff);
+            border-color: var(--line-celeste, #bae6fd);
+        }
+        .spot-footer-27 {
+            padding: 0.55rem 1rem;
+            background: var(--surface-subtle, #f8fafc);
+            border-top: 1px solid var(--line, #e2e8f0);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.7rem;
+            color: var(--ink-500, #64748b);
+        }
+
+        /* 2. BANNER DISCRETO DE CUMPLEAÑOS */
+        #bannerCumpleanosHoy27 {
+            background: linear-gradient(135deg, rgba(254, 243, 199, 0.85) 0%, rgba(253, 230, 138, 0.65) 100%);
+            border: 1.5px solid #f59e0b;
+            border-radius: 18px;
+            padding: 0.85rem 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.85rem;
+            flex-wrap: wrap;
+            box-shadow: var(--shadow-sm);
+        }
+        body[data-theme="dark"] #bannerCumpleanosHoy27 {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(180, 83, 9, 0.22) 100%);
+            border-color: rgba(251, 191, 36, 0.55);
+        }
+    `;
+    document.head.appendChild(st);
+})();
+
+// =========================================================================
+// 27.1 BUSCADOR UNIVERSAL RÁPIDO (CTRL + K)
+// =========================================================================
+
+let _spotResultadosActuales27 = [];
+let _spotIndexSel27 = 0;
+
+function asegurarModalSpotlight27() {
+    let backdrop = document.getElementById("cdmSpotlightBackdrop27");
+    if (backdrop) return backdrop;
+
+    backdrop = document.createElement("div");
+    backdrop.id = "cdmSpotlightBackdrop27";
+    backdrop.onclick = (e) => {
+        if (e.target === backdrop) cerrarBuscadorUniversal27();
+    };
+    backdrop.innerHTML = `
+        <div class="spot-window-27">
+            <div class="spot-input-bar-27">
+                <i class="ri-search-2-line"></i>
+                <input type="text" id="inpSpotlightUniversal27" autocomplete="off"
+                    placeholder="Buscar paciente, deportista, socio, DNI o herramienta (ej: caja, lote, totem, emmac)..."
+                    oninput="renderizarResultadosSpotlight27()">
+                <span class="spot-kbd-27">ESC</span>
+            </div>
+            <div id="listaResultadosSpotlight27" class="spot-results-list-27"></div>
+            <div class="spot-footer-27">
+                <span>↑↓ Navegar • Enter Abrir</span>
+                <span>⚡ Buscador Universal (Ctrl + K)</span>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(backdrop);
+    return backdrop;
+}
+
+window.abrirBuscadorUniversal27 = function () {
+    if (document.body?.getAttribute("data-rol") === "usuario" || document.body?.classList.contains("login-page")) return;
+    const backdrop = asegurarModalSpotlight27();
+    backdrop.classList.add("open");
+    _spotIndexSel27 = 0;
+    const inp = document.getElementById("inpSpotlightUniversal27");
+    if (inp) {
+        inp.value = "";
+        setTimeout(() => inp.focus(), 30);
+    }
+    renderizarResultadosSpotlight27();
+};
+
+window.cerrarBuscadorUniversal27 = function () {
+    document.getElementById("cdmSpotlightBackdrop27")?.classList.remove("open");
+};
+
+function recopilarItemsSpotlight27(queryRaw = "") {
+    const q = String(queryRaw || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+
+    const lic = typeof obtenerLicenciaSafe25 === "function" ? obtenerLicenciaSafe25() : {};
+    const f = typeof obtenerFuncionesActivasApp24 === "function" ? obtenerFuncionesActivasApp24() : { salud: {}, deporte: {}, general: {} };
+    const items = [];
+
+    // 1. Pacientes de Consultorio
+    if (typeof obtenerMapaUniversalPacientes19 === "function") {
+        const mapaPac = obtenerMapaUniversalPacientes19();
+        Object.values(mapaPac).forEach(pac => {
+            if (!pac || !pac.nombreCompleto) return;
+            items.push({
+                categoria: "🩺 Paciente",
+                icono: "🩺",
+                titulo: pac.nombreCompleto,
+                sub: `DNI ${pac.dni || "-"} • ${pac.especialidad || "Consultorio"} • ${pac.mutual || "Particular"} • ${pac.codigoAcceso || ""}`,
+                busqueda: `${pac.nombreCompleto} ${pac.dni || ""} ${pac.mutual || ""} ${pac.codigoAcceso || ""} paciente`,
+                accion: () => {
+                    if (f.salud?.genograma !== false && String(pac.especialidad || "").toLowerCase().includes("psic") && typeof abrirModalGenogramaPaciente24 === "function") {
+                        abrirModalGenogramaPaciente24(pac.clave);
+                    } else if (typeof abrirModalTokensSesionesPaciente21 === "function") {
+                        abrirModalTokensSesionesPaciente21(pac.clave);
+                    } else if (typeof abrirModalGestionEstudiosDePaciente19 === "function") {
+                        abrirModalGestionEstudiosDePaciente19(pac.clave);
+                    }
+                }
+            });
+        });
+    }
+
+    // 2. Deportistas y Socios de Gimnasio
+    (typeof basePersonas !== "undefined" ? basePersonas : []).forEach(p => {
+        if (!p || !p.activo) return;
+        const nom = `${p.apellido}, ${p.nombre}`;
+        items.push({
+            categoria: p.deporte === "Gimnasio" ? "🏋️ Socio Gym" : `⚽ ${p.deporte}`,
+            icono: p.deporte === "Gimnasio" ? "🏋️" : "🏅",
+            titulo: nom,
+            sub: `DNI ${p.dni || "-"} • ${p.deporte === "Gimnasio" ? p.puesto : `${p.categoria} • ${p.puesto}`} • ${p.codigoAcceso || ""}`,
+            busqueda: `${nom} ${p.nombre} ${p.apellido} ${p.dni || ""} ${p.deporte} ${p.categoria || ""} ${p.codigoAcceso || ""}`,
+            accion: () => {
+                window.location.href = `jugador.html?id=${p.id}`;
+            }
+        });
+    });
+
+    // 3. Acciones y Herramientas Rápidas habilitadas
+    const comandos = [
+        { ok: f.general?.cierreCaja !== false && typeof abrirModalCierreCaja25 === "function", icono: "💵", titulo: "Abrir Cierre de Caja por Medio de Pago", sub: "Efectivo, Transferencia / MP y Pendiente de Mutuales", busq: "caja cierre efectivo transferencia contabilidad finanzas plata", fn: () => abrirModalCierreCaja25() },
+        { ok: f.salud?.loteMutuales !== false && typeof abrirModalLoteMensualMutuales25 === "function", icono: "📊", titulo: "Abrir Lote Mensual por Mutual (Excel / PDF)", sub: "Facturación de obras sociales y tokens validados", busq: "lote mutual obra social excel pdf facturacion tokens", fn: () => abrirModalLoteMensualMutuales25() },
+        { ok: f.deporte?.aumentoMasivo !== false && typeof abrirModalAumentoMasivoYAlias25 === "function", icono: "📈", titulo: "Aumento Masivo de Cuotas & Alias WA", sub: "Actualizar tarifas por % o plan y avisos de vencimiento", busq: "aumento cuotas tarifas alias cbu vencimientos cobrar", fn: () => abrirModalAumentoMasivoYAlias25() },
+        { ok: f.deporte?.totemYCupos !== false && typeof abrirModoTotemRecepcion26 === "function", icono: "🖥️", titulo: "Abrir Modo Tótem / Check-in Recepción", sub: "Pantalla completa para ingreso de socios por DNI", busq: "totem recepcion checkin entrada dni gimnasio", fn: () => abrirModoTotemRecepcion26() },
+        { ok: f.deporte?.totemYCupos !== false && typeof abrirModalCuposHorariosGym26 === "function", icono: "🕒", titulo: "Control de Cupos por Turno / Horario (Gym)", sub: "Horarios de sala y disponibilidad de lugares", busq: "cupos horarios turnos sala gimnasio", fn: () => abrirModalCuposHorariosGym26() },
+        { ok: f.deporte?.emmacYEstadisticas !== false && typeof abrirModalSemaforoEmmacDeporte26 === "function", icono: "🏥", titulo: "Semáforo Apto Médico Anual (EMMAC)", sub: "Control de certificados vigentes y vencidos", busq: "emmac apto medico certificado salud deporte", fn: () => abrirModalSemaforoEmmacDeporte26(false) },
+        { ok: f.deporte?.emmacYEstadisticas !== false && typeof abrirModalEstadisticasTemporada26 === "function", icono: "🏆", titulo: "Tabla de Estadísticas de la Temporada", sub: "Goleadores, asistencias, quites y tarjetas", busq: "estadisticas goleadores asistencias temporada tabla", fn: () => abrirModalEstadisticasTemporada26() },
+        { ok: f.general?.notasRapidas !== false && typeof alternarDrawerNotasRapidas23 === "function", icono: "📝", titulo: "Abrir Bloc de Notas Rápidas", sub: "Recordatorios y checklist con autoguardado (Alt + N)", busq: "notas bloc recordatorios checklist apuntes", fn: () => alternarDrawerNotasRapidas23() },
+        { ok: typeof alternarTemaVisualCDM === "function", icono: "🌓", titulo: "Cambiar Modo Día / Modo Noche", sub: "Alternar tema claro y oscuro", busq: "tema modo noche dia oscuro claro", fn: () => alternarTemaVisualCDM() },
+        { ok: Boolean(lic.modulos?.consultorio && typeof abrirModuloConsultorioIndependienteCDM === "function"), icono: "🩺", titulo: "Ir a Suite de Profesionales / Consultorio", sub: "Pacientes, Agenda, Mutuales y Genogramas", busq: "consultorio salud psicologia kinesiologia pacientes", fn: () => abrirModuloConsultorioIndependienteCDM() }
+    ];
+
+    comandos.filter(c => c.ok).forEach(c => {
+        items.push({
+            categoria: "⚡ Acción Rápida",
+            icono: c.icono,
+            titulo: c.titulo,
+            sub: c.sub,
+            busqueda: `${c.titulo} ${c.sub} ${c.busq}`,
+            accion: c.fn
+        });
+    });
+
+    if (!q) {
+        return items.slice(0, 12);
+    }
+
+    const palabras = q.split(/\s+/).filter(Boolean);
+    return items.filter(it => {
+        const hay = it.busqueda.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return palabras.every(p => hay.includes(p));
+    }).slice(0, 15);
+}
+
+window.renderizarResultadosSpotlight27 = function () {
+    const cont = document.getElementById("listaResultadosSpotlight27");
+    if (!cont) return;
+    const q = document.getElementById("inpSpotlightUniversal27")?.value || "";
+    _spotResultadosActuales27 = recopilarItemsSpotlight27(q);
+    if (_spotIndexSel27 >= _spotResultadosActuales27.length) _spotIndexSel27 = 0;
+
+    if (_spotResultadosActuales27.length === 0) {
+        cont.innerHTML = `<div class="empty-box" style="padding:1.4rem;">No se encontraron resultados para "<b>${q}</b>".</div>`;
+        return;
+    }
+
+    cont.innerHTML = _spotResultadosActuales27.map((it, idx) => `
+        <div class="spot-item-27 ${idx === _spotIndexSel27 ? "active-sel" : ""}" onclick="ejecutarResultadoSpotlight27(${idx})">
+            <div style="display:flex; align-items:center; gap:0.75rem; min-width:0;">
+                <span style="font-size:1.25rem; flex-shrink:0;">${it.icono}</span>
+                <div style="min-width:0;">
+                    <strong style="display:block; font-size:0.88rem; color:var(--ink-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${it.titulo}</strong>
+                    <small style="display:block; font-size:0.73rem; color:var(--ink-500); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${it.sub}</small>
+                </div>
+            </div>
+            <span class="badge badge-celeste" style="font-size:0.65rem; flex-shrink:0;">${it.categoria}</span>
+        </div>
+    `).join("");
+};
+
+window.ejecutarResultadoSpotlight27 = function (idx) {
+    const item = _spotResultadosActuales27[idx];
+    if (!item || typeof item.accion !== "function") return;
+    cerrarBuscadorUniversal27();
+    setTimeout(() => item.accion(), 30);
+};
+
+// Atajo global Ctrl + K (o Cmd + K) + navegación con flechas dentro del buscador
+window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        const open = document.getElementById("cdmSpotlightBackdrop27")?.classList.contains("open");
+        if (open) cerrarBuscadorUniversal27();
+        else abrirBuscadorUniversal27();
+        return;
+    }
+
+    const backdrop = document.getElementById("cdmSpotlightBackdrop27");
+    if (!backdrop || !backdrop.classList.contains("open")) return;
+
+    if (e.key === "Escape") {
+        e.preventDefault();
+        cerrarBuscadorUniversal27();
+    } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (_spotResultadosActuales27.length > 0) {
+            _spotIndexSel27 = (_spotIndexSel27 + 1) % _spotResultadosActuales27.length;
+            renderizarResultadosSpotlight27();
+        }
+    } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (_spotResultadosActuales27.length > 0) {
+            _spotIndexSel27 = (_spotIndexSel27 - 1 + _spotResultadosActuales27.length) % _spotResultadosActuales27.length;
+            renderizarResultadosSpotlight27();
+        }
+    } else if (e.key === "Enter") {
+        if (_spotResultadosActuales27.length > 0) {
+            e.preventDefault();
+            ejecutarResultadoSpotlight27(_spotIndexSel27);
+        }
+    }
+});
+
+// Botón discreto en el menú lateral izquierdo (no recarga la barra superior)
+function inyectarBotonSpotlightEnSidebar27() {
+    if (document.body?.getAttribute("data-rol") === "usuario") return;
+    const nav = document.querySelector(".app-sidebar .sidebar-nav");
+    if (!nav || document.getElementById("btnSidebarSpotlight27")) return;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "btnSidebarSpotlight27";
+    btn.className = "btn btn-ghost btn-sm";
+    btn.style = "width:100%; justify-content:space-between; margin-bottom:0.6rem; background:rgba(255,255,255,0.07); color:#e2e8f0; border-color:rgba(255,255,255,0.16); padding:0.45rem 0.7rem;";
+    btn.onclick = abrirBuscadorUniversal27;
+    btn.innerHTML = `<span style="display:inline-flex; align-items:center; gap:0.4rem;"><i class="ri-search-line"></i> Buscar...</span><small style="opacity:0.7; font-size:0.66rem;">Ctrl+K</small>`;
+    nav.parentElement.insertBefore(btn, nav);
+}
+
+// =========================================================================
+// 27.2 AVISADOR DE CUMPLEAÑOS DEL DÍA / PRÓXIMOS 7 DÍAS + CAMPO EN FICHAS
+// =========================================================================
+
+function diasHastaProximoCumple27(fechaNacISO) {
+    if (!fechaNacISO || !/^\d{4}-\d{2}-\d{2}/.test(fechaNacISO)) return null;
+    const partes = fechaNacISO.split("-");
+    const mes = parseInt(partes[1], 10) - 1;
+    const dia = parseInt(partes[2], 10);
+    if (isNaN(mes) || isNaN(dia)) return null;
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    let prox = new Date(hoy.getFullYear(), mes, dia);
+    if (prox < hoy) {
+        prox = new Date(hoy.getFullYear() + 1, mes, dia);
+    }
+    return Math.round((prox - hoy) / (1000 * 60 * 60 * 24));
+}
+
+function obtenerCumpleanerosCercanos27() {
+    const lista = [];
+
+    // 1. Personas de Deportes y Gimnasio
+    (typeof basePersonas !== "undefined" ? basePersonas : []).forEach(p => {
+        if (!p || !p.activo || !p.fechaNacimiento) return;
+        const faltan = diasHastaProximoCumple27(p.fechaNacimiento);
+        if (faltan !== null && faltan <= 7) {
+            lista.push({
+                nombre: `${p.nombre} ${p.apellido}`,
+                area: p.deporte,
+                telefono: p.whatsapp || "",
+                faltan,
+                fecha: p.fechaNacimiento.slice(5)
+            });
+        }
+    });
+
+    // 2. Pacientes de Consultorio
+    if (typeof obtenerMapaUniversalPacientes19 === "function") {
+        Object.values(obtenerMapaUniversalPacientes19()).forEach(f => {
+            if (!f || !f.fechaNacimiento) return;
+            const faltan = diasHastaProximoCumple27(f.fechaNacimiento);
+            if (faltan !== null && faltan <= 7) {
+                lista.push({
+                    nombre: f.nombreCompleto,
+                    area: f.especialidad || "Consultorio",
+                    telefono: f.telefono || "",
+                    faltan,
+                    fecha: f.fechaNacimiento.slice(5)
+                });
+            }
+        });
+    }
+
+    lista.sort((a, b) => a.faltan - b.faltan);
+    return lista;
+}
+
+window.saludarCumpleanosPorWA27 = function (nombre, telefono) {
+    const lic = typeof obtenerLicenciaSafe25 === "function" ? obtenerLicenciaSafe25() : {};
+    const tel = String(telefono || "").replace(/\D/g, "");
+    const msg = `🎂🎉 *¡Muy feliz cumpleaños, ${nombre}!*\n\nDe parte de todo el equipo de *${lic.nombreEntidad || "nuestro espacio"}* te deseamos un excelente día lleno de salud y alegría. ¡A festejar! 🥳`;
+    const url = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
+};
+
+function renderizarBannerCumpleanosSiCorresponde27() {
+    if (document.body?.getAttribute("data-rol") === "usuario" || document.body?.classList.contains("login-page")) return;
+
+    const cumples = obtenerCumpleanerosCercanos27();
+    const existente = document.getElementById("bannerCumpleanosHoy27");
+
+    if (cumples.length === 0) {
+        existente?.remove();
+        return;
+    }
+
+    const destino = document.querySelector(".app-content");
+    if (!destino) return;
+
+    let banner = existente;
+    if (!banner) {
+        banner = document.createElement("section");
+        banner.id = "bannerCumpleanosHoy27";
+        banner.className = "animate-in";
+        destino.prepend(banner);
+    }
+
+    const hoyCount = cumples.filter(c => c.faltan === 0).length;
+    banner.innerHTML = `
+        <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+            <span style="font-size:1.55rem;">🎂</span>
+            <div>
+                <strong style="font-size:0.9rem; color:#92400e; display:block;">
+                    ${hoyCount > 0 ? `🎉 ¡Hoy hay ${hoyCount} cumpleaños!` : `🎈 Próximos cumpleaños esta semana (${cumples.length})`}
+                </strong>
+                <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-top:4px;">
+                    ${cumples.slice(0, 6).map(c => `
+                        <span class="badge" style="background:#ffffff; color:#0f172a; border:1px solid #f59e0b; display:inline-flex; align-items:center; gap:0.4rem; padding:0.22rem 0.55rem;">
+                            <strong>${c.nombre}</strong>
+                            <small style="color:#b45309;">${c.faltan === 0 ? "¡HOY!" : `en ${c.faltan}d`}</small>
+                            <button type="button" class="btn btn-whatsapp btn-sm" style="min-height:22px; padding:0 6px; font-size:0.68rem;" onclick="saludarCumpleanosPorWA27('${c.nombre.replace(/'/g, "\\'")}', '${c.telefono}')">
+                                <i class="ri-whatsapp-line"></i> Saludar
+                            </button>
+                        </span>
+                    `).join("")}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Inyectar campo opcional "🎂 Fecha de Nacimiento" en el modal de Persona (#formPersonaCDM) sin depender del orden de carga
+function inyectarCampoNacimientoEnModalPersona27() {
+    const form = document.getElementById("formPersonaCDM");
+    if (!form || document.getElementById("pFechaNac27")) return;
+
+    const idEdit = document.getElementById("pId")?.value;
+    const pExist = idEdit ? (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => String(x.id) === String(idEdit)) : null;
+
+    const inpEdad = document.getElementById("pEdad");
+    const filaEdad = inpEdad?.closest(".grid-3, .grid-4");
+    if (!filaEdad) return;
+
+    const wrapNac = document.createElement("div");
+    wrapNac.className = "field";
+    wrapNac.style = "margin-bottom:0.75rem;";
+    wrapNac.innerHTML = `
+        <label>🎂 Fecha de Nacimiento (Opcional — Activa aviso de Cumpleaños)</label>
+        <input type="date" id="pFechaNac27" value="${pExist?.fechaNacimiento || ""}">
+    `;
+    filaEdad.insertAdjacentElement("afterend", wrapNac);
+}
+
+// Guardar la fecha de nacimiento al confirmar #formPersonaCDM
+document.addEventListener("submit", function (e) {
+    const form = e.target;
+    if (!form || form.id !== "formPersonaCDM") return;
+    const valNac = document.getElementById("pFechaNac27")?.value || "";
+    const idEdit = document.getElementById("pId")?.value || "";
+    const dniVal = (document.getElementById("pDni")?.value || "").trim();
+
+    setTimeout(() => {
+        if (typeof basePersonas === "undefined" || !Array.isArray(basePersonas)) return;
+        let target = idEdit ? basePersonas.find(x => String(x.id) === String(idEdit)) : null;
+        if (!target && dniVal) target = basePersonas.find(x => String(x.dni).trim() === dniVal);
+        if (!target && basePersonas.length > 0) target = basePersonas[basePersonas.length - 1];
+        if (target) {
+            target.fechaNacimiento = valNac;
+            if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+            renderizarBannerCumpleanosSiCorresponde27();
+        }
+    }, 35);
+}, true);
+
+document.addEventListener("click", () => {
+    setTimeout(() => {
+        inyectarCampoNacimientoEnModalPersona27();
+        inyectarBotonSpotlightEnSidebar27();
+    }, 50);
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        inyectarBotonSpotlightEnSidebar27();
+        renderizarBannerCumpleanosSiCorresponde27();
+    }, 320);
+});
+// =========================================================================
+// 28. ATLAS ANATÓMICO INTERACTIVO PRO (MAPA CORPORAL POR CAPAS + ZOOM)
+//     - 3 CAPAS COMBINABLES: 🧴 PIEL / 💪 MUSCULAR / 🦴 ÓSEA-ARTICULAR
+//     - RECUADRO ANATÓMICO AL PASAR EL CURSOR + ZOOM SUAVE AL HACER CLIC
+//     - LATERALIDAD CLÍNICA REAL (FRENTE Y ESPALDA) + MIRA DE PRECISIÓN + PDF A4
+//     - REEMPLAZA AUTOMÁTICAMENTE A abrirModalMapaCorporalPaciente26
+// Pegar al final de app.js (debajo del Apartado 27)
+// =========================================================================
+
+(function inyectarCSSAtlasAnatomico28() {
+    if (document.getElementById("cdmCssAtlasAnatomico28")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssAtlasAnatomico28";
+    st.textContent = `
+        .atlas-layout-28 {
+            display: grid;
+            grid-template-columns: minmax(340px, 1.15fr) minmax(300px, 1fr);
+            gap: 1.1rem;
+            align-items: start;
+        }
+        @media (max-width: 880px) {
+            .atlas-layout-28 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Visor Clínico Oscuro tipo Atlas 3D / Radiología */
+        .atlas-viewport-card-28 {
+            background: radial-gradient(circle at 50% 35%, #16263d 0%, #0b1322 72%, #060b14 100%);
+            border: 1.5px solid rgba(56, 189, 248, 0.32);
+            border-radius: 20px;
+            padding: 0.85rem;
+            color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            box-shadow: 0 18px 40px rgba(2, 6, 23, 0.38);
+            position: relative;
+        }
+
+        .atlas-topbar-28 {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+        }
+
+        .atlas-pill-group-28 {
+            display: inline-flex;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 11px;
+            padding: 3px;
+            gap: 3px;
+        }
+
+        .atlas-pill-btn-28 {
+            border: none;
+            background: transparent;
+            color: #cbd5e1;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.32rem 0.65rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.16s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .atlas-pill-btn-28:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .atlas-pill-btn-28.active {
+            background: #0284c7;
+            color: #ffffff;
+            box-shadow: 0 3px 10px rgba(2, 132, 199, 0.45);
+        }
+        .atlas-pill-btn-28.layer-musc.active { background: #e11d48; box-shadow: 0 3px 10px rgba(225, 29, 72, 0.45); }
+        .atlas-pill-btn-28.layer-bone.active { background: #0ea5e9; box-shadow: 0 3px 10px rgba(14, 165, 233, 0.45); }
+        .atlas-pill-btn-28.layer-skin.active { background: #475569; }
+
+        .atlas-stage-box-28 {
+            position: relative;
+            width: 100%;
+            height: 495px;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            background:
+                linear-gradient(rgba(56, 189, 248, 0.045) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56, 189, 248, 0.045) 1px, transparent 1px);
+            background-size: 24px 24px;
+            user-select: none;
+        }
+        @media (max-width: 600px) {
+            .atlas-stage-box-28 { height: 420px; }
+        }
+
+        .atlas-stage-box-28 svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .atlas-stage-box-28.mode-zoom svg { cursor: zoom-in; }
+        .atlas-stage-box-28.mode-mark svg { cursor: crosshair; }
+
+        /* Regiones con recuadro iluminado antes de hacer clic */
+        .atlas-region-hitbox-28 {
+            fill: rgba(56, 189, 248, 0);
+            stroke: rgba(56, 189, 248, 0);
+            stroke-width: 1.6;
+            stroke-dasharray: 5 3;
+            rx: 8;
+            transition: fill 0.16s ease, stroke 0.16s ease;
+            cursor: zoom-in;
+        }
+        .atlas-stage-box-28.mode-zoom .atlas-region-hitbox-28:hover {
+            fill: rgba(56, 189, 248, 0.18);
+            stroke: #38bdf8;
+        }
+        .atlas-region-hitbox-28.focused-zone {
+            fill: rgba(56, 189, 248, 0.06);
+            stroke: rgba(56, 189, 248, 0.65);
+            pointer-events: none;
+        }
+
+        .atlas-hud-top-28 {
+            position: absolute;
+            top: 0.6rem;
+            left: 0.6rem;
+            right: 0.6rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.4rem;
+            pointer-events: none;
+            z-index: 6;
+        }
+        .atlas-hud-chip-28 {
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(56, 189, 248, 0.42);
+            color: #e0f2fe;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.3rem 0.65rem;
+            border-radius: 999px;
+            pointer-events: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .atlas-zoom-controls-28 {
+            position: absolute;
+            bottom: 0.65rem;
+            right: 0.65rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            z-index: 6;
+        }
+        .atlas-zoom-btn-28 {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(15, 23, 42, 0.9);
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .atlas-zoom-btn-28:hover {
+            background: #0284c7;
+            border-color: #38bdf8;
+        }
+
+        .atlas-hover-tooltip-28 {
+            position: absolute;
+            bottom: 0.65rem;
+            left: 0.65rem;
+            background: rgba(2, 132, 199, 0.94);
+            color: #ffffff;
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 0.35rem 0.75rem;
+            border-radius: 10px;
+            pointer-events: none;
+            z-index: 6;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+        }
+        .atlas-hover-tooltip-28.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Stepper Guía y Panel Derecho */
+        .atlas-step-banner-28 {
+            background: linear-gradient(135deg, var(--cdm-50, #f0f9ff), var(--surface-subtle, #f8fafc));
+            border: 1.5px solid var(--line-celeste, #bae6fd);
+            border-radius: 14px;
+            padding: 0.7rem 0.9rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.78rem;
+            color: var(--ink-800, #1e293b);
+        }
+        .atlas-quick-zones-28 {
+            display: flex;
+            gap: 0.32rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.75rem;
+        }
+        .atlas-zone-chip-28 {
+            background: var(--surface-solid, #ffffff);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            color: var(--ink-700, #334155);
+            font-size: 0.69rem;
+            font-weight: 700;
+            padding: 0.22rem 0.55rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .atlas-zone-chip-28:hover,
+        .atlas-zone-chip-28.active {
+            background: #0284c7;
+            border-color: #0284c7;
+            color: #ffffff;
+        }
+
+        /* Animación de pulso para la mira y marcadores activos */
+        @keyframes atlasPulse28 {
+            0% { r: 6; opacity: 0.9; }
+            100% { r: 16; opacity: 0; }
+        }
+        .atlas-reticle-pulse-28 {
+            animation: atlasPulse28 1.2s ease-out infinite;
+        }
+    `;
+    document.head.appendChild(st);
+})();
+
+// =========================================================================
+// 28.1 DEFINICIÓN ANATÓMICA DE REGIONES (BOUNDING BOX + ZOOM + ESTRUCTURAS)
+// Coordenadas sobre viewBox maestro: 0 0 300 620
+// =========================================================================
+
+function obtenerRegionesAnatomicas28(lado = "frente") {
+    const esEspalda = lado === "espalda";
+    // En Frente, izquierda de pantalla es DERECHA anatómica; en Espalda es IZQUIERDA anatómica
+    const L = esEspalda ? "Izquierdo" : "Derecho";
+    const R = esEspalda ? "Derecho" : "Izquierdo";
+    const LF = esEspalda ? "Izquierda" : "Derecha";
+    const RF = esEspalda ? "Derecha" : "Izquierda";
+
+    return [
+        {
+            id: "cabeza_cervical",
+            label: esEspalda ? "Cráneo / Zona Cervical" : "Cabeza / Cuello Anterior",
+            rect: { x: 114, y: 18, w: 72, h: 96 },
+            zoom: [78, 8, 144, 150],
+            musc: esEspalda ? "Suboccipitales / Trapecio Superior" : "Esternocleidomastoideo / Escalenos",
+            osea: "Columna Cervical (C1–C7) / Cráneo"
+        },
+        {
+            id: "hombro_v_izq",
+            label: `Hombro ${L}`,
+            rect: { x: 70, y: 106, w: 50, h: 52 },
+            zoom: [40, 82, 125, 130],
+            musc: esEspalda ? `Infraespinoso / Deltoides Post. ${L}` : `Deltoides Anterior / Manguito Rotador ${L}`,
+            osea: `Art. Glenohumeral / Acromioclavicular ${LF}`
+        },
+        {
+            id: "hombro_v_der",
+            label: `Hombro ${R}`,
+            rect: { x: 180, y: 106, w: 50, h: 52 },
+            zoom: [135, 82, 125, 130],
+            musc: esEspalda ? `Infraespinoso / Deltoides Post. ${R}` : `Deltoides Anterior / Manguito Rotador ${R}`,
+            osea: `Art. Glenohumeral / Acromioclavicular ${RF}`
+        },
+        {
+            id: "torax_dorsal",
+            label: esEspalda ? "Espalda Alta / Dorsal" : "Tórax / Pectoral",
+            rect: { x: 106, y: 114, w: 88, h: 98 },
+            zoom: [70, 92, 160, 165],
+            musc: esEspalda ? "Trapecio Medio / Romboides / Dorsal Ancho" : "Pectoral Mayor / Serrato Anterior",
+            osea: esEspalda ? "Columna Dorsal (T1–T12) / Escápulas" : "Esternón / Parrilla Costal / Clavículas"
+        },
+        {
+            id: "brazo_v_izq",
+            label: `Brazo y Codo ${L}`,
+            rect: { x: 26, y: 158, w: 66, h: 182 },
+            zoom: [5, 138, 130, 215],
+            musc: esEspalda ? `Tríceps / Extensores Antebrazo ${L}` : `Bíceps Braquial / Flexores Antebrazo ${L}`,
+            osea: `Húmero / Codo / Radio-Cúbito ${L}`
+        },
+        {
+            id: "brazo_v_der",
+            label: `Brazo y Codo ${R}`,
+            rect: { x: 208, y: 158, w: 66, h: 182 },
+            zoom: [165, 138, 130, 215],
+            musc: esEspalda ? `Tríceps / Extensores Antebrazo ${R}` : `Bíceps Braquial / Flexores Antebrazo ${R}`,
+            osea: `Húmero / Codo / Radio-Cúbito ${R}`
+        },
+        {
+            id: "lumbar_abdomen",
+            label: esEspalda ? "Zona Lumbar" : "Abdomen / Core",
+            rect: { x: 104, y: 212, w: 92, h: 78 },
+            zoom: [68, 185, 164, 150],
+            musc: esEspalda ? "Cuadrado Lumbar / Erectores Espinales" : "Recto Abdominal / Oblicuos",
+            osea: esEspalda ? "Columna Lumbar (L1–L5) / Sacro" : "Costillas Flotantes / Cresta Ilíaca"
+        },
+        {
+            id: "pelvis_cadera",
+            label: esEspalda ? "Glúteos / Sacroilíaca" : "Pelvis / Cadera / Ingle",
+            rect: { x: 94, y: 288, w: 112, h: 66 },
+            zoom: [62, 258, 176, 145],
+            musc: esEspalda ? "Glúteo Mayor / Glúteo Medio / Piramidal" : "Psoas Ilíaco / Aductores / Tensor Fascia Lata",
+            osea: "Pelvis / Art. Coxofemoral / Sacroilíaca"
+        },
+        {
+            id: "muslo_v_izq",
+            label: `Muslo ${L}`,
+            rect: { x: 92, y: 354, w: 56, h: 76 },
+            zoom: [56, 326, 132, 155],
+            musc: esEspalda ? `Isquiotibiales (Bíceps Femoral) ${L}` : `Cuádriceps (Recto Femoral / Vastos) ${L}`,
+            osea: `Diáfisis Femoral (Fémur) ${L}`
+        },
+        {
+            id: "muslo_v_der",
+            label: `Muslo ${R}`,
+            rect: { x: 152, y: 354, w: 56, h: 76 },
+            zoom: [112, 326, 132, 155],
+            musc: esEspalda ? `Isquiotibiales (Bíceps Femoral) ${R}` : `Cuádriceps (Recto Femoral / Vastos) ${R}`,
+            osea: `Diáfisis Femoral (Fémur) ${R}`
+        },
+        {
+            id: "rodilla_v_izq",
+            label: `Rodilla ${LF}`,
+            rect: { x: 92, y: 428, w: 56, h: 48 },
+            zoom: [58, 396, 126, 122],
+            musc: esEspalda ? `Hueco Poplíteo / Inserción Gemelo ${LF}` : `Tendón Rotuliano / Pata de Ganso ${LF}`,
+            osea: `Rótula / Meniscos / Ligamentos Rodilla ${LF}`
+        },
+        {
+            id: "rodilla_v_der",
+            label: `Rodilla ${RF}`,
+            rect: { x: 152, y: 428, w: 56, h: 48 },
+            zoom: [116, 396, 126, 122],
+            musc: esEspalda ? `Hueco Poplíteo / Inserción Gemelo ${RF}` : `Tendón Rotuliano / Pata de Ganso ${RF}`,
+            osea: `Rótula / Meniscos / Ligamentos Rodilla ${RF}`
+        },
+        {
+            id: "pierna_tobillo_v_izq",
+            label: `Pierna y Tobillo ${L}`,
+            rect: { x: 88, y: 476, w: 60, h: 132 },
+            zoom: [52, 456, 134, 164],
+            musc: esEspalda ? `Gemelos / Sóleo / Tendón de Aquiles ${L}` : `Tibial Anterior / Peroneos ${L}`,
+            osea: `Tibia / Peroné / Maléolo y Tobillo ${L}`
+        },
+        {
+            id: "pierna_tobillo_v_der",
+            label: `Pierna y Tobillo ${R}`,
+            rect: { x: 152, y: 476, w: 60, h: 132 },
+            zoom: [114, 456, 134, 164],
+            musc: esEspalda ? `Gemelos / Sóleo / Tendón de Aquiles ${R}` : `Tibial Anterior / Peroneos ${R}`,
+            osea: `Tibia / Peroné / Maléolo y Tobillo ${R}`
+        }
+    ];
+}
+
+// =========================================================================
+// 28.2 GENERADOR SVG MULTI-CAPA DE ALTA FIDELIDAD (PIEL + MÚSCULOS + HUESOS)
+// =========================================================================
+
+function construirSVGAtlasAnatomico28(lado = "frente", capas = { piel: true, musculo: true, hueso: false }, puntos = [], puntoPreview = null, regionFocoId = null, viewBoxArr = [0, 0, 300, 620], esImpresion = false) {
+    const esEspalda = lado === "espalda";
+    const regiones = obtenerRegionesAnatomicas28(lado);
+    const uid = `atl_${lado}_${esImpresion ? "pdf" : "live"}`;
+    const zoomFactor = Math.max(1, 300 / (viewBoxArr[2] || 300));
+    const markerScale = 1 / Math.pow(zoomFactor, 0.72);
+
+    // 1. CAPA SUPERFICIAL / PIEL (Silueta anatómica proporcionada)
+    const siluetaPath = `
+        M 150,24
+        C 166,24 176,37 175,56 C 174,73 166,85 161,89
+        L 163,104 C 176,109 202,113 216,126
+        C 226,136 230,156 234,178 L 245,232 L 258,296
+        C 262,312 268,324 264,334 C 260,342 251,341 247,331 L 243,315 L 236,304
+        L 220,236 L 207,180 L 203,164
+        C 199,184 196,210 192,232 C 189,252 192,268 198,288
+        C 205,310 206,338 202,368 L 196,428 C 194,442 195,456 197,472
+        C 201,500 198,530 191,562 L 194,580 C 198,592 204,600 190,602
+        C 176,603 170,596 171,582 L 173,562 L 165,492 L 164,454
+        L 158,380 L 152,340 L 148,340 L 142,380 L 136,454 L 135,492
+        L 127,562 L 129,582 C 130,596 124,603 110,602 C 96,600 102,592 106,580
+        L 109,562 C 102,530 99,500 103,472 C 105,456 106,442 104,428
+        L 98,368 C 94,338 95,310 102,288 C 108,268 111,252 108,232
+        C 104,210 101,184 97,164 L 93,180 L 80,236 L 64,304 L 57,315
+        L 53,331 C 49,341 40,342 36,334 C 32,324 38,312 42,296
+        L 55,232 L 66,178 C 70,156 74,136 84,126 C 98,113 124,109 137,104
+        L 139,89 C 134,85 126,73 125,56 C 124,37 134,24 150,24 Z
+    `;
+
+    // 2. CAPA MUSCULAR (Frente vs Espalda con gradientes de fibra muscular y tendones)
+    const musculosFrente = `
+        <!-- Esternocleidomastoideo -->
+        <path d="M139,88 L148,118 L142,118 L135,90 Z M161,88 L152,118 L158,118 L165,90 Z" fill="url(#${uid}_mgrad)" />
+        <!-- Trapecio Superior -->
+        <path d="M137,104 Q118,112 96,120 Q116,122 138,117 Z M163,104 Q182,112 204,120 Q184,122 162,117 Z" fill="url(#${uid}_mgrad2)" />
+        <!-- Pectorales Mayores -->
+        <path d="M148,124 C132,123 114,127 104,140 C102,158 112,174 132,176 C142,177 147,172 148,164 Z" fill="url(#${uid}_mgrad)" />
+        <path d="M152,124 C168,123 186,127 196,140 C198,158 188,174 168,176 C158,177 153,172 152,164 Z" fill="url(#${uid}_mgrad)" />
+        <!-- Deltoides -->
+        <path d="M104,124 C86,125 76,140 74,162 C82,168 94,164 102,148 Z" fill="url(#${uid}_mgrad2)" />
+        <path d="M196,124 C214,125 224,140 226,162 C218,168 206,164 198,148 Z" fill="url(#${uid}_mgrad2)" />
+        <!-- Bíceps y Antebrazos -->
+        <path d="M74,166 C66,184 64,206 70,224 C78,224 88,204 92,172 Z" fill="url(#${uid}_mgrad)" />
+        <path d="M226,166 C234,184 236,206 230,224 C222,224 212,204 208,172 Z" fill="url(#${uid}_mgrad)" />
+        <path d="M68,230 C59,254 54,278 52,298 C60,300 69,280 77,236 Z" fill="url(#${uid}_mgrad2)" />
+        <path d="M232,230 C241,254 246,278 248,298 C240,300 231,280 223,236 Z" fill="url(#${uid}_mgrad2)" />
+        <!-- Recto Abdominal (Bloques) + Oblicuos -->
+        <g fill="url(#${uid}_mgrad)" stroke="rgba(255,255,255,0.28)" stroke-width="0.9">
+            <rect x="131" y="182" width="17" height="21" rx="6" />
+            <rect x="152" y="182" width="17" height="21" rx="6" />
+            <rect x="132" y="206" width="16" height="22" rx="6" />
+            <rect x="152" y="206" width="16" height="22" rx="6" />
+            <rect x="133" y="231" width="15" height="23" rx="6" />
+            <rect x="152" y="231" width="15" height="23" rx="6" />
+            <path d="M134,258 L148,258 L148,296 L138,290 Z M152,258 L166,258 L162,290 L152,296 Z" />
+        </g>
+        <path d="M108,178 C116,192 124,220 128,258 L112,272 C106,242 104,206 108,178 Z" fill="url(#${uid}_mgrad2)" />
+        <path d="M192,178 C184,192 176,220 172,258 L188,272 C194,242 196,206 192,178 Z" fill="url(#${uid}_mgrad2)" />
+        <!-- Cuádriceps (Recto Femoral, Vasto Lateral y Medial) + Aductores -->
+        <path d="M104,306 C98,348 98,392 110,434 C122,438 134,424 142,374 L144,322 Z" fill="url(#${uid}_mgrad)" />
+        <path d="M196,306 C202,348 202,392 190,434 C178,438 166,424 158,374 L156,322 Z" fill="url(#${uid}_mgrad)" />
+        <path d="M116,324 C114,364 114,402 122,430 C130,404 134,364 130,326 Z" fill="url(#${uid}_mgrad2)" />
+        <path d="M184,324 C186,364 186,402 178,430 C170,404 166,364 170,326 Z" fill="url(#${uid}_mgrad2)" />
+        <!-- Tendones Rotulianos -->
+        <ellipse cx="122" cy="446" rx="11" ry="13" fill="rgba(226, 232, 240, 0.55)" />
+        <ellipse cx="178" cy="446" rx="11" ry="13" fill="rgba(226, 232, 240, 0.55)" />
+        <!-- Tibial Anterior y Gemelos visibles -->
+        <path d="M108,468 C102,498 106,530 116,560 C124,554 130,516 130,474 Z" fill="url(#${uid}_mgrad2)" />
+        <path d="M192,468 C198,498 194,530 184,560 C176,554 170,516 170,474 Z" fill="url(#${uid}_mgrad2)" />
+    `;
+
+    const musculosEspalda = `
+        <!-- Trapecio Completo (Diamante) -->
+        <path d="M150,92 L116,118 L98,136 L150,204 L202,136 L184,118 Z" fill="url(#${uid}_mgrad)" stroke="rgba(255,255,255,0.22)" stroke-width="1" />
+        <!-- Deltoides Posteriores -->
+        <path d="M102,124 C84,126 75,142 74,164 C84,168 96,162 104,146 Z" fill="url(#${uid}_mgrad2)" />
+        <path d="M198,124 C216,126 225,142 226,164 C216,168 204,162 196,146 Z" fill="url(#${uid}_mgrad2)" />
+        <!-- Dorsales Anchos (Latissimus Dorsi) -->
+        <path d="M104,166 C100,196 106,226 118,252 L147,264 L147,204 Z" fill="url(#${uid}_mgrad2)" />
+        <path d="M196,166 C200,196 194,226 182,252 L153,264 L153,204 Z" fill="url(#${uid}_mgrad2)" />
+        <!-- Tríceps y Antebrazos -->
+        <path d="M74,168 C65,186 64,208 71,226 C80,224 88,204 92,174 Z" fill="url(#${uid}_mgrad)" />
+        <path d="M226,168 C235,186 236,208 229,226 C220,224 212,204 208,174 Z" fill="url(#${uid}_mgrad)" />
+        <path d="M68,232 C58,256 54,280 53,298 C62,298 70,276 77,236 Z" fill="url(#${uid}_mgrad2)" />
+        <path d="M232,232 C242,256 246,280 247,298 C238,298 230,276 223,236 Z" fill="url(#${uid}_mgrad2)" />
+        <!-- Fascia Toracolumbar y Erectores -->
+        <path d="M134,218 L148,218 L148,286 L132,282 Z M152,218 L166,218 L168,282 L152,286 Z" fill="url(#${uid}_mgrad)" />
+        <polygon points="150,248 128,286 150,308 172,286" fill="rgba(226, 232, 240, 0.45)" />
+        <!-- Glúteos Mayores y Medios -->
+        <path d="M148,296 C126,294 102,306 100,334 C100,356 120,368 148,354 Z" fill="url(#${uid}_mgrad)" />
+        <path d="M152,296 C174,294 198,306 200,334 C200,356 180,368 152,354 Z" fill="url(#${uid}_mgrad)" />
+        <!-- Isquiotibiales -->
+        <path d="M104,358 C100,392 104,424 114,442 L134,442 C138,412 142,382 140,358 Z" fill="url(#${uid}_mgrad2)" />
+        <path d="M196,358 C200,392 196,424 186,442 L166,442 C162,412 158,382 160,358 Z" fill="url(#${uid}_mgrad2)" />
+        <!-- Gemelos (Gastrocnemio) + Tendón de Aquiles -->
+        <path d="M106,466 C98,494 102,522 114,536 C126,536 134,514 132,468 Z" fill="url(#${uid}_mgrad)" />
+        <path d="M194,466 C202,494 198,522 186,536 C174,536 166,514 168,468 Z" fill="url(#${uid}_mgrad)" />
+        <rect x="114" y="534" width="7" height="36" rx="3" fill="rgba(241, 245, 249, 0.72)" />
+        <rect x="179" y="534" width="7" height="36" rx="3" fill="rgba(241, 245, 249, 0.72)" />
+    `;
+
+    // 3. CAPA ÓSEA / ESQUELÉTICA (Columna, Costillas, Pelvis, Articulaciones y Huesos Largos)
+    const vertebras = [];
+    for (let y = 94; y <= 286; y += 11) {
+        const wV = y < 126 ? 12 : (y < 218 ? 15 : 18);
+        vertebras.push(`<rect x="${150 - wV / 2}" y="${y}" width="${wV}" height="7.5" rx="3" />`);
+    }
+    const costillas = [];
+    for (let i = 0; i < 6; i++) {
+        const yC = 132 + i * 13;
+        const rxC = 34 + (i < 4 ? i * 2.5 : (5 - i) * 1.5);
+        costillas.push(`<path d="M144,${yC} Q${150 - rxC},${yC + 4} ${150 - rxC + 8},${yC + 12}" fill="none" stroke="url(#${uid}_bgrad)" stroke-width="4.2" stroke-linecap="round"/>`);
+        costillas.push(`<path d="M156,${yC} Q${150 + rxC},${yC + 4} ${150 + rxC - 8},${yC + 12}" fill="none" stroke="url(#${uid}_bgrad)" stroke-width="4.2" stroke-linecap="round"/>`);
+    }
+
+    const capaOseaSVG = `
+        <g fill="url(#${uid}_bgrad)" stroke="#0f172a" stroke-width="0.9">
+            <!-- Cráneo -->
+            <ellipse cx="150" cy="52" rx="19" ry="23" />
+            ${!esEspalda ? `<circle cx="143" cy="52" r="4" fill="#0f172a"/><circle cx="157" cy="52" r="4" fill="#0f172a"/><path d="M144,68 L156,68" stroke="#0f172a" stroke-width="1.5"/>` : ""}
+            <!-- Columna Vertebral completa (C1 a L5) -->
+            ${vertebras.join("")}
+            <!-- Clavículas (Frente) o Escápulas (Espalda) -->
+            ${!esEspalda
+                ? `<path d="M146,120 Q120,115 92,126" fill="none" stroke="url(#${uid}_bgrad)" stroke-width="5.5" stroke-linecap="round"/>
+                   <path d="M154,120 Q180,115 208,126" fill="none" stroke="url(#${uid}_bgrad)" stroke-width="5.5" stroke-linecap="round"/>
+                   <rect x="145" y="122" width="10" height="62" rx="4" />`
+                : `<polygon points="104,126 136,128 128,176" opacity="0.9"/>
+                   <polygon points="196,126 164,128 172,176" opacity="0.9"/>`}
+            <!-- Parrilla Costal -->
+            ${costillas.join("")}
+            <!-- Pelvis y Sacro -->
+            <path d="M150,286 L138,314 L150,330 L162,314 Z" />
+            <path d="M138,292 C114,284 102,302 108,326 C114,340 130,336 138,320 Z" />
+            <path d="M162,292 C186,284 198,302 192,326 C186,340 170,336 162,320 Z" />
+            <!-- Brazos: Húmero + Radio/Cúbito -->
+            <line x1="88" y1="132" x2="74" y2="222" stroke="url(#${uid}_bgrad)" stroke-width="7.5" stroke-linecap="round"/>
+            <line x1="212" y1="132" x2="226" y2="222" stroke="url(#${uid}_bgrad)" stroke-width="7.5" stroke-linecap="round"/>
+            <line x1="72" y1="226" x2="56" y2="304" stroke="url(#${uid}_bgrad)" stroke-width="4.5" stroke-linecap="round"/>
+            <line x1="77" y1="227" x2="62" y2="306" stroke="url(#${uid}_bgrad)" stroke-width="3.6" stroke-linecap="round"/>
+            <line x1="228" y1="226" x2="244" y2="304" stroke="url(#${uid}_bgrad)" stroke-width="4.5" stroke-linecap="round"/>
+            <line x1="223" y1="227" x2="238" y2="306" stroke="url(#${uid}_bgrad)" stroke-width="3.6" stroke-linecap="round"/>
+            <!-- Piernas: Fémur + Tibia/Peroné -->
+            <line x1="120" y1="326" x2="122" y2="444" stroke="url(#${uid}_bgrad)" stroke-width="9.5" stroke-linecap="round"/>
+            <line x1="180" y1="326" x2="178" y2="444" stroke="url(#${uid}_bgrad)" stroke-width="9.5" stroke-linecap="round"/>
+            <line x1="122" y1="452" x2="118" y2="568" stroke="url(#${uid}_bgrad)" stroke-width="7" stroke-linecap="round"/>
+            <line x1="114" y1="458" x2="112" y2="566" stroke="url(#${uid}_bgrad)" stroke-width="3.2" stroke-linecap="round"/>
+            <line x1="178" y1="452" x2="182" y2="568" stroke="url(#${uid}_bgrad)" stroke-width="7" stroke-linecap="round"/>
+            <line x1="186" y1="458" x2="188" y2="566" stroke="url(#${uid}_bgrad)" stroke-width="3.2" stroke-linecap="round"/>
+            <!-- Articulaciones Clave (Hombros, Codos, Caderas, Rodillas/Rótulas, Tobillos) -->
+            <circle cx="88" cy="132" r="7" fill="#bae6fd"/>
+            <circle cx="212" cy="132" r="7" fill="#bae6fd"/>
+            <circle cx="74" cy="224" r="5.5" fill="#bae6fd"/>
+            <circle cx="226" cy="224" r="5.5" fill="#bae6fd"/>
+            <circle cx="120" cy="326" r="7.5" fill="#bae6fd"/>
+            <circle cx="180" cy="326" r="7.5" fill="#bae6fd"/>
+            <ellipse cx="122" cy="446" rx="7.5" ry="9" fill="#e0f2fe"/>
+            <ellipse cx="178" cy="446" rx="7.5" ry="9" fill="#e0f2fe"/>
+            <circle cx="117" cy="570" r="5.5" fill="#bae6fd"/>
+            <circle cx="183" cy="570" r="5.5" fill="#bae6fd"/>
+        </g>
+    `;
+
+    // 4. RECUADROS INTERACTIVOS DE REGIONES (SOLO EN VISOR EN VIVO)
+    const hitboxesHTML = esImpresion ? "" : `
+        <g class="layer-regions-28">
+            ${regiones.map(r => `
+                <rect class="atlas-region-hitbox-28 ${regionFocoId === r.id ? "focused-zone" : ""}"
+                    x="${r.rect.x}" y="${r.rect.y}" width="${r.rect.w}" height="${r.rect.h}"
+                    data-region-id="${r.id}"
+                    data-region-label="${r.label.replace(/"/g, "&quot;")}"
+                    onmouseenter="mostrarHoverRegionAtlas28('${r.label.replace(/'/g, "\\'")}')"
+                    onmouseleave="ocultarHoverRegionAtlas28()"
+                    onclick="clicEnRegionAtlas28(event, '${r.id}')">
+                </rect>
+            `).join("")}
+        </g>
+    `;
+
+    // 5. MARCADORES GUARDADOS + MIRA DE PRECISIÓN PENDIENTE
+    const marcadoresLado = (puntos || [])
+        .map((pt, idx) => ({ ...pt, num: idx + 1 }))
+        .filter(pt => (pt.lado || "frente") === lado);
+
+    const pinesSVG = marcadoresLado.map(pt => {
+        const sx = (Number(pt.x || 50) / 100) * 300;
+        const sy = (Number(pt.y || 50) / 100) * 620;
+        const color = pt.intensidad >= 7 ? "#ef4444" : (pt.intensidad >= 4 ? "#f59e0b" : "#10b981");
+        return `
+            <g transform="translate(${sx.toFixed(1)}, ${sy.toFixed(1)}) scale(${markerScale.toFixed(3)})"
+               style="cursor:pointer;"
+               onclick="${esImpresion ? "" : `event.stopPropagation(); enfocarPuntoGuardadoAtlas28(${pt.id})`}">
+                <circle r="11" fill="${color}" stroke="#ffffff" stroke-width="2.2" />
+                <text y="3.5" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="900" font-family="Poppins, sans-serif">${pt.num}</text>
+                <title>#${pt.num} ${pt.zona} (EVA ${pt.intensidad}/10)</title>
+            </g>
+        `;
+    }).join("");
+
+    let miraPreviewSVG = "";
+    if (!esImpresion && puntoPreview && puntoPreview.lado === lado) {
+        const px = (puntoPreview.x / 100) * 300;
+        const py = (puntoPreview.y / 100) * 620;
+        miraPreviewSVG = `
+            <g transform="translate(${px.toFixed(1)}, ${py.toFixed(1)}) scale(${markerScale.toFixed(3)})" pointer-events="none">
+                <circle class="atlas-reticle-pulse-28" r="10" fill="none" stroke="#38bdf8" stroke-width="2.2" />
+                <line x1="-14" y1="0" x2="14" y2="0" stroke="#38bdf8" stroke-width="1.8" />
+                <line x1="0" y1="-14" x2="0" y2="14" stroke="#38bdf8" stroke-width="1.8" />
+                <circle r="4.5" fill="#38bdf8" stroke="#ffffff" stroke-width="1.8" />
+            </g>
+        `;
+    }
+
+    const opPiel = capas.piel ? (capas.musculo || capas.hueso ? 0.34 : 0.92) : 0.12;
+    const opMusc = capas.musculo ? (capas.hueso ? 0.56 : 0.94) : 0;
+    const opHueso = capas.hueso ? 0.96 : 0;
+
+    return `
+        <svg id="${uid}_svg" viewBox="${viewBoxArr.join(" ")}" preserveAspectRatio="xMidYMid meet"
+             onclick="${esImpresion ? "" : "clicSobreCanvasAtlas28(event)"}">
+            <defs>
+                <linearGradient id="${uid}_sgrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#94a3b8"/>
+                    <stop offset="55%" stop-color="#64748b"/>
+                    <stop offset="100%" stop-color="#334155"/>
+                </linearGradient>
+                <linearGradient id="${uid}_mgrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#fb7185"/>
+                    <stop offset="50%" stop-color="#e11d48"/>
+                    <stop offset="100%" stop-color="#881337"/>
+                </linearGradient>
+                <linearGradient id="${uid}_mgrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#f43f5e"/>
+                    <stop offset="100%" stop-color="#9f1239"/>
+                </linearGradient>
+                <linearGradient id="${uid}_bgrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#f8fafc"/>
+                    <stop offset="55%" stop-color="#e2e8f0"/>
+                    <stop offset="100%" stop-color="#94a3b8"/>
+                </linearGradient>
+            </defs>
+
+            <!-- Eje de simetría clínico sutil -->
+            <line x1="150" y1="12" x2="150" y2="608" stroke="rgba(56,189,248,0.16)" stroke-width="1" stroke-dasharray="4 4"/>
+
+            <!-- CAPA 1: CONTORNO / PIEL -->
+            <g class="layer-skin-28" opacity="${opPiel}">
+                <path d="${siluetaPath}" fill="url(#${uid}_sgrad)" stroke="#94a3b8" stroke-width="2" />
+            </g>
+
+            <!-- CAPA 2: SISTEMA MUSCULAR -->
+            ${opMusc > 0 ? `<g class="layer-muscles-28" opacity="${opMusc}">${esEspalda ? musculosEspalda : musculosFrente}</g>` : ""}
+
+            <!-- CAPA 3: SISTEMA ÓSEO Y ARTICULAR -->
+            ${opHueso > 0 ? `<g class="layer-bones-28" opacity="${opHueso}">${capaOseaSVG}</g>` : ""}
+
+            <!-- CONTORNO EXTERNO DE DEFINICIÓN -->
+            <path d="${siluetaPath}" fill="none" stroke="rgba(186, 230, 253, 0.45)" stroke-width="1.35" pointer-events="none"/>
+
+            <!-- RECUADROS DE REGIONES -->
+            ${hitboxesHTML}
+
+            <!-- MARCADORES CLÍNICOS Y MIRA -->
+            <g class="layer-markers-28">${pinesSVG}${miraPreviewSVG}</g>
+        </svg>
+    `;
+}
+
+// =========================================================================
+// 28.3 ESTADO INTERACTIVO, ANIMACIÓN DE ZOOM Y CONTROLADOR DEL ATLAS
+// =========================================================================
+
+window.__atlasState28 = {
+    clavePaciente: null,
+    lado: "frente",
+    capas: { piel: true, musculo: true, hueso: false },
+    modo: "zoom", // 'zoom' (elegir recuadro) | 'mark' (marcar punto exacto)
+    regionFocoId: null,
+    viewBox: [0, 0, 300, 620],
+    puntoPreview: null,
+    animId: null
+};
+
+function animarViewBoxAtlas28(destinoVB, onDone = null) {
+    const st = window.__atlasState28;
+    const svg = document.querySelector("#atlasStageContainer28 svg");
+    if (!svg) {
+        st.viewBox = [...destinoVB];
+        if (onDone) onDone();
+        return;
+    }
+
+    if (st.animId) cancelAnimationFrame(st.animId);
+    const inicioVB = [...st.viewBox];
+    const t0 = performance.now();
+    const dur = 260;
+
+    const step = (now) => {
+        const rawT = Math.min(1, (now - t0) / dur);
+        const ease = 1 - Math.pow(1 - rawT, 3);
+        const curr = [
+            inicioVB[0] + (destinoVB[0] - inicioVB[0]) * ease,
+            inicioVB[1] + (destinoVB[1] - inicioVB[1]) * ease,
+            inicioVB[2] + (destinoVB[2] - inicioVB[2]) * ease,
+            inicioVB[3] + (destinoVB[3] - inicioVB[3]) * ease
+        ];
+        st.viewBox = curr;
+        svg.setAttribute("viewBox", curr.map(n => n.toFixed(1)).join(" "));
+
+        if (rawT < 1) {
+            st.animId = requestAnimationFrame(step);
+        } else {
+            st.animId = null;
+            st.viewBox = [...destinoVB];
+            if (onDone) onDone();
+        }
+    };
+    st.animId = requestAnimationFrame(step);
+}
+
+window.mostrarHoverRegionAtlas28 = function (label) {
+    if (window.__atlasState28.modo !== "zoom") return;
+    const tip = document.getElementById("atlasHoverTooltip28");
+    if (tip) {
+        tip.innerHTML = `🔍 ${label} — Clic para acercar`;
+        tip.classList.add("show");
+    }
+};
+
+window.ocultarHoverRegionAtlas28 = function () {
+    document.getElementById("atlasHoverTooltip28")?.classList.remove("show");
+};
+
+window.clicEnRegionAtlas28 = function (ev, regionId) {
+    const st = window.__atlasState28;
+    if (st.modo !== "zoom") return; // Si está en modo marcar, deja pasar el clic al SVG
+    ev.stopPropagation();
+    enfocarRegionAtlas28(regionId);
+};
+
+window.enfocarRegionAtlas28 = function (regionId) {
+    const st = window.__atlasState28;
+    const reg = obtenerRegionesAnatomicas28(st.lado).find(r => r.id === regionId);
+    if (!reg) return;
+
+    st.regionFocoId = reg.id;
+    st.modo = "mark";
+    ocultarHoverRegionAtlas28();
+
+    // Sugerir automáticamente la estructura según la capa activa
+    const sugerencia = (st.capas.hueso && !st.capas.musculo) ? reg.osea : reg.musc;
+    const inpZona = document.getElementById("atlasZonaInput28");
+    if (inpZona) inpZona.value = sugerencia;
+
+    animarViewBoxAtlas28(reg.zoom, () => {
+        refrescarVisorSVGAtlas28();
+    });
+    actualizarIndicadoresAtlas28();
+};
+
+window.resetearZoomAtlas28 = function () {
+    const st = window.__atlasState28;
+    st.regionFocoId = null;
+    st.modo = "zoom";
+    animarViewBoxAtlas28([0, 0, 300, 620], () => {
+        refrescarVisorSVGAtlas28();
+    });
+    actualizarIndicadoresAtlas28();
+};
+
+window.ajustarZoomManualAtlas28 = function (factor) {
+    const st = window.__atlasState28;
+    const [vx, vy, vw, vh] = st.viewBox;
+    const nuevoW = Math.max(90, Math.min(300, vw * factor));
+    const nuevoH = Math.max(110, Math.min(620, vh * factor));
+    const cx = vx + vw / 2;
+    const cy = vy + vh / 2;
+    const nx = Math.max(0, Math.min(300 - nuevoW, cx - nuevoW / 2));
+    const ny = Math.max(0, Math.min(620 - nuevoH, cy - nuevoH / 2));
+
+    if (nuevoW >= 295) {
+        st.regionFocoId = null;
+    }
+    animarViewBoxAtlas28([nx, ny, nuevoW, nuevoH], () => refrescarVisorSVGAtlas28());
+};
+
+window.cambiarLadoAtlas28 = function (nuevoLado) {
+    const st = window.__atlasState28;
+    st.lado = nuevoLado;
+    st.regionFocoId = null;
+    st.puntoPreview = null;
+    st.modo = "zoom";
+    st.viewBox = [0, 0, 300, 620];
+    abrirModalMapaCorporalPro28(st.clavePaciente);
+};
+
+window.alternarCapaAtlas28 = function (nombreCapa) {
+    const st = window.__atlasState28;
+    st.capas[nombreCapa] = !st.capas[nombreCapa];
+    if (!st.capas.piel && !st.capas.musculo && !st.capas.hueso) {
+        st.capas.piel = true;
+    }
+
+    // Sincronizar selector de capa afectada en el formulario
+    const selCapa = document.getElementById("atlasCapaAfectada28");
+    if (selCapa) {
+        if (st.capas.hueso && !st.capas.musculo) selCapa.value = "Ósea / Articular";
+        else if (st.capas.musculo) selCapa.value = "Muscular";
+    }
+
+    // Si hay una región en foco, actualizar el nombre sugerido según la capa
+    if (st.regionFocoId) {
+        const reg = obtenerRegionesAnatomicas28(st.lado).find(r => r.id === st.regionFocoId);
+        const inpZona = document.getElementById("atlasZonaInput28");
+        if (reg && inpZona && !st.puntoPreview) {
+            inpZona.value = (st.capas.hueso && !st.capas.musculo) ? reg.osea : reg.musc;
+        }
+    }
+
+    refrescarVisorSVGAtlas28();
+    actualizarIndicadoresAtlas28();
+};
+
+window.cambiarModoInteraccionAtlas28 = function (nuevoModo) {
+    window.__atlasState28.modo = nuevoModo;
+    actualizarIndicadoresAtlas28();
+};
+
+window.clicSobreCanvasAtlas28 = function (ev) {
+    const st = window.__atlasState28;
+    if (st.modo !== "mark") return;
+
+    const svg = ev.currentTarget;
+    if (!svg || !svg.getScreenCTM) return;
+
+    // Convertir clic de pantalla a coordenadas exactas del SVG (funciona perfecto con cualquier nivel de Zoom)
+    const pt = svg.createSVGPoint();
+    pt.x = ev.clientX;
+    pt.y = ev.clientY;
+    const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+    const xPct = Math.max(4, Math.min(96, Math.round((svgPt.x / 300) * 1000) / 10));
+    const yPct = Math.max(3, Math.min(97, Math.round((svgPt.y / 620) * 1000) / 10));
+
+    // Detectar qué región anatómica contiene ese punto exacto
+    const regiones = obtenerRegionesAnatomicas28(st.lado);
+    const regHit = regiones.find(r =>
+        svgPt.x >= r.rect.x && svgPt.x <= r.rect.x + r.rect.w &&
+        svgPt.y >= r.rect.y && svgPt.y <= r.rect.y + r.rect.h
+    ) || regiones.find(r => r.id === st.regionFocoId);
+
+    st.puntoPreview = {
+        lado: st.lado,
+        x: xPct,
+        y: yPct,
+        regionId: regHit ? regHit.id : (st.regionFocoId || "general")
+    };
+
+    const inpZona = document.getElementById("atlasZonaInput28");
+    if (inpZona && regHit) {
+        inpZona.value = (st.capas.hueso && !st.capas.musculo) ? regHit.osea : regHit.musc;
+    }
+
+    refrescarVisorSVGAtlas28();
+    actualizarIndicadoresAtlas28();
+    document.getElementById("atlasNotaInput28")?.focus();
+};
+
+window.enfocarPuntoGuardadoAtlas28 = function (idPunto) {
+    const st = window.__atlasState28;
+    const ficha = obtenerPacienteUniversalPorClave19(st.clavePaciente);
+    const pt = (ficha?.mapaCorporalPuntos || []).find(x => Number(x.id) === Number(idPunto));
+    if (!pt) return;
+
+    const cambioLado = (pt.lado || "frente") !== st.lado;
+    st.lado = pt.lado || "frente";
+    if (pt.capa === "Ósea / Articular") {
+        st.capas.hueso = true;
+    } else if (pt.capa === "Muscular") {
+        st.capas.musculo = true;
+    }
+
+    const sx = (Number(pt.x || 50) / 100) * 300;
+    const sy = (Number(pt.y || 50) / 100) * 620;
+    const vw = 130, vh = 145;
+    const vx = Math.max(0, Math.min(300 - vw, sx - vw / 2));
+    const vy = Math.max(0, Math.min(620 - vh, sy - vh / 2));
+
+    st.regionFocoId = pt.regionId || null;
+    st.modo = "mark";
+
+    if (cambioLado) {
+        st.viewBox = [vx, vy, vw, vh];
+        abrirModalMapaCorporalPro28(st.clavePaciente);
+    } else {
+        animarViewBoxAtlas28([vx, vy, vw, vh], () => refrescarVisorSVGAtlas28());
+        actualizarIndicadoresAtlas28();
+    }
+};
+
+function refrescarVisorSVGAtlas28() {
+    const cont = document.getElementById("atlasStageContainer28");
+    if (!cont) return;
+    const st = window.__atlasState28;
+    const ficha = obtenerPacienteUniversalPorClave19(st.clavePaciente);
+    const puntos = Array.isArray(ficha?.mapaCorporalPuntos) ? ficha.mapaCorporalPuntos : [];
+
+    const viejoSvg = cont.querySelector("svg");
+    const nuevoHTML = construirSVGAtlasAnatomico28(st.lado, st.capas, puntos, st.puntoPreview, st.regionFocoId, st.viewBox, false);
+    if (viejoSvg) {
+        viejoSvg.outerHTML = nuevoHTML;
+    } else {
+        cont.insertAdjacentHTML("afterbegin", nuevoHTML);
+    }
+}
+
+function actualizarIndicadoresAtlas28() {
+    const st = window.__atlasState28;
+    const stage = document.getElementById("atlasStageContainer28");
+    if (stage) {
+        stage.classList.toggle("mode-zoom", st.modo === "zoom");
+        stage.classList.toggle("mode-mark", st.modo === "mark");
+    }
+
+    document.getElementById("btnModoZoomAtlas28")?.classList.toggle("active", st.modo === "zoom");
+    document.getElementById("btnModoMarkAtlas28")?.classList.toggle("active", st.modo === "mark");
+    document.getElementById("btnCapaPiel28")?.classList.toggle("active", st.capas.piel);
+    document.getElementById("btnCapaMusc28")?.classList.toggle("active", st.capas.musculo);
+    document.getElementById("btnCapaHueso28")?.classList.toggle("active", st.capas.hueso);
+
+    const reg = st.regionFocoId ? obtenerRegionesAnatomicas28(st.lado).find(r => r.id === st.regionFocoId) : null;
+    const hudEstado = document.getElementById("atlasHudEstado28");
+    if (hudEstado) {
+        hudEstado.innerHTML = reg
+            ? `🔍 Foco: <b>${reg.label}</b> <button type="button" style="border:none;background:#38bdf8;color:#0f172a;font-weight:800;border-radius:99px;padding:1px 7px;cursor:pointer;margin-left:4px;font-size:0.66rem;" onclick="resetearZoomAtlas28()">← Cuerpo Completo</button>`
+            : (st.modo === "zoom" ? `🔍 Paso 1: Tocá un recuadro para hacer Zoom` : `🎯 Tocá cualquier punto para marcar`);
+    }
+
+    const bannerGuia = document.getElementById("atlasStepBanner28");
+    if (bannerGuia) {
+        if (st.puntoPreview) {
+            bannerGuia.innerHTML = `✅ <b>Paso 3 — Punto ubicado (${st.puntoPreview.lado.toUpperCase()}):</b> Completá el hallazgo, el dolor (EVA) y tocá <b>"+ Guardar Punto"</b>.`;
+            bannerGuia.style.borderColor = "#10b981";
+        } else if (st.modo === "mark") {
+            bannerGuia.innerHTML = `🎯 <b>Paso 2 — Marcar punto exacto:</b> Hacé clic sobre el músculo o hueso en el visor izquierdo para fijar la mira.`;
+            bannerGuia.style.borderColor = "#0284c7";
+        } else {
+            bannerGuia.innerHTML = `🔍 <b>Paso 1 — Elegí una región:</b> Pasá el mouse sobre el cuerpo y hacé clic en el recuadro para hacer <b>Zoom anatómico</b> (o elegí una zona abajo).`;
+            bannerGuia.style.borderColor = "#bae6fd";
+        }
+    }
+
+    document.querySelectorAll(".atlas-zone-chip-28").forEach(ch => {
+        ch.classList.toggle("active", ch.dataset.reg === st.regionFocoId);
+    });
+}
+
+
+// =========================================================================
+// 29. ATLAS ANATÓMICO CLÍNICO PRO HD (LÁMINAS 3D REALES POR CAPAS)
+//     - 6 LÁMINAS HD ALINEADAS (FRENTE/ESPALDA × MUSCULAR / ÓSEO / NERVIOSO)
+//     - LUPA ESCÁNER RAYOS X EN VIVO (ÓSEO Y NERVIOSO BAJO EL CURSOR)
+//     - 3 HERRAMIENTAS: 🎯 PUNTO EVA | 🔥 ZONA DIFUSA | ⚡ TRAYECTO IRRADIADO
+//     - GUÍA DE DERMATOMAS / MIOTOMAS (C5-S1) + EVOLUCIÓN + INFORME PDF A4
+//     - CARGA AUTOMÁTICA DESDE /img/atlas/ O SUBIDA DIRECTA GUARDADA EN INDEXEDDB
+// Pegar al final de app.js (reemplazando el Apartado 29 anterior)
+// =========================================================================
+
+// Parche preventivo para evitar interferencias del inyector de Tokens en modales del Atlas/Caja
+if (typeof inyectarCampoTokenEnModalMasSesionAbierto21 === "function") {
+    const _origInyToken29HD = inyectarCampoTokenEnModalMasSesionAbierto21;
+    inyectarCampoTokenEnModalMasSesionAbierto21 = function () {
+        if (!document.getElementById("modalFinanzasPro25")?.classList.contains("hidden")) return;
+        try { return _origInyToken29HD.apply(this, arguments); } catch {}
+    };
+}
+
+// =========================================================================
+// 29.1 ESTILOS DEL VISOR CLÍNICO HD, LUPA ESCÁNER Y HERRAMIENTAS
+// =========================================================================
+
+(function inyectarCSSAtlasHD29() {
+    if (document.getElementById("cdmCssAtlasHD29")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssAtlasHD29";
+    st.textContent = `
+        .atl29-layout {
+            display: grid;
+            grid-template-columns: minmax(390px, 1.18fr) minmax(320px, 0.98fr);
+            gap: 1.15rem;
+            align-items: start;
+        }
+        @media (max-width: 940px) {
+            .atl29-layout { grid-template-columns: 1fr; }
+        }
+
+        .atl29-viewport-card {
+            background: radial-gradient(circle at 50% 25%, #122036 0%, #070d18 70%, #04070d 100%);
+            border: 1.5px solid rgba(56, 189, 248, 0.34);
+            border-radius: 20px;
+            padding: 0.85rem;
+            color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+            box-shadow: 0 24px 55px rgba(2, 6, 23, 0.55);
+        }
+
+        .atl29-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .atl29-group {
+            display: inline-flex;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 10px;
+            padding: 3px;
+            gap: 3px;
+            flex-wrap: wrap;
+        }
+
+        .atl29-btn {
+            border: none;
+            background: transparent;
+            color: #cbd5e1;
+            font-size: 0.71rem;
+            font-weight: 700;
+            padding: 0.3rem 0.58rem;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.26rem;
+        }
+        .atl29-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.09); }
+        .atl29-btn.active { background: #0284c7; color: #ffffff; box-shadow: 0 2px 10px rgba(2, 132, 199, 0.45); }
+        .atl29-btn.b-musc.active { background: #e11d48; box-shadow: 0 2px 10px rgba(225, 29, 72, 0.45); }
+        .atl29-btn.b-bone.active { background: #0ea5e9; box-shadow: 0 2px 10px rgba(14, 165, 233, 0.45); }
+        .atl29-btn.b-nerve.active { background: #eab308; color: #0f172a; box-shadow: 0 2px 10px rgba(234, 179, 8, 0.45); }
+        .atl29-btn.b-lupa.active { background: linear-gradient(135deg, #06b6d4, #3b82f6); color: #ffffff; box-shadow: 0 0 14px rgba(56, 189, 248, 0.6); }
+
+        .atl29-xray-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px;
+            padding: 0.35rem 0.65rem;
+            font-size: 0.7rem;
+            color: #cbd5e1;
+            flex-wrap: wrap;
+        }
+
+        /* Escenario 2:3 de Alta Resolución */
+        .atl29-stage {
+            position: relative;
+            width: 100%;
+            height: 560px;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid rgba(56, 189, 248, 0.28);
+            background: #060b14;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            touch-action: none;
+        }
+        @media (max-width: 640px) { .atl29-stage { height: 460px; } }
+
+        .atl29-world {
+            position: relative;
+            height: 100%;
+            aspect-ratio: 2 / 3;
+            max-width: 100%;
+            transform-origin: center center;
+            transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+            will-change: transform;
+        }
+        .atl29-stage.dragging .atl29-world { transition: none !important; cursor: grabbing !important; }
+        .atl29-stage.mode-zoom .atl29-world { cursor: zoom-in; }
+        .atl29-stage.mode-mark .atl29-world { cursor: crosshair; }
+
+        .atl29-layer-img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .atl29-layer-img.blend-nerve {
+            mix-blend-mode: screen;
+        }
+
+        /* Capa de Lupa Escáner Rayos X */
+        #atl29LoupeImg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            z-index: 4;
+            clip-path: circle(0px at 50% 50%);
+            background: #060b14;
+        }
+        #atl29LoupeRing {
+            position: absolute;
+            pointer-events: none;
+            z-index: 5;
+            border: 2px solid #38bdf8;
+            border-radius: 50%;
+            box-shadow: 0 0 18px rgba(56, 189, 248, 0.65), inset 0 0 14px rgba(56, 189, 248, 0.28);
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+
+        /* Overlay SVG interactivo alineado 1:1 con el 2:3 HD */
+        .atl29-overlay-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 6;
+        }
+
+        .atl29-region-rect {
+            fill: rgba(56, 189, 248, 0);
+            stroke: rgba(56, 189, 248, 0);
+            stroke-width: 1.8;
+            transition: fill 0.14s ease, stroke 0.14s ease;
+            cursor: zoom-in;
+        }
+        .atl29-stage.mode-zoom .atl29-region-rect:hover {
+            fill: rgba(56, 189, 248, 0.16);
+            stroke: #38bdf8;
+            stroke-dasharray: 6 3;
+        }
+        .atl29-region-rect.focused {
+            fill: rgba(56, 189, 248, 0.04);
+            stroke: rgba(56, 189, 248, 0.7);
+            stroke-dasharray: 5 4;
+            pointer-events: none;
+        }
+
+        .atl29-hud-top {
+            position: absolute;
+            top: 0.55rem; left: 0.55rem; right: 0.55rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.35rem;
+            pointer-events: none;
+            z-index: 8;
+        }
+        .atl29-hud-chip {
+            background: rgba(6, 11, 20, 0.88);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(56, 189, 248, 0.42);
+            color: #e0f2fe;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.28rem 0.65rem;
+            border-radius: 999px;
+            pointer-events: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .atl29-tooltip {
+            position: absolute;
+            bottom: 0.65rem; left: 0.65rem;
+            background: rgba(2, 132, 199, 0.96);
+            color: #ffffff;
+            font-size: 0.74rem;
+            font-weight: 800;
+            padding: 0.34rem 0.75rem;
+            border-radius: 10px;
+            pointer-events: none;
+            z-index: 9;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: all 0.14s ease;
+        }
+        .atl29-tooltip.show { opacity: 1; transform: translateY(0); }
+
+        .atl29-zoom-dock {
+            position: absolute;
+            bottom: 0.65rem; right: 0.65rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.28rem;
+            z-index: 9;
+        }
+        .atl29-zbtn {
+            width: 34px; height: 34px;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.36);
+            background: rgba(6, 11, 20, 0.9);
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 0.92rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .atl29-zbtn:hover { background: #0284c7; border-color: #38bdf8; }
+
+        .atl29-missing-banner {
+            position: absolute;
+            inset: auto 0.75rem 3.3rem 0.75rem;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1.5px dashed #38bdf8;
+            border-radius: 14px;
+            padding: 0.7rem 0.85rem;
+            z-index: 10;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #e0f2fe;
+        }
+
+        /* Panel Derecho: Herramientas, Dermatomas y Hallazgos */
+        .atl29-guide {
+            background: linear-gradient(135deg, var(--cdm-50, #f0f9ff), var(--surface-subtle, #f8fafc));
+            border: 1.5px solid var(--line-celeste, #bae6fd);
+            border-radius: 14px;
+            padding: 0.68rem 0.9rem;
+            margin-bottom: 0.65rem;
+            font-size: 0.77rem;
+            color: var(--ink-800, #1e293b);
+            line-height: 1.38;
+        }
+
+        .atl29-tool-strip {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.35rem;
+            margin-bottom: 0.65rem;
+        }
+        .atl29-tool-btn {
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            background: var(--surface-solid, #ffffff);
+            color: var(--ink-800, #1e293b);
+            border-radius: 11px;
+            padding: 0.45rem 0.4rem;
+            font-size: 0.72rem;
+            font-weight: 800;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.14s ease;
+        }
+        .atl29-tool-btn.active {
+            background: #0284c7;
+            border-color: #0284c7;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+        }
+
+        .atl29-dermatome-box {
+            background: rgba(234, 179, 8, 0.08);
+            border: 1px solid rgba(234, 179, 8, 0.4);
+            border-radius: 13px;
+            padding: 0.55rem 0.75rem;
+            margin-bottom: 0.65rem;
+        }
+        .atl29-derm-chip {
+            border: 1px solid rgba(202, 138, 4, 0.45);
+            background: #ffffff;
+            color: #854d0e;
+            border-radius: 999px;
+            padding: 0.14rem 0.48rem;
+            font-size: 0.67rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .atl29-derm-chip.active, .atl29-derm-chip:hover {
+            background: #eab308;
+            color: #0f172a;
+        }
+
+        .atl29-chips {
+            display: flex;
+            gap: 0.28rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.65rem;
+        }
+        .atl29-chip {
+            background: var(--surface-solid, #ffffff);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            color: var(--ink-700, #334155);
+            font-size: 0.67rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 999px;
+            cursor: pointer;
+        }
+        .atl29-chip:hover, .atl29-chip.active {
+            background: #0284c7; border-color: #0284c7; color: #ffffff;
+        }
+
+        @keyframes atl29DashFlow {
+            to { stroke-dashoffset: -28; }
+        }
+        .atl29-irrad-line {
+            animation: atl29DashFlow 0.85s linear infinite;
+        }
+        @keyframes atl29Pulse {
+            0% { r: 6; opacity: 0.95; }
+            100% { r: 19; opacity: 0; }
+        }
+        .atl29-pulse { animation: atl29Pulse 1.15s ease-out infinite; }
+    `;
+    document.head.appendChild(st);
+})();
+
+// =========================================================================
+// 29.2 ALMACÉN DE LÁMINAS HD (AUTO-DETECTA /img/atlas/ + INDEXEDDB LOCAL)
+// =========================================================================
+
+const ATLAS29_IDB_NAME = "cdm_atlas_hd_plates_v29";
+const ATLAS29_IDB_STORE = "laminas";
+const ATLAS29_CLAVES_LAMINAS = [
+    { key: "frente_muscular", label: "Frente — Muscular", icono: "💪", archivo: "frente_muscular.jpg" },
+    { key: "frente_oseo", label: "Frente — Óseo", icono: "🦴", archivo: "frente_oseo.jpg" },
+    { key: "frente_nervioso", label: "Frente — Nervioso", icono: "⚡", archivo: "frente_nervioso.jpg" },
+    { key: "espalda_muscular", label: "Espalda — Muscular", icono: "💪", archivo: "espalda_muscular.jpg" },
+    { key: "espalda_oseo", label: "Espalda — Óseo", icono: "🦴", archivo: "espalda_oseo.jpg" },
+    { key: "espalda_nervioso", label: "Espalda — Nervioso / Ciático", icono: "⚡", archivo: "espalda_nervioso.jpg" }
+];
+
+window.__atlas29PlateCache = window.__atlas29PlateCache || {};
+
+function abrirIDBAtlas29() {
+    return new Promise((resolve, reject) => {
+        if (!window.indexedDB) return reject(new Error("Sin IndexedDB"));
+        const req = indexedDB.open(ATLAS29_IDB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(ATLAS29_IDB_STORE)) {
+                db.createObjectStore(ATLAS29_IDB_STORE, { keyPath: "key" });
+            }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function guardarLaminaIDBAtlas29(key, dataUrl) {
+    window.__atlas29PlateCache[key] = dataUrl;
+    try {
+        const db = await abrirIDBAtlas29();
+        await new Promise((res, rej) => {
+            const tx = db.transaction(ATLAS29_IDB_STORE, "readwrite");
+            tx.objectStore(ATLAS29_IDB_STORE).put({ key, dataUrl, updated: Date.now() });
+            tx.oncomplete = () => res(true);
+            tx.onerror = (e) => rej(e.target.error);
+        });
+    } catch {}
+}
+
+async function leerLaminaIDBAtlas29(key) {
+    try {
+        const db = await abrirIDBAtlas29();
+        return await new Promise((res) => {
+            const req = db.transaction(ATLAS29_IDB_STORE, "readonly").objectStore(ATLAS29_IDB_STORE).get(key);
+            req.onsuccess = () => res(req.result?.dataUrl || null);
+            req.onerror = () => res(null);
+        });
+    } catch {
+        return null;
+    }
+}
+
+function probarImagenUrlAtlas29(url) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(url);
+        img.onerror = () => resolve(null);
+        img.src = url;
+    });
+}
+
+async function resolverUrlLaminaHD29(key) {
+    if (window.__atlas29PlateCache[key] !== undefined) {
+        return window.__atlas29PlateCache[key];
+    }
+
+    // 1. Buscar en IndexedDB (si las subió desde el gestor del modal)
+    const localData = await leerLaminaIDBAtlas29(key);
+    if (localData) {
+        window.__atlas29PlateCache[key] = localData;
+        return localData;
+    }
+
+    // 2. Buscar en carpeta del proyecto /img/atlas/ (.jpg o .png)
+    // 2. Buscar directo en img/ y como respaldo en img/atlas/ (.jpg, .jpeg o .png)
+    const rutas = [
+        `img/${key}.jpg`,
+        `/img/${key}.jpg`,
+        `img/${key}.jpeg`,
+        `/img/${key}.jpeg`,
+        `img/${key}.png`,
+        `/img/${key}.png`,
+        `img/atlas/${key}.jpg`,
+        `/img/atlas/${key}.jpg`,
+        `img/atlas/${key}.png`,
+        `/img/atlas/${key}.png`
+    ];
+    for (const r of rutas) {
+        const ok = await probarImagenUrlAtlas29(r);
+        if (ok) {
+            window.__atlas29PlateCache[key] = ok;
+            return ok;
+        }
+    }
+
+    window.__atlas29PlateCache[key] = null;
+    return null;
+}
+
+async function precargarTodasLaminasHD29() {
+    await Promise.all(ATLAS29_CLAVES_LAMINAS.map(item => resolverUrlLaminaHD29(item.key)));
+}
+
+function leerArchivoImagenComoDataUrl29(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+    });
+}
+
+window.abrirGestorLaminasHD29 = async function () {
+    await precargarTodasLaminasHD29();
+    const st = window.__atlas29HDState;
+    const modal = asegurarModalPaquete1_25();
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:720px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-celeste">🖼️ GESTOR DE LÁMINAS ANATÓMICAS HD</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Cargar las 6 Láminas Médicas 3D (Guardado Permanente)</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalAtlasRealista29('${st.clavePaciente}')">← Volver al Atlas</button>
+            </div>
+
+            <div style="background:var(--cdm-50); border:1.5px solid var(--line-celeste); border-radius:14px; padding:0.85rem 1rem; margin-bottom:0.9rem; font-size:0.79rem; color:var(--ink-800);">
+                <b>2 formas de cargar tus láminas HD:</b><br>
+                • <b>Opción A (Automática en servidor):</b> Guardá las 6 imágenes en tu carpeta <code>public/img/atlas/</code> (o <code>img/atlas/</code>) con sus nombres exactos.<br>
+                • <b>Opción B (Directo acá, sin tocar carpetas):</b> Subilas abajo (de a una o seleccionando las 6 juntas) y quedan guardadas para siempre en la app.
+                <div style="margin-top:0.6rem;">
+                    <label class="btn btn-primary btn-sm" style="cursor:pointer;">
+                        <i class="ri-upload-cloud-2-line"></i> Seleccionar Varias Láminas Juntas (Auto-detecta por nombre)
+                        <input type="file" accept="image/*" multiple onchange="subirMultiplesLaminasHD29(event)" style="display:none;">
+                    </label>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:0.7rem;">
+                ${ATLAS29_CLAVES_LAMINAS.map(item => {
+                    const url = window.__atlas29PlateCache[item.key];
+                    return `
+                        <div style="background:var(--surface-solid); border:1.5px solid ${url ? "#10b981" : "var(--line-strong)"}; border-radius:14px; padding:0.7rem; text-align:center; display:flex; flex-direction:column; gap:0.45rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <strong style="font-size:0.76rem; color:var(--ink-900);">${item.icono} ${item.label}</strong>
+                                <span class="badge ${url ? "badge-ok" : "badge-warn"}" style="font-size:0.62rem;">${url ? "✓ Lista" : "Pendiente"}</span>
+                            </div>
+                            <div style="height:145px; background:#060b14; border-radius:10px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+                                ${url
+                                    ? `<img src="${url}" style="width:100%; height:100%; object-fit:contain;">`
+                                    : `<small style="color:#64748b; font-size:0.7rem;"><code>${item.archivo}</code></small>`}
+                            </div>
+                            <label class="btn btn-secondary btn-sm" style="cursor:pointer; width:100%; font-size:0.72rem;">
+                                ${url ? "🔄 Cambiar" : "📤 Subir Lámina"}
+                                <input type="file" accept="image/*" onchange="subirLaminaIndividualHD29(event, '${item.key}')" style="display:none;">
+                            </label>
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.subirLaminaIndividualHD29 = async function (event, key) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await leerArchivoImagenComoDataUrl29(file);
+    if (dataUrl) {
+        await guardarLaminaIDBAtlas29(key, dataUrl);
+        if (typeof mostrarToast === "function") mostrarToast(`🖼️ Lámina "${key}" cargada en HD.`);
+        abrirGestorLaminasHD29();
+    }
+};
+
+window.subirMultiplesLaminasHD29 = async function (event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    let cargadas = 0;
+
+    for (const f of files) {
+        const nom = f.name.toLowerCase();
+        const lado = (nom.includes("espalda") || nom.includes("back") || nom.includes("post")) ? "espalda" : "frente";
+        let capa = "muscular";
+        if (nom.includes("ose") || nom.includes("hues") || nom.includes("skel") || nom.includes("bone")) capa = "oseo";
+        else if (nom.includes("nerv") || nom.includes("ciat") || nom.includes("neur")) capa = "nervioso";
+        const key = `${lado}_${capa}`;
+        const dataUrl = await leerArchivoImagenComoDataUrl29(f);
+        if (dataUrl) {
+            await guardarLaminaIDBAtlas29(key, dataUrl);
+            cargadas++;
+        }
+    }
+    if (typeof mostrarToast === "function") mostrarToast(`✅ Se cargaron ${cargadas} lámina(s) HD automáticamente.`);
+    abrirGestorLaminasHD29();
+};
+
+// =========================================================================
+// 29.3 REGIONES ANATÓMICAS (COORDS 0..400 × 0..600) Y GUÍA DE DERMATOMAS
+// =========================================================================
+
+const GUIA_DERMATOMAS_29 = {
+    C5: { raiz: "C5", dermatoma: "Cara lateral del hombro y brazo superior (deltoides)", miotoma: "Deltoides (abducción hombro) y Bíceps", reflejo: "Bicipital", foco: "hombro_der", lado: "frente" },
+    C6: { raiz: "C6", dermatoma: "Cara radial antebrazo, pulgar e índice", miotoma: "Extensores de muñeca y Bíceps", reflejo: "Estilorradial", foco: "brazo_der", lado: "frente" },
+    C7: { raiz: "C7", dermatoma: "Dorso antebrazo y dedo medio", miotoma: "Tríceps (extensión codo) y Flexores muñeca", reflejo: "Tricipital", foco: "brazo_der", lado: "espalda" },
+    C8: { raiz: "C8", dermatoma: "Borde cubital antebrazo, anular y meñique", miotoma: "Flexores profundos de dedos / Interóseos", reflejo: "—", foco: "brazo_der", lado: "espalda" },
+    L4: { raiz: "L4", dermatoma: "Cara anterior del muslo, rodilla y maléolo interno", miotoma: "Cuádriceps (extensión rodilla) y Tibial anterior", reflejo: "Rotuliano", foco: "muslo_der", lado: "frente" },
+    L5: { raiz: "L5", dermatoma: "Cara anterolateral pierna, dorso del pie y hallux", miotoma: "Extensor largo del hallux y Glúteo medio", reflejo: "Tibial posterior", foco: "lumbar_abdomen", lado: "espalda" },
+    S1: { raiz: "S1", dermatoma: "Glúteo, muslo posterior, pantorrilla y borde externo del pie", miotoma: "Tríceps sural (flexión plantar) y Peroneos", reflejo: "Aquíleo", foco: "pelvis_cadera", lado: "espalda" }
+};
+
+function obtenerRegionesHD29(lado = "frente") {
+    const esp = lado === "espalda";
+    const L = esp ? "Izquierdo" : "Derecho";
+    const R = esp ? "Derecho" : "Izquierdo";
+    const LF = esp ? "Izquierda" : "Derecha";
+    const RF = esp ? "Derecha" : "Izquierda";
+
+    // Coordenadas calibradas sobre 400 × 600 para las 6 láminas 2:3 generadas
+    return [
+        { id: "cabeza_cuello", label: esp ? "Cráneo / Cervical (C1–C7)" : "Cabeza / Cuello / ATM", rect: { x: 152, y: 22, w: 96, h: 86 }, cx: 50, cy: 11, zoom: 2.4, musc: esp ? "Suboccipitales / Esplenio / Trapecio Sup." : "ECM / Masetero / Escalenos", osea: "Columna Cervical (C1–C7) / Cráneo / ATM", nerv: "Plexo Cervical / N. Occipital Mayor" },
+        { id: "hombro_izq", label: `Hombro ${L}`, rect: { x: 96, y: 98, w: 66, h: 66 }, cx: 33, cy: 22, zoom: 2.5, musc: esp ? `Supraespinoso / Infraespinoso / Deltoides Post. ${L}` : `Deltoides Anterior / Manguito Rotador ${L}`, osea: `Art. Glenohumeral / Acromioclavicular / Clavícula ${LF}`, nerv: `Plexo Braquial (C5–T1) / N. Axilar ${L}` },
+        { id: "hombro_der", label: `Hombro ${R}`, rect: { x: 238, y: 98, w: 66, h: 66 }, cx: 67, cy: 22, zoom: 2.5, musc: esp ? `Supraespinoso / Infraespinoso / Deltoides Post. ${R}` : `Deltoides Anterior / Manguito Rotador ${R}`, osea: `Art. Glenohumeral / Acromioclavicular / Clavícula ${RF}`, nerv: `Plexo Braquial (C5–T1) / N. Axilar ${R}` },
+        { id: "torax_dorsal", label: esp ? "Dorsal / Escápulas (T1–T12)" : "Tórax / Pectoral", rect: { x: 140, y: 108, w: 120, h: 102 }, cx: 50, cy: 27, zoom: 2.2, musc: esp ? "Trapecio Medio-Inf. / Romboides / Dorsal Ancho" : "Pectoral Mayor / Serrato Anterior", osea: esp ? "Columna Dorsal (T1–T12) / Escápulas" : "Esternón / Parrilla Costal", nerv: "Nervios Intercostales / Raíces Torácicas" },
+        { id: "brazo_izq", label: `Brazo, Codo y Mano ${L}`, rect: { x: 40, y: 162, w: 92, h: 184 }, cx: 22, cy: 42, zoom: 2.2, musc: esp ? `Tríceps / Extensores Antebrazo ${L}` : `Bíceps / Braquiorradial / Flexores ${L}`, osea: `Húmero / Epicóndilos / Radio-Cúbito / Carpo ${L}`, nerv: `N. Radial / Mediano / Cubital ${L}` },
+        { id: "brazo_der", label: `Brazo, Codo y Mano ${R}`, rect: { x: 268, y: 162, w: 92, h: 184 }, cx: 78, cy: 42, zoom: 2.2, musc: esp ? `Tríceps / Extensores Antebrazo ${R}` : `Bíceps / Braquiorradial / Flexores ${R}`, osea: `Húmero / Epicóndilos / Radio-Cúbito / Carpo ${R}`, nerv: `N. Radial / Mediano / Cubital ${R}` },
+        { id: "lumbar_abdomen", label: esp ? "Columna Lumbar (L1–L5)" : "Abdomen / Core", rect: { x: 138, y: 208, w: 124, h: 68 }, cx: 50, cy: 40, zoom: 2.4, musc: esp ? "Erectores Espinales / Cuadrado Lumbar / Fascia Toracolumbar" : "Recto Abdominal / Oblicuos / Transverso", osea: esp ? "Columna Lumbar (L1–L5) / Discos" : "Costillas Flotantes / Crestas Ilíacas", nerv: "Raíces Lumbares (L1–L5) / Plexo Lumbar" },
+        { id: "pelvis_cadera", label: esp ? "Glúteos / Sacroilíaca / Ciático" : "Pelvis / Cadera / Ingle", rect: { x: 128, y: 274, w: 144, h: 66 }, cx: 50, cy: 51, zoom: 2.3, musc: esp ? "Glúteo Mayor / Medio / Piramidal" : "Psoas Ilíaco / TFL / Aductores", osea: "Pelvis / Sacro / Art. Sacroilíaca y Coxofemoral", nerv: esp ? "Plexo Sacro / Origen Nervio Ciático (L4–S3)" : "Nervio Femoral / Obturador" },
+        { id: "muslo_izq", label: `Muslo ${L}`, rect: { x: 128, y: 338, w: 72, h: 82 }, cx: 41, cy: 63, zoom: 2.4, musc: esp ? `Isquiotibiales (Bíceps Femoral / Semitendinoso) ${L}` : `Cuádriceps / Banda Iliotibial ${L}`, osea: `Fémur (Trocánter Mayor / Diáfisis) ${L}`, nerv: esp ? `Nervio Ciático (Trayecto Muslo) ${L}` : `Nervio Femoral / Safeno ${L}` },
+        { id: "muslo_der", label: `Muslo ${R}`, rect: { x: 200, y: 338, w: 72, h: 82 }, cx: 59, cy: 63, zoom: 2.4, musc: esp ? `Isquiotibiales (Bíceps Femoral / Semitendinoso) ${R}` : `Cuádriceps / Banda Iliotibial ${R}`, osea: `Fémur (Trocánter Mayor / Diáfisis) ${R}`, nerv: esp ? `Nervio Ciático (Trayecto Muslo) ${R}` : `Nervio Femoral / Safeno ${R}` },
+        { id: "rodilla_izq", label: `Rodilla ${LF}`, rect: { x: 132, y: 416, w: 66, h: 48 }, cx: 41, cy: 73, zoom: 2.7, musc: esp ? `Fosa Poplítea / Inserción Gemelos ${LF}` : `Tendón Rotuliano / VMO / Pata de Ganso ${LF}`, osea: `Rótula / Meniscos / LCA-LCM ${LF}`, nerv: `Nervio Tibial y Peroneo Común ${LF}` },
+        { id: "rodilla_der", label: `Rodilla ${RF}`, rect: { x: 202, y: 416, w: 66, h: 48 }, cx: 59, cy: 73, zoom: 2.7, musc: esp ? `Fosa Poplítea / Inserción Gemelos ${RF}` : `Tendón Rotuliano / VMO / Pata de Ganso ${RF}`, osea: `Rótula / Meniscos / LCA-LCM ${RF}`, nerv: `Nervio Tibial y Peroneo Común ${RF}` },
+        { id: "pierna_pie_izq", label: `Pierna, Tobillo y Pie ${L}`, rect: { x: 122, y: 464, w: 76, h: 120 }, cx: 40, cy: 86, zoom: 2.3, musc: esp ? `Gemelos / Sóleo / Tendón de Aquiles ${L}` : `Tibial Anterior / Peroneos ${L}`, osea: `Tibia / Peroné / Maléolos y Pie ${L}`, nerv: `Nervio Tibial Post. / Peroneo Profundo ${L}` },
+        { id: "pierna_pie_der", label: `Pierna, Tobillo y Pie ${R}`, rect: { x: 202, y: 464, w: 76, h: 120 }, cx: 60, cy: 86, zoom: 2.3, musc: esp ? `Gemelos / Sóleo / Tendón de Aquiles ${R}` : `Tibial Anterior / Peroneos ${R}`, osea: `Tibia / Peroné / Maléolos y Pie ${R}`, nerv: `Nervio Tibial Post. / Peroneo Profundo ${R}` }
+    ];
+}
+
+// =========================================================================
+// 29.4 ESTADO GLOBAL DEL VISOR HD, LUPA RAYOS X, ZOOM/PAN Y HERRAMIENTAS
+// =========================================================================
+
+window.__atlas29HDState = {
+    clavePaciente: null,
+    lado: "frente",
+    capas: { muscular: true, oseo: false, nervioso: false },
+    xrayBlend: 0, // 0 = 100% músculo, 100 = 100% óseo
+    lupaModo: "off", // 'off' | 'oseo' | 'nervioso'
+    modoInteraccion: "zoom", // 'zoom' | 'mark'
+    herramienta: "punto", // 'punto' | 'zona' | 'irradiacion'
+    radioZona: 26,
+    dermatomaActivo: null,
+    regionFocoId: null,
+    zoom: 1,
+    panX: 0, // en % del mundo (-50..50)
+    panY: 0,
+    puntoPreview: null,
+    irradOrigen: null,
+    isDragging: false,
+    wasDragged: false,
+    dragStart: null
+};
+
+function calcularEstructuraSugerida29(reg) {
+    if (!reg) return "";
+    const st = window.__atlas29HDState;
+    if (st.herramienta === "irradiacion" || st.lupaModo === "nervioso" || (st.capas.nervioso && !st.capas.muscular && !st.capas.oseo)) {
+        return reg.nerv;
+    }
+    if (st.lupaModo === "oseo" || (st.capas.oseo && !st.capas.muscular) || st.xrayBlend >= 65) {
+        return reg.osea;
+    }
+    return reg.musc;
+}
+
+function aplicarTransformMundo29() {
+    const st = window.__atlas29HDState;
+    const world = document.getElementById("atl29World");
+    if (!world) return;
+    const maxPan = Math.max(0, ((st.zoom - 1) / (2 * st.zoom)) * 100);
+    st.panX = Math.max(-maxPan, Math.min(maxPan, st.panX));
+    st.panY = Math.max(-maxPan, Math.min(maxPan, st.panY));
+    world.style.transform = `scale(${st.zoom.toFixed(3)}) translate(${st.panX.toFixed(2)}%, ${st.panY.toFixed(2)}%)`;
+}
+
+function enfocarPorcentajeAtlas29(cxPct, cyPct, zoomVal = 2.4) {
+    const st = window.__atlas29HDState;
+    st.zoom = Math.max(1, Math.min(4, zoomVal));
+    st.panX = 50 - cxPct;
+    st.panY = 50 - cyPct;
+    aplicarTransformMundo29();
+    refrescarOverlaySVG29();
+}
+
+window.resetearZoomHD29 = function () {
+    const st = window.__atlas29HDState;
+    st.zoom = 1;
+    st.panX = 0;
+    st.panY = 0;
+    st.regionFocoId = null;
+    st.modoInteraccion = "zoom";
+    aplicarTransformMundo29();
+    refrescarOverlaySVG29();
+    actualizarHUDHD29();
+};
+
+window.ajustarZoomHD29 = function (deltaFactor) {
+    const st = window.__atlas29HDState;
+    st.zoom = Math.max(1, Math.min(4, st.zoom * deltaFactor));
+    if (st.zoom <= 1.05) {
+        st.zoom = 1;
+        st.panX = 0;
+        st.panY = 0;
+        st.regionFocoId = null;
+    }
+    aplicarTransformMundo29();
+    refrescarOverlaySVG29();
+    actualizarHUDHD29();
+};
+
+window.enfocarRegionHD29 = function (regionId) {
+    const st = window.__atlas29HDState;
+    const reg = obtenerRegionesHD29(st.lado).find(r => r.id === regionId);
+    if (!reg) return;
+    st.regionFocoId = reg.id;
+    st.modoInteraccion = "mark";
+    ocultarTooltipHD29();
+    const inp = document.getElementById("atl29ZonaInput");
+    if (inp) inp.value = calcularEstructuraSugerida29(reg);
+    enfocarPorcentajeAtlas29(reg.cx, reg.cy, reg.zoom || 2.4);
+    actualizarHUDHD29();
+};
+
+window.clicRegionHD29 = function (ev, regionId) {
+    const st = window.__atlas29HDState;
+    if (st.wasDragged) { st.wasDragged = false; return; }
+    if (st.modoInteraccion !== "zoom") return;
+    ev.stopPropagation();
+    enfocarRegionHD29(regionId);
+};
+
+window.mostrarTooltipHD29 = function (label) {
+    if (window.__atlas29HDState.modoInteraccion !== "zoom") return;
+    const el = document.getElementById("atl29Tooltip");
+    if (el) { el.innerHTML = `🔍 ${label} — Clic para Zoom`; el.classList.add("show"); }
+};
+
+window.ocultarTooltipHD29 = function () {
+    document.getElementById("atl29Tooltip")?.classList.remove("show");
+};
+
+window.cambiarLadoHD29 = function (nuevoLado) {
+    const st = window.__atlas29HDState;
+    st.lado = nuevoLado;
+    st.regionFocoId = null;
+    st.puntoPreview = null;
+    st.irradOrigen = null;
+    st.zoom = 1;
+    st.panX = 0;
+    st.panY = 0;
+    st.modoInteraccion = "zoom";
+    abrirModalAtlasRealista29(st.clavePaciente);
+};
+
+window.alternarCapaHD29 = function (capa) {
+    const st = window.__atlas29HDState;
+    st.capas[capa] = !st.capas[capa];
+    if (!st.capas.muscular && !st.capas.oseo && !st.capas.nervioso) {
+        st.capas.muscular = true;
+    }
+    if (capa === "oseo" && st.capas.oseo && !st.capas.muscular) st.xrayBlend = 100;
+    else if (capa === "muscular" && st.capas.muscular && !st.capas.oseo) st.xrayBlend = 0;
+    else if (st.capas.muscular && st.capas.oseo) st.xrayBlend = 55;
+
+    const rng = document.getElementById("atl29XraySlider");
+    if (rng) rng.value = st.xrayBlend;
+    aplicarCapasImagenesHD29();
+    actualizarHUDHD29();
+};
+
+window.cambiarXrayBlendHD29 = function (val) {
+    const st = window.__atlas29HDState;
+    st.xrayBlend = Number(val) || 0;
+    if (st.xrayBlend > 0) st.capas.oseo = true;
+    if (st.xrayBlend < 100) st.capas.muscular = true;
+    aplicarCapasImagenesHD29();
+    actualizarHUDHD29();
+};
+
+window.activarLupaEscannerHD29 = function (modo) {
+    const st = window.__atlas29HDState;
+    st.lupaModo = (st.lupaModo === modo) ? "off" : modo;
+    if (st.lupaModo !== "off") {
+        // Dejar la capa muscular visible como base para que el escáner contraste al máximo
+        st.capas.muscular = true;
+        st.xrayBlend = 0;
+        const rng = document.getElementById("atl29XraySlider");
+        if (rng) rng.value = 0;
+        if (typeof mostrarToast === "function") {
+            mostrarToast(st.lupaModo === "oseo"
+                ? "🩻 Lupa Rayos X Ósea activa: pasá el cursor sobre el cuerpo para inspeccionar huesos."
+                : "⚡ Lupa Nerviosa activa: pasá el cursor para ver el ciático y plexos bajo el músculo.");
+        }
+    }
+    aplicarCapasImagenesHD29();
+    actualizarHUDHD29();
+};
+
+window.cambiarModoInteraccionHD29 = function (modo) {
+    window.__atlas29HDState.modoInteraccion = modo;
+    actualizarHUDHD29();
+};
+
+window.seleccionarHerramientaHD29 = function (herr) {
+    const st = window.__atlas29HDState;
+    st.herramienta = herr;
+    st.modoInteraccion = "mark";
+    st.irradOrigen = null;
+    st.puntoPreview = null;
+    const selHall = document.getElementById("atl29TipoHallazgo");
+    if (selHall) {
+        if (herr === "irradiacion") selHall.value = "Irradiación / Ciatalgia / Pinzamiento";
+        else if (herr === "zona") selHall.value = "Inflamación / Dolor Difuso";
+    }
+    refrescarOverlaySVG29();
+    actualizarHUDHD29();
+};
+
+window.seleccionarDermatomaHD29 = function (raiz) {
+    const st = window.__atlas29HDState;
+    const d = GUIA_DERMATOMAS_29[raiz];
+    if (!d) return;
+
+    if (st.dermatomaActivo === raiz) {
+        st.dermatomaActivo = null;
+        actualizarHUDHD29();
+        return;
+    }
+
+    st.dermatomaActivo = raiz;
+    st.capas.nervioso = true;
+    const cambioLado = st.lado !== d.lado;
+    st.lado = d.lado;
+
+    if (cambioLado) {
+        abrirModalAtlasRealista29(st.clavePaciente).then(() => {
+            enfocarRegionHD29(d.foco);
+            const inp = document.getElementById("atl29ZonaInput");
+            if (inp) inp.value = `Raíz ${d.raiz} — ${d.dermatoma}`;
+        });
+    } else {
+        aplicarCapasImagenesHD29();
+        enfocarRegionHD29(d.foco);
+        const inp = document.getElementById("atl29ZonaInput");
+        if (inp) inp.value = `Raíz ${d.raiz} — ${d.dermatoma}`;
+        actualizarHUDHD29();
+    }
+};
+
+function aplicarCapasImagenesHD29() {
+    const st = window.__atlas29HDState;
+    const imgM = document.getElementById("atl29ImgMusc");
+    const imgO = document.getElementById("atl29ImgOseo");
+    const imgN = document.getElementById("atl29ImgNerv");
+    const imgLupa = document.getElementById("atl29LoupeImg");
+    const ringLupa = document.getElementById("atl29LoupeRing");
+
+    const urlM = window.__atlas29PlateCache[`${st.lado}_muscular`];
+    const urlO = window.__atlas29PlateCache[`${st.lado}_oseo`];
+    const urlN = window.__atlas29PlateCache[`${st.lado}_nervioso`];
+
+    if (imgM) {
+        if (urlM) { imgM.src = urlM; imgM.style.display = "block"; } else imgM.style.display = "none";
+        const opM = st.capas.muscular ? Math.max(0.08, 1 - (st.xrayBlend / 100) * 0.92) : 0;
+        imgM.style.opacity = opM.toFixed(2);
+    }
+    if (imgO) {
+        if (urlO) { imgO.src = urlO; imgO.style.display = "block"; } else imgO.style.display = "none";
+        const opO = st.capas.oseo
+            ? (st.capas.muscular ? Math.max(0.15, st.xrayBlend / 100) : 1)
+            : 0;
+        imgO.style.opacity = opO.toFixed(2);
+    }
+    if (imgN) {
+        if (urlN) { imgN.src = urlN; imgN.style.display = "block"; } else imgN.style.display = "none";
+        imgN.style.opacity = st.capas.nervioso ? "0.95" : "0";
+    }
+    if (imgLupa) {
+        if (st.lupaModo === "oseo" && urlO) {
+            imgLupa.src = urlO;
+            imgLupa.style.display = "block";
+        } else if (st.lupaModo === "nervioso" && urlN) {
+            imgLupa.src = urlN;
+            imgLupa.style.display = "block";
+        } else {
+            imgLupa.style.display = "none";
+            imgLupa.style.clipPath = "circle(0px at 50% 50%)";
+            if (ringLupa) ringLupa.style.display = "none";
+        }
+    }
+}
+
+// =========================================================================
+// 29.5 CONSTRUCCIÓN DEL OVERLAY SVG (PUNTOS, ZONAS DIFUSAS, FLECHAS IRRADIADAS)
+// =========================================================================
+
+function construirOverlaySVGHD29(lado, puntos, puntoPreview, irradOrigen, regionFocoId, zoom = 1, esImpresion = false) {
+    const regiones = obtenerRegionesHD29(lado);
+    const invScale = 1 / Math.pow(Math.max(1, zoom), 0.72);
+    const uid = `ov29_${lado}_${esImpresion ? "pdf" : "live"}`;
+
+    // 1. Recuadros de selección anatómica
+    const rectsHTML = esImpresion ? "" : regiones.map(r => {
+        const foc = regionFocoId === r.id;
+        const { x, y, w, h } = r.rect;
+        const cLen = 10;
+        const corners = foc ? `
+            <g stroke="#38bdf8" stroke-width="2.4" fill="none" pointer-events="none">
+                <path d="M${x},${y + cLen} L${x},${y} L${x + cLen},${y}"/>
+                <path d="M${x + w - cLen},${y} L${x + w},${y} L${x + w},${y + cLen}"/>
+                <path d="M${x},${y + h - cLen} L${x},${y + h} L${x + cLen},${y + h}"/>
+                <path d="M${x + w - cLen},${y + h} L${x + w},${y + h} L${x + w},${y + h - cLen}"/>
+            </g>
+        ` : "";
+        return `
+            <rect class="atl29-region-rect ${foc ? "focused" : ""}"
+                x="${x}" y="${y}" width="${w}" height="${h}" rx="9"
+                onmouseenter="mostrarTooltipHD29('${r.label.replace(/'/g, "\\'")}')"
+                onmouseleave="ocultarTooltipHD29()"
+                onclick="clicRegionHD29(event, '${r.id}')"></rect>
+            ${corners}
+        `;
+    }).join("");
+
+    // 2. Hallazgos guardados de este lado
+    const delLado = (puntos || [])
+        .map((pt, i) => ({ ...pt, num: i + 1 }))
+        .filter(pt => (pt.lado || "frente") === lado);
+
+    const elementosGuardados = delLado.map(pt => {
+        const sx = (Number(pt.x || 50) / 100) * 400;
+        const sy = (Number(pt.y || 50) / 100) * 600;
+        const resuelto = pt.estadoEvol === "Resuelto";
+        const col = resuelto ? "#10b981" : (pt.intensidad >= 7 ? "#ef4444" : (pt.intensidad >= 4 ? "#f59e0b" : "#22c55e"));
+        const clickEv = esImpresion ? "" : `event.stopPropagation(); enfocarPuntoHD29(${pt.id})`;
+
+        let extraVisual = "";
+        if (pt.tipoMarcador === "zona") {
+            const rad = Number(pt.radioZona || 28);
+            const gId = resuelto ? `${uid}_heatOk` : (pt.intensidad >= 7 ? `${uid}_heatRed` : `${uid}_heatWarn`);
+            extraVisual = `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${rad}" fill="url(#${gId})" stroke="${col}" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.85" style="cursor:pointer;" onclick="${clickEv}"/>`;
+        } else if (pt.tipoMarcador === "irradiacion" && pt.x2 !== undefined && pt.y2 !== undefined) {
+            const tx = (Number(pt.x2) / 100) * 400;
+            const ty = (Number(pt.y2) / 100) * 600;
+            const mx = (sx + tx) / 2 + (ty > sy ? 14 : -14);
+            const my = (sy + ty) / 2;
+            extraVisual = `
+                <path d="M${sx.toFixed(1)},${sy.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}"
+                    fill="none" stroke="${col}" stroke-width="${(3.2 * invScale).toFixed(2)}"
+                    stroke-dasharray="7 4" class="atl29-irrad-line"
+                    marker-end="url(#${uid}_arrow)" style="cursor:pointer;" onclick="${clickEv}"/>
+                <circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="${(4.5 * invScale).toFixed(2)}" fill="#fde047" stroke="#ffffff" stroke-width="1.4"/>
+            `;
+        }
+
+        return `
+            ${extraVisual}
+            <g transform="translate(${sx.toFixed(1)}, ${sy.toFixed(1)}) scale(${invScale.toFixed(3)})" style="cursor:pointer;" onclick="${clickEv}">
+                <circle r="11.5" fill="${col}" stroke="#ffffff" stroke-width="2.2" opacity="${resuelto ? "0.8" : "1"}"/>
+                <text y="3.8" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="900" font-family="Poppins, sans-serif">${resuelto ? "✓" : pt.num}</text>
+                <title>#${pt.num} ${pt.zona} (EVA ${pt.intensidad}/10 • ${pt.estadoEvol || "Activo"})</title>
+            </g>
+        `;
+    }).join("");
+
+    // 3. Preview en vivo (mira / zona / origen de irradiación)
+    let previewSVG = "";
+    if (!esImpresion && irradOrigen && irradOrigen.lado === lado && !puntoPreview) {
+        const ox = (irradOrigen.x / 100) * 400;
+        const oy = (irradOrigen.y / 100) * 600;
+        previewSVG = `
+            <g transform="translate(${ox.toFixed(1)}, ${oy.toFixed(1)}) scale(${invScale.toFixed(3)})" pointer-events="none">
+                <circle class="atl29-pulse" r="9" fill="none" stroke="#facc15" stroke-width="2.4"/>
+                <circle r="5" fill="#facc15" stroke="#ffffff" stroke-width="1.8"/>
+            </g>
+        `;
+    } else if (!esImpresion && puntoPreview && puntoPreview.lado === lado) {
+        const px = (puntoPreview.x / 100) * 400;
+        const py = (puntoPreview.y / 100) * 600;
+        if (puntoPreview.tipoMarcador === "zona") {
+            previewSVG += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${puntoPreview.radioZona || 28}" fill="url(#${uid}_heatWarn)" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="5 3" pointer-events="none"/>`;
+        } else if (puntoPreview.tipoMarcador === "irradiacion" && puntoPreview.x2 !== undefined) {
+            const tx = (puntoPreview.x2 / 100) * 400;
+            const ty = (puntoPreview.y2 / 100) * 600;
+            const mx = (px + tx) / 2 + 14;
+            const my = (py + ty) / 2;
+            previewSVG += `
+                <path d="M${px.toFixed(1)},${py.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}"
+                    fill="none" stroke="#38bdf8" stroke-width="${(3.2 * invScale).toFixed(2)}"
+                    stroke-dasharray="7 4" class="atl29-irrad-line" marker-end="url(#${uid}_arrowCyan)" pointer-events="none"/>
+            `;
+        }
+        previewSVG += `
+            <g transform="translate(${px.toFixed(1)}, ${py.toFixed(1)}) scale(${invScale.toFixed(3)})" pointer-events="none">
+                <circle class="atl29-pulse" r="10" fill="none" stroke="#38bdf8" stroke-width="2.2"/>
+                <line x1="-16" y1="0" x2="16" y2="0" stroke="#38bdf8" stroke-width="1.8"/>
+                <line x1="0" y1="-16" x2="0" y2="16" stroke="#38bdf8" stroke-width="1.8"/>
+                <circle r="4.5" fill="#38bdf8" stroke="#ffffff" stroke-width="1.8"/>
+            </g>
+        `;
+    }
+
+    return `
+        <svg class="atl29-overlay-svg" viewBox="0 0 400 600" preserveAspectRatio="none"
+             onclick="${esImpresion ? "" : "clicCanvasHD29(event)"}">
+            <defs>
+                <radialGradient id="${uid}_heatRed">
+                    <stop offset="0%" stop-color="#ef4444" stop-opacity="0.62"/>
+                    <stop offset="60%" stop-color="#ef4444" stop-opacity="0.28"/>
+                    <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
+                </radialGradient>
+                <radialGradient id="${uid}_heatWarn">
+                    <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.58"/>
+                    <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+                </radialGradient>
+                <radialGradient id="${uid}_heatOk">
+                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.5"/>
+                    <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+                </radialGradient>
+                <marker id="${uid}_arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="#facc15"/>
+                </marker>
+                <marker id="${uid}_arrowCyan" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+                </marker>
+            </defs>
+            ${rectsHTML}
+            ${elementosGuardados}
+            ${previewSVG}
+        </svg>
+    `;
+}
+
+function refrescarOverlaySVG29() {
+    const world = document.getElementById("atl29World");
+    if (!world) return;
+    const st = window.__atlas29HDState;
+    const ficha = obtenerPacienteUniversalPorClave19(st.clavePaciente);
+    const puntos = Array.isArray(ficha?.mapaCorporalPuntos) ? ficha.mapaCorporalPuntos : [];
+    const viejo = world.querySelector(".atl29-overlay-svg");
+    const html = construirOverlaySVGHD29(st.lado, puntos, st.puntoPreview, st.irradOrigen, st.regionFocoId, st.zoom, false);
+    if (viejo) viejo.outerHTML = html;
+    else world.insertAdjacentHTML("beforeend", html);
+}
+
+window.clicCanvasHD29 = function (ev) {
+    const st = window.__atlas29HDState;
+    if (st.wasDragged) { st.wasDragged = false; return; }
+    if (st.modoInteraccion !== "mark") return;
+
+    const world = document.getElementById("atl29World");
+    if (!world) return;
+    const rect = world.getBoundingClientRect();
+    const xPct = Math.max(2, Math.min(98, Math.round(((ev.clientX - rect.left) / rect.width) * 1000) / 10));
+    const yPct = Math.max(2, Math.min(98, Math.round(((ev.clientY - rect.top) / rect.height) * 1000) / 10));
+
+    const sx = (xPct / 100) * 400;
+    const sy = (yPct / 100) * 600;
+    const regiones = obtenerRegionesHD29(st.lado);
+    const regHit = regiones.find(r => sx >= r.rect.x && sx <= r.rect.x + r.rect.w && sy >= r.rect.y && sy <= r.rect.y + r.rect.h)
+                || regiones.find(r => r.id === st.regionFocoId);
+
+    const inpZona = document.getElementById("atl29ZonaInput");
+
+    if (st.herramienta === "irradiacion") {
+        if (!st.irradOrigen) {
+            st.irradOrigen = { lado: st.lado, x: xPct, y: yPct, regionId: regHit?.id || null, labelOrigen: regHit?.label || "Origen" };
+            st.puntoPreview = null;
+            if (inpZona && regHit) inpZona.value = `Irradiación desde ${regHit.label}`;
+        } else {
+            st.puntoPreview = {
+                lado: st.lado,
+                tipoMarcador: "irradiacion",
+                x: st.irradOrigen.x,
+                y: st.irradOrigen.y,
+                x2: xPct,
+                y2: yPct,
+                regionId: st.irradOrigen.regionId || regHit?.id || null
+            };
+            if (inpZona) inpZona.value = `Irradiación: ${st.irradOrigen.labelOrigen} ➔ ${regHit?.label || "Distal"}`;
+            st.irradOrigen = null;
+            document.getElementById("atl29NotaInput")?.focus();
+        }
+    } else {
+        st.puntoPreview = {
+            lado: st.lado,
+            tipoMarcador: st.herramienta === "zona" ? "zona" : "punto",
+            radioZona: Number(document.getElementById("atl29RadioZona")?.value) || st.radioZona || 26,
+            x: xPct,
+            y: yPct,
+            regionId: regHit?.id || st.regionFocoId || null
+        };
+        if (inpZona && regHit) inpZona.value = calcularEstructuraSugerida29(regHit);
+        document.getElementById("atl29NotaInput")?.focus();
+    }
+
+    refrescarOverlaySVG29();
+    actualizarHUDHD29();
+};
+
+window.enfocarPuntoHD29 = function (idPunto) {
+    const st = window.__atlas29HDState;
+    const ficha = obtenerPacienteUniversalPorClave19(st.clavePaciente);
+    const pt = (ficha?.mapaCorporalPuntos || []).find(x => Number(x.id) === Number(idPunto));
+    if (!pt) return;
+
+    const cambioLado = (pt.lado || "frente") !== st.lado;
+    st.lado = pt.lado || "frente";
+    if (String(pt.capa || "").includes("Ósea")) { st.capas.oseo = true; st.xrayBlend = 85; }
+    else if (String(pt.capa || "").includes("Nerv")) { st.capas.nervioso = true; }
+
+    st.regionFocoId = pt.regionId || null;
+    st.modoInteraccion = "mark";
+
+    if (cambioLado) {
+        abrirModalAtlasRealista29(st.clavePaciente).then(() => {
+            enfocarPorcentajeAtlas29(Number(pt.x || 50), Number(pt.y || 50), 2.6);
+            actualizarHUDHD29();
+        });
+    } else {
+        aplicarCapasImagenesHD29();
+        enfocarPorcentajeAtlas29(Number(pt.x || 50), Number(pt.y || 50), 2.6);
+        actualizarHUDHD29();
+    }
+};
+
+function enlazarEventosVisorHD29() {
+    const stage = document.getElementById("atl29Stage");
+    const world = document.getElementById("atl29World");
+    if (!stage || !world || stage.dataset.bound29 === "1") return;
+    stage.dataset.bound29 = "1";
+
+    // Rueda del mouse = Zoom suave
+    stage.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        ajustarZoomHD29(e.deltaY > 0 ? 0.85 : 1.18);
+    }, { passive: false });
+
+    // Movimiento del cursor = Lupa Escáner Rayos X en tiempo real
+    world.addEventListener("pointermove", (e) => {
+        const st = window.__atlas29HDState;
+        if (st.lupaModo === "off") return;
+        const imgLupa = document.getElementById("atl29LoupeImg");
+        const ring = document.getElementById("atl29LoupeRing");
+        if (!imgLupa || imgLupa.style.display === "none") return;
+
+        const rect = world.getBoundingClientRect();
+        const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+        const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+        const radio = Math.round(62 / Math.sqrt(st.zoom));
+
+        imgLupa.style.clipPath = `circle(${radio}px at ${xPct.toFixed(2)}% ${yPct.toFixed(2)}%)`;
+        if (ring) {
+            ring.style.display = "block";
+            ring.style.left = `${xPct.toFixed(2)}%`;
+            ring.style.top = `${yPct.toFixed(2)}%`;
+            ring.style.width = `${radio * 2}px`;
+            ring.style.height = `${radio * 2}px`;
+            ring.style.borderColor = st.lupaModo === "nervioso" ? "#facc15" : "#38bdf8";
+        }
+    });
+
+    world.addEventListener("pointerleave", () => {
+        const imgLupa = document.getElementById("atl29LoupeImg");
+        const ring = document.getElementById("atl29LoupeRing");
+        if (imgLupa) imgLupa.style.clipPath = "circle(0px at 50% 50%)";
+        if (ring) ring.style.display = "none";
+    });
+
+    // Arrastre para desplazarse cuando hay zoom
+    stage.addEventListener("pointerdown", (e) => {
+        const st = window.__atlas29HDState;
+        if (st.zoom <= 1.05 || e.target.closest("button")) return;
+        st.isDragging = true;
+        st.wasDragged = false;
+        st.dragStart = { x: e.clientX, y: e.clientY, panX: st.panX, panY: st.panY };
+    });
+
+    window.addEventListener("pointermove", (e) => {
+        const st = window.__atlas29HDState;
+        if (!st.isDragging || !st.dragStart) return;
+        const dx = e.clientX - st.dragStart.x;
+        const dy = e.clientY - st.dragStart.y;
+        if (Math.hypot(dx, dy) > 5) {
+            st.wasDragged = true;
+            stage.classList.add("dragging");
+        }
+        if (!st.wasDragged) return;
+
+        const wRect = world.getBoundingClientRect();
+        st.panX = st.dragStart.panX + (dx / Math.max(1, wRect.width)) * 100;
+        st.panY = st.dragStart.panY + (dy / Math.max(1, wRect.height)) * 100;
+        aplicarTransformMundo29();
+    });
+
+    window.addEventListener("pointerup", () => {
+        const st = window.__atlas29HDState;
+        if (st.isDragging) {
+            st.isDragging = false;
+            stage.classList.remove("dragging");
+            if (st.wasDragged) setTimeout(() => { st.wasDragged = false; }, 45);
+        }
+    });
+}
+
+function actualizarHUDHD29() {
+    const st = window.__atlas29HDState;
+    const stage = document.getElementById("atl29Stage");
+    if (stage) {
+        stage.classList.toggle("mode-zoom", st.modoInteraccion === "zoom");
+        stage.classList.toggle("mode-mark", st.modoInteraccion === "mark");
+    }
+
+    document.getElementById("btn29HDMusc")?.classList.toggle("active", st.capas.muscular);
+    document.getElementById("btn29HDOseo")?.classList.toggle("active", st.capas.oseo);
+    document.getElementById("btn29HDNerv")?.classList.toggle("active", st.capas.nervioso);
+    document.getElementById("btn29LupaOseo")?.classList.toggle("active", st.lupaModo === "oseo");
+    document.getElementById("btn29LupaNerv")?.classList.toggle("active", st.lupaModo === "nervioso");
+    document.getElementById("btn29ModeZoom")?.classList.toggle("active", st.modoInteraccion === "zoom");
+    document.getElementById("btn29ModeMark")?.classList.toggle("active", st.modoInteraccion === "mark");
+
+    document.querySelectorAll(".atl29-tool-btn").forEach(b => b.classList.toggle("active", b.dataset.tool === st.herramienta));
+    document.getElementById("wrapRadioZona29")?.classList.toggle("hidden", st.herramienta !== "zona");
+
+    const reg = st.regionFocoId ? obtenerRegionesHD29(st.lado).find(r => r.id === st.regionFocoId) : null;
+    const hud = document.getElementById("atl29HudStatus");
+    if (hud) {
+        hud.innerHTML = reg || st.zoom > 1.05
+            ? `🔍 <b>${reg ? reg.label : `Zoom ${st.zoom.toFixed(1)}x`}</b> <button type="button" style="border:none;background:#38bdf8;color:#0f172a;font-weight:800;border-radius:99px;padding:1px 7px;cursor:pointer;margin-left:4px;font-size:0.65rem;" onclick="resetearZoomHD29()">← Cuerpo Completo</button>`
+            : (st.lupaModo !== "off" ? `🩻 Lupa ${st.lupaModo === "oseo" ? "Rayos X Ósea" : "Nerviosa"} activa` : (st.modoInteraccion === "zoom" ? "🔍 Tocá un recuadro para acercar" : "🎯 Tocá sobre el cuerpo para marcar"));
+    }
+
+    const guia = document.getElementById("atl29Guide");
+    if (guia) {
+        if (st.herramienta === "irradiacion" && st.irradOrigen && !st.puntoPreview) {
+            guia.innerHTML = `⚡ <b>Paso 2 de Irradiación:</b> Origen fijado en <b>${st.irradOrigen.labelOrigen}</b>. Ahora hacé clic en el <b>punto de destino</b> hasta donde corre el dolor.`;
+            guia.style.borderColor = "#eab308";
+        } else if (st.puntoPreview) {
+            guia.innerHTML = `✅ <b>Listo para archivar (${st.puntoPreview.lado.toUpperCase()}):</b> Ajustá EVA, agregá la observación clínica y tocá <b>"+ Guardar Hallazgo"</b>.`;
+            guia.style.borderColor = "#10b981";
+        } else if (st.modoInteraccion === "mark") {
+            const msgH = st.herramienta === "irradiacion"
+                ? "Hacé <b>2 clics</b> en el cuerpo: primero el <b>origen</b> (ej. L5) y luego el <b>destino</b> del dolor irradiado."
+                : (st.herramienta === "zona" ? "Hacé clic en el centro del área inflamada o contracturada para pintar la <b>zona térmica</b>." : "Hacé clic sobre el músculo, hueso o nervio para clavar el <b>punto clínico</b>.");
+            guia.innerHTML = `🎯 <b>Modo Marcación:</b> ${msgH}`;
+            guia.style.borderColor = "#0284c7";
+        } else {
+            guia.innerHTML = `🔍 <b>Paso 1 — Inspección:</b> Tocá una región del cuerpo para hacer <b>Zoom</b>, o activá <b>🩻 Lupa Rayos X</b> para ver huesos y nervios bajo el músculo en tiempo real.`;
+            guia.style.borderColor = "#bae6fd";
+        }
+    }
+
+    // Actualizar tarjeta de Dermatoma activo
+    const dermInfo = document.getElementById("atl29DermatomeInfo");
+    if (dermInfo) {
+        const d = st.dermatomaActivo ? GUIA_DERMATOMAS_29[st.dermatomaActivo] : null;
+        if (d) {
+            dermInfo.innerHTML = `
+                <div style="margin-top:0.4rem; font-size:0.71rem; color:var(--ink-800); line-height:1.35;">
+                    <b>Raíz ${d.raiz}:</b> <b>Dermatoma:</b> ${d.dermatoma} • <b>Miotoma:</b> ${d.miotoma} • <b>Reflejo:</b> ${d.reflejo}
+                </div>
+            `;
+        } else {
+            dermInfo.innerHTML = `<small style="font-size:0.68rem; color:var(--ink-500); display:block; margin-top:3px;">Tocá una raíz nerviosa para consultar su dermatoma, miotoma y hacer zoom directo.</small>`;
+        }
+    }
+    document.querySelectorAll(".atl29-derm-chip").forEach(c => c.classList.toggle("active", c.dataset.raiz === st.dermatomaActivo));
+    document.querySelectorAll(".atl29-chip").forEach(c => c.classList.toggle("active", c.dataset.reg === st.regionFocoId));
+}
+
+// =========================================================================
+// 29.6 MODAL PRINCIPAL DEL ATLAS HD + GUARDADO + EVOLUCIÓN + PDF A4
+// =========================================================================
+
+window.abrirModalAtlasRealista29 = async function (clavePaciente) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha) return;
+    if (!Array.isArray(ficha.mapaCorporalPuntos)) ficha.mapaCorporalPuntos = [];
+
+    await precargarTodasLaminasHD29();
+
+    const st = window.__atlas29HDState;
+    if (st.clavePaciente !== clavePaciente) {
+        st.clavePaciente = clavePaciente;
+        st.lado = "frente";
+        st.capas = { muscular: true, oseo: false, nervioso: false };
+        st.xrayBlend = 0;
+        st.lupaModo = "off";
+        st.modoInteraccion = "zoom";
+        st.herramienta = "punto";
+        st.dermatomaActivo = null;
+        st.regionFocoId = null;
+        st.zoom = 1;
+        st.panX = 0;
+        st.panY = 0;
+        st.puntoPreview = null;
+        st.irradOrigen = null;
+    }
+
+    const puntos = ficha.mapaCorporalPuntos;
+    const regiones = obtenerRegionesHD29(st.lado);
+    const tieneAlgunaLaminaLado = Boolean(
+        window.__atlas29PlateCache[`${st.lado}_muscular`] ||
+        window.__atlas29PlateCache[`${st.lado}_oseo`] ||
+        window.__atlas29PlateCache[`${st.lado}_nervioso`]
+    );
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:1160px;">
+            <div class="modal-top">
+                <div>
+                    <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                        <span class="badge badge-celeste">🧬 ATLAS ANATÓMICO HD — MIOLOGÍA · OSTEOLOGÍA · NEUROLOGÍA</span>
+                        <span class="badge badge-purple">${ficha.especialidad || "Kinesiología / Quiropraxia"}</span>
+                    </div>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Evaluación Anatómica — ${ficha.nombreCompleto}</h3>
+                </div>
+                <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="abrirGestorLaminasHD29()" title="Subir o cambiar las 6 láminas anatómicas HD">
+                        🖼️ Láminas HD
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="imprimirAtlasHD29PDF('${ficha.clave}')">
+                        🖨️ Informe PDF A4
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+
+            <div class="atl29-layout">
+                <!-- COLUMNA IZQUIERDA: VISOR HD CON LUPA ESCÁNER RAYOS X -->
+                <div class="atl29-viewport-card">
+                    <!-- Fila 1: Frente / Espalda + Capas HD -->
+                    <div class="atl29-bar">
+                        <div class="atl29-group">
+                            <button type="button" class="atl29-btn ${st.lado === "frente" ? "active" : ""}" onclick="cambiarLadoHD29('frente')">👤 Frente</button>
+                            <button type="button" class="atl29-btn ${st.lado === "espalda" ? "active" : ""}" onclick="cambiarLadoHD29('espalda')">👤 Espalda</button>
+                        </div>
+
+                        <div class="atl29-group">
+                            <button type="button" id="btn29HDMusc" class="atl29-btn b-musc ${st.capas.muscular ? "active" : ""}" onclick="alternarCapaHD29('muscular')">💪 Músculos</button>
+                            <button type="button" id="btn29HDOseo" class="atl29-btn b-bone ${st.capas.oseo ? "active" : ""}" onclick="alternarCapaHD29('oseo')">🦴 Huesos</button>
+                            <button type="button" id="btn29HDNerv" class="atl29-btn b-nerve ${st.capas.nervioso ? "active" : ""}" onclick="alternarCapaHD29('nervioso')">⚡ Nervios</button>
+                        </div>
+                    </div>
+
+                    <!-- Fila 2: Lupa Rayos X en Vivo + Transición Músculo ⇄ Hueso -->
+                    <div class="atl29-xray-bar">
+                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                            <button type="button" id="btn29LupaOseo" class="atl29-btn b-lupa ${st.lupaModo === "oseo" ? "active" : ""}" onclick="activarLupaEscannerHD29('oseo')" title="Pasá el cursor sobre el músculo para ver el hueso debajo">
+                                🩻 Lupa Rayos X
+                            </button>
+                            <button type="button" id="btn29LupaNerv" class="atl29-btn b-lupa ${st.lupaModo === "nervioso" ? "active" : ""}" onclick="activarLupaEscannerHD29('nervioso')" title="Pasá el cursor para ver el nervio ciático y plexos debajo">
+                                ⚡ Lupa Nervios
+                            </button>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:0.4rem;">
+                            <span style="font-size:0.66rem; font-weight:700; color:#fda4af;">💪</span>
+                            <input type="range" id="atl29XraySlider" min="0" max="100" value="${st.xrayBlend}"
+                                oninput="cambiarXrayBlendHD29(this.value)" title="Fundido suave entre Capa Muscular y Capa Ósea"
+                                style="width:98px; accent-color:#38bdf8; min-height:18px;">
+                            <span style="font-size:0.66rem; font-weight:700; color:#7dd3fc;">🦴</span>
+                        </div>
+                    </div>
+
+                    <!-- Fila 3: Modo Recuadro (Zoom) vs Marcar -->
+                    <div class="atl29-group" style="width:100%;">
+                        <button type="button" id="btn29ModeZoom" class="atl29-btn ${st.modoInteraccion === "zoom" ? "active" : ""}" style="flex:1; justify-content:center;" onclick="cambiarModoInteraccionHD29('zoom')">🔍 1. Elegir Recuadro (Zoom)</button>
+                        <button type="button" id="btn29ModeMark" class="atl29-btn ${st.modoInteraccion === "mark" ? "active" : ""}" style="flex:1; justify-content:center;" onclick="cambiarModoInteraccionHD29('mark')">🎯 2. Marcar sobre el Cuerpo</button>
+                    </div>
+
+                    <!-- Escenario HD -->
+                    <div id="atl29Stage" class="atl29-stage ${st.modoInteraccion === "zoom" ? "mode-zoom" : "mode-mark"}">
+                        <div class="atl29-hud-top">
+                            <div id="atl29HudStatus" class="atl29-hud-chip"></div>
+                            <span class="atl29-hud-chip" style="font-size:0.63rem; color:#94a3b8;">
+                                ${st.lado === "frente" ? "DER ◄ • ► IZQ" : "IZQ ◄ • ► DER"}
+                            </span>
+                        </div>
+
+                        <div id="atl29World" class="atl29-world">
+                            <img id="atl29ImgMusc" class="atl29-layer-img" alt="Capa Muscular HD">
+                            <img id="atl29ImgOseo" class="atl29-layer-img" alt="Capa Ósea HD">
+                            <img id="atl29ImgNerv" class="atl29-layer-img blend-nerve" alt="Capa Nerviosa HD">
+                            <img id="atl29LoupeImg" alt="Escáner Rayos X">
+                            <div id="atl29LoupeRing"></div>
+                            ${construirOverlaySVGHD29(st.lado, puntos, st.puntoPreview, st.irradOrigen, st.regionFocoId, st.zoom, false)}
+                        </div>
+
+                        ${!tieneAlgunaLaminaLado ? `
+                            <div class="atl29-missing-banner">
+                                <strong style="display:block; color:#38bdf8; margin-bottom:4px;">🖼️ Faltan cargar las 6 Láminas Médicas 3D HD</strong>
+                                <p style="margin:0 0 0.5rem; color:#cbd5e1;">Guardalas en <code>img/atlas/</code> o cargalas ahora mismo en 1 clic:</p>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="abrirGestorLaminasHD29()">📤 Cargar Láminas HD Ahora</button>
+                            </div>
+                        ` : ""}
+
+                        <div id="atl29Tooltip" class="atl29-tooltip"></div>
+
+                        <div class="atl29-zoom-dock">
+                            <button type="button" class="atl29-zbtn" onclick="ajustarZoomHD29(1.3)" title="Acercar">+</button>
+                            <button type="button" class="atl29-zbtn" onclick="ajustarZoomHD29(0.77)" title="Alejar">−</button>
+                            <button type="button" class="atl29-zbtn" onclick="resetearZoomHD29()" title="Vista Completa 1x" style="font-size:0.74rem;">1x</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUMNA DERECHA: HERRAMIENTAS CLÍNICAS, DERMATOMAS Y EVOLUCIÓN -->
+                <div>
+                    <div id="atl29Guide" class="atl29-guide"></div>
+
+                    <!-- Selector de Herramienta de Marcación -->
+                    <div class="atl29-tool-strip">
+                        <button type="button" class="atl29-tool-btn ${st.herramienta === "punto" ? "active" : ""}" data-tool="punto" onclick="seleccionarHerramientaHD29('punto')">🎯 Punto EVA</button>
+                        <button type="button" class="atl29-tool-btn ${st.herramienta === "zona" ? "active" : ""}" data-tool="zona" onclick="seleccionarHerramientaHD29('zona')">🔥 Zona Difusa</button>
+                        <button type="button" class="atl29-tool-btn ${st.herramienta === "irradiacion" ? "active" : ""}" data-tool="irradiacion" onclick="seleccionarHerramientaHD29('irradiacion')">⚡ Irradiación</button>
+                    </div>
+
+                    <!-- Guía Clínica Rápida de Dermatomas y Miotomas -->
+                    <div class="atl29-dermatome-box">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">
+                            <strong style="font-size:0.71rem; color:#a16207; text-transform:uppercase;">🧠 Raíces & Dermatomas:</strong>
+                            <div style="display:flex; gap:0.25rem; flex-wrap:wrap;">
+                                ${Object.keys(GUIA_DERMATOMAS_29).map(r => `
+                                    <button type="button" class="atl29-derm-chip ${st.dermatomaActivo === r ? "active" : ""}" data-raiz="${r}" onclick="seleccionarDermatomaHD29('${r}')">${r}</button>
+                                `).join("")}
+                            </div>
+                        </div>
+                        <div id="atl29DermatomeInfo"></div>
+                    </div>
+
+                    <!-- Chips rápidos por región -->
+                    <div class="atl29-chips">
+                        <button type="button" class="atl29-chip" onclick="resetearZoomHD29()">⟲ Todo</button>
+                        ${regiones.map(r => `
+                            <button type="button" class="atl29-chip ${st.regionFocoId === r.id ? "active" : ""}" data-reg="${r.id}" onclick="enfocarRegionHD29('${r.id}')">${r.label}</button>
+                        `).join("")}
+                    </div>
+
+                    <!-- Formulario de Registro Clínico -->
+                    <form onsubmit="guardarHallazgoAtlasHD29(event)" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:16px; padding:0.85rem; margin-bottom:0.8rem;">
+                        <div class="field" style="margin-bottom:0.5rem;">
+                            <label>Estructura Anatómica / Diagnóstico Local *</label>
+                            <input type="text" id="atl29ZonaInput" required placeholder="Ej: Supraespinoso Der. / Ciatalgia L5-S1 / LCA Rodilla Izq.">
+                        </div>
+
+                        <div class="grid-2" style="margin-bottom:0.5rem;">
+                            <div class="field">
+                                <label>Tejido / Plano</label>
+                                <select id="atl29CapaSelect">
+                                    <option value="Muscular / Tendinosa">💪 Muscular / Tendinosa</option>
+                                    <option value="Ósea / Articular">🦴 Ósea / Articular / Disco</option>
+                                    <option value="Nerviosa / Radicular">⚡ Nerviosa / Ciático</option>
+                                    <option value="Ligamentaria / Fascia">🩹 Ligamentaria / Fascia</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Hallazgo Clínico</label>
+                                <select id="atl29TipoHallazgo">
+                                    <option value="Dolor Puntual / Trigger Point">🎯 Dolor Puntual / Trigger Point</option>
+                                    <option value="Contractura / Hipertonía">🔴 Contractura / Hipertonía</option>
+                                    <option value="Irradiación / Ciatalgia / Pinzamiento">⚡ Irradiación / Pinzamiento</option>
+                                    <option value="Inflamación / Dolor Difuso">🔥 Inflamación / Dolor Difuso</option>
+                                    <option value="Tendinopatía / Sobrecarga">💥 Tendinopatía / Sobrecarga</option>
+                                    <option value="Distensión / Desgarro">🩹 Distensión / Desgarro</option>
+                                    <option value="Bloqueo / Restricción Articular">🦴 Bloqueo Articular</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="wrapRadioZona29" class="field ${st.herramienta === "zona" ? "" : "hidden"}" style="margin-bottom:0.5rem;">
+                            <label>Radio del Área Difusa</label>
+                            <input type="range" id="atl29RadioZona" min="16" max="54" value="${st.radioZona}"
+                                oninput="window.__atlas29HDState.radioZona=Number(this.value); if(window.__atlas29HDState.puntoPreview){window.__atlas29HDState.puntoPreview.radioZona=Number(this.value); refrescarOverlaySVG29();}"
+                                style="width:100%; accent-color:#f59e0b; min-height:20px;">
+                        </div>
+
+                        <div class="field" style="margin-bottom:0.5rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <label>Dolor EVA (1–10)</label>
+                                <strong id="lblEvaHD29" style="font-size:0.8rem; color:#f59e0b;">EVA 5/10 (Moderado)</strong>
+                            </div>
+                            <input type="range" id="atl29EvaRange" min="1" max="10" value="5"
+                                oninput="const v=Number(this.value); const l=document.getElementById('lblEvaHD29'); l.textContent='EVA '+v+'/10 ('+(v>=7?'Agudo':(v>=4?'Moderado':'Leve'))+')'; l.style.color=v>=7?'#ef4444':(v>=4?'#f59e0b':'#10b981');"
+                                style="width:100%; accent-color:#0284c7; min-height:20px;">
+                        </div>
+
+                        <div class="field" style="margin-bottom:0.65rem;">
+                            <label>Test Ortopédico / Observación / Conducta</label>
+                            <input type="text" id="atl29NotaInput" placeholder="Ej: Neer (+) / Lasègue 45° / Punción seca + movilidad...">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-sm" style="width:100%; min-height:36px;">
+                            <i class="ri-map-pin-add-fill"></i> + Guardar Hallazgo en el Expediente
+                        </button>
+                    </form>
+
+                    <!-- Historial Evolutivo de Hallazgos -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                        <strong style="font-size:0.82rem; color:var(--ink-900);">📍 Hallazgos Registrados (${puntos.length})</strong>
+                        ${puntos.length > 0 ? `<small style="color:var(--ink-500); font-size:0.69rem;">Tocá para Zoom • Tocá estado para evolucionar</small>` : ""}
+                    </div>
+                    <div style="max-height:230px; overflow-y:auto; display:flex; flex-direction:column; gap:0.42rem; padding-right:2px;">
+                        ${puntos.length === 0
+                            ? `<div class="empty-box" style="padding:0.9rem;">Sin hallazgos registrados aún. Elegí una herramienta arriba y marcá sobre el cuerpo HD.</div>`
+                            : puntos.map((pt, i) => {
+                                const est = pt.estadoEvol || "Activo";
+                                const estCls = est === "Resuelto" ? "badge-ok" : (est === "En Evolución" ? "badge-warn" : "badge-danger");
+                                const icTipo = pt.tipoMarcador === "irradiacion" ? "⚡" : (pt.tipoMarcador === "zona" ? "🔥" : "🎯");
+                                return `
+                                    <div onclick="enfocarPuntoHD29(${pt.id})"
+                                        style="background:var(--surface-solid); border:1px solid var(--line-strong); border-radius:12px; padding:0.52rem 0.72rem; cursor:pointer; display:flex; justify-content:space-between; align-items:flex-start; gap:0.45rem; opacity:${est === "Resuelto" ? "0.75" : "1"};">
+                                        <div style="min-width:0;">
+                                            <div style="display:flex; align-items:center; gap:0.3rem; flex-wrap:wrap;">
+                                                <span class="badge ${pt.intensidad >= 7 ? "badge-danger" : (pt.intensidad >= 4 ? "badge-warn" : "badge-ok")}" style="font-size:0.64rem;">#${i + 1} ${icTipo} EVA ${pt.intensidad}/10</span>
+                                                <span class="badge badge-celeste" style="font-size:0.62rem;">${pt.lado === "espalda" ? "Espalda" : "Frente"}</span>
+                                                <button type="button" class="badge ${estCls}" style="font-size:0.62rem; border:none; cursor:pointer;"
+                                                    onclick="event.stopPropagation(); ciclarEstadoHallazgoHD29('${ficha.clave}', ${pt.id})" title="Cambiar estado clínico (Activo ➔ En Evolución ➔ Resuelto)">
+                                                    ${est === "Resuelto" ? "🟢 Resuelto" : (est === "En Evolución" ? "🟡 En Evolución" : "🔴 Activo")}
+                                                </button>
+                                            </div>
+                                            <strong style="display:block; font-size:0.8rem; color:var(--ink-900); margin-top:3px; ${est === "Resuelto" ? "text-decoration:line-through;" : ""}">${pt.zona}</strong>
+                                            <small style="color:var(--ink-500); font-size:0.7rem; display:block;">${pt.tipoHallazgo ? `<b>${pt.tipoHallazgo}</b> • ` : ""}${pt.nota || "Sin nota"} (${pt.fecha || ""})</small>
+                                        </div>
+                                        <button type="button" class="btn btn-danger btn-sm" style="min-height:25px; padding:0 6px;" onclick="event.stopPropagation(); eliminarHallazgoHD29('${ficha.clave}', ${pt.id})">🗑️</button>
+                                    </div>
+                                `;
+                            }).join("")}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.classList.remove("hidden");
+    aplicarCapasImagenesHD29();
+    aplicarTransformMundo29();
+    enlazarEventosVisorHD29();
+    actualizarHUDHD29();
+};
+
+window.guardarHallazgoAtlasHD29 = function (e) {
+    e.preventDefault();
+    const st = window.__atlas29HDState;
+    if (!st.puntoPreview) {
+        alert(st.herramienta === "irradiacion"
+            ? "⚡ Hacé 2 clics sobre el cuerpo (Origen y Destino) para trazar el trayecto irradiado antes de guardar."
+            : "🎯 Hacé clic sobre el cuerpo en el visor izquierdo para ubicar el hallazgo.");
+        st.modoInteraccion = "mark";
+        actualizarHUDHD29();
+        return;
+    }
+
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[st.clavePaciente];
+    if (!ficha) return;
+    if (!Array.isArray(ficha.mapaCorporalPuntos)) ficha.mapaCorporalPuntos = [];
+
+    ficha.mapaCorporalPuntos.push({
+        id: Date.now(),
+        lado: st.puntoPreview.lado,
+        tipoMarcador: st.puntoPreview.tipoMarcador || "punto",
+        radioZona: st.puntoPreview.radioZona || 26,
+        x: st.puntoPreview.x,
+        y: st.puntoPreview.y,
+        x2: st.puntoPreview.x2,
+        y2: st.puntoPreview.y2,
+        regionId: st.puntoPreview.regionId || st.regionFocoId || null,
+        zona: document.getElementById("atl29ZonaInput").value.trim(),
+        capa: document.getElementById("atl29CapaSelect")?.value || "Muscular / Tendinosa",
+        tipoHallazgo: document.getElementById("atl29TipoHallazgo")?.value || "Dolor Puntual",
+        intensidad: parseInt(document.getElementById("atl29EvaRange")?.value) || 5,
+        nota: (document.getElementById("atl29NotaInput")?.value || "").trim(),
+        estadoEvol: "Activo",
+        fecha: new Date().toISOString().split("T")[0]
+    });
+
+    guardarMapaUniversalPacientes19(mapa);
+    st.puntoPreview = null;
+    st.irradOrigen = null;
+    if (typeof mostrarToast === "function") mostrarToast("📍 Hallazgo guardado en el Atlas Clínico HD.");
+    abrirModalAtlasRealista29(st.clavePaciente);
+};
+
+window.ciclarEstadoHallazgoHD29 = function (clavePaciente, idPt) {
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    const pt = (ficha?.mapaCorporalPuntos || []).find(p => Number(p.id) === Number(idPt));
+    if (!pt) return;
+
+    const orden = ["Activo", "En Evolución", "Resuelto"];
+    const idx = orden.indexOf(pt.estadoEvol || "Activo");
+    pt.estadoEvol = orden[(idx + 1) % orden.length];
+    if (pt.estadoEvol === "En Evolución") {
+        const nuevoEva = prompt(`Actualizar intensidad EVA (1-10) para "${pt.zona}":`, pt.intensidad);
+        if (nuevoEva !== null && !isNaN(parseInt(nuevoEva))) {
+            pt.intensidad = Math.max(1, Math.min(10, parseInt(nuevoEva)));
+        }
+    }
+    guardarMapaUniversalPacientes19(mapa);
+    abrirModalAtlasRealista29(clavePaciente);
+};
+
+window.eliminarHallazgoHD29 = function (clavePaciente, idPt) {
+    if (!confirm("🗑️ ¿Quitar este hallazgo del Atlas?")) return;
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+    ficha.mapaCorporalPuntos = (ficha.mapaCorporalPuntos || []).filter(p => Number(p.id) !== Number(idPt));
+    guardarMapaUniversalPacientes19(mapa);
+    abrirModalAtlasRealista29(clavePaciente);
+};
+
+window.imprimirAtlasHD29PDF = async function (clavePaciente) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha) return;
+    await precargarTodasLaminasHD29();
+    const puntos = Array.isArray(ficha.mapaCorporalPuntos) ? ficha.mapaCorporalPuntos : [];
+    const st = window.__atlas29HDState;
+    const lic = typeof obtenerLicenciaSafe25 === "function" ? obtenerLicenciaSafe25() : {};
+    const hoy = new Date().toLocaleDateString("es-AR");
+
+    const renderMiniVistaPDF = (lado) => {
+        const uM = window.__atlas29PlateCache[`${lado}_muscular`];
+        const uO = window.__atlas29PlateCache[`${lado}_oseo`];
+        const uN = window.__atlas29PlateCache[`${lado}_nervioso`];
+        const opM = st.capas.muscular ? Math.max(0.1, 1 - (st.xrayBlend / 100) * 0.9) : 0;
+        const opO = st.capas.oseo ? (st.capas.muscular ? Math.max(0.2, st.xrayBlend / 100) : 1) : 0;
+        return `
+            <div style="position:relative; height:320px; aspect-ratio:2/3; margin:0 auto; background:#060b14; border-radius:12px; overflow:hidden;">
+                ${uM && opM > 0 ? `<img src="${uM}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:${opM.toFixed(2)};">` : ""}
+                ${uO && opO > 0 ? `<img src="${uO}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:${opO.toFixed(2)};">` : ""}
+                ${uN && st.capas.nervioso ? `<img src="${uN}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;mix-blend-mode:screen;opacity:0.95;">` : ""}
+                ${construirOverlaySVGHD29(lado, puntos, null, null, null, 1, true)}
+            </div>
+        `;
+    };
+
+    const modal = asegurarModalPaquete1_25();
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:860px;">
+            <div class="modal-top no-print-pdf">
+                <h3>🖨️ Informe Anatómico Clínico HD — ${ficha.nombreCompleto}</h3>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalAtlasRealista29('${ficha.clave}')">← Volver al Atlas</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+            <div class="tactical-pdf-sheet" style="padding:1.8rem;">
+                <div style="display:flex; justify-content:space-between; border-bottom:2.5px solid #0284c7; padding-bottom:0.85rem; margin-bottom:1.1rem;">
+                    <div>
+                        <span style="font-size:0.72rem; font-weight:800; color:#0284c7;">INFORME ANATÓMICO Y MAPEO CLÍNICO DE HALLAZGOS</span>
+                        <h2 style="font-size:1.35rem; font-weight:900; color:#0f172a; margin:2px 0;">${ficha.nombreCompleto}</h2>
+                        <small style="color:#475569; font-weight:700;">DNI ${ficha.dni || "-"} • ${ficha.mutual || "Particular"} • ${lic.nombreEntidad || "Consultorio"}</small>
+                    </div>
+                    <div style="text-align:right;">
+                        <strong style="color:#0f172a; display:block;">Fecha: ${hoy}</strong>
+                        <small style="color:#64748b;">${puntos.length} hallazgo(s) registrados</small>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.25rem;">
+                    <div style="background:#060b14; border-radius:14px; padding:0.65rem; text-align:center;">
+                        <small style="color:#38bdf8; font-weight:800; display:block; margin-bottom:5px;">VISTA ANTERIOR (FRENTE)</small>
+                        ${renderMiniVistaPDF("frente")}
+                    </div>
+                    <div style="background:#060b14; border-radius:14px; padding:0.65rem; text-align:center;">
+                        <small style="color:#38bdf8; font-weight:800; display:block; margin-bottom:5px;">VISTA POSTERIOR (ESPALDA)</small>
+                        ${renderMiniVistaPDF("espalda")}
+                    </div>
+                </div>
+                <table class="app-table" style="font-size:0.78rem;">
+                    <thead><tr><th>#</th><th>Vista</th><th>Estructura / Zona</th><th>Plano</th><th>Hallazgo</th><th>EVA</th><th>Estado</th><th>Observación</th></tr></thead>
+                    <tbody>
+                        ${puntos.length === 0
+                            ? `<tr><td colspan="8" style="text-align:center;">Sin hallazgos registrados.</td></tr>`
+                            : puntos.map((pt, i) => `
+                                <tr>
+                                    <td><strong>#${i + 1}</strong></td>
+                                    <td>${pt.lado === "espalda" ? "Espalda" : "Frente"}</td>
+                                    <td><strong>${pt.zona}</strong></td>
+                                    <td>${pt.capa || "-"}</td>
+                                    <td>${pt.tipoHallazgo || "-"}</td>
+                                    <td><strong>${pt.intensidad}/10</strong></td>
+                                    <td>${pt.estadoEvol || "Activo"}</td>
+                                    <td>${pt.nota || "-"} (${pt.fecha || ""})</td>
+                                </tr>
+                            `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+// Conectar automáticamente todos los botones de Mapa Corporal al nuevo Atlas HD
+window.abrirModalMapaCorporalPaciente26 = window.abrirModalAtlasRealista29;
+window.abrirModalMapaCorporalPro28 = window.abrirModalAtlasRealista29;
+
+// =========================================================================
+// 30. CIERRE SUITE DE SALUD:
+//     1) 🥗 MÓDULO DE NUTRICIÓN (ANTROPOMETRÍA + PLAN ALIMENTARIO PDF / WA)
+//     2) 🔐 SECRETO PROFESIONAL CON PIN (4 DÍGITOS) PARA PSICOLOGÍA
+//     3) 🎂 FECHA DE NACIMIENTO RÁPIDA EN PACIENTES (CONECTADA AL AVISO 27.2)
+// Pegar al final de app.js (debajo del Apartado 29)
+// =========================================================================
+
+// =========================================================================
+// 30.1 SECRETO PROFESIONAL CON PIN (PSICOLOGÍA / NOTAS CONFIDENCIALES)
+// =========================================================================
+
+function obtenerClavePinPsico30() {
+    const club = typeof obtenerClaveClubFinanzas25 === "function" ? obtenerClaveClubFinanzas25() : "default";
+    return `cdm_pin_secreto_psico_v30_${club}`;
+}
+
+function obtenerPinGuardadoPsico30() {
+    return localStorage.getItem(obtenerClavePinPsico30()) || "";
+}
+
+function estaDesbloqueadoSecretoPsico30() {
+    const pin = obtenerPinGuardadoPsico30();
+    if (!pin) return true; // Si no configuró PIN, acceso libre
+    const exp = Number(sessionStorage.getItem("cdm_psico_unlock_until_30") || 0);
+    return Date.now() < exp;
+}
+
+window.solicitarDesbloqueoSecreto30 = function (onSuccess) {
+    if (estaDesbloqueadoSecretoPsico30()) {
+        if (typeof onSuccess === "function") onSuccess();
+        return true;
+    }
+    const pinGuardado = obtenerPinGuardadoPsico30();
+    const ingresado = prompt("🔐 SECRETO PROFESIONAL (Psicología)\n\nIngresá tu PIN de 4 dígitos para acceder a información confidencial:");
+    if (ingresado === null) return false;
+    if (String(ingresado).trim() === String(pinGuardado).trim()) {
+        // Desbloquea por 15 minutos en esta pestaña
+        sessionStorage.setItem("cdm_psico_unlock_until_30", String(Date.now() + 15 * 60 * 1000));
+        if (typeof mostrarToast === "function") mostrarToast("🔓 Secreto Profesional desbloqueado (15 min).");
+        if (typeof onSuccess === "function") onSuccess();
+        return true;
+    }
+    alert("❌ PIN incorrecto. Acceso denegado.");
+    return false;
+};
+
+window.abrirModalSecretoProfesional30 = function (clavePaciente) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha) return;
+
+    const pinActual = obtenerPinGuardadoPsico30();
+    const abrirContenido = () => {
+        if (!Array.isArray(ficha.notasConfidenciales30)) ficha.notasConfidenciales30 = [];
+        const modal = asegurarModalPaquete1_25();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:740px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">🔐 SECRETO PROFESIONAL — HISTORIA RESERVADA</span>
+                        <h3 style="color:var(--ink-900); margin-top:4px;">Notas Confidenciales — ${ficha.nombreCompleto}</h3>
+                    </div>
+                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="configurarPinSecretoPsico30('${ficha.clave}')">
+                            ${pinActual ? "🔑 Cambiar / Quitar PIN" : "🔒 Activar PIN (4 dígitos)"}
+                        </button>
+                        ${pinActual ? `<button type="button" class="btn btn-ghost btn-sm" onclick="sessionStorage.removeItem('cdm_psico_unlock_until_30'); cerrarModalPaquete1_25(); mostrarToast('🔒 Bloqueado.');">🔒 Bloquear Ahora</button>` : ""}
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                    </div>
+                </div>
+
+                <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.3); border-radius:12px; padding:0.7rem 0.9rem; margin-bottom:0.85rem; font-size:0.77rem; color:var(--ink-700);">
+                    ${pinActual
+                        ? "🛡️ <b>Protección Activa:</b> El Genograma y estas notas confidenciales requieren tu PIN de 4 dígitos. Recepción puede gestionar turnos y mutuales sin ver este contenido."
+                        : "ℹ️ <b>Sin PIN configurado:</b> Tocá <b>🔒 Activar PIN</b> arriba para proteger las notas reservadas y el Genograma con una clave de 4 dígitos."}
+                </div>
+
+                <form onsubmit="guardarNotaConfidencial30(event, '${ficha.clave}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:14px; padding:0.85rem; margin-bottom:0.9rem;">
+                    <div class="grid-2" style="margin-bottom:0.55rem;">
+                        <div class="field">
+                            <label>Fecha de Sesión</label>
+                            <input type="date" id="confFecha30" value="${new Date().toISOString().split("T")[0]}" required>
+                        </div>
+                        <div class="field">
+                            <label>Etiqueta / Eje Clínico</label>
+                            <input type="text" id="confEje30" placeholder="Ej: Vínculo familiar / Ansiedad / Hipótesis clínica">
+                        </div>
+                    </div>
+                    <div class="field" style="margin-bottom:0.65rem;">
+                        <label>Nota Reservada (Solo visible con PIN) *</label>
+                        <textarea id="confTexto30" rows="3" required placeholder="Escribí aquí las anotaciones reservadas bajo Secreto Profesional..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">💾 Guardar Nota Confidencial</button>
+                </form>
+
+                <div style="max-height:240px; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem;">
+                    ${ficha.notasConfidenciales30.length === 0
+                        ? `<div class="empty-box" style="padding:1rem;">Sin notas confidenciales cargadas todavía.</div>`
+                        : ficha.notasConfidenciales30.map(n => `
+                            <div style="background:var(--surface-solid); border:1px solid var(--line-strong); border-left:4px solid #6366f1; border-radius:12px; padding:0.7rem 0.9rem;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:4px;">
+                                    <div>
+                                        <span class="badge badge-purple" style="font-size:0.65rem;">📅 ${n.fecha}</span>
+                                        ${n.eje ? `<strong style="font-size:0.8rem; margin-left:6px; color:var(--ink-900);">${n.eje}</strong>` : ""}
+                                    </div>
+                                    <button type="button" class="btn btn-danger btn-sm" style="min-height:24px; padding:0 6px;" onclick="eliminarNotaConfidencial30('${ficha.clave}', ${n.id})">🗑️</button>
+                                </div>
+                                <p style="margin:0; font-size:0.82rem; color:var(--ink-700); white-space:pre-line;">${n.texto}</p>
+                            </div>
+                        `).join("")}
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    solicitarDesbloqueoSecreto30(abrirContenido);
+};
+
+window.configurarPinSecretoPsico30 = function (clavePaciente) {
+    const actual = obtenerPinGuardadoPsico30();
+    const nuevo = prompt(
+        actual
+            ? "Ingresá el nuevo PIN de 4 dígitos (o dejalo VACÍO y tocá Aceptar para desactivar el PIN):"
+            : "Creá un PIN de 4 dígitos para proteger Psicología (Genograma y Notas Confidenciales):",
+        ""
+    );
+    if (nuevo === null) return;
+    const limpio = nuevo.trim();
+    if (limpio === "") {
+        localStorage.removeItem(obtenerClavePinPsico30());
+        sessionStorage.removeItem("cdm_psico_unlock_until_30");
+        if (typeof mostrarToast === "function") mostrarToast("🔓 PIN de Secreto Profesional desactivado.");
+    } else if (!/^\d{4}$/.test(limpio)) {
+        alert("⚠️ El PIN debe tener exactamente 4 números (ejemplo: 1234).");
+        return;
+    } else {
+        localStorage.setItem(obtenerClavePinPsico30(), limpio);
+        sessionStorage.setItem("cdm_psico_unlock_until_30", String(Date.now() + 15 * 60 * 1000));
+        if (typeof mostrarToast === "function") mostrarToast("🔐 PIN de 4 dígitos activado correctamente.");
+    }
+    abrirModalSecretoProfesional30(clavePaciente);
+};
+
+window.guardarNotaConfidencial30 = function (e, clavePaciente) {
+    e.preventDefault();
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+    if (!Array.isArray(ficha.notasConfidenciales30)) ficha.notasConfidenciales30 = [];
+
+    ficha.notasConfidenciales30.unshift({
+        id: Date.now(),
+        fecha: document.getElementById("confFecha30").value || new Date().toISOString().split("T")[0],
+        eje: (document.getElementById("confEje30")?.value || "").trim(),
+        texto: document.getElementById("confTexto30").value.trim()
+    });
+    guardarMapaUniversalPacientes19(mapa);
+    if (typeof mostrarToast === "function") mostrarToast("🔐 Nota confidencial guardada.");
+    abrirModalSecretoProfesional30(clavePaciente);
+};
+
+window.eliminarNotaConfidencial30 = function (clavePaciente, idNota) {
+    if (!confirm("🗑️ ¿Eliminar esta nota confidencial?")) return;
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+    ficha.notasConfidenciales30 = (ficha.notasConfidenciales30 || []).filter(n => Number(n.id) !== Number(idNota));
+    guardarMapaUniversalPacientes19(mapa);
+    abrirModalSecretoProfesional30(clavePaciente);
+};
+
+// Proteger también el Genograma existente cuando el PIN esté activo
+if (typeof window.abrirModalGenogramaPaciente24 === "function" && !window.__genoPinWrapped30) {
+    window.__genoPinWrapped30 = true;
+    const _origGeno30 = window.abrirModalGenogramaPaciente24;
+    window.abrirModalGenogramaPaciente24 = function () {
+        const args = arguments;
+        solicitarDesbloqueoSecreto30(() => _origGeno30.apply(this, args));
+    };
+}
+
+// =========================================================================
+// 30.2 MÓDULO DE NUTRICIÓN (ANTROPOMETRÍA + PLAN ALIMENTARIO PDF / WA)
+// =========================================================================
+
+window.abrirModalNutricionPaciente30 = function (clavePaciente, tabActiva = "antropo") {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    if (!ficha) return;
+    if (!Array.isArray(ficha.nutricionAntropo)) ficha.nutricionAntropo = [];
+    if (!ficha.nutricionPlan || typeof ficha.nutricionPlan !== "object") {
+        ficha.nutricionPlan = {
+            objetivo: "Recomposición Corporal / Hábitos Saludables",
+            kcal: "2000 kcal",
+            agua: "2.5 Litros / día",
+            desayuno: "Infusión + 2 tostadas integrales con queso untable descremado y huevo revuelto + 1 fruta.",
+            mediaManana: "1 yogur descremado o puñado de frutos secos (25g).",
+            almuerzo: "1/2 plato vegetales variados + 1/4 proteína magra (pollo/pescado/carne/legumbres) + 1/4 carbohidrato complejo (arroz integral/papa/quinoa).",
+            merienda: "Licuado o infusión + pan integral con palta o ricota + fruta de estación.",
+            cena: "Vegetales cocidos o ensalada completa + proteína magra + aceite de oliva (1 cda).",
+            indicaciones: "Evitar ultraprocesados y bebidas azucaradas. Priorizar descanso de 7-8 hs y actividad física regular."
+        };
+    }
+
+    const ant = ficha.nutricionAntropo;
+    const ult = ant[0] || {};
+    const plan = ficha.nutricionPlan;
+    const modal = asegurarModalPaquete1_25();
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:880px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-ok">🥗 NUTRICIÓN CLÍNICA Y DEPORTIVA</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">Seguimiento Nutricional — ${ficha.nombreCompleto}</h3>
+                </div>
+                <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarPlanNutricionWA30('${ficha.clave}')"><i class="ri-whatsapp-line"></i> Enviar Plan WA</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="imprimirPlanNutricionPDF30('${ficha.clave}')">🖨️ Plan PDF A4</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:0.45rem; margin-bottom:0.9rem;">
+                <button type="button" class="btn ${tabActiva === "antropo" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="abrirModalNutricionPaciente30('${ficha.clave}', 'antropo')">
+                    📏 1. Antropometría (${ant.length})
+                </button>
+                <button type="button" class="btn ${tabActiva === "plan" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="abrirModalNutricionPaciente30('${ficha.clave}', 'plan')">
+                    🍽️ 2. Plan Alimentario Semanal
+                </button>
+            </div>
+
+            ${tabActiva === "antropo" ? `
+                <form onsubmit="guardarControlAntropo30(event, '${ficha.clave}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:15px; padding:0.9rem; margin-bottom:0.95rem;">
+                    <div class="grid-4" style="margin-bottom:0.6rem;">
+                        <div class="field"><label>Fecha *</label><input type="date" id="nutFecha30" required value="${new Date().toISOString().split("T")[0]}"></div>
+                        <div class="field"><label>Peso (kg) *</label><input type="number" step="0.1" id="nutPeso30" required value="${ult.peso || ""}" placeholder="Ej: 68.5"></div>
+                        <div class="field"><label>Altura (cm) *</label><input type="number" id="nutAltura30" required value="${ult.altura || 168}" placeholder="Ej: 168"></div>
+                        <div class="field"><label>Cintura (cm)</label><input type="number" step="0.1" id="nutCintura30" value="${ult.cintura || ""}" placeholder="Ej: 76"></div>
+                    </div>
+                    <div class="grid-4" style="margin-bottom:0.7rem; align-items:end;">
+                        <div class="field"><label>Cadera (cm)</label><input type="number" step="0.1" id="nutCadera30" value="${ult.cadera || ""}" placeholder="Ej: 96"></div>
+                        <div class="field"><label>% Grasa Corporal</label><input type="number" step="0.1" id="nutGrasa30" value="${ult.grasa || ""}" placeholder="Ej: 22.4"></div>
+                        <div class="field"><label>% Masa Muscular</label><input type="number" step="0.1" id="nutMusculo30" value="${ult.musculo || ""}" placeholder="Ej: 41.2"></div>
+                        <button type="submit" class="btn btn-primary btn-sm" style="min-height:38px;">+ Registrar Control</button>
+                    </div>
+                </form>
+
+                ${ant.length === 0
+                    ? `<div class="empty-box" style="padding:1rem;">Sin mediciones antropométricas registradas todavía.</div>`
+                    : `<div class="table-wrap" style="max-height:240px; overflow-y:auto;">
+                        <table class="app-table">
+                            <thead><tr><th>Fecha</th><th>Peso / IMC</th><th>Cintura / Cadera</th><th>% Grasa</th><th>% Músculo</th><th></th></tr></thead>
+                            <tbody>
+                                ${ant.map(c => `
+                                    <tr>
+                                        <td><b>${c.fecha}</b></td>
+                                        <td><strong>${c.peso} kg</strong> <span class="badge badge-celeste">IMC ${c.imc}</span></td>
+                                        <td>${c.cintura ? c.cintura + " cm" : "-"} / ${c.cadera ? c.cadera + " cm" : "-"}</td>
+                                        <td>${c.grasa ? c.grasa + "%" : "-"}</td>
+                                        <td>${c.musculo ? c.musculo + "%" : "-"}</td>
+                                        <td style="text-align:right;"><button type="button" class="btn btn-danger btn-sm" onclick="eliminarControlAntropo30('${ficha.clave}', ${c.id})">🗑️</button></td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                       </div>`}
+            ` : `
+                <form onsubmit="guardarPlanNutricion30(event, '${ficha.clave}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:15px; padding:0.95rem;">
+                    <div class="grid-3" style="margin-bottom:0.6rem;">
+                        <div class="field"><label>Objetivo Nutricional</label><input type="text" id="nutObj30" value="${(plan.objetivo || "").replace(/"/g, "&quot;")}"></div>
+                        <div class="field"><label>Meta Calórica / Macros</label><input type="text" id="nutKcal30" value="${(plan.kcal || "").replace(/"/g, "&quot;")}"></div>
+                        <div class="field"><label>Hidratación Diaria</label><input type="text" id="nutAgua30" value="${(plan.agua || "").replace(/"/g, "&quot;")}"></div>
+                    </div>
+                    <div class="grid-2" style="margin-bottom:0.55rem;">
+                        <div class="field"><label>☀️ Desayuno</label><textarea id="nutDes30" rows="2">${plan.desayuno || ""}</textarea></div>
+                        <div class="field"><label>🍎 Media Mañana / Colación</label><textarea id="nutMedM30" rows="2">${plan.mediaManana || ""}</textarea></div>
+                    </div>
+                    <div class="grid-2" style="margin-bottom:0.55rem;">
+                        <div class="field"><label>🍽️ Almuerzo</label><textarea id="nutAlm30" rows="2">${plan.almuerzo || ""}</textarea></div>
+                        <div class="field"><label>☕ Merienda</label><textarea id="nutMer30" rows="2">${plan.merienda || ""}</textarea></div>
+                    </div>
+                    <div class="grid-2" style="margin-bottom:0.7rem;">
+                        <div class="field"><label>🌙 Cena</label><textarea id="nutCen30" rows="2">${plan.cena || ""}</textarea></div>
+                        <div class="field"><label>📝 Indicaciones / Suplementación</label><textarea id="nutInd30" rows="2">${plan.indicaciones || ""}</textarea></div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; gap:0.45rem;">
+                        <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Plan Alimentario</button>
+                    </div>
+                </form>
+            `}
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.guardarControlAntropo30 = function (e, clavePaciente) {
+    e.preventDefault();
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+    if (!Array.isArray(ficha.nutricionAntropo)) ficha.nutricionAntropo = [];
+
+    const peso = parseFloat(document.getElementById("nutPeso30").value) || 0;
+    const altura = parseFloat(document.getElementById("nutAltura30").value) || 170;
+    const imc = altura > 0 ? (peso / Math.pow(altura / 100, 2)).toFixed(1) : "-";
+
+    ficha.nutricionAntropo.unshift({
+        id: Date.now(),
+        fecha: document.getElementById("nutFecha30").value || new Date().toISOString().split("T")[0],
+        peso,
+        altura,
+        imc,
+        cintura: document.getElementById("nutCintura30").value || "",
+        cadera: document.getElementById("nutCadera30").value || "",
+        grasa: document.getElementById("nutGrasa30").value || "",
+        musculo: document.getElementById("nutMusculo30").value || ""
+    });
+    guardarMapaUniversalPacientes19(mapa);
+    if (typeof mostrarToast === "function") mostrarToast("📏 Control antropométrico guardado.");
+    abrirModalNutricionPaciente30(clavePaciente, "antropo");
+};
+
+window.eliminarControlAntropo30 = function (clavePaciente, idCtrl) {
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+    ficha.nutricionAntropo = (ficha.nutricionAntropo || []).filter(c => Number(c.id) !== Number(idCtrl));
+    guardarMapaUniversalPacientes19(mapa);
+    abrirModalNutricionPaciente30(clavePaciente, "antropo");
+};
+
+window.guardarPlanNutricion30 = function (e, clavePaciente) {
+    e.preventDefault();
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+    ficha.nutricionPlan = {
+        objetivo: document.getElementById("nutObj30").value.trim(),
+        kcal: document.getElementById("nutKcal30").value.trim(),
+        agua: document.getElementById("nutAgua30").value.trim(),
+        desayuno: document.getElementById("nutDes30").value.trim(),
+        mediaManana: document.getElementById("nutMedM30").value.trim(),
+        almuerzo: document.getElementById("nutAlm30").value.trim(),
+        merienda: document.getElementById("nutMer30").value.trim(),
+        cena: document.getElementById("nutCen30").value.trim(),
+        indicaciones: document.getElementById("nutInd30").value.trim()
+    };
+    guardarMapaUniversalPacientes19(mapa);
+    if (typeof mostrarToast === "function") mostrarToast("🥗 Plan alimentario guardado.");
+    abrirModalNutricionPaciente30(clavePaciente, "plan");
+};
+
+window.enviarPlanNutricionWA30 = function (clavePaciente) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    const p = ficha?.nutricionPlan;
+    if (!ficha || !p) return;
+    const lic = typeof obtenerLicenciaSafe25 === "function" ? obtenerLicenciaSafe25() : {};
+    const tel = String(ficha.telefono || "").replace(/\D/g, "");
+    const msg = `🥗 *PLAN ALIMENTARIO PERSONALIZADO — ${lic.nombreEntidad || "CONSULTORIO"}*\n` +
+        `👤 *Paciente:* ${ficha.nombreCompleto}\n` +
+        `🎯 *Objetivo:* ${p.objetivo} (${p.kcal} • 💧 ${p.agua})\n` +
+        `----------------------------------\n\n` +
+        `☀️ *DESAYUNO:* ${p.desayuno}\n\n` +
+        `🍎 *MEDIA MAÑANA:* ${p.mediaManana}\n\n` +
+        `🍽️ *ALMUERZO:* ${p.almuerzo}\n\n` +
+        `☕ *MERIENDA:* ${p.merienda}\n\n` +
+        `🌙 *CENA:* ${p.cena}\n\n` +
+        `📝 *INDICACIONES:* ${p.indicaciones}`;
+    window.open(tel ? `https://wa.me/${tel}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+window.imprimirPlanNutricionPDF30 = function (clavePaciente) {
+    const ficha = obtenerPacienteUniversalPorClave19(clavePaciente);
+    const p = ficha?.nutricionPlan;
+    if (!ficha || !p) return;
+    const ult = (ficha.nutricionAntropo || [])[0] || null;
+    const lic = typeof obtenerLicenciaSafe25 === "function" ? obtenerLicenciaSafe25() : {};
+    const modal = asegurarModalPaquete1_25();
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:820px;">
+            <div class="modal-top no-print-pdf">
+                <h3>🖨️ Plan Nutricional — ${ficha.nombreCompleto}</h3>
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalNutricionPaciente30('${ficha.clave}', 'plan')">← Volver</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPaquete1_25()">✕</button>
+                </div>
+            </div>
+            <div class="tactical-pdf-sheet" style="padding:1.8rem;">
+                <div style="display:flex; justify-content:space-between; border-bottom:2.5px solid #10b981; padding-bottom:0.85rem; margin-bottom:1rem;">
+                    <div>
+                        <span style="font-size:0.72rem; font-weight:800; color:#059669;">PLAN ALIMENTARIO PERSONALIZADO</span>
+                        <h2 style="font-size:1.35rem; font-weight:900; color:#0f172a; margin:2px 0;">${ficha.nombreCompleto}</h2>
+                        <small style="color:#475569; font-weight:700;">${lic.nombreEntidad || "Consultorio"} • Objetivo: ${p.objetivo}</small>
+                    </div>
+                    <div style="text-align:right; font-size:0.8rem;">
+                        <strong>${p.kcal} • 💧 ${p.agua}</strong><br>
+                        ${ult ? `<small style="color:#475569;">Últ. control: ${ult.peso} kg (IMC ${ult.imc})</small>` : ""}
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.8rem; margin-bottom:1rem; font-size:0.84rem;">
+                    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:0.8rem;"><b>☀️ DESAYUNO</b><p style="margin:4px 0 0;">${p.desayuno}</p></div>
+                    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:0.8rem;"><b>🍎 MEDIA MAÑANA</b><p style="margin:4px 0 0;">${p.mediaManana}</p></div>
+                    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:0.8rem;"><b>🍽️ ALMUERZO</b><p style="margin:4px 0 0;">${p.almuerzo}</p></div>
+                    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:0.8rem;"><b>☕ MERIENDA</b><p style="margin:4px 0 0;">${p.merienda}</p></div>
+                    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:12px; padding:0.8rem; grid-column:1/-1;"><b>🌙 CENA</b><p style="margin:4px 0 0;">${p.cena}</p></div>
+                </div>
+                <div style="background:#ecfdf5; border:1px solid #6ee7b7; border-radius:12px; padding:0.85rem; font-size:0.84rem;">
+                    <b style="color:#065f46;">📝 INDICACIONES GENERALES:</b>
+                    <p style="margin:4px 0 0; color:#064e3b;">${p.indicaciones}</p>
+                </div>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+// =========================================================================
+// 30.3 FECHA DE NACIMIENTO RÁPIDA EN PACIENTES + INYECCIÓN EN BARRA INTERNA
+// =========================================================================
+
+window.editarFechaNacimientoPaciente30 = function (clavePaciente) {
+    const mapa = obtenerMapaUniversalPacientes19();
+    const ficha = mapa[clavePaciente];
+    if (!ficha) return;
+    const val = prompt(`🎂 Fecha de Nacimiento de ${ficha.nombreCompleto} (formato AAAA-MM-DD, ej: 1995-11-18):`, ficha.fechaNacimiento || "");
+    if (val === null) return;
+    const limpio = val.trim();
+    if (limpio && !/^\d{4}-\d{2}-\d{2}$/.test(limpio)) {
+        alert("⚠️ Usá el formato AAAA-MM-DD (por ejemplo: 1992-05-24).");
+        return;
+    }
+    ficha.fechaNacimiento = limpio;
+    guardarMapaUniversalPacientes19(mapa);
+    if (typeof renderizarBannerCumpleanosSiCorresponde27 === "function") renderizarBannerCumpleanosSiCorresponde27();
+    if (typeof mostrarToast === "function") mostrarToast(limpio ? `🎂 Cumpleaños guardado (${limpio}).` : "Fecha de nacimiento quitada.");
+};
+
+function inyectarBotonesSuiteSalud30() {
+    if (document.body?.getAttribute("data-rol") === "usuario") return;
+
+    document.querySelectorAll(".barra-herramientas-interna-paciente-22").forEach(barra => {
+        const btnEst = barra.querySelector("button[onclick*='abrirModalGestionEstudiosDePaciente19']");
+        const m = (btnEst?.getAttribute("onclick") || "").match(/'([^']+)'/);
+        if (!m) return;
+        const clave = m[1];
+        const cont = barra.querySelector("div:last-child");
+        if (!cont) return;
+
+        if (!cont.querySelector(".btn-nutricion-30")) {
+            const bNut = document.createElement("button");
+            bNut.type = "button";
+            bNut.className = "btn btn-sm btn-nutricion-30";
+            bNut.style = "background:#10b981; color:#ffffff; font-weight:800; min-height:30px;";
+            bNut.onclick = () => abrirModalNutricionPaciente30(clave, "antropo");
+            bNut.innerHTML = `🥗 Nutrición`;
+            cont.appendChild(bNut);
+        }
+
+        if (!cont.querySelector(".btn-secreto-psico-30")) {
+            const bSec = document.createElement("button");
+            bSec.type = "button";
+            bSec.className = "btn btn-sm btn-secreto-psico-30";
+            bSec.style = "background:#6366f1; color:#ffffff; font-weight:800; min-height:30px;";
+            bSec.onclick = () => abrirModalSecretoProfesional30(clave);
+            bSec.innerHTML = `🔐 Secreto Prof.`;
+            cont.appendChild(bSec);
+        }
+
+        if (!cont.querySelector(".btn-cumple-pac-30")) {
+            const bCum = document.createElement("button");
+            bCum.type = "button";
+            bCum.className = "btn btn-ghost btn-sm btn-cumple-pac-30";
+            bCum.style = "color:#fde68a; border-color:rgba(253,230,138,0.35); min-height:30px;";
+            bCum.onclick = () => editarFechaNacimientoPaciente30(clave);
+            bCum.title = "Cargar fecha de nacimiento para aviso de cumpleaños";
+            bCum.innerHTML = `🎂`;
+            cont.appendChild(bCum);
+        }
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(inyectarBotonesSuiteSalud30, 350);
+    setTimeout(inyectarBotonesSuiteSalud30, 800);
+});
+document.addEventListener("click", () => {
+    setTimeout(inyectarBotonesSuiteSalud30, 90);
+});
+window.abrirModalMapaCorporalPro28 = window.abrirModalAtlasRealista29;

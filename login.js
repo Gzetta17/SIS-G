@@ -3661,8 +3661,11 @@ if (document.readyState === "loading") {
     verificarAccesoYRolEnApp();
 }
 // =========================================================================
-// 9. EXTENSIÓN OFICIAL: DISCRIMINACIÓN DE MÓDULOS (DEPORTES, GIMNASIO, KINESIOLOGÍA,
-//    QUIROPRAXIA, PSICOLOGÍA, NUTRICIÓN) + BLOQUEO DE COBRANZA POR COMERCIO
+// 9. SUITE SAAS DEFINITIVA EN LOGIN.JS:
+//    - VISTA SIMPLE ULTRA LIMPIA: SOLO SERIES × REPS, VIDEO Y CONTROL TIEMPO REAL (SIN PESOS NI TIEMPO)
+//    - VISTA AVANZADA: CON CARGA/PESOS, MEMORIA 1RM Y BIOMECÁNICA (SIN TIEMPO EN LA TARJETA)
+//    - GOTA FLOTANTE DE RELOJ INDEPENDIENTE (💧⏱️) PARA QUIEN LA QUIERA USAR
+//    - CANDADO DE AUTOGESTIÓN (🔒/🔓) Y EDICIÓN/BORRADO DE PROGRESIONES
 // Pegar al final de login.js (reemplazando el Bloque 9 anterior)
 // =========================================================================
 
@@ -3673,6 +3676,667 @@ const CATALOGO_PROFESIONES_BASE_SAAS = [
     { clave: "Nutrición", icono: "🥗", nombre: "Nutrición" }
 ];
 
+function obtenerPersonasRealesCDM() {
+    if (typeof basePersonas !== "undefined" && Array.isArray(basePersonas)) {
+        window.basePersonas = basePersonas;
+        return basePersonas;
+    }
+    try {
+        const local = JSON.parse(localStorage.getItem("cdm_personas_v1") || "[]");
+        window.basePersonas = local;
+        return local;
+    } catch {
+        return [];
+    }
+}
+
+function obtenerRutinasRealesCDM() {
+    if (typeof baseRutinas !== "undefined" && Array.isArray(baseRutinas)) {
+        window.baseRutinas = baseRutinas;
+        return baseRutinas;
+    }
+    try {
+        const local = JSON.parse(localStorage.getItem("cdm_rutinas_v1") || "[]");
+        window.baseRutinas = local;
+        return local;
+    } catch {
+        return [];
+    }
+}
+
+function obtenerVideotecaRealCDM() {
+    if (typeof baseVideoteca !== "undefined" && Array.isArray(baseVideoteca)) {
+        window.baseVideoteca = baseVideoteca;
+        return baseVideoteca;
+    }
+    try {
+        return JSON.parse(localStorage.getItem("cdm_videoteca_v1") || "[]");
+    } catch {
+        return [];
+    }
+}
+
+function persistirCambiosPersonasYRutinasCDM() {
+    const listaP = obtenerPersonasRealesCDM();
+    const listaR = obtenerRutinasRealesCDM();
+    localStorage.setItem("cdm_personas_v1", JSON.stringify(listaP));
+    localStorage.setItem("cdm_rutinas_v1", JSON.stringify(listaR));
+    if (typeof guardarSnapshotClubActualEnMapaLocal === "function") {
+        guardarSnapshotClubActualEnMapaLocal();
+    }
+    if (typeof guardarDatosCDM === "function") {
+        guardarDatosCDM();
+    }
+}
+
+function inyectarEstilosRutinasCompactasYModoSimpleCDM() {
+    if (document.getElementById("cdmEstilosRutinaCompactaSaaS")) return;
+    const st = document.createElement("style");
+    st.id = "cdmEstilosRutinaCompactaSaaS";
+    st.textContent = `
+        /* 1. EN VISTA SIMPLE: OCULTAR PESOS, CALCULADORA 1RM Y BIOMECÁNICA */
+        body[data-vista-usuario="simple"] #jug-sec-calculadora,
+        body[data-vista-usuario="simple"] .mod-tab[data-user-tab="calculadora"],
+        body[data-vista-usuario="simple"] .user-quick-dock-btn[data-user-tab="calculadora"],
+        body[data-vista-usuario="simple"] .mod-tab[onclick*="calculadora"],
+        body[data-vista-usuario="simple"] .routine-stickman-mini,
+        body[data-vista-usuario="simple"] .stickman-tech-card,
+        body[data-vista-usuario="simple"] .live-overload-bar,
+        body[data-vista-usuario="simple"] .ex-big-pill-load,
+        body[data-vista-usuario="simple"] .btn-ejemplo-biomecanico {
+            display: none !important;
+        }
+
+        /* Ocultar el dock viejo de pausa porque ahora usamos la Gota Independiente */
+        #cdmWorkoutRestTimerDock {
+            display: none !important;
+        }
+
+        body[data-rol="usuario"] .usr-action-allow {
+            display: inline-flex !important;
+        }
+
+        /* 2. BOTONERÍA DE ACCESOS DE ALTO CONTRASTE + DOCK MÓVIL */
+        body[data-rol="usuario"] .module-tabs {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)) !important;
+            gap: 0.55rem !important;
+            background: var(--surface-solid) !important;
+            padding: 0.65rem !important;
+            border-radius: 20px !important;
+            border: 1.5px solid var(--line-strong) !important;
+            box-shadow: var(--shadow-card) !important;
+            position: sticky !important;
+            top: 68px !important;
+            z-index: 450 !important;
+        }
+
+        body[data-rol="usuario"] .module-tabs .mod-tab {
+            background: var(--surface-subtle) !important;
+            border: 1.5px solid var(--line-strong) !important;
+            color: var(--ink-900) !important;
+            font-weight: 700 !important;
+            font-size: 0.82rem !important;
+            padding: 0.72rem 0.65rem !important;
+            border-radius: 14px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 0.55rem !important;
+            box-shadow: var(--shadow-sm) !important;
+            transition: all 0.18s ease !important;
+        }
+
+        body[data-rol="usuario"] .module-tabs .mod-tab i {
+            width: 32px !important;
+            height: 32px !important;
+            border-radius: 9px !important;
+            background: var(--cdm-50) !important;
+            color: var(--cdm-600) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 1.1rem !important;
+            flex-shrink: 0 !important;
+        }
+
+        body[data-rol="usuario"] .module-tabs .mod-tab.active {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+            border-color: #0284c7 !important;
+            color: #ffffff !important;
+            box-shadow: 0 8px 20px -4px rgba(2, 132, 199, 0.48) !important;
+        }
+
+        body[data-rol="usuario"] .module-tabs .mod-tab.active i {
+            background: rgba(255, 255, 255, 0.2) !important;
+            color: #ffffff !important;
+        }
+
+        .user-mobile-bottom-dock {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 66px;
+            background: rgba(12, 25, 44, 0.98);
+            backdrop-filter: blur(16px);
+            border-top: 1.5px solid rgba(56, 189, 248, 0.25);
+            z-index: 950;
+            padding: 0.25rem 0.4rem;
+            justify-content: space-around;
+            align-items: center;
+            gap: 0.2rem;
+        }
+        .user-quick-dock-btn {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 0.62rem;
+            font-weight: 700;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            padding: 0.3rem 0.15rem;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .user-quick-dock-btn i { font-size: 1.15rem; }
+        .user-quick-dock-btn.active { background: var(--cdm-500); color: #ffffff; }
+
+        @media (max-width: 820px) {
+            body[data-rol="usuario"] { padding-bottom: 78px !important; }
+            body[data-rol="usuario"] .user-mobile-bottom-dock { display: flex !important; }
+            body[data-rol="usuario"] .module-tabs {
+                position: static !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+        }
+
+        /* 3. TARJETA DE EJERCICIO: TÍTULO ARRIBA + SERIES × REPS EN GRANDE ABAJO (SIN TIEMPO) */
+        .clean-user-ex-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+            padding: 1.15rem 1.25rem;
+            background: var(--surface-subtle);
+        }
+        .clean-user-ex-row {
+            background: var(--surface-solid);
+            border: 1.5px solid var(--line-strong);
+            border-radius: 18px;
+            padding: 1rem 1.15rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            box-shadow: var(--shadow-sm);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .clean-user-ex-row.done-row {
+            border-color: var(--ok);
+            background: linear-gradient(to right, var(--surface-solid), var(--ok-bg));
+        }
+        .clean-user-ex-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .clean-user-ex-left {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            min-width: 0;
+            flex: 1;
+        }
+        .clean-ex-thumb-btn {
+            width: 62px;
+            height: 62px;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+            flex-shrink: 0;
+            cursor: pointer;
+            background: #0c192c;
+            border: 2px solid var(--line-celeste);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #38bdf8;
+            font-weight: 800;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
+        }
+        .clean-ex-thumb-btn img { width: 100%; height: 100%; object-fit: cover; }
+        .clean-ex-thumb-play {
+            position: absolute;
+            inset: 0;
+            background: rgba(12, 25, 44, 0.42);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 1.3rem;
+        }
+        .clean-ex-info { min-width: 0; flex: 1; }
+        .clean-ex-info h4 {
+            font-size: 1.12rem !important;
+            font-weight: 800 !important;
+            color: var(--ink-900) !important;
+            margin: 0 0 0.42rem 0 !important;
+            line-height: 1.25 !important;
+        }
+
+        .ex-big-prescription-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            margin-top: 0.2rem;
+        }
+        .ex-big-pill-primary {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            color: #ffffff !important;
+            font-size: 0.96rem !important;
+            font-weight: 800 !important;
+            padding: 0.38rem 0.95rem !important;
+            border-radius: 11px !important;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.26);
+        }
+        .ex-big-pill-load {
+            background: var(--ok-bg);
+            color: var(--ok-ink) !important;
+            border: 1.5px solid rgba(16, 185, 129, 0.35);
+            font-size: 0.92rem !important;
+            font-weight: 800 !important;
+            padding: 0.36rem 0.85rem !important;
+            border-radius: 11px !important;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        /* BARRA DE CONTROL TIEMPO REAL (SIN TEXTO DE PAUSA) */
+        .realtime-control-bar {
+            background: var(--surface-subtle);
+            border: 1.5px dashed var(--line-celeste);
+            border-radius: 13px;
+            padding: 0.6rem 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+        .realtime-control-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: var(--cdm-700);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        body[data-theme="dark"] .realtime-control-title { color: #38bdf8; }
+        .realtime-pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+        }
+
+        /* 4. GOTA FLOTANTE INDEPENDIENTE DEL RELOJITO (💧⏱️) */
+        .cdm-droplet-clock-wrap {
+            position: fixed;
+            bottom: 1.35rem;
+            right: 1.35rem;
+            z-index: 2600;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        @media (max-width: 820px) {
+            .cdm-droplet-clock-wrap {
+                bottom: 5.1rem;
+                right: 1rem;
+            }
+        }
+        .cdm-droplet-btn {
+            min-width: 58px;
+            height: 58px;
+            padding: 0 1.05rem;
+            border-radius: 29px 29px 8px 29px;
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 55%, #0c192c 100%);
+            color: #ffffff;
+            border: 2px solid rgba(125, 211, 252, 0.65);
+            box-shadow: 0 14px 30px rgba(2, 132, 199, 0.45);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            font-weight: 800;
+            font-size: 0.92rem;
+            transition: transform 0.22s ease, box-shadow 0.22s ease;
+        }
+        .cdm-droplet-btn:hover {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 18px 36px rgba(2, 132, 199, 0.6);
+        }
+        .cdm-droplet-btn.running {
+            background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+            border-color: #a7f3d0;
+            box-shadow: 0 14px 32px rgba(16, 185, 129, 0.5);
+        }
+        .cdm-droplet-btn i {
+            font-size: 1.35rem;
+        }
+        .cdm-droplet-popover {
+            background: #0c192c;
+            color: #ffffff;
+            border: 1.5px solid rgba(56, 189, 248, 0.45);
+            border-radius: 22px;
+            padding: 1rem 1.15rem;
+            width: 285px;
+            margin-bottom: 0.65rem;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.65);
+            animation: slideUpFade 0.2s ease forwards;
+        }
+        .droplet-preset-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.38rem;
+            margin: 0.65rem 0;
+        }
+        .droplet-preset-chip {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #e0f2fe;
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 0.42rem 0.3rem;
+            border-radius: 9px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .droplet-preset-chip:hover,
+        .droplet-preset-chip.active {
+            background: #0284c7;
+            border-color: #38bdf8;
+            color: #ffffff;
+        }
+
+        .self-routine-banner {
+            background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+            color: #ffffff;
+            border-radius: 18px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.15rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.85rem;
+            flex-wrap: wrap;
+            box-shadow: var(--shadow-card);
+        }
+
+        .admin-complexity-toolbar {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1.5px solid #0284c7;
+            border-radius: 16px;
+            padding: 0.85rem 1.1rem;
+            margin-bottom: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            box-shadow: var(--shadow-sm);
+        }
+        body[data-theme="dark"] .admin-complexity-toolbar {
+            background: rgba(14, 165, 233, 0.14);
+            border-color: rgba(56, 189, 248, 0.45);
+        }
+
+        @media (max-width: 600px) {
+            .clean-user-ex-list { padding: 0.75rem; }
+            .clean-user-ex-main { flex-direction: column; align-items: stretch; }
+            .clean-ex-right-actions { width: 100%; justify-content: flex-end; }
+            .ex-big-pill-primary, .ex-big-pill-load { font-size: 0.88rem !important; width: 100%; justify-content: center; }
+        }
+    `;
+    document.head.appendChild(st);
+}
+
+// =========================================================================
+// 1. GOTA DEL RELOJITO INDEPENDIENTE (💧⏱️)
+//    No invade las tarjetas ni salta sola: solo la abre quien la quiere usar
+// =========================================================================
+
+let intervaloGotaRelojCDM = null;
+let segsRestantesGotaCDM = 0;
+let segsTotalesGotaCDM = 90;
+let gotaRelojAbiertaCDM = false;
+
+function asegurarGotaRelojitoFlotanteCDM() {
+    let wrap = document.getElementById("cdmFloatingDropletClock");
+    if (!wrap) {
+        wrap = document.createElement("div");
+        wrap.id = "cdmFloatingDropletClock";
+        wrap.className = "cdm-droplet-clock-wrap usr-action-allow";
+        document.body.appendChild(wrap);
+    }
+    renderizarGotaRelojitoFlotanteCDM();
+}
+
+function alternarAperturaGotaRelojCDM() {
+    gotaRelojAbiertaCDM = !gotaRelojAbiertaCDM;
+    renderizarGotaRelojitoFlotanteCDM();
+}
+
+function iniciarDescansoEnGotaRelojCDM(segundos) {
+    const segs = Math.max(5, parseInt(segundos) || 90);
+    segsTotalesGotaCDM = segs;
+    segsRestantesGotaCDM = segs;
+
+    if (intervaloGotaRelojCDM) clearInterval(intervaloGotaRelojCDM);
+    renderizarGotaRelojitoFlotanteCDM();
+
+    intervaloGotaRelojCDM = setInterval(() => {
+        segsRestantesGotaCDM--;
+        if (segsRestantesGotaCDM <= 0) {
+            segsRestantesGotaCDM = 0;
+            clearInterval(intervaloGotaRelojCDM);
+            intervaloGotaRelojCDM = null;
+            if (typeof emitirBeepFinPausaCDM === "function") emitirBeepFinPausaCDM();
+            if (typeof mostrarToast === "function") {
+                mostrarToast("🔔 ¡Tiempo cumplido en el reloj de descanso!");
+            }
+        }
+        renderizarGotaRelojitoFlotanteCDM();
+    }, 1000);
+}
+
+function ajustarTiempoGotaRelojCDM(deltaSegs) {
+    segsRestantesGotaCDM = Math.max(0, segsRestantesGotaCDM + deltaSegs);
+    segsTotalesGotaCDM = Math.max(segsTotalesGotaCDM, segsRestantesGotaCDM);
+    renderizarGotaRelojitoFlotanteCDM();
+}
+
+function detenerGotaRelojCDM() {
+    if (intervaloGotaRelojCDM) {
+        clearInterval(intervaloGotaRelojCDM);
+        intervaloGotaRelojCDM = null;
+    }
+    segsRestantesGotaCDM = 0;
+    renderizarGotaRelojitoFlotanteCDM();
+}
+
+function renderizarGotaRelojitoFlotanteCDM() {
+    const wrap = document.getElementById("cdmFloatingDropletClock");
+    if (!wrap) return;
+
+    const corriendo = Boolean(intervaloGotaRelojCDM && segsRestantesGotaCDM > 0);
+    const mins = Math.floor(segsRestantesGotaCDM / 60);
+    const secs = segsRestantesGotaCDM % 60;
+    const tiempoStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    const pct = segsTotalesGotaCDM > 0
+        ? Math.round(((segsTotalesGotaCDM - segsRestantesGotaCDM) / segsTotalesGotaCDM) * 100)
+        : 0;
+
+    const popoverHTML = gotaRelojAbiertaCDM ? `
+        <div class="cdm-droplet-popover" onclick="event.stopPropagation();">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                <span style="font-size:0.7rem; font-weight:800; color:#38bdf8; text-transform:uppercase; letter-spacing:0.04em;">
+                    💧⏱️ Reloj de Descanso Libre
+                </span>
+                <button type="button" class="btn btn-ghost btn-sm usr-action-allow" style="min-height:24px; padding:0 6px; color:#94a3b8; border:none;" onclick="alternarAperturaGotaRelojCDM()">✕</button>
+            </div>
+
+            <div style="text-align:center; padding:0.35rem 0;">
+                <div style="font-size:2.1rem; font-weight:900; color:${corriendo ? "#34d399" : "#ffffff"}; line-height:1.1; font-variant-numeric:tabular-nums;">
+                    ${tiempoStr}
+                </div>
+                <div style="height:5px; background:rgba(255,255,255,0.12); border-radius:99px; overflow:hidden; margin-top:0.45rem;">
+                    <div style="height:100%; width:${corriendo ? pct : 0}%; background:linear-gradient(90deg, #38bdf8, #10b981); transition:width 0.3s ease;"></div>
+                </div>
+            </div>
+
+            <small style="color:#94a3b8; font-size:0.68rem; font-weight:700; display:block; margin-top:0.3rem;">
+                Tocá un tiempo para iniciar:
+            </small>
+            <div class="droplet-preset-grid">
+                <button type="button" class="droplet-preset-chip usr-action-allow ${segsTotalesGotaCDM === 30 && corriendo ? "active" : ""}" onclick="iniciarDescansoEnGotaRelojCDM(30)">30s</button>
+                <button type="button" class="droplet-preset-chip usr-action-allow ${segsTotalesGotaCDM === 45 && corriendo ? "active" : ""}" onclick="iniciarDescansoEnGotaRelojCDM(45)">45s</button>
+                <button type="button" class="droplet-preset-chip usr-action-allow ${segsTotalesGotaCDM === 60 && corriendo ? "active" : ""}" onclick="iniciarDescansoEnGotaRelojCDM(60)">1m (60s)</button>
+                <button type="button" class="droplet-preset-chip usr-action-allow ${segsTotalesGotaCDM === 90 && corriendo ? "active" : ""}" onclick="iniciarDescansoEnGotaRelojCDM(90)">1m 30s</button>
+                <button type="button" class="droplet-preset-chip usr-action-allow ${segsTotalesGotaCDM === 120 && corriendo ? "active" : ""}" onclick="iniciarDescansoEnGotaRelojCDM(120)">2 min</button>
+                <button type="button" class="droplet-preset-chip usr-action-allow ${segsTotalesGotaCDM === 180 && corriendo ? "active" : ""}" onclick="iniciarDescansoEnGotaRelojCDM(180)">3 min</button>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.35rem; margin-top:0.5rem;">
+                <button type="button" class="btn btn-ghost btn-sm usr-action-allow" style="color:#fff; border-color:rgba(255,255,255,0.2); min-height:28px; padding:0.2rem 0.55rem;" onclick="ajustarTiempoGotaRelojCDM(-15)">-15s</button>
+                <button type="button" class="btn btn-ghost btn-sm usr-action-allow" style="color:#fff; border-color:rgba(255,255,255,0.2); min-height:28px; padding:0.2rem 0.55rem;" onclick="ajustarTiempoGotaRelojCDM(15)">+15s</button>
+                <button type="button" class="btn btn-danger btn-sm usr-action-allow" style="min-height:28px; padding:0.2rem 0.65rem; flex:1;" onclick="detenerGotaRelojCDM()">Reiniciar 00:00</button>
+            </div>
+        </div>
+    ` : "";
+
+    wrap.innerHTML = `
+        ${popoverHTML}
+        <button type="button" class="cdm-droplet-btn usr-action-allow ${corriendo ? "running" : ""}" onclick="alternarAperturaGotaRelojCDM()" title="Reloj de descanso independiente (Tocar para abrir/minimizar)">
+            <i class="ri-timer-flash-fill"></i>
+            <span>${corriendo ? tiempoStr : "Reloj"}</span>
+        </button>
+    `;
+}
+
+// =========================================================================
+// 2. RESOLUTOR Y GUARDADO FIRME DE COMPLEJIDAD (POR COMERCIO Y POR USUARIO)
+// =========================================================================
+
+function obtenerModoComplejidadComercioActualCDM() {
+    try {
+        const lic = obtenerLicenciaConfigCDM();
+        return lic?.modoComplejidad === "simple" ? "simple" : "avanzado";
+    } catch {
+        return "avanzado";
+    }
+}
+
+function obtenerPersonaActualEnFichaCDM() {
+    const lista = obtenerPersonasRealesCDM();
+    const params = new URLSearchParams(window.location.search);
+    const idUrl = parseInt(params.get("id"));
+    if (!isNaN(idUrl)) {
+        const pUrl = lista.find(x => Number(x.id) === Number(idUrl));
+        if (pUrl) return pUrl;
+    }
+    try {
+        const ses = obtenerSesionActivaCDM();
+        if (ses && ses.personaId) {
+            return lista.find(x => Number(x.id) === Number(ses.personaId)) || null;
+        }
+    } catch {}
+    return null;
+}
+
+function obtenerNivelVistaRutinaEfectivoCDM(personaObj = null) {
+    const p = personaObj || obtenerPersonaActualEnFichaCDM();
+    if (p && (p.modoVistaRutina === "simple" || p.modoVistaRutina === "avanzado")) {
+        return p.modoVistaRutina;
+    }
+    return obtenerModoComplejidadComercioActualCDM();
+}
+
+function cambiarModoComplejidadGeneralDesdeAdminCDM(nuevoModo) {
+    const lic = obtenerLicenciaConfigCDM();
+    lic.modoComplejidad = nuevoModo === "simple" ? "simple" : "avanzado";
+    guardarLicenciaConfigCDM(lic);
+    sincronizarAtributoCobranzaBodyCDM();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(lic.modoComplejidad === "simple"
+            ? "✅ Guardado: Modo General del Gimnasio/Club en VISTA SIMPLE"
+            : "✅ Guardado: Modo General del Gimnasio/Club en VISTA AVANZADA");
+    }
+
+    const p = obtenerPersonaActualEnFichaCDM();
+    if (p) {
+        inyectarPanelCodigoEnFichaIndividual();
+        window.agregarBotonesVideoEnRutinasJugador({ personaId: p.id });
+    }
+    if (typeof renderizarPaginaDeporte === "function" && window.deportePagina) {
+        renderizarPaginaDeporte();
+    }
+}
+
+function cambiarModoVistaRutinaUsuarioParticularCDM(idPersona, nuevoModoUsuario) {
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(idPersona));
+    if (!p) return;
+
+    const modoElegido = nuevoModoUsuario || document.getElementById("selModoVistaUsuarioHeader")?.value || "simple";
+    p.modoVistaRutina = modoElegido;
+    persistirCambiosPersonasYRutinasCDM();
+    sincronizarAtributoCobranzaBodyCDM();
+
+    const selHeader = document.getElementById("selModoVistaUsuarioHeader");
+    if (selHeader) selHeader.value = modoElegido;
+    const selToolbar = document.getElementById("selModoVistaUsuarioToolbar");
+    if (selToolbar) selToolbar.value = modoElegido;
+
+    const efectivo = obtenerNivelVistaRutinaEfectivoCDM(p);
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`💾 Guardado para ${p.nombre} ${p.apellido}: Vista ${efectivo.toUpperCase()} activa.`);
+    }
+
+    if (document.getElementById("fichaCabeceraJugador")) {
+        inyectarPanelCodigoEnFichaIndividual();
+        window.agregarBotonesVideoEnRutinasJugador({ personaId: p.id });
+    }
+    if (typeof renderizarPaginaDeporte === "function" && window.deportePagina) {
+        renderizarPaginaDeporte();
+    }
+}
+
+function alternarVistaSimpleAvanzadaRapidaCardCDM(idPersona) {
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(idPersona));
+    if (!p) return;
+    const actual = obtenerNivelVistaRutinaEfectivoCDM(p);
+    const nuevo = actual === "simple" ? "avanzado" : "simple";
+    cambiarModoVistaRutinaUsuarioParticularCDM(p.id, nuevo);
+}
+
 function estaCobranzaBloqueadaEnComercioActualCDM() {
     try {
         const lic = obtenerLicenciaConfigCDM();
@@ -3682,36 +4346,1303 @@ function estaCobranzaBloqueadaEnComercioActualCDM() {
     }
 }
 
-function obtenerProfesionesHabilitadasComercioActualCDM() {
-    try {
-        const lic = obtenerLicenciaConfigCDM();
-        if (Array.isArray(lic?.profesionesHabilitadas)) {
-            return lic.profesionesHabilitadas;
-        }
-    } catch {}
-    return ["Quiropraxia", "Kinesiología", "Psicología", "Nutrición"];
-}
-
 function sincronizarAtributoCobranzaBodyCDM() {
+    inyectarEstilosRutinasCompactasYModoSimpleCDM();
     if (!document.body) return;
     const bloqueada = estaCobranzaBloqueadaEnComercioActualCDM();
-    document.body.setAttribute("data-cobranza", bloqueada ? "bloqueada" : "activa");
+    const modoComp = obtenerModoComplejidadComercioActualCDM();
+    const pActual = obtenerPersonaActualEnFichaCDM();
+    const vistaEfectivaUsuario = obtenerNivelVistaRutinaEfectivoCDM(pActual);
 
-    const btnTop = document.getElementById("btnQuickToggleCobranzaTopbar");
-    if (btnTop) {
-        btnTop.innerHTML = bloqueada
-            ? `<i class="ri-lock-2-fill"></i><span>Cobranza: Bloqueada</span>`
-            : `<i class="ri-bank-card-line"></i><span>Cobranza: Activa</span>`;
-        btnTop.style.borderColor = bloqueada ? "rgba(244,63,94,0.4)" : "rgba(16,185,129,0.4)";
-        btnTop.style.color = bloqueada ? "var(--err-ink)" : "var(--ok-ink)";
+    document.body.setAttribute("data-cobranza", bloqueada ? "bloqueada" : "activa");
+    document.body.setAttribute("data-complejidad", modoComp);
+    document.body.setAttribute("data-vista-usuario", vistaEfectivaUsuario);
+}
+
+// =========================================================================
+// 3. DESBLOQUEO DEL CANDADO DE AUTOGESTIÓN DE RUTINAS (🔒 ⇄ 🔓)
+// =========================================================================
+
+function alternarPermisoAutogestionRutinaCDM(idPersona) {
+    if (!esAdminCDM()) return;
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(idPersona));
+    if (!p) return;
+
+    p.puedeCrearRutinas = !Boolean(p.puedeCrearRutinas);
+    persistirCambiosPersonasYRutinasCDM();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(p.puedeCrearRutinas
+            ? `🔓 Candado Abierto: Ahora ${p.nombre} ${p.apellido} puede cargar y armar sus propias rutinas.`
+            : `🔒 Candado Cerrado: ${p.nombre} ${p.apellido} solo verá las rutinas asignadas por el entrenador.`);
+    }
+
+    if (document.getElementById("fichaCabeceraJugador")) {
+        inyectarPanelCodigoEnFichaIndividual();
+        window.agregarBotonesVideoEnRutinasJugador({ personaId: p.id });
+    }
+    if (typeof renderizarPaginaDeporte === "function" && window.deportePagina) {
+        renderizarPaginaDeporte();
     }
 }
 
-// 1. Extender obtenerLicenciaConfigCDM con soporte nativo para profesionesHabilitadas y modulos.consultorio
+// =========================================================================
+// 4. MODIFICAR (✏️) Y QUITAR (🗑️) PROGRESIONES Y EVALUACIONES
+// =========================================================================
+
+function abrirModalModificarProgresionEvalCDM(idPersona, idEval) {
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(idPersona));
+    if (!p || !Array.isArray(p.evaluaciones)) return;
+
+    const ev = p.evaluaciones.find(e => Number(e.id) === Number(idEval));
+    if (!ev) return;
+
+    if (typeof asegurarModalVideoEnPaginaActualCDM === "function") asegurarModalVideoEnPaginaActualCDM();
+    const modal = document.getElementById("modalVideoEjercicio");
+    if (!modal) return;
+
+    const matchKgReps = String(ev.detalle || "").match(/([\d.]+)\s*kg\s*[×x]\s*(\d+)/i);
+    const kgActual = matchKgReps ? parseFloat(matchKgReps[1]) : (ev.valor || 60);
+    const repsActual = matchKgReps ? parseInt(matchKgReps[2]) : 5;
+    const notaLimpia = String(ev.nota || "")
+        .replace(/^👤 Cargado por Deportista\s*•?\s*/i, "")
+        .replace(/^👨‍🏫 Cargado por Profe\s*•?\s*/i, "")
+        .replace(/^👤 Deportista:\s*/i, "")
+        .replace(/^👨‍🏫 Profe\/Admin:\s*/i, "")
+        .trim();
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:520px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-celeste">✏️ MODIFICAR PROGRESIÓN / EVALUACIÓN</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">${ev.ejercicio}</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalVideoEjercicio()">✕</button>
+            </div>
+
+            <form onsubmit="guardarModificacionProgresionEvalCDM(event, ${p.id}, ${ev.id})">
+                <div class="grid-2" style="margin-bottom:0.75rem;">
+                    <div class="field">
+                        <label>Fecha *</label>
+                        <input type="date" id="editEvFecha" required value="${ev.fecha || obtenerHoyISO()}">
+                    </div>
+                    <div class="field">
+                        <label>Ejercicio *</label>
+                        <input type="text" id="editEvEjercicio" required value="${(ev.ejercicio || "").replace(/"/g, "&quot;")}">
+                    </div>
+                </div>
+
+                ${ev.tipo === "fuerza_kg" ? `
+                    <div class="grid-2" style="margin-bottom:0.75rem;">
+                        <div class="field">
+                            <label>Peso Levantado (kg) *</label>
+                            <input type="number" step="0.5" id="editEvKg" required value="${kgActual}">
+                        </div>
+                        <div class="field">
+                            <label>Repeticiones *</label>
+                            <input type="number" min="1" max="50" id="editEvReps" required value="${repsActual}">
+                        </div>
+                    </div>
+                ` : `
+                    <div class="field" style="margin-bottom:0.75rem;">
+                        <label>Valor Registrado (${ev.unidad || "marca"}) *</label>
+                        <input type="number" step="0.1" id="editEvValorSimple" required value="${ev.valor || 0}">
+                    </div>
+                `}
+
+                <div class="field" style="margin-bottom:1.1rem;">
+                    <label>Nota / Observación</label>
+                    <input type="text" id="editEvNota" value="${notaLimpia.replace(/"/g, "&quot;")}" placeholder="Ej: Buena profundidad / PR en Banca...">
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+                    <button type="button" class="btn btn-danger btn-sm usr-action-allow" onclick="cerrarModalVideoEjercicio(); quitarProgresionEvalCDM(${p.id}, ${ev.id});">
+                        <i class="ri-delete-bin-line"></i> Quitar Registro
+                    </button>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button type="button" class="btn btn-ghost" onclick="cerrarModalVideoEjercicio()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary usr-action-allow">
+                            <i class="ri-save-3-line"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+}
+
+function guardarModificacionProgresionEvalCDM(e, idPersona, idEval) {
+    e.preventDefault();
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(idPersona));
+    if (!p || !Array.isArray(p.evaluaciones)) return;
+
+    const ev = p.evaluaciones.find(item => Number(item.id) === Number(idEval));
+    if (!ev) return;
+
+    ev.fecha = document.getElementById("editEvFecha")?.value || ev.fecha;
+    ev.ejercicio = (document.getElementById("editEvEjercicio")?.value || ev.ejercicio).trim();
+    const notaTxt = (document.getElementById("editEvNota")?.value || "").trim();
+    ev.nota = notaTxt || "-";
+
+    if (ev.tipo === "fuerza_kg") {
+        const kg = parseFloat(document.getElementById("editEvKg")?.value) || 0;
+        const reps = parseInt(document.getElementById("editEvReps")?.value) || 1;
+        const rm = Math.round((reps === 1 ? kg : kg * (1 + reps / 30)) * 10) / 10;
+        const fRel = (rm / (p.peso || 70)).toFixed(2);
+        ev.valor = rm;
+        ev.unidad = "kg (1RM)";
+        ev.detalle = `${kg} kg × ${reps} reps (1RM: ${rm} kg • F.Rel: ${fRel}x)`;
+
+        const clave = normalizarClaveProgPersonalCDM(ev.ejercicio);
+        if (p.progresionesPersonales && p.progresionesPersonales[clave]) {
+            p.progresionesPersonales[clave] = {
+                ejercicio: ev.ejercicio,
+                peso: `${kg} kg`,
+                kgNumerico: kg,
+                reps: String(reps),
+                rm: rm,
+                fecha: ev.fecha
+            };
+        }
+    } else {
+        const val = parseFloat(document.getElementById("editEvValorSimple")?.value) || 0;
+        ev.valor = val;
+        ev.detalle = `${val} ${ev.unidad || ""}`;
+    }
+
+    p.evaluaciones.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    persistirCambiosPersonasYRutinasCDM();
+    cerrarModalVideoEjercicio();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`✏️ Progresión de "${ev.ejercicio}" actualizada.`);
+    }
+    if (typeof inicializarPaginaJugadorIndividual === "function") {
+        inicializarPaginaJugadorIndividual();
+    }
+}
+
+function quitarProgresionEvalCDM(idPersona, idEval) {
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(idPersona));
+    if (!p || !Array.isArray(p.evaluaciones)) return;
+
+    const ev = p.evaluaciones.find(item => Number(item.id) === Number(idEval));
+    if (!ev) return;
+    if (!confirm(`🗑️ ¿Quitar este registro de "${ev.ejercicio}" (${ev.detalle}) del historial?`)) return;
+
+    p.evaluaciones = p.evaluaciones.filter(item => Number(item.id) !== Number(idEval));
+
+    const clave = normalizarClaveProgPersonalCDM(ev.ejercicio);
+    if (p.progresionesPersonales && p.progresionesPersonales[clave]) {
+        const restantes = p.evaluaciones.filter(item => normalizarClaveProgPersonalCDM(item.ejercicio) === clave);
+        if (restantes.length === 0) {
+            delete p.progresionesPersonales[clave];
+        } else {
+            const ult = restantes[restantes.length - 1];
+            const m = String(ult.detalle || "").match(/([\d.]+)\s*kg\s*[×x]\s*(\d+)/i);
+            if (m) {
+                p.progresionesPersonales[clave] = {
+                    ejercicio: ult.ejercicio,
+                    peso: `${m[1]} kg`,
+                    kgNumerico: parseFloat(m[1]),
+                    reps: String(m[2]),
+                    rm: ult.valor,
+                    fecha: ult.fecha
+                };
+            }
+        }
+    }
+
+    persistirCambiosPersonasYRutinasCDM();
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`🗑️ Registro de progresión quitado.`);
+    }
+    if (typeof inicializarPaginaJugadorIndividual === "function") {
+        inicializarPaginaJugadorIndividual();
+    }
+}
+
+function limpiarCargaPersonalRutinaCDM(idPersona, nombreEjercicio) {
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(idPersona));
+    if (!p || !p.progresionesPersonales) return;
+
+    const clave = normalizarClaveProgPersonalCDM(nombreEjercicio);
+    if (!p.progresionesPersonales[clave]) return;
+    if (!confirm(`🔄 ¿Restaurar la carga original sugerida por el profe en "${nombreEjercicio}"?`)) return;
+
+    delete p.progresionesPersonales[clave];
+    persistirCambiosPersonasYRutinasCDM();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`↺ Carga personal de "${nombreEjercicio}" restaurada al valor original.`);
+    }
+    window.agregarBotonesVideoEnRutinasJugador({ personaId: p.id });
+}
+
+window.renderizarHistorialJugador = function (p) {
+    const cont = document.getElementById("contenedorHistorialJugador");
+    if (!cont || !p) return;
+    if (!Array.isArray(p.evaluaciones) || p.evaluaciones.length === 0) {
+        cont.innerHTML = `<div class="empty-box">Sin evaluaciones ni progresiones cargadas.</div>`;
+        return;
+    }
+
+    let html = `
+        <div class="table-wrap">
+            <table class="app-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Ejercicio</th>
+                        <th>Resultado / Progresión</th>
+                        <th>Nota</th>
+                        <th style="text-align:right;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    [...p.evaluaciones].reverse().forEach(ev => {
+        html += `
+            <tr>
+                <td data-label="Fecha"><b>${ev.fecha}</b></td>
+                <td data-label="Ejercicio"><strong>${ev.ejercicio}</strong></td>
+                <td data-label="Resultado"><span class="badge badge-ok" style="font-size:0.78rem;">${ev.detalle}</span></td>
+                <td data-label="Nota"><small>${ev.nota || "-"}</small></td>
+                <td data-label="Acciones">
+                    <div style="display:flex; gap:0.35rem; justify-content:flex-end;">
+                        <button type="button" class="btn btn-secondary btn-sm usr-action-allow" onclick="abrirModalModificarProgresionEvalCDM(${p.id}, ${ev.id})" title="Modificar kilos, repeticiones o fecha">
+                            ✏️ Modificar
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm usr-action-allow" onclick="quitarProgresionEvalCDM(${p.id}, ${ev.id})" title="Quitar esta progresión">
+                            🗑️
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    cont.innerHTML = html + `</tbody></table></div>`;
+};
+
+// =========================================================================
+// 5. AISLAMIENTO PERSONAL DE SERIES Y PROGRESIONES (SIN AUTO-RELOJ MOLESTO)
+// =========================================================================
+
+function obtenerIdPersonaActivaEnVistaCDM() {
+    const p = obtenerPersonaActualEnFichaCDM();
+    return p ? Number(p.id) : 0;
+}
+
+obtenerClaveSeriesHoyCDM = function (personaIdOpt = null) {
+    const hoy = new Date().toISOString().split("T")[0];
+    const pid = personaIdOpt || obtenerIdPersonaActivaEnVistaCDM() || "general";
+    return `cdm_series_check_u${pid}_${hoy}`;
+};
+
+obtenerMapaSeriesHoyCDM = function (personaIdOpt = null) {
+    try {
+        return JSON.parse(localStorage.getItem(obtenerClaveSeriesHoyCDM(personaIdOpt))) || {};
+    } catch {
+        return {};
+    }
+};
+
+function guardarMapaSeriesHoyCDM(mapa, personaIdOpt = null) {
+    localStorage.setItem(obtenerClaveSeriesHoyCDM(personaIdOpt), JSON.stringify(mapa));
+}
+
+// Al tocar S1, S2, S3, S4: SOLO marca la serie en tiempo real (NO abre ningún reloj automático)
+alternarSerieCompletadaCDM = function (claveSerie, pausaStr, nombreEjercicio, totalSeries, idRutina, idxEj) {
+    const pid = obtenerIdPersonaActivaEnVistaCDM();
+    const mapa = obtenerMapaSeriesHoyCDM(pid);
+    mapa[claveSerie] = !Boolean(mapa[claveSerie]);
+    guardarMapaSeriesHoyCDM(mapa, pid);
+
+    const p = obtenerPersonaActualEnFichaCDM();
+    window.agregarBotonesVideoEnRutinasJugador({ personaId: p?.id || pid });
+    const sesion = obtenerSesionActivaCDM();
+    if (sesion && sesion.rol === "usuario") {
+        renderizarInicioTarjetasGrandesUsuario(sesion);
+    }
+};
+
+function normalizarClaveProgPersonalCDM(nombreEjercicio = "") {
+    return String(nombreEjercicio || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+}
+
+function obtenerProgresionPersonalEjercicioCDM(personaObj, nombreEjercicio, pesoBaseRutina, repsBaseRutina) {
+    if (!personaObj) {
+        return { pesoMostrar: pesoBaseRutina || "A ajustar", repsMostrar: repsBaseRutina || "8-10", rmMejor: null, ultimaNota: null, esPersonalizado: false, ultimaEvalId: null };
+    }
+    const clave = normalizarClaveProgPersonalCDM(nombreEjercicio);
+    const progGuardada = personaObj.progresionesPersonales && personaObj.progresionesPersonales[clave]
+        ? personaObj.progresionesPersonales[clave]
+        : null;
+
+    const evalsMatch = (personaObj.evaluaciones || []).filter(ev =>
+        normalizarClaveProgPersonalCDM(ev.ejercicio) === clave ||
+        normalizarClaveProgPersonalCDM(ev.ejercicio).includes(clave) ||
+        clave.includes(normalizarClaveProgPersonalCDM(ev.ejercicio))
+    );
+
+    const ultimaEval = evalsMatch.length > 0 ? evalsMatch[evalsMatch.length - 1] : null;
+    const mejorRM = evalsMatch.length > 0 ? Math.max(...evalsMatch.map(e => Number(e.valor) || 0)) : null;
+
+    if (progGuardada) {
+        return {
+            pesoMostrar: progGuardada.peso || pesoBaseRutina || "A ajustar",
+            repsMostrar: progGuardada.reps || repsBaseRutina || "8-10",
+            rmMejor: mejorRM || progGuardada.rm || null,
+            ultimaNota: `${progGuardada.peso} × ${progGuardada.reps} (${progGuardada.fecha || "Hoy"})`,
+            esPersonalizado: true,
+            ultimaEvalId: ultimaEval ? ultimaEval.id : null
+        };
+    }
+
+    return {
+        pesoMostrar: pesoBaseRutina || "A ajustar",
+        repsMostrar: repsBaseRutina || "8-10",
+        rmMejor: mejorRM,
+        ultimaNota: ultimaEval ? `${ultimaEval.detalle} (${ultimaEval.fecha.slice(5)})` : null,
+        esPersonalizado: false,
+        ultimaEvalId: ultimaEval ? ultimaEval.id : null
+    };
+}
+
+function guardarProgresionPersonalAisladaCDM(personaId, idRutina, idxEj, nombreEjercicio) {
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(personaId));
+    if (!p) return;
+
+    const inpKg = document.getElementById(`inp_prog_kg_${personaId}_${idRutina}_${idxEj}`) || document.getElementById(`inp_kg_live_${idRutina}_${idxEj}`);
+    const inpReps = document.getElementById(`inp_prog_reps_${personaId}_${idRutina}_${idxEj}`) || document.getElementById(`inp_reps_live_${idRutina}_${idxEj}`);
+    const kgVal = parseFloat(inpKg?.value);
+    const repsVal = parseInt(inpReps?.value) || 8;
+
+    if (isNaN(kgVal) || kgVal <= 0) {
+        alert("Ingresá los kilos que utilizaste hoy (ej: 65).");
+        return;
+    }
+
+    const hoy = typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+    const rmEst = Math.round((repsVal === 1 ? kgVal : kgVal * (1 + repsVal / 30)) * 10) / 10;
+    const fRel = (rmEst / (p.peso || 70)).toFixed(2);
+    const clave = normalizarClaveProgPersonalCDM(nombreEjercicio);
+
+    if (!p.progresionesPersonales || typeof p.progresionesPersonales !== "object") {
+        p.progresionesPersonales = {};
+    }
+    p.progresionesPersonales[clave] = {
+        ejercicio: nombreEjercicio,
+        peso: `${kgVal} kg`,
+        kgNumerico: kgVal,
+        reps: String(repsVal),
+        rm: rmEst,
+        fecha: hoy
+    };
+
+    const rutinas = obtenerRutinasRealesCDM();
+    const r = rutinas.find(x => Number(x.id) === Number(idRutina));
+    if (r && !r.esGrupal && Number(r.personaId) === Number(p.id) && r.ejercicios && r.ejercicios[idxEj]) {
+        r.ejercicios[idxEj].peso = `${kgVal} kg`;
+    }
+
+    if (!Array.isArray(p.evaluaciones)) p.evaluaciones = [];
+    p.evaluaciones.push({
+        id: Date.now(),
+        fecha: hoy,
+        ejercicio: nombreEjercicio,
+        tipo: "fuerza_kg",
+        valor: rmEst,
+        unidad: "kg (1RM)",
+        detalle: `${kgVal} kg × ${repsVal} reps (1RM: ${rmEst} kg • F.Rel: ${fRel}x)`,
+        nota: "💪 Progresión personal desde Mi Rutina"
+    });
+    p.evaluaciones.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+    persistirCambiosPersonasYRutinasCDM();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`💪 Carga personal de ${p.nombre} en ${nombreEjercicio} (${kgVal} kg × ${repsVal}) guardada.`);
+    }
+
+    window.agregarBotonesVideoEnRutinasJugador({ personaId: p.id });
+    if (typeof window.renderizarHistorialJugador === "function") {
+        window.renderizarHistorialJugador(p);
+    }
+    if (typeof dibujarGraficoEvolucion === "function") {
+        dibujarGraficoEvolucion();
+    }
+}
+
+window.construirBarraMemoriaKilosHTML = function (personaId, idRutina, idxEj, ex) {
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(personaId));
+    if (!p) return "";
+
+    const infoProg = obtenerProgresionPersonalEjercicioCDM(p, ex.nombre, ex.peso, ex.reps);
+    const kgSugerido = parseFloat(String(infoProg.pesoMostrar).replace(",", ".")) || "";
+    const repsSugeridas = parseInt(String(infoProg.repsMostrar)) || 8;
+    const nomEsc = String(ex.nombre || "").replace(/'/g, "\\'");
+
+    return `
+        <div class="live-overload-bar" onclick="event.stopPropagation();">
+            <div class="live-overload-memory">
+                <span class="overload-chip-last">
+                    👤 <b>Mi última carga:</b> ${infoProg.ultimaNota || "Sin registro previo"}
+                </span>
+                ${infoProg.rmMejor ? `<span class="overload-chip-pr">🏆 Mi PR 1RM: ${infoProg.rmMejor} kg</span>` : ""}
+                <span class="badge badge-celeste" style="font-size:0.63rem;">🔒 Solo afecta a ${p.nombre}</span>
+            </div>
+            <div class="live-overload-inputs">
+                <input type="number" step="0.5" id="inp_prog_kg_${p.id}_${idRutina}_${idxEj}" placeholder="Kg hoy" value="${kgSugerido}" title="Kilos levantados hoy">
+                <span style="font-size:0.74rem; font-weight:800; color:var(--ink-500);">×</span>
+                <input type="number" id="inp_prog_reps_${p.id}_${idRutina}_${idxEj}" placeholder="Reps" value="${repsSugeridas}" title="Repeticiones logradas hoy">
+                <button type="button" class="btn btn-primary btn-sm usr-action-allow" style="min-height:31px; padding:0.2rem 0.65rem;" onclick="guardarProgresionPersonalAisladaCDM(${p.id}, ${idRutina}, ${idxEj}, '${nomEsc}')">
+                    💾 Guardar Mi Carga
+                </button>
+                ${infoProg.ultimaEvalId ? `
+                    <button type="button" class="btn btn-secondary btn-sm usr-action-allow" style="min-height:31px; padding:0.2rem 0.55rem;" onclick="abrirModalModificarProgresionEvalCDM(${p.id}, ${infoProg.ultimaEvalId})" title="Modificar o quitar última progresión">
+                        ✏️ Editar
+                    </button>
+                ` : ""}
+                ${infoProg.esPersonalizado ? `
+                    <button type="button" class="btn btn-danger btn-sm usr-action-allow" style="min-height:31px; padding:0.2rem 0.55rem;" onclick="limpiarCargaPersonalRutinaCDM(${p.id}, '${nomEsc}')" title="Restaurar peso original de la rutina">
+                        ↺
+                    </button>
+                ` : ""}
+            </div>
+        </div>
+    `;
+};
+
+window.guardarAvanceEnVivoDesdeRutinaCDM = function (personaId, idRutina, idxEj) {
+    const rutinas = obtenerRutinasRealesCDM();
+    const r = rutinas.find(x => Number(x.id) === Number(idRutina));
+    const ex = r && r.ejercicios ? r.ejercicios[idxEj] : null;
+    if (!ex) return;
+    guardarProgresionPersonalAisladaCDM(personaId, idRutina, idxEj, ex.nombre);
+};
+
+// =========================================================================
+// 6. MODAL DE AUTOGESTIÓN DE RUTINAS PARA EL USUARIO HABILITADO
+// =========================================================================
+
+function abrirModalCrearRutinaPropiaUsuarioCDM(idRutinaEditar = null) {
+    const p = obtenerPersonaActualEnFichaCDM();
+    if (!p || (!p.puedeCrearRutinas && !esAdminCDM())) {
+        if (typeof mostrarToast === "function") {
+            mostrarToast("🔒 Tu entrenador aún no habilitó la creación libre de rutinas en tu perfil.");
+        }
+        return;
+    }
+
+    if (typeof asegurarModalVideoEnPaginaActualCDM === "function") asegurarModalVideoEnPaginaActualCDM();
+    const modal = document.getElementById("modalVideoEjercicio");
+    if (!modal) return;
+
+    const rutinas = obtenerRutinasRealesCDM();
+    const rEdit = idRutinaEditar ? rutinas.find(r => Number(r.id) === Number(idRutinaEditar) && Number(r.personaId) === Number(p.id)) : null;
+    const ejerciciosBase = rEdit && Array.isArray(rEdit.ejercicios) && rEdit.ejercicios.length > 0
+        ? rEdit.ejercicios
+        : [{ nombre: "", series: 4, reps: "8-10", peso: "Mi carga", pausa: "90s", forma: "" }];
+
+    const todosNombres = typeof obtenerTodosLosNombresEjerciciosCDM === "function" ? obtenerTodosLosNombresEjerciciosCDM() : [];
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:680px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-ok">🔓 ENTRENAMIENTO AUTÓNOMO HABILITADO</span>
+                    <h3 style="color:var(--ink-900); margin-top:4px;">
+                        ${rEdit ? `✏️ Editar Rutina: ${rEdit.nombre}` : `🏋️ Armar Nueva Rutina Personal para ${p.nombre}`}
+                    </h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalVideoEjercicio()">✕</button>
+            </div>
+
+            <form onsubmit="guardarRutinaPropiaUsuarioDesdeModalCDM(event, ${p.id}, ${rEdit ? rEdit.id : "null"})">
+                <div class="grid-3" style="margin-bottom:0.8rem;">
+                    <div class="field">
+                        <label>Nombre de la Rutina *</label>
+                        <input type="text" id="usrRutNombre" required placeholder="Ej: Día 1 - Pecho y Espalda" value="${(rEdit?.nombre || "").replace(/"/g, "&quot;")}">
+                    </div>
+                    <div class="field">
+                        <label>Enfoque / Objetivo *</label>
+                        <select id="usrRutObjetivo">
+                            <option value="Hipertrofia" ${rEdit?.objetivo?.includes("Hipertrofia") ? "selected" : ""}>💪 Hipertrofia / Musculación</option>
+                            <option value="Fuerza" ${rEdit?.objetivo?.includes("Fuerza") ? "selected" : ""}>🏋️ Fuerza</option>
+                            <option value="Potencia" ${rEdit?.objetivo?.includes("Potencia") ? "selected" : ""}>⚡ Potencia y Velocidad</option>
+                            <option value="Funcional y Core" ${rEdit?.objetivo?.includes("Funcional") ? "selected" : ""}>🔥 Funcional y Core</option>
+                            <option value="Movilidad" ${rEdit?.objetivo?.includes("Movilidad") ? "selected" : ""}>🤸 Movilidad / Prevención</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Días de Entreno *</label>
+                        <input type="text" id="usrRutDias" required placeholder="Ej: Lunes y Jueves" value="${(rEdit?.dias || "Lunes, Miércoles y Viernes").replace(/"/g, "&quot;")}">
+                    </div>
+                </div>
+
+                <datalist id="dlEjerciciosAutogestionUser">
+                    ${todosNombres.map(n => `<option value="${n.replace(/"/g, "&quot;")}">`).join("")}
+                </datalist>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                    <label style="font-size:0.72rem; font-weight:800; color:var(--ink-700); text-transform:uppercase;">
+                        📋 Ejercicios de la rutina:
+                    </label>
+                    <button type="button" class="btn btn-secondary btn-sm usr-action-allow" onclick="agregarFilaModalRutinaPropiaUsuarioCDM()">
+                        + Sumar Ejercicio
+                    </button>
+                </div>
+
+                <div id="contenedorFilasRutinaPropiaUser" style="max-height:310px; overflow-y:auto; padding-right:4px; margin-bottom:0.85rem;">
+                    ${ejerciciosBase.map((ex, idx) => construirFilaHTMLRutinaPropiaUsuario(idx + 1, ex)).join("")}
+                </div>
+
+                <div class="field" style="margin-bottom:1rem;">
+                    <label>Notas Personales (Opcional)</label>
+                    <input type="text" id="usrRutNotas" placeholder="Ej: Subir 2.5kg la semana que viene..." value="${(rEdit?.notas || "").replace(/"/g, "&quot;")}">
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+                    <button type="button" class="btn btn-ghost" onclick="cerrarModalVideoEjercicio()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary usr-action-allow">
+                        <i class="ri-save-3-line"></i> Guardar en Mis Rutinas
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+}
+
+function construirFilaHTMLRutinaPropiaUsuario(num, ex = {}) {
+    return `
+        <div class="ex-builder-row usr-own-ex-row">
+            <div class="ex-builder-top">
+                <span class="ex-builder-num">#${num}</span>
+                <div class="field" style="flex:1;">
+                    <input type="text" class="uo-nombre" list="dlEjerciciosAutogestionUser" required placeholder="Nombre del ejercicio (Ej: Press de Banca)" value="${(ex.nombre || "").replace(/"/g, "&quot;")}">
+                </div>
+                <button type="button" class="btn btn-danger btn-sm ex-builder-del usr-action-allow" onclick="this.closest('.usr-own-ex-row').remove()">✕</button>
+            </div>
+            <div class="ex-builder-metrics-grid">
+                <div class="field"><label>Series</label><input type="number" class="uo-series" required min="1" max="15" value="${ex.series || 4}"></div>
+                <div class="field"><label>Reps</label><input type="text" class="uo-reps" required value="${(ex.reps || "8-10").replace(/"/g, "&quot;")}"></div>
+                <div class="field"><label>Mi Peso / Carga</label><input type="text" class="uo-peso" value="${(ex.peso || "A ajustar").replace(/"/g, "&quot;")}"></div>
+                <div class="field"><label>Pausa</label><input type="text" class="uo-pausa" value="${(ex.pausa || "90s").replace(/"/g, "&quot;")}"></div>
+            </div>
+        </div>
+    `;
+}
+
+function agregarFilaModalRutinaPropiaUsuarioCDM() {
+    const cont = document.getElementById("contenedorFilasRutinaPropiaUser");
+    if (!cont) return;
+    const n = cont.querySelectorAll(".usr-own-ex-row").length + 1;
+    cont.insertAdjacentHTML("beforeend", construirFilaHTMLRutinaPropiaUsuario(n, {}));
+}
+
+function guardarRutinaPropiaUsuarioDesdeModalCDM(e, personaId, idRutinaEditar = null) {
+    e.preventDefault();
+    const lista = obtenerPersonasRealesCDM();
+    const p = lista.find(x => Number(x.id) === Number(personaId));
+    if (!p) return;
+
+    const filas = document.querySelectorAll("#contenedorFilasRutinaPropiaUser .usr-own-ex-row");
+    if (filas.length === 0) {
+        alert("Agregá al menos 1 ejercicio a tu rutina.");
+        return;
+    }
+
+    const ejercicios = [];
+    filas.forEach(f => {
+        const nom = f.querySelector(".uo-nombre")?.value.trim();
+        if (!nom) return;
+        if (typeof agregarEjercicioInventadoAlCatalogoCDM === "function") {
+            agregarEjercicioInventadoAlCatalogoCDM(nom, "fuerza_1rm", true);
+        }
+        ejercicios.push({
+            nombre: nom,
+            series: parseInt(f.querySelector(".uo-series")?.value) || 4,
+            reps: f.querySelector(".uo-reps")?.value.trim() || "8-10",
+            peso: f.querySelector(".uo-peso")?.value.trim() || "Mi carga",
+            pausa: f.querySelector(".uo-pausa")?.value.trim() || "90s",
+            forma: ""
+        });
+    });
+
+    const datosRutina = {
+        id: idRutinaEditar ? Number(idRutinaEditar) : Date.now(),
+        esGrupal: false,
+        creadaPorUsuario: true,
+        deporteDestino: p.deporte,
+        categoriaDestino: p.categoria,
+        personaId: p.id,
+        etiquetaDestino: `👤 ${p.nombre} ${p.apellido} (Mi Rutina Propia)`,
+        fecha: new Date().toLocaleDateString("es-AR"),
+        nombre: document.getElementById("usrRutNombre").value.trim(),
+        objetivo: document.getElementById("usrRutObjetivo").value,
+        dias: document.getElementById("usrRutDias").value.trim(),
+        notas: document.getElementById("usrRutNotas").value.trim(),
+        ejercicios
+    };
+
+    const rutinas = obtenerRutinasRealesCDM();
+    if (idRutinaEditar) {
+        const idx = rutinas.findIndex(r => Number(r.id) === Number(idRutinaEditar));
+        if (idx >= 0) rutinas[idx] = datosRutina;
+    } else {
+        rutinas.unshift(datosRutina);
+    }
+
+    persistirCambiosPersonasYRutinasCDM();
+    cerrarModalVideoEjercicio();
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`✅ Rutina personal "${datosRutina.nombre}" guardada.`);
+    }
+
+    window.agregarBotonesVideoEnRutinasJugador({ personaId: p.id });
+    const ses = obtenerSesionActivaCDM();
+    if (ses && ses.rol === "usuario") {
+        renderizarInicioTarjetasGrandesUsuario(ses);
+    }
+}
+
+function quitarMiRutinaAutogestionadaCDM(idRutina, personaId) {
+    const rutinas = obtenerRutinasRealesCDM();
+    const r = rutinas.find(x => Number(x.id) === Number(idRutina) && Number(x.personaId) === Number(personaId));
+    if (!r) return;
+    if (!confirm(`🗑️ ¿Quitar la rutina personal "${r.nombre}"?`)) return;
+
+    const idx = rutinas.findIndex(x => Number(x.id) === Number(idRutina));
+    if (idx >= 0) rutinas.splice(idx, 1);
+    persistirCambiosPersonasYRutinasCDM();
+
+    window.agregarBotonesVideoEnRutinasJugador({ personaId });
+    const ses = obtenerSesionActivaCDM();
+    if (ses && ses.rol === "usuario") {
+        renderizarInicioTarjetasGrandesUsuario(ses);
+    }
+}
+
+// =========================================================================
+// 7. NAVEGACIÓN Y RENDERIZADO DE TARJETAS DE RUTINA (SIMPLE vs. AVANZADO)
+// =========================================================================
+
+abrirSeccionUsuarioDesdeCard = function (nombreSeccion) {
+    document.querySelectorAll(".jug-seccion").forEach(s => {
+        s.classList.add("hidden");
+        s.classList.remove("animate-in");
+    });
+    const sec = document.getElementById(`jug-sec-${nombreSeccion}`);
+    if (sec) {
+        sec.classList.remove("hidden");
+        sec.classList.add("animate-in");
+    }
+
+    document.querySelectorAll(".module-tabs .mod-tab, .user-mobile-bottom-dock .user-quick-dock-btn").forEach(b => {
+        b.classList.toggle("active", b.getAttribute("data-user-tab") === nombreSeccion);
+    });
+
+    const sesion = obtenerSesionActivaCDM();
+    if (nombreSeccion === "inicio-user" && sesion) {
+        renderizarInicioTarjetasGrandesUsuario(sesion);
+    } else if (nombreSeccion === "rutinas") {
+        const p = obtenerPersonaActualEnFichaCDM();
+        window.agregarBotonesVideoEnRutinasJugador(sesion || { personaId: p?.id });
+    } else if (nombreSeccion === "videoteca-user") {
+        renderizarVideotecaModoUsuario();
+    } else if (nombreSeccion === "ranking-user" && sesion) {
+        renderizarRankingModoUsuario(sesion);
+    } else if (nombreSeccion === "graficos") {
+        if (typeof dibujarGraficoEvolucion === "function") dibujarGraficoEvolucion();
+        const p = obtenerPersonaActualEnFichaCDM();
+        if (p && typeof dibujarRadarJugador === "function") dibujarRadarJugador(p);
+        if (p && typeof window.renderizarHistorialJugador === "function") window.renderizarHistorialJugador(p);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+function asegurarBarraNavegacionUsuarioClaraCDM() {
+    if (document.body.getAttribute("data-rol") !== "usuario") return;
+    const tabsBar = document.querySelector(".module-tabs");
+    if (tabsBar && !tabsBar.dataset.enhancedNavReady) {
+        tabsBar.dataset.enhancedNavReady = "1";
+        tabsBar.innerHTML = `
+            <button type="button" class="mod-tab active" data-user-tab="inicio-user" onclick="abrirSeccionUsuarioDesdeCard('inicio-user')">
+                <i class="ri-home-5-fill"></i><span>Inicio</span>
+            </button>
+            <button type="button" class="mod-tab" data-user-tab="rutinas" onclick="abrirSeccionUsuarioDesdeCard('rutinas')">
+                <i class="ri-clipboard-fill"></i><span>Mis Rutinas</span>
+            </button>
+            <button type="button" class="mod-tab" data-user-tab="videoteca-user" onclick="abrirSeccionUsuarioDesdeCard('videoteca-user')">
+                <i class="ri-movie-2-fill"></i><span>Videos</span>
+            </button>
+            <button type="button" class="mod-tab" data-user-tab="graficos" onclick="abrirSeccionUsuarioDesdeCard('graficos')">
+                <i class="ri-line-chart-fill"></i><span>Mi Progreso</span>
+            </button>
+            <button type="button" class="mod-tab" data-user-tab="calculadora" onclick="abrirSeccionUsuarioDesdeCard('calculadora')">
+                <i class="ri-calculator-fill"></i><span>Tabla % 1RM</span>
+            </button>
+            <button type="button" class="mod-tab" data-user-tab="ranking-user" onclick="abrirSeccionUsuarioDesdeCard('ranking-user')">
+                <i class="ri-trophy-fill"></i><span>Ranking</span>
+            </button>
+        `;
+    }
+
+    if (!document.getElementById("cdmUserMobileBottomDock")) {
+        const dock = document.createElement("nav");
+        dock.id = "cdmUserMobileBottomDock";
+        dock.className = "user-mobile-bottom-dock";
+        dock.innerHTML = `
+            <button type="button" class="user-quick-dock-btn active" data-user-tab="inicio-user" onclick="abrirSeccionUsuarioDesdeCard('inicio-user')">
+                <i class="ri-home-5-fill"></i><span>Inicio</span>
+            </button>
+            <button type="button" class="user-quick-dock-btn" data-user-tab="rutinas" onclick="abrirSeccionUsuarioDesdeCard('rutinas')">
+                <i class="ri-clipboard-fill"></i><span>Rutinas</span>
+            </button>
+            <button type="button" class="user-quick-dock-btn" data-user-tab="videoteca-user" onclick="abrirSeccionUsuarioDesdeCard('videoteca-user')">
+                <i class="ri-movie-2-fill"></i><span>Videos</span>
+            </button>
+            <button type="button" class="user-quick-dock-btn" data-user-tab="graficos" onclick="abrirSeccionUsuarioDesdeCard('graficos')">
+                <i class="ri-line-chart-fill"></i><span>Progreso</span>
+            </button>
+            <button type="button" class="user-quick-dock-btn" data-user-tab="calculadora" onclick="abrirSeccionUsuarioDesdeCard('calculadora')">
+                <i class="ri-calculator-fill"></i><span>% 1RM</span>
+            </button>
+            <button type="button" class="user-quick-dock-btn" data-user-tab="ranking-user" onclick="abrirSeccionUsuarioDesdeCard('ranking-user')">
+                <i class="ri-trophy-fill"></i><span>Ranking</span>
+            </button>
+        `;
+        document.body.appendChild(dock);
+    }
+}
+
+function alternarEjercicioCompletoSimpleCDM(idRutina, idxEj, cantSeries, personaIdOpt = null) {
+    const pid = personaIdOpt || obtenerIdPersonaActivaEnVistaCDM();
+    const mapa = obtenerMapaSeriesHoyCDM(pid);
+    const primeraClave = `${idRutina}_${idxEj}_S1`;
+    const yaEstabaHecho = Boolean(mapa[primeraClave]);
+
+    for (let s = 1; s <= cantSeries; s++) {
+        const k = `${idRutina}_${idxEj}_S${s}`;
+        if (yaEstabaHecho) delete mapa[k];
+        else mapa[k] = true;
+    }
+
+    guardarMapaSeriesHoyCDM(mapa, pid);
+    const p = obtenerPersonaActualEnFichaCDM();
+    window.agregarBotonesVideoEnRutinasJugador({ personaId: p?.id || pid });
+    const ses = obtenerSesionActivaCDM();
+    if (ses && ses.rol === "usuario") {
+        renderizarInicioTarjetasGrandesUsuario(ses);
+    }
+}
+
+function construirVistaRutinasUsuarioSimplificadaCDM(rutinasLista, personaObj) {
+    if (typeof asegurarVideotecaCargada === "function") asegurarVideotecaCargada();
+    if (typeof asegurarModalVideoEnPaginaActualCDM === "function") asegurarModalVideoEnPaginaActualCDM();
+    asegurarGotaRelojitoFlotanteCDM();
+
+    sincronizarAtributoCobranzaBodyCDM();
+    const nivelVista = obtenerNivelVistaRutinaEfectivoCDM(personaObj); // 'simple' | 'avanzado'
+    const esModoSimple = nivelVista === "simple";
+    const mapaSeries = obtenerMapaSeriesHoyCDM(personaObj?.id);
+    const puedeAuto = Boolean(personaObj && personaObj.puedeCrearRutinas);
+    const rolActual = document.body.getAttribute("data-rol");
+    const videoteca = obtenerVideotecaRealCDM();
+
+    const barraControlAdminComplejidadHTML = rolActual === "admin" && personaObj ? `
+        <div class="admin-complexity-toolbar">
+            <div>
+                <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap;">
+                    <strong style="font-size:0.88rem; color:var(--ink-900);">
+                        🎚️ Vista de Rutina de ${personaObj.nombre} ${personaObj.apellido}:
+                    </strong>
+                    <span class="badge ${esModoSimple ? "badge-ok" : "badge-purple"}" style="font-size:0.74rem;">
+                        ${esModoSimple ? "🟢 MODO SIMPLE (Sin pesos ni tiempos)" : "🚀 MODO AVANZADO (Con pesos, 1RM y Biomecánica)"}
+                    </span>
+                </div>
+                <small style="color:var(--ink-500); font-size:0.74rem; display:block; margin-top:2px;">
+                    El reloj de descanso ahora está en la <b>gota flotante (💧⏱️)</b> abajo a la derecha solo para quien lo quiera usar.
+                </small>
+            </div>
+            <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                <select id="selModoVistaUsuarioToolbar" onchange="cambiarModoVistaRutinaUsuarioParticularCDM(${personaObj.id}, this.value)" style="width:auto; min-height:34px; font-weight:800; font-size:0.78rem;">
+                    <option value="heredar" ${(!personaObj.modoVistaRutina || personaObj.modoVistaRutina === "heredar") ? "selected" : ""}>🔄 Usar Modo General del Club (${obtenerModoComplejidadComercioActualCDM().toUpperCase()})</option>
+                    <option value="simple" ${personaObj.modoVistaRutina === "simple" ? "selected" : ""}>🟢 Vista SIMPLE (Solo Series × Reps y Video)</option>
+                    <option value="avanzado" ${personaObj.modoVistaRutina === "avanzado" ? "selected" : ""}>🚀 Vista AVANZADA (Con Pesos, 1RM y Biomecánica)</option>
+                </select>
+                <button type="button" class="btn btn-primary btn-sm" onclick="cambiarModoVistaRutinaUsuarioParticularCDM(${personaObj.id}, document.getElementById('selModoVistaUsuarioToolbar').value)">
+                    💾 Guardar Vista
+                </button>
+            </div>
+        </div>
+    ` : "";
+
+    const bannerAutogestionHTML = (puedeAuto || rolActual === "admin") && personaObj ? `
+        <div class="self-routine-banner">
+            <div>
+                <span class="badge badge-ok" style="background:rgba(255,255,255,0.2); color:#fff; border:none;">
+                    ${puedeAuto ? "🔓 CANDADO ABIERTO: AUTOGESTIÓN HABILITADA" : "🔒 CANDADO CERRADO: SOLO RUTINAS DEL ENTRENADOR"}
+                </span>
+                <h4 style="font-size:1.05rem; font-weight:800; color:#ffffff; margin:4px 0 0 0;">
+                    ${puedeAuto ? `${personaObj.nombre} está habilitado/a para cargar y armar sus propias rutinas` : `${personaObj.nombre} solo ve las rutinas asignadas por el entrenador`}
+                </h4>
+            </div>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                ${rolActual === "admin" ? `
+                    <button type="button" class="btn btn-secondary btn-sm" style="background:#ffffff; color:#064e3b; font-weight:800;" onclick="alternarPermisoAutogestionRutinaCDM(${personaObj.id})">
+                        ${puedeAuto ? "🔒 Cerrar Candado (Bloquear Autogestión)" : "🔓 Abrir Candado (Permitir que arme su rutina)"}
+                    </button>
+                ` : ""}
+                ${(puedeAuto || rolActual === "admin") ? `
+                    <button type="button" class="btn btn-primary btn-sm usr-action-allow" style="background:#10b981; color:#ffffff; border-color:#059669; font-weight:800;" onclick="abrirModalCrearRutinaPropiaUsuarioCDM(null)">
+                        <i class="ri-add-circle-fill"></i> + Crear Rutina para ${personaObj.nombre}
+                    </button>
+                ` : ""}
+            </div>
+        </div>
+    ` : "";
+
+    if (!Array.isArray(rutinasLista) || rutinasLista.length === 0) {
+        return barraControlAdminComplejidadHTML + bannerAutogestionHTML + `<div class="empty-box">Todavía no hay planes de entrenamiento asignados.</div>`;
+    }
+
+    const tarjetasHTML = rutinasLista.map((r) => {
+        let seriesTotales = 0;
+        let seriesHechas = 0;
+        const esMiaCreadaPorMi = Boolean(r.creadaPorUsuario && Number(r.personaId) === Number(personaObj?.id));
+
+        const filasEjerciciosHTML = (r.ejercicios || []).map((ex, i) => {
+            const cantSeries = Math.min(8, Math.max(1, parseInt(ex.series) || 4));
+            seriesTotales += cantSeries;
+
+            const infoProg = obtenerProgresionPersonalEjercicioCDM(personaObj, ex.nombre, ex.peso, ex.reps);
+
+            let completadasCount = 0;
+            let pillsSeriesProHTML = "";
+            const nomEsc = String(ex.nombre || "").replace(/'/g, "\\'");
+
+            for (let s = 1; s <= cantSeries; s++) {
+                const claveS = `${r.id}_${i}_S${s}`;
+                const ok = Boolean(mapaSeries[claveS]);
+                if (ok) {
+                    completadasCount++;
+                    seriesHechas++;
+                }
+                pillsSeriesProHTML += `
+                    <button type="button"
+                        class="serie-check-pill usr-action-allow ${ok ? "done" : ""}"
+                        onclick="alternarSerieCompletadaCDM('${claveS}', '', '${nomEsc}', ${cantSeries}, ${r.id}, ${i})">
+                        ${ok ? "✓" : ""} S${s}
+                    </button>
+                `;
+            }
+
+            const ejercicioCompleto = completadasCount === cantSeries;
+            const matchVideo = videoteca.find(v =>
+                v.nombre.toLowerCase().includes((ex.nombre || "").toLowerCase()) ||
+                (ex.nombre || "").toLowerCase().includes(v.nombre.toLowerCase())
+            );
+            const formaLimpia = ex.forma ? ex.forma.replace(/\(Video:.*?\)/gi, "").trim() : "";
+            const idAnimDrawer = `anim_drawer_${r.id}_${i}`;
+
+            const thumbHTML = matchVideo
+                ? `<div class="clean-ex-thumb-btn" onclick="abrirModalReproductorEjercicio(${matchVideo.id})" title="Ver video de ${ex.nombre}">
+                       <img src="${matchVideo.imagenPreview || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=400&q=80'}" alt="${ex.nombre}">
+                       <span class="clean-ex-thumb-play"><i class="ri-play-fill"></i></span>
+                   </div>`
+                : `<div class="clean-ex-thumb-btn">#${i + 1}</div>`;
+
+            // En Modo Avanzado mostramos el avatar biomecánico 60 FPS; en Modo Simple no
+            const miniHombrecitoHTML = (!esModoSimple && typeof renderMiniHombrecitoSVG === "function")
+                ? renderMiniHombrecitoSVG(ex.nombre, r.objetivo || "")
+                : "";
+
+            return `
+                <div class="clean-user-ex-row ${ejercicioCompleto ? "done-row" : ""}">
+                    <div class="clean-user-ex-main">
+                        <div class="clean-user-ex-left">
+                            ${thumbHTML}
+                            ${miniHombrecitoHTML}
+                            <div class="clean-ex-info">
+                                <!-- 1. TÍTULO DEL EJERCICIO ARRIBA -->
+                                <h4>${i + 1}. ${ex.nombre}</h4>
+
+                                <!-- 2. DEBAJO DEL TÍTULO: EN MODO SIMPLE SOLO SERIES×REPS | EN MODO AVANZADO SERIES×REPS + CARGA (SIN TIEMPO) -->
+                                <div class="ex-big-prescription-row">
+                                    <span class="ex-big-pill-primary">
+                                        <i class="ri-repeat-line"></i> ${ex.series} SERIES × ${infoProg.repsMostrar} REPS
+                                    </span>
+                                    ${!esModoSimple ? `
+                                        <span class="ex-big-pill-load">
+                                            <i class="ri-scales-3-line"></i> CARGA: ${infoProg.pesoMostrar} ${infoProg.esPersonalizado ? "✓" : ""}
+                                        </span>
+                                    ` : ""}
+                                </div>
+
+                                ${formaLimpia ? `<small class="clean-ex-cue">💡 <b>Indicación técnica:</b> ${formaLimpia}</small>` : ""}
+                            </div>
+                        </div>
+
+                        <div class="clean-ex-right-actions">
+                            ${matchVideo ? `
+                                <button type="button" class="btn btn-primary btn-sm usr-action-allow" onclick="abrirModalReproductorEjercicio(${matchVideo.id})">
+                                    <i class="ri-play-circle-line"></i> Video
+                                </button>
+                            ` : ""}
+
+                            ${!esModoSimple ? `
+                                <button type="button" class="btn btn-secondary btn-sm btn-ejemplo-biomecanico usr-action-allow" onclick="document.getElementById('${idAnimDrawer}').classList.toggle('hidden')">
+                                    <i class="ri-body-scan-fill"></i> Ejemplo 1-4
+                                </button>
+                            ` : ""}
+
+                            <button type="button" class="clean-check-ex-btn usr-action-allow ${ejercicioCompleto ? "checked" : ""}" onclick="alternarEjercicioCompletoSimpleCDM(${r.id}, ${i}, ${cantSeries}, ${personaObj?.id || 0})">
+                                ${ejercicioCompleto ? "✓ Completado" : "✓ Marcar Todo"}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3. BARRA "⏱️ CONTROL TIEMPO REAL" LIMPIA (SIN TIEMPO DE PAUSA) -->
+                    <div class="realtime-control-bar">
+                        <div class="realtime-control-title">
+                            <span class="realtime-pulse-dot"></span>
+                            <span>⏱️ Control Tiempo Real <small style="font-weight:600; color:var(--ink-500); text-transform:none;">(${completadasCount}/${cantSeries} series hoy)</small></span>
+                        </div>
+                        <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                            ${pillsSeriesProHTML}
+                        </div>
+                    </div>
+
+                    <!-- 4. EXCLUSIVO DE VISTA AVANZADA: BIOMECÁNICA 1-4 Y BARRA DE PESOS / PROGRESIÓN 1RM -->
+                    ${!esModoSimple ? `
+                        <div id="${idAnimDrawer}" class="hidden">
+                            ${typeof generarBloqueAnimacionHombrecitosHTML === "function" ? generarBloqueAnimacionHombrecitosHTML(ex.nombre, r.objetivo || "") : ""}
+                        </div>
+                        ${personaObj ? window.construirBarraMemoriaKilosHTML(personaObj.id, r.id, i, ex) : ""}
+                    ` : ""}
+                </div>
+            `;
+        }).join("");
+
+        const pct = seriesTotales > 0 ? Math.round((seriesHechas / seriesTotales) * 100) : 0;
+
+        return `
+            <div class="user-workout-pro-card" style="margin-bottom:1.25rem;">
+                <div class="user-workout-banner" style="padding:1.1rem 1.35rem;">
+                    <div class="user-workout-banner-left">
+                        <div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center; margin-bottom:0.25rem;">
+                            <span class="user-workout-type-pill">${esMiaCreadaPorMi ? "🔓 Mi Rutina Propia" : `🏋️ ${r.objetivo || "Plan Activo"}`}</span>
+                            <span class="user-workout-days-pill"><i class="ri-calendar-event-line"></i> ${r.dias || "Semanal"}</span>
+                            <span class="user-workout-type-pill" style="background:rgba(16,185,129,0.28);">${esModoSimple ? "🟢 Vista Simple" : "🚀 Vista Avanzada"}</span>
+                        </div>
+                        <h3 style="font-size:1.22rem; margin:0;">${r.nombre}</h3>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        ${(esMiaCreadaPorMi && puedeAuto) || rolActual === "admin" ? `
+                            <button type="button" class="btn btn-secondary btn-sm usr-action-allow" style="background:rgba(255,255,255,0.18); color:#fff; border-color:rgba(255,255,255,0.3);" onclick="abrirModalCrearRutinaPropiaUsuarioCDM(${r.id})">
+                                ✏️ Editar
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm usr-action-allow" onclick="quitarMiRutinaAutogestionadaCDM(${r.id}, ${personaObj?.id || 0})">
+                                🗑️
+                            </button>
+                        ` : ""}
+                        <div class="user-workout-progress-card" style="padding:0.55rem 0.9rem; min-width:165px;">
+                            <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                                <small style="color:#bae6fd; font-weight:700; font-size:0.63rem;">CONTROL EN VIVO</small>
+                                <strong style="color:#34d399; font-size:1.05rem; font-weight:800;">${pct}% Completado</strong>
+                            </div>
+                            <div class="user-workout-progress-track" style="height:6px; margin-top:3px;">
+                                <div class="user-workout-progress-fill" style="width:${pct}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="clean-user-ex-list">
+                    ${filasEjerciciosHTML}
+                </div>
+
+                ${r.notas ? `
+                    <div class="user-workout-coach-banner" style="margin:0 1.25rem 1.1rem; padding:0.7rem 0.95rem;">
+                        <i class="ri-megaphone-fill"></i>
+                        <div><b>Nota del Entrenador:</b> ${r.notas}</div>
+                    </div>
+                ` : ""}
+            </div>
+        `;
+    }).join("");
+
+    return barraControlAdminComplejidadHTML + bannerAutogestionHTML + tarjetasHTML;
+}
+
+function inyectarBotonesRapidosEnTarjetasDeportistasDOM() {
+    if (!esAdminCDM()) return;
+    const lista = obtenerPersonasRealesCDM();
+    document.querySelectorAll(".athlete-card").forEach(card => {
+        const grp = card.querySelector(".ath-actions-group");
+        if (!grp || grp.dataset.candadoInjected === "1") return;
+        const attrClick = card.getAttribute("onclick") || "";
+        const m = attrClick.match(/irAPaginaIndividual\((\d+)\)/);
+        if (!m) return;
+        const pid = Number(m[1]);
+        const p = lista.find(x => Number(x.id) === pid);
+        if (!p) return;
+
+        grp.dataset.candadoInjected = "1";
+        const autoOn = Boolean(p.puedeCrearRutinas);
+        const vistaEf = obtenerNivelVistaRutinaEfectivoCDM(p);
+
+        const btnCandado = document.createElement("button");
+        btnCandado.type = "button";
+        btnCandado.className = `btn ${autoOn ? "btn-ok" : "btn-ghost"} btn-sm`;
+        btnCandado.title = autoOn
+            ? "Autogestión de rutinas HABILITADA (Click para bloquear)"
+            : "Autogestión de rutinas BLOQUEADA (Click para permitir que cargue su rutina)";
+        btnCandado.innerHTML = autoOn ? "🔓" : "🔒";
+        btnCandado.onclick = (e) => {
+            e.stopPropagation();
+            alternarPermisoAutogestionRutinaCDM(p.id);
+        };
+
+        const btnVista = document.createElement("button");
+        btnVista.type = "button";
+        btnVista.className = "btn btn-ghost btn-sm";
+        btnVista.title = `Vista de rutina actual: ${vistaEf.toUpperCase()} (Click para cambiar entre Simple y Avanzada)`;
+        btnVista.innerHTML = vistaEf === "simple" ? "🟢" : "🚀";
+        btnVista.onclick = (e) => {
+            e.stopPropagation();
+            alternarVistaSimpleAvanzadaRapidaCardCDM(p.id);
+        };
+
+        grp.prepend(btnVista);
+        grp.prepend(btnCandado);
+    });
+}
+
+function aplicarOverrideVistaRutinasUsuarioBlindadoCDM() {
+    asegurarBarraNavegacionUsuarioClaraCDM();
+    asegurarGotaRelojitoFlotanteCDM();
+
+    window.agregarBotonesVideoEnRutinasJugador = function (sesionOpt = null) {
+        inyectarEstilosRutinasCompactasYModoSimpleCDM();
+        asegurarBarraNavegacionUsuarioClaraCDM();
+        asegurarGotaRelojitoFlotanteCDM();
+        const cont = document.getElementById("listaRutinasGuardadasJugador");
+        if (!cont) return;
+
+        const listaP = obtenerPersonasRealesCDM();
+        const p = (sesionOpt && sesionOpt.personaId)
+            ? listaP.find(x => Number(x.id) === Number(sesionOpt.personaId))
+            : obtenerPersonaActualEnFichaCDM();
+        if (!p) return;
+
+        const todasRutinas = obtenerRutinasRealesCDM();
+        const rutinas = todasRutinas.filter(r =>
+            Number(r.personaId) === Number(p.id) ||
+            (r.esGrupal && r.deporteDestino === p.deporte && (r.categoriaDestino === p.categoria || r.categoriaDestino === "General"))
+        );
+
+        cont.className = "user-routines-full-list";
+        cont.innerHTML = construirVistaRutinasUsuarioSimplificadaCDM(rutinas, p);
+    };
+
+    window.renderizarRutinasIndividuales = function (p) {
+        window.agregarBotonesVideoEnRutinasJugador({ personaId: p?.id });
+    };
+
+    if (typeof window.refrescarVistasRutinasJerarquicasCDM === "function" && !window.__cdmJerarquicoPatched) {
+        window.__cdmJerarquicoPatched = true;
+        const _origRefrescarJerarquico = window.refrescarVistasRutinasJerarquicasCDM;
+        window.refrescarVistasRutinasJerarquicasCDM = function () {
+            if (document.body.dataset.page === "perfil-individual" || window.location.pathname.toLowerCase().includes("jugador.html")) {
+                const p = obtenerPersonaActualEnFichaCDM();
+                if (p) {
+                    window.agregarBotonesVideoEnRutinasJugador({ personaId: p.id });
+                    return;
+                }
+            }
+            _origRefrescarJerarquico.apply(this, arguments);
+        };
+    }
+}
+
+// =========================================================================
+// 8. CONTROLES DEL ADMIN EN CABECERA DE JUGADOR.HTML, TOPBAR Y MODAL PERSONA
+// =========================================================================
+
+const _origInyectarPanelCodigoEnFichaIndividual = inyectarPanelCodigoEnFichaIndividual;
+inyectarPanelCodigoEnFichaIndividual = function () {
+    _origInyectarPanelCodigoEnFichaIndividual.apply(this, arguments);
+    if (!esAdminCDM()) return;
+
+    const barra = document.getElementById("adminBoxCodigoFicha");
+    const p = obtenerPersonaActualEnFichaCDM();
+    if (!barra || !p) return;
+
+    const prevControles = document.getElementById("boxControlesVistaYCandadoAdmin");
+    if (prevControles) prevControles.remove();
+
+    const habilitado = Boolean(p.puedeCrearRutinas);
+    const modoVistaUser = p.modoVistaRutina || "heredar";
+
+    const controlesExtra = document.createElement("div");
+    controlesExtra.id = "boxControlesVistaYCandadoAdmin";
+    controlesExtra.style = "display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;";
+    controlesExtra.innerHTML = `
+        <div style="display:inline-flex; align-items:center; gap:0.25rem; background:rgba(255,255,255,0.14); padding:0.2rem 0.35rem; border-radius:10px; border:1px solid rgba(255,255,255,0.28);">
+            <select id="selModoVistaUsuarioHeader" onchange="cambiarModoVistaRutinaUsuarioParticularCDM(${p.id}, this.value)"
+                    style="width:auto; min-height:30px; padding:0.15rem 0.5rem; font-size:0.74rem; font-weight:800; background:transparent; color:#fff; border:none;">
+                <option value="heredar" ${modoVistaUser === "heredar" ? "selected" : ""} style="color:#0f172a;">🎚️ Vista: Automática (${obtenerModoComplejidadComercioActualCDM().toUpperCase()})</option>
+                <option value="simple" ${modoVistaUser === "simple" ? "selected" : ""} style="color:#0f172a;">🟢 Vista Rutina: SIMPLE (Solo para ${p.nombre})</option>
+                <option value="avanzado" ${modoVistaUser === "avanzado" ? "selected" : ""} style="color:#0f172a;">🚀 Vista Rutina: AVANZADA (Solo para ${p.nombre})</option>
+            </select>
+            <button type="button" class="btn btn-primary btn-sm" style="min-height:28px; padding:0.15rem 0.55rem; font-size:0.7rem;" onclick="cambiarModoVistaRutinaUsuarioParticularCDM(${p.id}, document.getElementById('selModoVistaUsuarioHeader').value)" title="Guardar vista para este usuario">
+                💾 Guardar
+            </button>
+        </div>
+
+        <button type="button" id="btnToggleAutogestionFichaCDM" class="btn btn-sm"
+                style="${habilitado ? "background:#10b981; color:#ffffff; border-color:#059669; font-weight:800;" : "color:#ffffff; border-color:rgba(255,255,255,0.35); background:rgba(255,255,255,0.14); font-weight:700;"}"
+                onclick="alternarPermisoAutogestionRutinaCDM(${p.id})"
+                title="Habilitar o deshabilitar que esta persona cargue sus propias rutinas">
+            ${habilitado ? "🔓 Autogestión Rutina: SÍ (Habilitado)" : "🔒 Autogestión Rutina: NO (Click para Desbloquear)"}
+        </button>
+    `;
+
+    const cajaBotones = barra.querySelector("div:last-child");
+    if (cajaBotones) cajaBotones.prepend(controlesExtra);
+};
+
+const _origInyectarBarraSesionTopbar = inyectarBarraSesionTopbar;
+inyectarBarraSesionTopbar = function (sesion) {
+    _origInyectarBarraSesionTopbar.apply(this, arguments);
+    if (!sesion || sesion.rol !== "admin") return;
+
+    const barra = document.getElementById("cdmBarraSesionActiva");
+    if (!barra || document.getElementById("btnAdminSwitchComplejidadTop")) return;
+
+    const modoActual = obtenerModoComplejidadComercioActualCDM();
+    const btnComp = document.createElement("button");
+    btnComp.type = "button";
+    btnComp.id = "btnAdminSwitchComplejidadTop";
+    btnComp.className = "btn btn-ghost btn-sm";
+    btnComp.title = "Cambiar la vista general predeterminada de rutinas entre Modo Simple y Modo Avanzado";
+    btnComp.onclick = () => {
+        const nuevo = obtenerModoComplejidadComercioActualCDM() === "simple" ? "avanzado" : "simple";
+        cambiarModoComplejidadGeneralDesdeAdminCDM(nuevo);
+        btnComp.innerHTML = nuevo === "simple"
+            ? `🟢 Rutinas Club: Simples`
+            : `🚀 Rutinas Club: Avanzadas`;
+    };
+    btnComp.innerHTML = modoActual === "simple"
+        ? `🟢 Rutinas Club: Simples`
+        : `🚀 Rutinas Club: Avanzadas`;
+
+    barra.insertBefore(btnComp, barra.firstChild);
+};
+
+const _origAbrirModalPersonaLoginHook = window.abrirModalPersona;
+if (typeof _origAbrirModalPersonaLoginHook === "function") {
+    window.abrirModalPersona = function (idEditar = null) {
+        _origAbrirModalPersonaLoginHook.apply(this, arguments);
+        const form = document.getElementById("formPersonaCDM");
+        if (!form || document.getElementById("pPuedeCrearRutinas")) return;
+
+        const lista = obtenerPersonasRealesCDM();
+        const p = idEditar ? lista.find(x => Number(x.id) === Number(idEditar)) : null;
+        const habilitado = Boolean(p && p.puedeCrearRutinas);
+        const modoVista = p?.modoVistaRutina || "heredar";
+
+        const divPermiso = document.createElement("div");
+        divPermiso.style = "margin-bottom:0.95rem; background:var(--cdm-50); border:1.5px solid var(--line-celeste); padding:0.85rem 1rem; border-radius:14px; display:flex; flex-direction:column; gap:0.7rem;";
+        divPermiso.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                <div>
+                    <strong style="font-size:0.82rem; color:var(--cdm-900); display:block;">
+                        🎚️ Nivel de Complejidad de Rutinas para este Usuario Particular
+                    </strong>
+                    <small style="color:var(--ink-500); font-size:0.72rem;">
+                        Elegí si esta persona ve sus rutinas en formato Simple (sin pesos ni tiempo) o Avanzado (con pesos y 1RM).
+                    </small>
+                </div>
+                <select id="pModoVistaRutina" style="width:auto; min-width:220px; font-weight:700;">
+                    <option value="heredar" ${modoVista === "heredar" ? "selected" : ""}>🔄 Automático según el Gimnasio/Club</option>
+                    <option value="simple" ${modoVista === "simple" ? "selected" : ""}>🟢 Vista Simple (Solo Series × Reps)</option>
+                    <option value="avanzado" ${modoVista === "avanzado" ? "selected" : ""}>🚀 Vista Avanzada (Con Pesos y 1RM)</option>
+                </select>
+            </div>
+
+            <label style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; cursor:pointer; padding-top:0.55rem; border-top:1px dashed var(--line-celeste);">
+                <div>
+                    <strong style="font-size:0.82rem; color:var(--cdm-900); display:block;">
+                        🔓 Permitir que esta persona cargue sus propias rutinas (Sacar Candado)
+                    </strong>
+                    <small style="color:var(--ink-500); font-size:0.72rem;">
+                        Si lo tildás, podrá crear y editar sus propias rutinas para entrenarse solo.
+                    </small>
+                </div>
+                <input type="checkbox" id="pPuedeCrearRutinas" style="width:20px; height:20px; min-height:auto; flex-shrink:0;" ${habilitado ? "checked" : ""}>
+            </label>
+        `;
+
+        const btnSubmitRow = form.querySelector("div:last-child");
+        if (btnSubmitRow) form.insertBefore(divPermiso, btnSubmitRow);
+    };
+}
+
+const _origGuardarPersonaCDMLoginHook = window.guardarPersonaCDM;
+if (typeof _origGuardarPersonaCDMLoginHook === "function") {
+    window.guardarPersonaCDM = function (e) {
+        const chkAuto = Boolean(document.getElementById("pPuedeCrearRutinas")?.checked);
+        const selVista = document.getElementById("pModoVistaRutina")?.value || "heredar";
+        const idEdit = document.getElementById("pId")?.value;
+        _origGuardarPersonaCDMLoginHook.apply(this, arguments);
+
+        const lista = obtenerPersonasRealesCDM();
+        if (idEdit) {
+            const p = lista.find(x => Number(x.id) === Number(idEdit));
+            if (p) {
+                p.puedeCrearRutinas = chkAuto;
+                p.modoVistaRutina = selVista;
+            }
+        } else if (lista.length > 0) {
+            const ult = lista[lista.length - 1];
+            ult.puedeCrearRutinas = chkAuto;
+            ult.modoVistaRutina = selVista;
+        }
+        persistirCambiosPersonasYRutinasCDM();
+    };
+}
+
+// =========================================================================
+// 9. CONFIGURACIÓN POR COMERCIO EN HUB SUPERADMIN
+// =========================================================================
+
 const _origObtenerLicenciaConfigCDM = obtenerLicenciaConfigCDM;
 obtenerLicenciaConfigCDM = function () {
     const lic = _origObtenerLicenciaConfigCDM.apply(this, arguments);
     lic.bloquearCobranza = Boolean(lic.bloquearCobranza);
+    lic.modoComplejidad = lic.modoComplejidad || "avanzado";
     if (!lic.modulos) lic.modulos = { futbol: true, hockey: true, gym: true, consultorio: true };
     if (!Array.isArray(lic.profesionesHabilitadas)) {
         lic.profesionesHabilitadas = ["Quiropraxia", "Kinesiología", "Psicología", "Nutrición"];
@@ -3722,7 +5653,6 @@ obtenerLicenciaConfigCDM = function () {
     return lic;
 };
 
-// 2. Aplicar discriminación estricta de Módulos (Deportes, Gym, Profesiones) en Sidebar e Index
 const _origAplicarLicenciaYModulosCDM = aplicarLicenciaYModulosCDM;
 aplicarLicenciaYModulosCDM = function () {
     _origAplicarLicenciaYModulosCDM.apply(this, arguments);
@@ -3734,15 +5664,12 @@ aplicarLicenciaYModulosCDM = function () {
     const tieneConsultorio = Boolean(mod.consultorio && profs.length > 0);
     const tieneDeportesOGym = Boolean(mod.futbol || mod.hockey || mod.gym || (Array.isArray(lic.deportesExtra) && lic.deportesExtra.length > 0));
 
-    // Mostrar u ocultar accesos de Consultorio según la configuración del comercio
     const linkCons = document.querySelector('.app-sidebar .side-link[data-nav="consultorio"]');
     if (linkCons) linkCons.classList.toggle("hidden", !tieneConsultorio);
 
     const cardCons = document.getElementById("cardShowcaseConsultorioPro");
     if (cardCons) cardCons.classList.toggle("hidden", !tieneConsultorio);
 
-    // Si el comercio es EXCLUSIVAMENTE un Consultorio Profesional (ej: Solo Kinesiología o Solo Quiropraxia),
-    // ocultar enlaces deportivos vacíos y abrir directo su Consultorio al entrar al sistema
     if (tieneConsultorio && !tieneDeportesOGym) {
         document.querySelectorAll('.app-sidebar .side-link[data-nav="inicio"], .app-sidebar .side-link[data-nav="futbol"], .app-sidebar .side-link[data-nav="hockey"], .app-sidebar .side-link[data-nav="gym"]').forEach(el => {
             el.classList.add("hidden");
@@ -3752,190 +5679,8 @@ aplicarLicenciaYModulosCDM = function () {
             setTimeout(() => abrirModuloConsultorioIndependienteCDM(), 80);
         }
     }
-
-    if (typeof aplicarReglasVisualesCobranzaEnDOM === "function") {
-        aplicarReglasVisualesCobranzaEnDOM();
-    }
 };
 
-// 3. Alternar bloqueo de cobranza desde el Hub o Topbar
-async function alternarBloqueoCobranzaComercioCDM(claveClub, forzarEstado = null) {
-    const clave = claveClub || obtenerClaveClubActivoCDM();
-    const mapa = obtenerMapaLocalClubesCDM();
-
-    if (mapa[clave] && mapa[clave].licenciaConfig) {
-        const actual = Boolean(mapa[clave].licenciaConfig.bloquearCobranza);
-        const nuevo = forzarEstado !== null ? Boolean(forzarEstado) : !actual;
-        mapa[clave].licenciaConfig.bloquearCobranza = nuevo;
-        localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
-
-        if (obtenerClaveClubActivoCDM() === clave) {
-            const licActiva = obtenerLicenciaConfigCDM();
-            licActiva.bloquearCobranza = nuevo;
-            guardarLicenciaConfigCDM(licActiva);
-        }
-
-        sincronizarAtributoCobranzaBodyCDM();
-        if (typeof mostrarToast === "function") {
-            mostrarToast(nuevo
-                ? `🔒 Cobranza bloqueada para ${mapa[clave].licenciaConfig.nombreEntidad || clave}.`
-                : `💳 Cobranza habilitada para ${mapa[clave].licenciaConfig.nombreEntidad || clave}.`);
-        }
-    }
-
-    const enLogin = window.location.pathname.toLowerCase().includes("login.html") || document.body.classList.contains("login-page");
-    if (enLogin && !document.getElementById("vistaHubSuperAdmin")?.classList.contains("hidden")) {
-        await mostrarHubSelectorDeComercios();
-    } else if (!enLogin) {
-        if (typeof aplicarReglasVisualesCobranzaEnDOM === "function") aplicarReglasVisualesCobranzaEnDOM();
-    }
-}
-
-async function alternarBloqueoCobranzaTodosLosComerciosHub(bloquearTodos) {
-    const lista = await obtenerListaCompletaComerciosCDM();
-    for (const c of lista) {
-        await alternarBloqueoCobranzaComercioCDM(c.claveClub, bloquearTodos);
-    }
-}
-
-// 4. Mostrar en cada tarjeta del Hub qué Deportes, Gimnasio y Profesiones (Kinesiología, Quiropraxia, etc.) tiene habilitados
-const _origMostrarHubSelectorDeComercios = mostrarHubSelectorDeComercios;
-mostrarHubSelectorDeComercios = async function () {
-    await _origMostrarHubSelectorDeComercios.apply(this, arguments);
-    const grid = document.getElementById("gridTarjetasComerciosHub");
-    const vistaHub = document.getElementById("vistaHubSuperAdmin");
-    if (!grid || !vistaHub) return;
-
-    const lista = await obtenerListaCompletaComerciosCDM();
-    const todosBloqueados = lista.length > 0 && lista.every(c => Boolean(c.licenciaConfig?.bloquearCobranza));
-
-    let masterBar = document.getElementById("hubBarraMaestraCobranza");
-    if (!masterBar) {
-        masterBar = document.createElement("div");
-        masterBar.id = "hubBarraMaestraCobranza";
-        masterBar.className = "hub-cobranza-master-bar";
-        grid.parentNode.insertBefore(masterBar, grid);
-    }
-
-    masterBar.innerHTML = `
-        <div>
-            <strong style="font-size:0.9rem; color:#0f172a; display:flex; align-items:center; gap:0.4rem;">
-                <i class="ri-shield-keyhole-line" style="color:#0284c7; font-size:1.1rem;"></i>
-                BLOQUEAR COBRANZA (Comercios con otro sistema)
-            </strong>
-            <small style="color:#64748b; font-size:0.75rem;">
-                Podés bloquear u ocultar la parte de cuotas y caja a todos o individualmente en cada comercio o consultorio.
-            </small>
-        </div>
-        <label class="cdm-switch-wrap">
-            <span style="color:${todosBloqueados ? '#64748b' : '#047857'};">${todosBloqueados ? 'BLOQUEADO (OFF)' : 'ACTIVO (ON)'}</span>
-            <input type="checkbox" class="cdm-switch-input" ${todosBloqueados ? "checked" : ""} onchange="alternarBloqueoCobranzaTodosLosComerciosHub(this.checked)">
-            <span class="cdm-switch-slider"></span>
-        </label>
-    `;
-
-    grid.innerHTML = lista.map(c => {
-        const lic = c.licenciaConfig || {};
-        const mod = lic.modulos || { futbol: true, hockey: true, gym: true, consultorio: true };
-        const profs = Array.isArray(lic.profesionesHabilitadas) ? lic.profesionesHabilitadas : [];
-        const nombre = lic.nombreEntidad || c.claveClub;
-        const sub = lic.subtituloEntidad || "Sede Oficial";
-        const sigla = (lic.siglaCodigo || "CDM").toUpperCase();
-        const userComercio = lic.adminUsuario === "admin" ? "cdm" : (lic.adminUsuario || "cdm");
-        const passComercio = lic.adminClave || "cdm2026";
-        const pausado = lic.estadoServicio === "suspendido";
-        const cobroBloqueado = Boolean(lic.bloquearCobranza);
-
-        return `
-            <div class="hub-comercio-card">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.6rem;">
-                    <div style="display:flex; align-items:center; gap:0.65rem; min-width:0;">
-                        <img src="${lic.logoUrl || 'logo.png'}" alt="${nombre}" style="width:42px; height:42px; object-fit:contain; background:#fff; padding:4px; border-radius:11px; border:1px solid #cbd5e1; flex-shrink:0;" onerror="this.onerror=null; this.src='logo.png';">
-                        <div style="min-width:0;">
-                            <h4 style="font-size:0.96rem; font-weight:800; color:#0f172a; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${nombre}</h4>
-                            <small style="color:#64748b; font-size:0.74rem; display:block;">📍 ${sub} • <b>[${sigla}]</b></small>
-                        </div>
-                    </div>
-                    <span class="badge ${pausado ? 'badge-danger' : 'badge-ok'}" style="font-size:0.64rem;">
-                        ${pausado ? "🔴 Pausado" : "✓ Activo"}
-                    </span>
-                </div>
-
-                <div class="hub-cobranza-pill-row">
-                    <div style="display:flex; align-items:center; gap:0.4rem;">
-                        <span class="cobranza-tag-title">COBRANZA</span>
-                        <span class="badge ${cobroBloqueado ? 'badge-ghost' : 'badge-ok'}" style="font-size:0.66rem; ${cobroBloqueado ? 'background:#e2e8f0; color:#475569;' : ''}">
-                            ${cobroBloqueado ? "✕ Bloqueado" : "✓ Activo"}
-                        </span>
-                    </div>
-                    <button type="button" class="btn ${cobroBloqueado ? 'btn-secondary' : 'btn-ghost'} btn-sm" style="min-height:26px; padding:0.15rem 0.55rem; font-size:0.68rem;" onclick="alternarBloqueoCobranzaComercioCDM('${c.claveClub}')">
-                        ${cobroBloqueado ? "🔓 Habilitar" : "🔒 Bloquear"}
-                    </button>
-                </div>
-
-                <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
-                    ${mod.futbol ? `<span class="badge badge-celeste" style="font-size:0.65rem;">⚽ Fútbol</span>` : ""}
-                    ${mod.hockey ? `<span class="badge badge-celeste" style="font-size:0.65rem;">🏑 Hockey</span>` : ""}
-                    ${mod.gym ? `<span class="badge badge-celeste" style="font-size:0.65rem;">🏋️ Gym</span>` : ""}
-                    ${(lic.deportesExtra || []).map(d => `<span class="badge badge-celeste" style="font-size:0.65rem;">${d}</span>`).join("")}
-                    ${(mod.consultorio !== false ? profs : []).map(pr => `<span class="badge badge-ok" style="font-size:0.65rem;">🩺 ${pr}</span>`).join("")}
-                </div>
-
-                <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:0.45rem 0.65rem; font-size:0.73rem; color:#334155;">
-                    <div>👤 <b>Usuario:</b> ${userComercio} • 🔑 <b>Clave:</b> ${passComercio}</div>
-                </div>
-
-                <div style="display:flex; flex-direction:column; gap:0.38rem; margin-top:auto;">
-                    <button type="button" class="btn btn-primary btn-sm" style="width:100%;" onclick="entrarAComercioDesdeHub('${c.claveClub}')">
-                        <i class="ri-login-box-line"></i> Abrir este Comercio / Consultorio
-                    </button>
-                    <div style="display:flex; gap:0.35rem;">
-                        <button type="button" class="btn btn-secondary btn-sm" style="flex:1;" onclick="abrirModalCrearOEditarComercio('${c.claveClub}')">
-                            <i class="ri-settings-4-line"></i> Módulos / Profesiones
-                        </button>
-                        <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarCredencialesDeComercioEspecificoWA('${c.claveClub}')">
-                            <i class="ri-whatsapp-line"></i> WA
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join("");
-};
-
-// 5. Funciones auxiliares para seleccionar planes y profesiones dentro del Modal de Configuración del Comercio
-function aplicarPresetConsultorioEnModalCDM(modo) {
-    const chkFut = document.getElementById("mcModFutbol");
-    const chkHoc = document.getElementById("mcModHockey");
-    const chkGym = document.getElementById("mcModGym");
-    const inpDepExtra = document.getElementById("mcDeportesExtra");
-    const chksProf = document.querySelectorAll(".mc-chk-profesion");
-
-    if (modo === "solo_consultorio") {
-        if (chkFut) chkFut.checked = false;
-        if (chkHoc) chkHoc.checked = false;
-        if (chkGym) chkGym.checked = false;
-        if (inpDepExtra) inpDepExtra.value = "";
-        chksProf.forEach(c => { c.checked = true; });
-    } else if (modo === "todo_completo") {
-        if (chkFut) chkFut.checked = true;
-        if (chkHoc) chkHoc.checked = true;
-        if (chkGym) chkGym.checked = true;
-        chksProf.forEach(c => { c.checked = true; });
-    }
-}
-
-function agregarProfesionExtraChipModalCDM(nombreConIcono) {
-    const inp = document.getElementById("mcProfesionesExtra");
-    if (!inp) return;
-    const partes = inp.value.split(",").map(s => s.trim()).filter(Boolean);
-    if (!partes.includes(nombreConIcono)) {
-        partes.push(nombreConIcono);
-        inp.value = partes.join(", ");
-    }
-}
-
-// 6. Extender abrirModalCrearOEditarComercio para discriminar Deportes, Gimnasio y Profesiones (Quiropraxia, Kinesiología, Psicología, Nutrición, etc.)
 const _origAbrirModalCrearOEditarComercio = abrirModalCrearOEditarComercio;
 abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
     await _origAbrirModalCrearOEditarComercio.apply(this, arguments);
@@ -3946,6 +5691,7 @@ abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
     const existente = claveClubEditar ? lista.find(x => x.claveClub === claveClubEditar) : null;
     const lic = existente?.licenciaConfig || {};
     const bloqueada = Boolean(lic.bloquearCobranza);
+    const modoCompActual = lic.modoComplejidad || "simple";
     const profsGuardadas = Array.isArray(lic.profesionesHabilitadas)
         ? lic.profesionesHabilitadas
         : (claveClubEditar ? [] : ["Quiropraxia", "Kinesiología", "Psicología", "Nutrición"]);
@@ -3958,45 +5704,44 @@ abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
     const primerBloque = bloquesDiv[0];
     const bloqueModulos = bloquesDiv.find(d => (d.innerText || "").includes("¿QUÉ MÓDULOS USA ESTE CLIENTE?"));
 
-    // A) Inyectar caja de bloqueo de cobranza si no existe
-    if (form && primerBloque && !document.getElementById("mcBloquearCobranza")) {
-        const boxCobranza = document.createElement("div");
-        boxCobranza.style = "background:var(--warn-bg); border:1.5px solid rgba(245, 158, 11, 0.38); border-radius:16px; padding:0.9rem 1rem; margin-bottom:0.95rem;";
-        boxCobranza.innerHTML = `
-            <label style="display:flex; align-items:center; justify-content:space-between; gap:0.85rem; cursor:pointer;">
-                <div>
-                    <strong style="font-size:0.86rem; color:var(--warn-ink); display:flex; align-items:center; gap:0.35rem;">
-                        🔒 Bloquear Parte de Cobranza / Cuotas en este Comercio
-                    </strong>
-                    <small style="color:var(--ink-500); font-size:0.74rem; display:block; margin-top:2px;">
-                        Activalo si el comercio ya administra sus pagos y facturación en otro sistema externo.
-                    </small>
-                </div>
-                <input type="checkbox" id="mcBloquearCobranza" style="width:22px; height:22px; min-height:auto; flex-shrink:0;" ${bloqueada ? "checked" : ""}>
-            </label>
+    if (form && primerBloque && !document.getElementById("mcModoComplejidad")) {
+        const boxConfigExtra = document.createElement("div");
+        boxConfigExtra.style = "display:flex; flex-direction:column; gap:0.75rem; margin-bottom:0.95rem;";
+        boxConfigExtra.innerHTML = `
+            <div style="background:#f0f9ff; border:1.5px solid #7dd3fc; border-radius:16px; padding:0.9rem 1rem;">
+                <label style="font-size:0.72rem; font-weight:800; color:#0369a1; text-transform:uppercase; display:block; margin-bottom:0.4rem;">
+                    🎚️ NIVEL DE COMPLEJIDAD PREDETERMINADO DE ESTE GIMNASIO / CLUB
+                </label>
+                <select id="mcModoComplejidad" style="font-weight:700; color:#0f172a; background:#ffffff;">
+                    <option value="simple" ${modoCompActual === "simple" ? "selected" : ""}>🟢 Modo Simple / Clásico (Solo Series × Reps en grande, video y Control Tiempo Real)</option>
+                    <option value="avanzado" ${modoCompActual === "avanzado" ? "selected" : ""}>🚀 Modo Avanzado / Pro (Con Pesos, Memoria 1RM y Biomecánica 60 FPS)</option>
+                </select>
+            </div>
+
+            <div style="background:var(--warn-bg); border:1.5px solid rgba(245, 158, 11, 0.38); border-radius:16px; padding:0.8rem 1rem;">
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:0.85rem; cursor:pointer;">
+                    <div>
+                        <strong style="font-size:0.84rem; color:var(--warn-ink); display:flex; align-items:center; gap:0.35rem;">
+                            🔒 Bloquear Parte de Cobranza / Cuotas en este Comercio
+                        </strong>
+                        <small style="color:var(--ink-500); font-size:0.72rem; display:block;">
+                            Activalo si el cliente ya administra sus cobros en otro sistema externo.
+                        </small>
+                    </div>
+                    <input type="checkbox" id="mcBloquearCobranza" style="width:20px; height:20px; min-height:auto; flex-shrink:0;" ${bloqueada ? "checked" : ""}>
+                </label>
+            </div>
         `;
-        primerBloque.insertAdjacentElement("afterend", boxCobranza);
+        primerBloque.insertAdjacentElement("afterend", boxConfigExtra);
     }
 
-    // B) Inyectar dentro del bloque 2 la discriminación de PROFESIONES Y CONSULTORIO
     if (bloqueModulos && !document.getElementById("bloqueSeleccionProfesionesModalCDM")) {
-        // Agregar botón rápido "🩺 Solo Consultorio ($300k)" en la botonera de planes
-        const filaPlanes = bloqueModulos.querySelector("div");
-        if (filaPlanes) {
-            const btnSoloCons = document.createElement("button");
-            btnSoloCons.type = "button";
-            btnSoloCons.className = "btn btn-secondary btn-sm";
-            btnSoloCons.innerHTML = `🩺 Solo Consultorio / Salud ($300k)`;
-            btnSoloCons.onclick = () => aplicarPresetConsultorioEnModalCDM("solo_consultorio");
-            filaPlanes.insertBefore(btnSoloCons, filaPlanes.firstChild);
-        }
-
         const divProfs = document.createElement("div");
         divProfs.id = "bloqueSeleccionProfesionesModalCDM";
         divProfs.style = "margin-top:0.95rem; padding-top:0.9rem; border-top:1.5px dashed #cbd5e1;";
         divProfs.innerHTML = `
             <label style="font-size:0.7rem; font-weight:800; color:#0369a1; text-transform:uppercase; display:block; margin-bottom:0.5rem;">
-                🩺 HABILITAR PROFESIONES / CONSULTORIOS INDEPENDIENTES (AGENDA, PACIENTES Y MUTUALES)
+                🩺 HABILITAR PROFESIONES / CONSULTORIOS INDEPENDIENTES
             </label>
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(145px, 1fr)); gap:0.5rem; margin-bottom:0.65rem;">
                 ${CATALOGO_PROFESIONES_BASE_SAAS.map(pr => `
@@ -4006,27 +5751,16 @@ abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
                     </label>
                 `).join("")}
             </div>
-
-            <label style="font-size:0.66rem; font-weight:700; color:#64748b; text-transform:uppercase; display:block; margin-bottom:0.35rem;">
-                ➕ AGREGAR OTRAS PROFESIONES / ESPECIALIDADES (TOCÁ UN BOTÓN O ESCRIBILAS SEPARADAS POR COMA)
-            </label>
-            <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:0.45rem;">
-                ${["🦶 Podología", "🗣️ Fonoaudiología", "💆 Masoterapia y Estética", "⚕️ Medicina Deportiva", "🧘 Osteopatía y RPG", "🦷 Odontología"].map(ex => `
-                    <button type="button" class="btn btn-secondary btn-sm" style="min-height:26px; padding:0.15rem 0.55rem; font-size:0.69rem; border-radius:999px;" onclick="agregarProfesionExtraChipModalCDM('${ex}')">
-                        + ${ex}
-                    </button>
-                `).join("")}
-            </div>
-            <input type="text" id="mcProfesionesExtra" placeholder="Ej: 🦶 Podología, 🗣️ Fonoaudiología (o dejá vacío si no usa otras)" value="${profsExtraGuardadas.join(", ")}">
+            <input type="text" id="mcProfesionesExtra" placeholder="Otras profesiones separadas por coma..." value="${profsExtraGuardadas.join(", ")}">
         `;
         bloqueModulos.appendChild(divProfs);
     }
 };
 
-// 7. Guardar exactamente qué Deportes, Gimnasio y Profesiones quedaron habilitados en este Comercio
 const _origGuardarComercioDesdeModal = guardarComercioDesdeModal;
 guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
     const chkBloq = Boolean(document.getElementById("mcBloquearCobranza")?.checked);
+    const modoComp = document.getElementById("mcModoComplejidad")?.value || "simple";
     const nombreInput = (document.getElementById("mcNombreEntidad")?.value || "").trim();
 
     const profsTildadas = Array.from(document.querySelectorAll(".mc-chk-profesion:checked")).map(c => c.value);
@@ -4036,7 +5770,6 @@ guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
         .filter(Boolean);
     const todasLasProfesiones = [...new Set([...profsTildadas, ...profsExtraTxt])];
 
-    // Si el cliente solo usa Consultorio/Profesiones (sin Fútbol, Hockey ni Gym), permitir guardar sin que el validador viejo lo frene
     const chkGym = document.getElementById("mcModGym");
     const chkFut = document.getElementById("mcModFutbol");
     const chkHoc = document.getElementById("mcModHockey");
@@ -4065,6 +5798,7 @@ guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
         licTarget.profesionesHabilitadas = todasLasProfesiones;
         licTarget.modulos.consultorio = todasLasProfesiones.length > 0;
         licTarget.bloquearCobranza = chkBloq;
+        licTarget.modoComplejidad = modoComp;
 
         localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
         if (obtenerClaveClubActivoCDM() === claveTarget) {
@@ -4072,29 +5806,1779 @@ guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
         }
     }
 
+    sincronizarAtributoCobranzaBodyCDM();
     const enLogin = window.location.pathname.toLowerCase().includes("login.html") || document.body.classList.contains("login-page");
     if (enLogin && !document.getElementById("vistaHubSuperAdmin")?.classList.contains("hidden")) {
         await mostrarHubSelectorDeComercios();
     }
 };
 
-const _origInyectarBarraSesionTopbar = inyectarBarraSesionTopbar;
-inyectarBarraSesionTopbar = function (sesion) {
-    _origInyectarBarraSesionTopbar.apply(this, arguments);
-    sincronizarAtributoCobranzaBodyCDM();
+const _obsRutinasDOM = new MutationObserver(() => {
+    inyectarBotonesRapidosEnTarjetasDeportistasDOM();
+});
 
-    const cont = document.getElementById("cdmBarraSesionActiva");
-    if (cont && sesion && sesion.esSuperAdmin && !document.getElementById("btnQuickToggleCobranzaTopbar")) {
-        const btnCob = document.createElement("button");
-        btnCob.type = "button";
-        btnCob.id = "btnQuickToggleCobranzaTopbar";
-        btnCob.className = "btn btn-ghost btn-sm";
-        btnCob.onclick = function () {
-            alternarBloqueoCobranzaComercioCDM(obtenerClaveClubActivoCDM());
+sincronizarAtributoCobranzaBodyCDM();
+aplicarOverrideVistaRutinasUsuarioBlindadoCDM();
+
+document.addEventListener("DOMContentLoaded", () => {
+    sincronizarAtributoCobranzaBodyCDM();
+    aplicarOverrideVistaRutinasUsuarioBlindadoCDM();
+    _obsRutinasDOM.observe(document.body, { childList: true, subtree: true });
+
+    setTimeout(() => {
+        aplicarOverrideVistaRutinasUsuarioBlindadoCDM();
+        inyectarBotonesRapidosEnTarjetasDeportistasDOM();
+        const p = obtenerPersonaActualEnFichaCDM();
+        if (p) {
+            window.agregarBotonesVideoEnRutinasJugador({ personaId: p.id });
+            if (typeof window.renderizarHistorialJugador === "function") {
+                window.renderizarHistorialJugador(p);
+            }
+        }
+        const ses = obtenerSesionActivaCDM();
+        if (ses && ses.rol === "admin" && document.getElementById("fichaCabeceraJugador")) {
+            inyectarPanelCodigoEnFichaIndividual();
+        }
+    }, 220);
+});
+// =========================================================================
+// 10. CONECTOR COMPLETO DE LOGIN Y PORTAL DE DESCARGAS PARA PACIENTES (PAC-XXXX)
+//     - RECONOCE CÓDIGOS DE PACIENTES (EJ: PAC-802) Y DNI EN LOGIN.HTML
+//     - EVITA EL REREBOTE DE JUGADOR.HTML Y ABRE EL PORTAL CLÍNICO DEL PACIENTE
+//     - PERMITE VER Y DESCARGAR ESTUDIOS (PDF, RX, LAB, PLANES) E INDICACIONES
+// Pegar al final de login.js
+// =========================================================================
+
+function buscarPacienteConsultorioPorCodigoODni10(rawInput) {
+    const codigoBuscado = String(rawInput || "").trim().toUpperCase();
+    if (!codigoBuscado) return null;
+
+    const limpioBuscado = codigoBuscado.replace(/[^A-Z0-9]/g, "");
+    const soloNumeros = codigoBuscado.replace(/\D/g, "");
+
+    // 1. Buscar en el Registro Universal de Pacientes (cdm_registro_universal_pacientes_v19)
+    try {
+        const mapaUniv = JSON.parse(localStorage.getItem("cdm_registro_universal_pacientes_v19") || "{}");
+        for (const ficha of Object.values(mapaUniv)) {
+            if (!ficha) continue;
+            const cod = String(ficha.codigoAcceso || "").toUpperCase();
+            const codLimpio = cod.replace(/[^A-Z0-9]/g, "");
+            const sufijo = cod.split("-")[1] || cod;
+            const dniPac = String(ficha.dni || "").replace(/\D/g, "");
+            const idStr = String(ficha.id || "");
+
+            if (
+                cod === codigoBuscado ||
+                codLimpio === limpioBuscado ||
+                sufijo === codigoBuscado ||
+                `PAC-${idStr}` === codigoBuscado ||
+                `PAC${idStr}` === limpioBuscado ||
+                (soloNumeros.length >= 7 && dniPac === soloNumeros)
+            ) {
+                return ficha;
+            }
+        }
+    } catch {}
+
+    // 2. Buscar en cualquier base de Consultorio guardada en localStorage (ej: cdm_consultorio_pro_v1)
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || k.startsWith("cdm_series_")) continue;
+        try {
+            const data = JSON.parse(localStorage.getItem(k));
+            if (!data || typeof data !== "object") continue;
+
+            const listasPacientes = [];
+            if (Array.isArray(data.pacientes)) listasPacientes.push(data.pacientes);
+            Object.values(data).forEach(sub => {
+                if (sub && typeof sub === "object" && Array.isArray(sub.pacientes)) {
+                    listasPacientes.push(sub.pacientes);
+                }
+            });
+
+            for (const lista of listasPacientes) {
+                for (const p of lista) {
+                    if (!p || typeof p !== "object") continue;
+                    const codP = String(p.codigoAcceso || `PAC-${p.id}`).toUpperCase();
+                    const codPLimpio = codP.replace(/[^A-Z0-9]/g, "");
+                    const dniP = String(p.dni || "").replace(/\D/g, "");
+
+                    if (
+                        codP === codigoBuscado ||
+                        codPLimpio === limpioBuscado ||
+                        String(p.id) === soloNumeros ||
+                        (soloNumeros.length >= 7 && dniP === soloNumeros)
+                    ) {
+                        // Sincronizar en el registro universal para que tenga sus estudios disponibles
+                        const mapaUniv = JSON.parse(localStorage.getItem("cdm_registro_universal_pacientes_v19") || "{}");
+                        const clave = `id_${p.id}`;
+                        const fichaNueva = mapaUniv[clave] || {
+                            clave,
+                            id: p.id,
+                            codigoAcceso: codP,
+                            nombreCompleto: p.nombreCompleto || `${p.apellido || ""}, ${p.nombre || ""}`.replace(/^,\s*/, "").trim(),
+                            dni: p.dni || "",
+                            telefono: p.telefono || p.whatsapp || "",
+                            especialidad: p.especialidad || "Consultorio",
+                            mutual: p.mutual || p.obraSocial || "Particular",
+                            diagnostico: p.diagnostico || "",
+                            profesional: p.profesional || "",
+                            sesionesInfo: p.sesionesTotales ? `${p.sesionesRealizadas || 0}/${p.sesionesTotales} sesiones` : "",
+                            estudiosClinicos: Array.isArray(p.estudiosClinicos) ? p.estudiosClinicos : []
+                        };
+                        mapaUniv[clave] = fichaNueva;
+                        localStorage.setItem("cdm_registro_universal_pacientes_v19", JSON.stringify(mapaUniv));
+                        return fichaNueva;
+                    }
+                }
+            }
+        } catch {}
+    }
+
+    return null;
+}
+
+// 10.1 Sobrescribir iniciarSesionConCodigo para que acepte códigos de Pacientes (ej: PAC-802)
+const _origIniciarSesionConCodigo10 = iniciarSesionConCodigo;
+iniciarSesionConCodigo = async function (e) {
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
+    const rawInput = (document.getElementById("inputCodigoUsuario")?.value || "").trim().toUpperCase();
+
+    const fichaPac = buscarPacienteConsultorioPorCodigoODni10(rawInput);
+    if (fichaPac) {
+        if (fichaPac.claveClub) {
+            localStorage.setItem(STORAGE_CLUB_ACTIVO_KEY, fichaPac.claveClub);
+        }
+        localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+            rol: "usuario",
+            esPacienteConsultorio: true,
+            clavePaciente: fichaPac.clave,
+            personaId: fichaPac.id,
+            dni: fichaPac.dni || "",
+            nombre: fichaPac.nombreCompleto || "Paciente",
+            deporte: fichaPac.especialidad || "Consultorio",
+            categoria: fichaPac.mutual || "Particular",
+            codigo: fichaPac.codigoAcceso || rawInput,
+            fechaIngreso: new Date().toISOString()
+        }));
+
+        window.location.href = `jugador.html?id=${encodeURIComponent(fichaPac.id)}&pac=${encodeURIComponent(fichaPac.clave)}&modo=paciente`;
+        return;
+    }
+
+    // Si no es paciente de consultorio, continúa con el login normal de Deportistas y Socios de Gimnasio
+    return _origIniciarSesionConCodigo10.apply(this, arguments);
+};
+
+// 10.2 Desactivar bloqueo de descarga/impresión cuando entra un Paciente a bajar sus estudios
+const _origActivarBlindaje10 = activarBlindajeAntiDescargaYCaptura;
+activarBlindajeAntiDescargaYCaptura = function (sesion) {
+    const params = new URLSearchParams(window.location.search);
+    if ((sesion && sesion.esPacienteConsultorio) || params.get("modo") === "paciente") {
+        return;
+    }
+    return _origActivarBlindaje10.apply(this, arguments);
+};
+
+// 10.3 Asegurar que verificarAccesoYRolEnApp no rebote al Paciente ni borre ?modo=paciente
+const _origVerificarAcceso10 = verificarAccesoYRolEnApp;
+verificarAccesoYRolEnApp = function () {
+    const sesion = obtenerSesionActivaCDM();
+    const params = new URLSearchParams(window.location.search);
+    const esModoPac = (sesion && sesion.esPacienteConsultorio) || params.get("modo") === "paciente";
+
+    if (esModoPac && (window.location.pathname.toLowerCase().includes("jugador.html") || document.body.dataset.page === "perfil-individual")) {
+        aplicarTemaGuardadoCDM();
+        aplicarLicenciaYModulosCDM();
+        document.body.setAttribute("data-rol", sesion?.rol || "usuario");
+        document.body.setAttribute("data-modo-portal", "paciente");
+        inyectarCSSRestriccionesRol();
+        inyectarBarraSesionTopbar(sesion || { rol: "usuario", nombre: "Paciente", codigo: "" });
+
+        const claveBuscar = params.get("pac") || sesion?.clavePaciente || params.get("id") || sesion?.personaId || sesion?.codigo;
+        setTimeout(() => {
+            if (typeof renderizarPortalPacienteUniversalEnJugadorHTML19 === "function") {
+                renderizarPortalPacienteUniversalEnJugadorHTML19(claveBuscar);
+            } else {
+                renderizarPortalPacienteFallbackEnLogin10(claveBuscar);
+            }
+        }, 80);
+        return;
+    }
+
+    return _origVerificarAcceso10.apply(this, arguments);
+};
+
+// 10.4 Renderizador de respaldo en login.js por si inicializarPaginaJugadorIndividual corre antes que el Bloque 19
+function renderizarPortalPacienteFallbackEnLogin10(claveBuscar) {
+    const ficha = buscarPacienteConsultorioPorCodigoODni10(claveBuscar) ||
+                  (typeof obtenerPacienteUniversalPorClave19 === "function" ? obtenerPacienteUniversalPorClave19(claveBuscar) : null);
+    if (!ficha) return;
+
+    if (typeof renderizarPortalPacienteUniversalEnJugadorHTML19 === "function") {
+        renderizarPortalPacienteUniversalEnJugadorHTML19(ficha.clave);
+        return;
+    }
+
+    const cabecera = document.getElementById("fichaCabeceraJugador");
+    if (cabecera) {
+        cabecera.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                <div>
+                    <span class="badge badge-ok">🩺 PORTAL DEL PACIENTE</span>
+                    <span class="badge badge-celeste">🔑 Código: ${ficha.codigoAcceso}</span>
+                    <h2 style="font-size:1.4rem; font-weight:900; color:#ffffff; margin-top:4px;">${ficha.nombreCompleto}</h2>
+                    <small style="color:#e0f2fe;">DNI ${ficha.dni || "-"} • ${ficha.especialidad || "Consultorio"} • ${ficha.mutual || "Particular"}</small>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Interceptar inicializarPaginaJugadorIndividual en jugador.html cuando entra un Paciente
+document.addEventListener("DOMContentLoaded", () => {
+    const sesion = obtenerSesionActivaCDM();
+    const params = new URLSearchParams(window.location.search);
+    const esModoPac = (sesion && sesion.esPacienteConsultorio) || params.get("modo") === "paciente";
+
+    if (esModoPac && typeof window.inicializarPaginaJugadorIndividual === "function") {
+        window.inicializarPaginaJugadorIndividual = function () {
+            const claveBuscar = params.get("pac") || sesion?.clavePaciente || params.get("id") || sesion?.personaId || sesion?.codigo;
+            if (typeof renderizarPortalPacienteUniversalEnJugadorHTML19 === "function") {
+                renderizarPortalPacienteUniversalEnJugadorHTML19(claveBuscar);
+            } else {
+                renderizarPortalPacienteFallbackEnLogin10(claveBuscar);
+            }
         };
-        cont.insertBefore(btnCob, cont.firstChild);
-        sincronizarAtributoCobranzaBodyCDM();
+        window.inicializarPaginaJugadorIndividual();
+    }
+});
+// =========================================================================
+// 11. BLOQUEO TOTAL DEL RELOJ FUERA DE DEPORTES Y GIMNASIO (CSS + JS)
+//     Reemplazar las últimas 25 líneas de login.js por este bloque
+// =========================================================================
+
+(function bloquearRelojFueraDeGymYDeportesCDM() {
+    if (!document.getElementById("cdmCssHideClockInClinicAndLogin")) {
+        const st = document.createElement("style");
+        st.id = "cdmCssHideClockInClinicAndLogin";
+        st.textContent = `
+            /* Ocultar instantáneamente el reloj en Login, Hub de Comercios, Consultorio y Pacientes */
+            body.login-page #cdmFloatingDropletClock,
+            body[data-modo-portal="paciente"] #cdmFloatingDropletClock,
+            body[data-reloj-oculto="1"] #cdmFloatingDropletClock,
+            body:has(#vistaLoginGenerico) #cdmFloatingDropletClock,
+            body:has(#formLoginUsuario) #cdmFloatingDropletClock,
+            body:has(#vistaHubSuperAdmin:not(.hidden)) #cdmFloatingDropletClock,
+            body:has(#cdmSeccionConsultorioGlobal:not(.hidden)) #cdmFloatingDropletClock,
+            body:has(.patient-quick-card) #cdmFloatingDropletClock,
+            body:has(.conventional-cal-panel) #cdmFloatingDropletClock,
+            body:has(#contenedorPortalClinicoPaciente19) #cdmFloatingDropletClock {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+        `;
+        document.head.appendChild(st);
+    }
+})();
+
+function puedeMostrarseRelojDeportivoCDM() {
+    const path = window.location.pathname.toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+
+    // 1. Prohibido en Login o Hub de Comercios
+    if (
+        path.includes("login") ||
+        document.body?.classList.contains("login-page") ||
+        document.getElementById("vistaLoginGenerico") ||
+        document.getElementById("formLoginUsuario")
+    ) {
+        return false;
+    }
+
+    // 2. Prohibido en Portal de Paciente
+    let ses = null;
+    try { ses = obtenerSesionActivaCDM(); } catch {}
+    if (
+        params.get("modo") === "paciente" ||
+        params.get("pac") ||
+        (ses && ses.esPacienteConsultorio) ||
+        document.body?.getAttribute("data-modo-portal") === "paciente" ||
+        document.getElementById("contenedorPortalClinicoPaciente19")
+    ) {
+        return false;
+    }
+
+    // 3. Prohibido si el Consultorio / Suite de Profesionales está en pantalla
+    const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+    if (secCons && !secCons.classList.contains("hidden")) {
+        return false;
+    }
+    if (document.querySelector(".patient-quick-card, .conventional-cal-panel")) {
+        return false;
+    }
+    const tituloTop = (document.querySelector(".topbar-title h2")?.innerText || "").toLowerCase();
+    if (tituloTop.includes("profesionales") || tituloTop.includes("salud") || tituloTop.includes("consultorio") || tituloTop.includes("paciente")) {
+        return false;
+    }
+
+    // 4. Prohibido si el comercio actual es exclusivamente de Consultorio (sin deportes ni gimnasio)
+    try {
+        const lic = obtenerLicenciaConfigCDM();
+        const mod = lic?.modulos || {};
+        const tieneDeporteOGym = Boolean(mod.futbol || mod.hockey || mod.gym || (Array.isArray(lic?.deportesExtra) && lic.deportesExtra.length > 0));
+        if (!tieneDeporteOGym) return false;
+    } catch {}
+
+    // 5. Permitido únicamente en pantallas de Gimnasio, Deportes o Ficha de Deportista
+    return (
+        path.includes("gym.html") ||
+        path.includes("futbol.html") ||
+        path.includes("hockey.html") ||
+        path.includes("jugador.html") ||
+        Boolean(document.body?.dataset.deporte)
+    );
+}
+
+asegurarGotaRelojitoFlotanteCDM = function () {
+    if (!puedeMostrarseRelojDeportivoCDM()) {
+        document.body?.setAttribute("data-reloj-oculto", "1");
+        document.getElementById("cdmFloatingDropletClock")?.remove();
+        return;
+    }
+
+    document.body?.removeAttribute("data-reloj-oculto");
+    let wrap = document.getElementById("cdmFloatingDropletClock");
+    if (!wrap) {
+        wrap = document.createElement("div");
+        wrap.id = "cdmFloatingDropletClock";
+        wrap.className = "cdm-droplet-clock-wrap usr-action-allow";
+        document.body.appendChild(wrap);
+    }
+    renderizarGotaRelojitoFlotanteCDM();
+};
+
+function limpiarRelojSiNoEsDeporteOGymCDM() {
+    if (!puedeMostrarseRelojDeportivoCDM()) {
+        document.body?.setAttribute("data-reloj-oculto", "1");
+        document.getElementById("cdmFloatingDropletClock")?.remove();
+    } else {
+        document.body?.removeAttribute("data-reloj-oculto");
+    }
+}
+
+limpiarRelojSiNoEsDeporteOGymCDM();
+document.addEventListener("DOMContentLoaded", () => {
+    limpiarRelojSiNoEsDeporteOGymCDM();
+    setTimeout(limpiarRelojSiNoEsDeporteOGymCDM, 150);
+    setTimeout(limpiarRelojSiNoEsDeporteOGymCDM, 450);
+    setTimeout(limpiarRelojSiNoEsDeporteOGymCDM, 900);
+});
+window.addEventListener("click", () => {
+    setTimeout(limpiarRelojSiNoEsDeporteOGymCDM, 40);
+});
+// =========================================================================
+// 12. SOPORTE NATIVO PARA COMERCIOS "SOLO PSICOLOGÍA / SOLO CONSULTORIO"
+//     - ELIMINA LA ALERTA "Debés dejar al menos 1 módulo o deporte activo"
+//     - INYECTA SIEMPRE LAS PROFESIONES Y EL BOTÓN RÁPIDO "🧠 SOLO PSICOLOGÍA / SALUD"
+//     - MUESTRA LAS ESPECIALIDADES EN LAS TARJETAS DEL HUB SUPERADMIN
+// Pegar al final de login.js
+// =========================================================================
+
+function activarPresetSoloConsultorioEnModal(profesionFoco = "") {
+    const chkF = document.getElementById("mcModFutbol");
+    const chkH = document.getElementById("mcModHockey");
+    const chkG = document.getElementById("mcModGym");
+    const inpDep = document.getElementById("mcDeportesExtra");
+    const inpPlan = document.getElementById("mcPlanActivo");
+    const inpSigla = document.getElementById("mcSiglaCodigo");
+
+    if (chkF) chkF.checked = false;
+    if (chkH) chkH.checked = false;
+    if (chkG) chkG.checked = false;
+    if (inpDep) inpDep.value = "";
+    if (inpPlan) inpPlan.value = "solo_consultorio";
+
+    if (profesionFoco) {
+        document.querySelectorAll(".mc-chk-profesion").forEach(chk => {
+            chk.checked = (chk.value === profesionFoco);
+        });
+        if (inpSigla && (inpSigla.value === "GYM" || inpSigla.value === "CDM")) {
+            inpSigla.value = profesionFoco === "Psicología" ? "PSI" : "PAC";
+        }
+    } else {
+        const algunoTildado = Array.from(document.querySelectorAll(".mc-chk-profesion")).some(c => c.checked);
+        if (!algunoTildado) {
+            const chkPsi = document.querySelector('.mc-chk-profesion[value="Psicología"]');
+            if (chkPsi) chkPsi.checked = true;
+        }
+        if (inpSigla && (inpSigla.value === "GYM" || inpSigla.value === "CDM")) {
+            inpSigla.value = "PSI";
+        }
+    }
+}
+
+// 1. Reemplazar abrirModalCrearOEditarComercio con inyección garantizada de Profesiones y botón Solo Psicología
+const _baseAbrirModalComercio12 = _origAbrirModalCrearOEditarComercio;
+abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+    await _baseAbrirModalComercio12.apply(this, arguments);
+    const modal = document.getElementById("modalSuperAdminCDM");
+    if (!modal) return;
+
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const existente = claveClubEditar ? lista.find(x => x.claveClub === claveClubEditar) : null;
+    const lic = existente?.licenciaConfig || {};
+    const bloqueada = Boolean(lic.bloquearCobranza);
+    const modoCompActual = lic.modoComplejidad || "simple";
+
+    // Si es nuevo o si ya tenía profesiones guardadas, recuperarlas
+    const profsGuardadas = Array.isArray(lic.profesionesHabilitadas)
+        ? lic.profesionesHabilitadas
+        : (claveClubEditar ? [] : ["Psicología"]);
+
+    const clavesBase = CATALOGO_PROFESIONES_BASE_SAAS.map(p => p.clave);
+    const profsExtraGuardadas = profsGuardadas.filter(p => !clavesBase.includes(p));
+
+    const form = modal.querySelector("form");
+    if (!form) return;
+
+    const bloquesDiv = Array.from(form.children).filter(el => el.tagName === "DIV");
+    const primerBloque = bloquesDiv[0];
+    // Buscar el bloque 2 sin importar mayúsculas/minúsculas o acentos
+    const bloqueModulos = bloquesDiv.find(d => /m[oó]dulos\s+usa\s+este\s+cliente/i.test(d.textContent || "")) || bloquesDiv[1];
+
+    // A) Inyectar selector de complejidad y bloqueo de cobranza
+    if (primerBloque && !document.getElementById("mcModoComplejidad")) {
+        const boxConfigExtra = document.createElement("div");
+        boxConfigExtra.style = "display:flex; flex-direction:column; gap:0.75rem; margin-bottom:0.95rem;";
+        boxConfigExtra.innerHTML = `
+            <div style="background:#f0f9ff; border:1.5px solid #7dd3fc; border-radius:16px; padding:0.9rem 1rem;">
+                <label style="font-size:0.72rem; font-weight:800; color:#0369a1; text-transform:uppercase; display:block; margin-bottom:0.4rem;">
+                    🎚️ NIVEL DE COMPLEJIDAD PREDETERMINADO DE ESTE COMERCIO
+                </label>
+                <select id="mcModoComplejidad" style="font-weight:700; color:#0f172a; background:#ffffff;">
+                    <option value="simple" ${modoCompActual === "simple" ? "selected" : ""}>🟢 Modo Simple / Clásico (Ideal para Consultorios, Psicología o Gimnasios simples)</option>
+                    <option value="avanzado" ${modoCompActual === "avanzado" ? "selected" : ""}>🚀 Modo Avanzado / Pro (Con Pesos, Memoria 1RM y Biomecánica 60 FPS)</option>
+                </select>
+            </div>
+
+            <div style="background:var(--warn-bg); border:1.5px solid rgba(245, 158, 11, 0.38); border-radius:16px; padding:0.8rem 1rem;">
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:0.85rem; cursor:pointer;">
+                    <div>
+                        <strong style="font-size:0.84rem; color:var(--warn-ink); display:flex; align-items:center; gap:0.35rem;">
+                            🔒 Bloquear Parte de Cobranza / Cuotas en este Comercio
+                        </strong>
+                        <small style="color:var(--ink-500); font-size:0.72rem; display:block;">
+                            Activalo si el profesional o cliente ya administra sus cobros aparte.
+                        </small>
+                    </div>
+                    <input type="checkbox" id="mcBloquearCobranza" style="width:20px; height:20px; min-height:auto; flex-shrink:0;" ${bloqueada ? "checked" : ""}>
+                </label>
+            </div>
+        `;
+        primerBloque.insertAdjacentElement("afterend", boxConfigExtra);
+    }
+
+    // B) Inyectar siempre el bloque de Profesiones / Consultorios dentro del Bloque 2
+    if (bloqueModulos) {
+        document.getElementById("bloqueSeleccionProfesionesModalCDM")?.remove();
+
+        const divProfs = document.createElement("div");
+        divProfs.id = "bloqueSeleccionProfesionesModalCDM";
+        divProfs.style = "margin-top:0.95rem; padding-top:0.9rem; border-top:2px dashed #38bdf8; background:rgba(240,249,255,0.6); padding:0.9rem; border-radius:14px;";
+        divProfs.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.65rem;">
+                <label style="font-size:0.74rem; font-weight:800; color:#0369a1; text-transform:uppercase; margin:0;">
+                    🩺 CONSULTORIOS Y PROFESIONALES DE LA SALUD (PUEDE USARSE SOLO SIN DEPORTES)
+                </label>
+                <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-primary btn-sm" style="min-height:28px; padding:0.2rem 0.65rem; font-size:0.72rem; background:#6366f1; border-color:#4f46e5;" onclick="activarPresetSoloConsultorioEnModal('Psicología')">
+                        🧠 Solo Psicología
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="min-height:28px; padding:0.2rem 0.65rem; font-size:0.72rem;" onclick="activarPresetSoloConsultorioEnModal('Kinesiología')">
+                        🦿 Solo Kinesiología
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="min-height:28px; padding:0.2rem 0.65rem; font-size:0.72rem;" onclick="activarPresetSoloConsultorioEnModal('')">
+                        🩺 Solo Consultorio
+                    </button>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(145px, 1fr)); gap:0.5rem; margin-bottom:0.65rem;">
+                ${CATALOGO_PROFESIONES_BASE_SAAS.map(pr => `
+                    <label style="display:flex; align-items:center; gap:0.45rem; background:#ffffff; border:1.5px solid #bae6fd; padding:0.55rem 0.7rem; border-radius:11px; cursor:pointer; font-weight:700; font-size:0.82rem; color:#0f172a;">
+                        <input type="checkbox" class="mc-chk-profesion" value="${pr.clave}" style="width:18px; height:18px; min-height:auto;" ${profsGuardadas.includes(pr.clave) ? "checked" : ""}>
+                        <span>${pr.icono} ${pr.nombre}</span>
+                    </label>
+                `).join("")}
+            </div>
+            <input type="text" id="mcProfesionesExtra" placeholder="Otras especialidades separadas por coma (ej: Fonoaudiología, Psicopedagogía, Psiquiatría)..." value="${profsExtraGuardadas.join(", ")}">
+        `;
+        bloqueModulos.appendChild(divProfs);
     }
 };
 
-sincronizarAtributoCobranzaBodyCDM();
+// 2. Reemplazar por completo guardarComercioDesdeModal para que acepte Psicólogos / Consultorios puros sin deportes
+guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
+    e.preventDefault();
+
+    const futbol = Boolean(document.getElementById("mcModFutbol")?.checked);
+    const hockey = Boolean(document.getElementById("mcModHockey")?.checked);
+    const gym = Boolean(document.getElementById("mcModGym")?.checked);
+    const deportesExtra = (document.getElementById("mcDeportesExtra")?.value || "")
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+
+    const profsTildadas = Array.from(document.querySelectorAll(".mc-chk-profesion:checked")).map(c => c.value);
+    const profsExtraTxt = (document.getElementById("mcProfesionesExtra")?.value || "")
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+    let todasLasProfesiones = [...new Set([...profsTildadas, ...profsExtraTxt])];
+
+    const nombre = (document.getElementById("mcNombreEntidad")?.value || "").trim();
+    const subtitulo = (document.getElementById("mcSubtituloEntidad")?.value || "").trim();
+
+    // Si destildó todos los deportes/gym y se olvidó de tildar la casilla de profesión, deducirla del nombre (ej. "Psicólogo...")
+    const tieneDeporteOGym = Boolean(futbol || hockey || gym || deportesExtra.length > 0);
+    if (!tieneDeporteOGym && todasLasProfesiones.length === 0) {
+        const nomLower = nombre.toLowerCase();
+        if (nomLower.includes("psic") || nomLower.includes("terap")) todasLasProfesiones = ["Psicología"];
+        else if (nomLower.includes("kine") || nomLower.includes("fisio")) todasLasProfesiones = ["Kinesiología"];
+        else if (nomLower.includes("quiro")) todasLasProfesiones = ["Quiropraxia"];
+        else if (nomLower.includes("nutri")) todasLasProfesiones = ["Nutrición"];
+        else {
+            alert("⚠️ Seleccioná al menos 1 especialidad de salud (ej: 🧠 Psicología) o 1 deporte/gimnasio.");
+            return;
+        }
+    }
+
+    const adminUsuario = (document.getElementById("mcAdminUsuario")?.value || "").trim().toLowerCase();
+    const adminClave = (document.getElementById("mcAdminClave")?.value || "").trim();
+
+    if (CREDENCIALES_SUPERADMIN.usuarios.includes(adminUsuario)) {
+        alert("⚠️ El usuario '" + adminUsuario + "' está reservado para el Administrador General. Elegí un usuario propio para este profesional o comercio.");
+        return;
+    }
+
+    let sigla = (document.getElementById("mcSiglaCodigo")?.value.trim() || "PAC").toUpperCase();
+    if (!tieneDeporteOGym && (sigla === "GYM" || sigla === "CDM")) {
+        sigla = todasLasProfesiones.includes("Psicología") ? "PSI" : "PAC";
+    }
+
+    const logoUrl = document.getElementById("mcLogoUrl")?.value.trim() || "/img/logo.png";
+    const planActivo = !tieneDeporteOGym ? "solo_consultorio" : (document.getElementById("mcPlanActivo")?.value || "personalizado");
+    const estadoServicio = document.getElementById("mcEstadoServicio")?.value || "activo";
+    const bloquearCobranza = Boolean(document.getElementById("mcBloquearCobranza")?.checked);
+    const modoComplejidad = document.getElementById("mcModoComplejidad")?.value || "simple";
+
+    const claveFinal = claveClubExistente || (
+        nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") + "_" + Math.floor(100 + Math.random() * 899)
+    );
+
+    const nuevaLicencia = {
+        claveClub: claveFinal,
+        nombreEntidad: nombre,
+        subtituloEntidad: subtitulo,
+        siglaCodigo: sigla,
+        logoUrl,
+        planActivo,
+        modulos: {
+            futbol,
+            hockey,
+            gym,
+            consultorio: todasLasProfesiones.length > 0
+        },
+        deportesExtra,
+        profesionesHabilitadas: todasLasProfesiones,
+        bloquearCobranza,
+        modoComplejidad,
+        adminUsuario,
+        adminClave,
+        estadoServicio
+    };
+
+    const mapa = obtenerMapaLocalClubesCDM();
+    if (!claveClubExistente) {
+        mapa[claveFinal] = {
+            claveClub: claveFinal,
+            ultimaActualizacionISO: new Date().toISOString(),
+            personas: [],
+            rutinas: [],
+            partidos: [],
+            alineaciones: {},
+            microciclos: {},
+            licenciaConfig: nuevaLicencia
+        };
+        localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+
+        if (window.location.protocol !== "file:") {
+            try {
+                await fetch("/api/cdm/clubes/nuevo", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ licenciaConfig: nuevaLicencia })
+                });
+            } catch {}
+        }
+    } else {
+        if (mapa[claveFinal]) {
+            mapa[claveFinal].licenciaConfig = nuevaLicencia;
+            localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+        }
+        if (obtenerClaveClubActivoCDM() === claveFinal) {
+            guardarLicenciaConfigCDM(nuevaLicencia);
+        }
+        if (window.location.protocol !== "file:") {
+            try {
+                const respEst = await fetch(`/api/cdm/estado?club=${encodeURIComponent(claveFinal)}`);
+                if (respEst.ok) {
+                    const dEst = await respEst.json();
+                    const estActual = dEst.estado || {};
+                    estActual.licenciaConfig = nuevaLicencia;
+                    await fetch("/api/cdm/estado", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...estActual, claveClub: claveFinal })
+                    });
+                }
+            } catch {}
+        }
+    }
+
+    document.getElementById("modalSuperAdminCDM")?.classList.add("hidden");
+    sincronizarAtributoCobranzaBodyCDM();
+
+    const enLogin = window.location.pathname.toLowerCase().includes("login.html") || document.body.classList.contains("login-page");
+    if (enLogin) {
+        await mostrarHubSelectorDeComercios();
+    } else {
+        aplicarLicenciaYModulosCDM();
+        if (typeof sincronizarSidebarActivoCDM === "function") sincronizarSidebarActivoCDM();
+        window.location.reload();
+    }
+};
+
+// 3. Mostrar las etiquetas de Psicología / Kinesiología / etc. en las tarjetas del Hub SuperAdmin
+const _origMostrarHubComercios12 = mostrarHubSelectorDeComercios;
+mostrarHubSelectorDeComercios = async function () {
+    await _origMostrarHubComercios12.apply(this, arguments);
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const cards = document.querySelectorAll("#gridTarjetasComerciosHub .hub-comercio-card");
+
+    cards.forEach((card, idx) => {
+        const item = lista[idx];
+        const lic = item?.licenciaConfig || {};
+        const profs = Array.isArray(lic.profesionesHabilitadas) ? lic.profesionesHabilitadas : [];
+        if (profs.length === 0) return;
+
+        const filaBadges = card.querySelectorAll("div")[3];
+        if (!filaBadges || filaBadges.dataset.profsRendered === "1") return;
+        filaBadges.dataset.profsRendered = "1";
+
+        const iconosMapa = { "Psicología": "🧠", "Kinesiología": "🦿", "Quiropraxia": "🦴", "Nutrición": "🥗" };
+        const badgesHTML = profs.map(pr => {
+            const ic = iconosMapa[pr] || "🩺";
+            return `<span class="badge badge-ok" style="font-size:0.65rem;">${ic} ${pr}</span>`;
+        }).join("");
+
+        filaBadges.insertAdjacentHTML("afterbegin", badgesHTML);
+    });
+};
+// =========================================================================
+// 13. LOGO GENÉRICO AUTOMÁTICO PARA COMERCIOS Y CONSULTORIOS NUEVOS
+//     - ELIMINA EL ESCUDO DEL CLUB (/img/logo.png) DE LOS COMERCIOS QUE NO SON CDM
+//     - GENERA UN ÍCONO GENÉRICO NEUTRO CON LA SIGLA DEL COMERCIO HASTA QUE SUBAN UNO
+//     - AGREGA EL BOTÓN "🗑️ QUITAR LOGO (USAR GENÉRICO)" EN EL MODAL DEL COMERCIO
+// Pegar al final de login.js
+// =========================================================================
+
+function esLogoPorDefectoDelClubCDM13(url = "") {
+    const limpio = String(url || "").trim().toLowerCase();
+    return !limpio || limpio === "/img/logo.png" || limpio === "img/logo.png" || limpio === "logo.png" || limpio === "generico";
+}
+
+// Genera un ícono SVG neutro y moderno (en Data URI) para cualquier comercio o consultorio que no tenga logo propio
+function generarLogoGenericoSVGComercio13(lic = {}) {
+    const sigla = String(lic.siglaCodigo || lic.nombreEntidad || "APP")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toUpperCase()
+        .slice(0, 3) || "PRO";
+
+    const esSoloConsultorio = lic.planActivo === "solo_consultorio" ||
+        (!lic.modulos?.futbol && !lic.modulos?.hockey && !lic.modulos?.gym);
+
+    const color1 = esSoloConsultorio ? "#0d9488" : "#0284c7";
+    const color2 = esSoloConsultorio ? "#115e59" : "#0f172a";
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+        <defs>
+            <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="${color1}"/>
+                <stop offset="100%" stop-color="${color2}"/>
+            </linearGradient>
+        </defs>
+        <rect width="112" height="112" x="4" y="4" rx="28" fill="url(#g)" stroke="#38bdf8" stroke-width="3" stroke-opacity="0.45"/>
+        <text x="60" y="69" font-family="Poppins, Arial, sans-serif" font-size="34" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1">${sigla}</text>
+    </svg>`;
+
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+}
+
+function resolverLogoEfectivoComercio13(lic = {}, claveClub = "") {
+    const clave = claveClub || lic?.claveClub || obtenerClaveClubActivoCDM();
+    // Solo el Club Deportivo Municipal original usa /img/logo.png por defecto
+    if (clave === CLAVE_CLUB_DEFECTO_CDM) {
+        return lic?.logoUrl || "/img/logo.png";
+    }
+    // Para cualquier otro comercio: si no subieron un logo propio, usar el Logo Genérico Neutro
+    if (esLogoPorDefectoDelClubCDM13(lic?.logoUrl)) {
+        return generarLogoGenericoSVGComercio13(lic);
+    }
+    return lic.logoUrl;
+}
+
+function quitarLogoYUsarGenericoEnModal13() {
+    const inp = document.getElementById("mcLogoUrl");
+    const prev = document.getElementById("mcPreviewLogo");
+    const sigla = document.getElementById("mcSiglaCodigo")?.value || "PRO";
+    const svgGen = generarLogoGenericoSVGComercio13({ siglaCodigo: sigla });
+
+    if (inp) inp.value = "";
+    if (prev) prev.src = svgGen;
+    if (typeof mostrarToast === "function") {
+        mostrarToast("✨ Se aplicó el ícono genérico neutro (sin escudo del club).");
+    }
+}
+
+// 1. Actualizar aplicarLicenciaYModulosCDM para que la barra lateral izquierda nunca muestre el escudo del club en otros comercios
+const _origAplicarLicencia13 = aplicarLicenciaYModulosCDM;
+aplicarLicenciaYModulosCDM = function () {
+    _origAplicarLicencia13.apply(this, arguments);
+
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes("login.html") || document.body?.classList.contains("login-page")) return;
+
+    const lic = obtenerLicenciaConfigCDM();
+    const claveActiva = obtenerClaveClubActivoCDM();
+    const logoFinal = resolverLogoEfectivoComercio13(lic, claveActiva);
+
+    document.querySelectorAll(".sidebar-brand img").forEach(img => {
+        img.src = logoFinal;
+        img.onerror = null;
+    });
+};
+
+// 2. Actualizar abrirModalCrearOEditarComercio para que al crear un comercio nuevo salga con logo vacío/genérico y botón "Quitar Logo"
+const _origAbrirModalComercio13 = abrirModalCrearOEditarComercio;
+abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+    await _origAbrirModalComercio13.apply(this, arguments);
+
+    const inpLogo = document.getElementById("mcLogoUrl");
+    const prevLogo = document.getElementById("mcPreviewLogo");
+    const inpSigla = document.getElementById("mcSiglaCodigo");
+    if (!inpLogo || !prevLogo) return;
+
+    const esCdmOriginal = claveClubEditar === CLAVE_CLUB_DEFECTO_CDM;
+
+    // Si es un comercio nuevo o si tenía pegado "/img/logo.png" sin ser CDM, limpiarlo a genérico
+    if (!esCdmOriginal && esLogoPorDefectoDelClubCDM13(inpLogo.value)) {
+        inpLogo.value = "";
+        inpLogo.placeholder = "Sin logo cargado (Usando ícono genérico con sigla)";
+        prevLogo.src = generarLogoGenericoSVGComercio13({ siglaCodigo: inpSigla?.value || "PRO" });
+    }
+
+    // Actualizar vista previa del logo genérico si cambia las 3 letras de la sigla y no subió imagen propia
+    if (inpSigla && !inpSigla.dataset.hookLogoSigla13) {
+        inpSigla.dataset.hookLogoSigla13 = "1";
+        inpSigla.addEventListener("input", () => {
+            if (!inpLogo.value.trim()) {
+                prevLogo.src = generarLogoGenericoSVGComercio13({ siglaCodigo: inpSigla.value || "PRO" });
+            }
+        });
+    }
+
+    // Agregar botón "🗑️ Quitar Logo / Usar Genérico" al lado de "Subir Logo"
+    const filaLogo = inpLogo.closest("div")?.parentElement;
+    if (filaLogo && !document.getElementById("btnQuitarLogoComercio13")) {
+        const btnQuitar = document.createElement("button");
+        btnQuitar.type = "button";
+        btnQuitar.id = "btnQuitarLogoComercio13";
+        btnQuitar.className = "btn btn-ghost btn-sm";
+        btnQuitar.onclick = quitarLogoYUsarGenericoEnModal13;
+        btnQuitar.innerHTML = `<i class="ri-refresh-line"></i> Usar Genérico / Sin Logo`;
+        filaLogo.appendChild(btnQuitar);
+    }
+};
+
+// 3. Al guardar el comercio, si no es CDM y dejaron el campo de logo vacío, guardar "" (para que use siempre el genérico y no /img/logo.png)
+const _origGuardarComercio13 = guardarComercioDesdeModal;
+guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
+    const inpLogo = document.getElementById("mcLogoUrl");
+    const esCdm = claveClubExistente === CLAVE_CLUB_DEFECTO_CDM;
+    const valorLogoUsuario = (inpLogo?.value || "").trim();
+    const usarGenerico = !esCdm && esLogoPorDefectoDelClubCDM13(valorLogoUsuario);
+
+    await _origGuardarComercio13.apply(this, arguments);
+
+    if (usarGenerico) {
+        const mapa = obtenerMapaLocalClubesCDM();
+        const nombreInput = (document.getElementById("mcNombreEntidad")?.value || "").trim().toLowerCase();
+        let claveTarget = claveClubExistente;
+        if (!claveTarget && nombreInput) {
+            const match = Object.values(mapa).find(c => (c.licenciaConfig?.nombreEntidad || "").toLowerCase() === nombreInput);
+            if (match) claveTarget = match.claveClub;
+        }
+        if (claveTarget && mapa[claveTarget]?.licenciaConfig) {
+            mapa[claveTarget].licenciaConfig.logoUrl = "";
+            localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+            if (obtenerClaveClubActivoCDM() === claveTarget) {
+                guardarLicenciaConfigCDM(mapa[claveTarget].licenciaConfig);
+            }
+        }
+    }
+
+    const enLogin = window.location.pathname.toLowerCase().includes("login.html") || document.body?.classList.contains("login-page");
+    if (enLogin && !document.getElementById("vistaHubSuperAdmin")?.classList.contains("hidden")) {
+        await mostrarHubSelectorDeComercios();
+    }
+};
+
+// 4. Actualizar las tarjetas del Hub SuperAdmin para que reemplacen el escudo de CDM por el Logo Genérico en todos los demás comercios
+const _origMostrarHub13 = mostrarHubSelectorDeComercios;
+mostrarHubSelectorDeComercios = async function () {
+    await _origMostrarHub13.apply(this, arguments);
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const cards = document.querySelectorAll("#gridTarjetasComerciosHub .hub-comercio-card");
+
+    cards.forEach((card, idx) => {
+        const item = lista[idx];
+        if (!item) return;
+        const img = card.querySelector("img");
+        if (img) {
+            img.onerror = null;
+            img.src = resolverLogoEfectivoComercio13(item.licenciaConfig || {}, item.claveClub);
+        }
+    });
+};
+
+// Aplicar el logo correcto apenas carga cualquier página interna
+document.addEventListener("DOMContentLoaded", () => {
+    aplicarLicenciaYModulosCDM();
+    setTimeout(aplicarLicenciaYModulosCDM, 150);
+});
+// =========================================================================
+// 14. PANEL SUPERADMIN DE INTERRUPTORES GRANULARES POR RUBRO (SALUD vs. DEPORTE)
+//     + PRESETS DE 1 CLIC (PSICÓLOGA INDIVIDUAL, KINE/CENTRO, GYM, CLUB COMPLETO)
+//     + SINCRONIZACIÓN DE ATRIBUTOS DATA-FEAT-* PARA BLOQUEO INSTANTÁNEO EN TODA LA APP
+// Pegar al final de login.js (debajo del Bloque 13)
+// =========================================================================
+
+const FUNCIONES_DEFECTO_SUPERADMIN_14 = {
+    salud: {
+        agenda: true,
+        mutuales: true,
+        genograma: true,
+        evolucion: true,
+        eva: true,
+        portalEstudios: true,
+        equipo: true
+    },
+    deporte: {
+        cobranza: true,
+        rutinasVideos: true,
+        evaluaciones1RM: true,
+        partidosPizarra: true,
+        ranking: true,
+        planSemanal: true
+    },
+    general: {
+        notasRapidas: true
+    }
+};
+
+window.__cdmPendingFunciones14 = null;
+
+function normalizarFuncionesLicencia14(lic = {}) {
+    const raw = (lic && typeof lic.funciones === "object" && lic.funciones) ? lic.funciones : {};
+    const cobranzaActiva = raw.deporte?.cobranza !== undefined
+        ? Boolean(raw.deporte.cobranza)
+        : !Boolean(lic?.bloquearCobranza);
+
+    return {
+        salud: {
+            ...FUNCIONES_DEFECTO_SUPERADMIN_14.salud,
+            ...(raw.salud || {})
+        },
+        deporte: {
+            ...FUNCIONES_DEFECTO_SUPERADMIN_14.deporte,
+            ...(raw.deporte || {}),
+            cobranza: cobranzaActiva
+        },
+        general: {
+            ...FUNCIONES_DEFECTO_SUPERADMIN_14.general,
+            ...(raw.general || {})
+        }
+    };
+}
+
+// 1. Asegurar que obtenerLicenciaConfigCDM siempre devuelva el objeto `funciones` completo
+const _origObtenerLicencia14 = obtenerLicenciaConfigCDM;
+obtenerLicenciaConfigCDM = function () {
+    const lic = _origObtenerLicencia14.apply(this, arguments);
+    lic.funciones = normalizarFuncionesLicencia14(lic);
+    return lic;
+};
+
+// 2. Asegurar que guardarLicenciaConfigCDM incluya siempre las funciones recién configuradas antes de persistir
+const _origGuardarLicencia14 = guardarLicenciaConfigCDM;
+guardarLicenciaConfigCDM = function (nuevaConfig) {
+    if (nuevaConfig && typeof nuevaConfig === "object") {
+        if (window.__cdmPendingFunciones14) {
+            nuevaConfig.funciones = normalizarFuncionesLicencia14({ funciones: window.__cdmPendingFunciones14 });
+            nuevaConfig.bloquearCobranza = !nuevaConfig.funciones.deporte.cobranza;
+        } else {
+            nuevaConfig.funciones = normalizarFuncionesLicencia14(nuevaConfig);
+        }
+    }
+    return _origGuardarLicencia14.apply(this, arguments);
+};
+
+// 3. Estampar los interruptores como atributos en <body> para ocultamiento instantáneo por CSS
+function sincronizarAtributosFuncionesBody14() {
+    if (!document.body) return;
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes("login.html") || document.body.classList.contains("login-page")) return;
+
+    const lic = obtenerLicenciaConfigCDM();
+    const f = normalizarFuncionesLicencia14(lic);
+
+    document.body.setAttribute("data-feat-sal-agenda", f.salud.agenda ? "on" : "off");
+    document.body.setAttribute("data-feat-sal-mutuales", f.salud.mutuales ? "on" : "off");
+    document.body.setAttribute("data-feat-sal-genograma", f.salud.genograma ? "on" : "off");
+    document.body.setAttribute("data-feat-sal-evolucion", f.salud.evolucion ? "on" : "off");
+    document.body.setAttribute("data-feat-sal-eva", f.salud.eva ? "on" : "off");
+    document.body.setAttribute("data-feat-sal-portal", f.salud.portalEstudios ? "on" : "off");
+    document.body.setAttribute("data-feat-sal-equipo", f.salud.equipo ? "on" : "off");
+
+    document.body.setAttribute("data-feat-dep-cobranza", f.deporte.cobranza ? "on" : "off");
+    document.body.setAttribute("data-feat-dep-rutinas", f.deporte.rutinasVideos ? "on" : "off");
+    document.body.setAttribute("data-feat-dep-evals", f.deporte.evaluaciones1RM ? "on" : "off");
+    document.body.setAttribute("data-feat-dep-partidos", f.deporte.partidosPizarra ? "on" : "off");
+    document.body.setAttribute("data-feat-dep-ranking", f.deporte.ranking ? "on" : "off");
+    document.body.setAttribute("data-feat-dep-plan", f.deporte.planSemanal ? "on" : "off");
+
+    document.body.setAttribute("data-feat-gen-notas", f.general.notasRapidas ? "on" : "off");
+    document.body.setAttribute("data-cobranza", f.deporte.cobranza ? "activa" : "bloqueada");
+}
+
+const _origAplicarLicencia14 = aplicarLicenciaYModulosCDM;
+aplicarLicenciaYModulosCDM = function () {
+    _origAplicarLicencia14.apply(this, arguments);
+    sincronizarAtributosFuncionesBody14();
+};
+
+// 4. Presets Inteligentes de 1 Clic en el Modal del Hub SuperAdmin
+function aplicarPresetRubroYFunciones14(presetKey) {
+    const chkF = document.getElementById("mcModFutbol");
+    const chkH = document.getElementById("mcModHockey");
+    const chkG = document.getElementById("mcModGym");
+    const inpDep = document.getElementById("mcDeportesExtra");
+    const inpPlan = document.getElementById("mcPlanActivo");
+    const inpSigla = document.getElementById("mcSiglaCodigo");
+    const selComp = document.getElementById("mcModoComplejidad");
+    const chkBloqCob = document.getElementById("mcBloquearCobranza");
+
+    const setSwitch = (grupo, clave, val) => {
+        const el = document.querySelector(`.mc-feat-switch-14[data-grupo="${grupo}"][data-clave="${clave}"]`);
+        if (el) el.checked = Boolean(val);
+    };
+
+    const setProfs = (listaActivas) => {
+        document.querySelectorAll(".mc-chk-profesion").forEach(c => {
+            c.checked = listaActivas.includes(c.value);
+        });
+    };
+
+    if (presetKey === "psicologa_individual") {
+        if (chkF) chkF.checked = false;
+        if (chkH) chkH.checked = false;
+        if (chkG) chkG.checked = false;
+        if (inpDep) inpDep.value = "";
+        if (inpPlan) inpPlan.value = "solo_consultorio";
+        if (inpSigla && ["GYM", "CDM", "CLB", "PAC", "KIN"].includes(inpSigla.value.toUpperCase())) inpSigla.value = "PSI";
+        if (selComp) selComp.value = "simple";
+        setProfs(["Psicología"]);
+
+        // Enfoque pedido: Genograma + Mutuales/Tokens + Notas de Evolución (todo lo demás apagado)
+        setSwitch("salud", "agenda", false);
+        setSwitch("salud", "mutuales", true);
+        setSwitch("salud", "genograma", true);
+        setSwitch("salud", "evolucion", true);
+        setSwitch("salud", "eva", false);
+        setSwitch("salud", "portalEstudios", false);
+        setSwitch("salud", "equipo", false);
+        setSwitch("general", "notasRapidas", true);
+    } else if (presetKey === "kine_centro") {
+        if (chkF) chkF.checked = false;
+        if (chkH) chkH.checked = false;
+        if (chkG) chkG.checked = false;
+        if (inpDep) inpDep.value = "";
+        if (inpPlan) inpPlan.value = "solo_consultorio";
+        if (inpSigla && ["GYM", "CDM", "CLB", "PSI"].includes(inpSigla.value.toUpperCase())) inpSigla.value = "KIN";
+        if (selComp) selComp.value = "simple";
+        setProfs(["Kinesiología", "Quiropraxia", "Nutrición", "Psicología"]);
+
+        setSwitch("salud", "agenda", true);
+        setSwitch("salud", "mutuales", true);
+        setSwitch("salud", "genograma", false);
+        setSwitch("salud", "evolucion", true);
+        setSwitch("salud", "eva", true);
+        setSwitch("salud", "portalEstudios", true);
+        setSwitch("salud", "equipo", true);
+        setSwitch("general", "notasRapidas", true);
+    } else if (presetKey === "gym_simple") {
+        if (chkF) chkF.checked = false;
+        if (chkH) chkH.checked = false;
+        if (chkG) chkG.checked = true;
+        if (inpDep) inpDep.value = "";
+        if (inpPlan) inpPlan.value = "solo_gym";
+        if (inpSigla && ["CDM", "PSI", "KIN"].includes(inpSigla.value.toUpperCase())) inpSigla.value = "GYM";
+        if (selComp) selComp.value = "simple";
+        setProfs([]);
+
+        setSwitch("deporte", "cobranza", true);
+        setSwitch("deporte", "rutinasVideos", true);
+        setSwitch("deporte", "evaluaciones1RM", false);
+        setSwitch("deporte", "partidosPizarra", false);
+        setSwitch("deporte", "ranking", false);
+        setSwitch("deporte", "planSemanal", false);
+        setSwitch("general", "notasRapidas", true);
+        if (chkBloqCob) chkBloqCob.checked = false;
+    } else if (presetKey === "club_completo") {
+        if (chkF) chkF.checked = true;
+        if (chkH) chkH.checked = true;
+        if (chkG) chkG.checked = true;
+        if (inpPlan) inpPlan.value = "completo";
+        if (selComp) selComp.value = "avanzado";
+        setProfs(["Kinesiología", "Nutrición", "Psicología"]);
+
+        document.querySelectorAll(".mc-feat-switch-14").forEach(el => { el.checked = true; });
+        if (chkBloqCob) chkBloqCob.checked = false;
+    }
+
+    actualizarVisibilidadBloquesInterruptores14();
+}
+
+function actualizarVisibilidadBloquesInterruptores14() {
+    const tieneSalud = document.querySelectorAll(".mc-chk-profesion:checked").length > 0 ||
+                       Boolean((document.getElementById("mcProfesionesExtra")?.value || "").trim());
+    const tieneDeporte = Boolean(
+        document.getElementById("mcModFutbol")?.checked ||
+        document.getElementById("mcModHockey")?.checked ||
+        document.getElementById("mcModGym")?.checked ||
+        (document.getElementById("mcDeportesExtra")?.value || "").trim()
+    );
+
+    const boxSalud = document.getElementById("panelSwitchesSalud14");
+    const boxDep = document.getElementById("panelSwitchesDeporte14");
+    if (boxSalud) boxSalud.style.opacity = tieneSalud ? "1" : "0.48";
+    if (boxDep) boxDep.style.opacity = tieneDeporte ? "1" : "0.48";
+}
+
+function leerFuncionesDesdeModalSuperAdmin14() {
+    const res = {
+        salud: { ...FUNCIONES_DEFECTO_SUPERADMIN_14.salud },
+        deporte: { ...FUNCIONES_DEFECTO_SUPERADMIN_14.deporte },
+        general: { ...FUNCIONES_DEFECTO_SUPERADMIN_14.general }
+    };
+    document.querySelectorAll(".mc-feat-switch-14").forEach(chk => {
+        const g = chk.dataset.grupo;
+        const k = chk.dataset.clave;
+        if (g && k && res[g]) {
+            res[g][k] = Boolean(chk.checked);
+        }
+    });
+    return res;
+}
+
+// 5. Inyectar el Tablero de Presets e Interruptores Granulares en abrirModalCrearOEditarComercio
+const _origAbrirModalComercio14 = abrirModalCrearOEditarComercio;
+abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+    await _origAbrirModalComercio14.apply(this, arguments);
+    const modal = document.getElementById("modalSuperAdminCDM");
+    if (!modal) return;
+
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const existente = claveClubEditar ? lista.find(x => x.claveClub === claveClubEditar) : null;
+    const lic = existente?.licenciaConfig || {};
+    const f = normalizarFuncionesLicencia14(lic);
+
+    const form = modal.querySelector("form");
+    if (!form || document.getElementById("panelInterruptoresGranulares14")) return;
+
+    const bloqueCredenciales = Array.from(form.children).find(el =>
+        el.tagName === "DIV" && /Credenciales\s+del\s+Due[ñn]o/i.test(el.textContent || "")
+    );
+
+    const renderSwitchItem = (grupo, clave, icono, titulo, desc, checked) => `
+        <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.55rem; background:#ffffff; border:1px solid #cbd5e1; border-radius:11px; padding:0.5rem 0.65rem; cursor:pointer;">
+            <div style="min-width:0;">
+                <strong style="font-size:0.77rem; color:#0f172a; display:block; line-height:1.2;">${icono} ${titulo}</strong>
+                <small style="font-size:0.66rem; color:#64748b; display:block; margin-top:2px; line-height:1.25;">${desc}</small>
+            </div>
+            <input type="checkbox" class="mc-feat-switch-14" data-grupo="${grupo}" data-clave="${clave}"
+                style="width:18px; height:18px; min-height:auto; flex-shrink:0; margin-top:2px; accent-color:#0284c7;"
+                ${checked ? "checked" : ""}>
+        </label>
+    `;
+
+    const panel = document.createElement("div");
+    panel.id = "panelInterruptoresGranulares14";
+    panel.style = "background:var(--surface-subtle); border:1.5px solid var(--line-celeste); border-radius:16px; padding:1rem; margin-bottom:0.95rem;";
+    panel.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
+            <div>
+                <label style="font-size:0.73rem; font-weight:800; color:#0369a1; text-transform:uppercase; margin:0; display:block;">
+                    🎛️ CONTROL DE FUNCIONES POR CLIENTE (PRENDER / BLOQUEAR HERRAMIENTAS)
+                </label>
+                <small style="font-size:0.71rem; color:var(--ink-500);">
+                    Elegí una plantilla rápida o destildá lo que este cliente NO necesita ver en su pantalla.
+                </small>
+            </div>
+        </div>
+
+        <!-- PLANTILLAS RÁPIDAS DE 1 CLIC -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:0.4rem; margin-bottom:0.85rem;">
+            <button type="button" class="btn btn-primary btn-sm" style="background:#6366f1; border-color:#4f46e5; font-size:0.72rem;" onclick="aplicarPresetRubroYFunciones14('psicologa_individual')">
+                🧠 Psicóloga (Genograma + Mutual)
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.72rem;" onclick="aplicarPresetRubroYFunciones14('kine_centro')">
+                🦿 Centro Kine / Salud
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.72rem;" onclick="aplicarPresetRubroYFunciones14('gym_simple')">
+                🏋️ Gimnasio Simple
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.72rem;" onclick="aplicarPresetRubroYFunciones14('club_completo')">
+                🏟️ Club Completo
+            </button>
+        </div>
+
+        <!-- BLOQUE A: INTERRUPTORES DEL MUNDO SALUD / CONSULTORIOS -->
+        <div id="panelSwitchesSalud14" style="background:rgba(16, 185, 129, 0.06); border:1px solid rgba(16, 185, 129, 0.28); border-radius:13px; padding:0.75rem; margin-bottom:0.75rem; transition:opacity 0.2s;">
+            <strong style="font-size:0.72rem; color:#047857; text-transform:uppercase; display:block; margin-bottom:0.5rem;">
+                🩺 Herramientas de Salud / Consultorios (Psicología, Kinesiología, Nutrición, Quiropraxia)
+            </strong>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(195px, 1fr)); gap:0.45rem;">
+                ${renderSwitchItem("salud", "genograma", "🌳", "Genograma y Vínculos", "Árbol familiar (padres, abuelos, hermanos, amigos)", f.salud.genograma)}
+                ${renderSwitchItem("salud", "mutuales", "🏥", "Mutuales, Tokens y Órdenes", "Convenios, tokens por sesión y liquidación", f.salud.mutuales)}
+                ${renderSwitchItem("salud", "evolucion", "✍️", "Sesiones y Evolución", "Registro de sesiones e historia clínica", f.salud.evolucion)}
+                ${renderSwitchItem("salud", "agenda", "📅", "Calendario 30 Días", "Agenda de turnos y avisos por WhatsApp", f.salud.agenda)}
+                ${renderSwitchItem("salud", "eva", "📉", "Escala de Dolor (EVA)", "Métrica física 0-10 (ideal Kine/Quiro)", f.salud.eva)}
+                ${renderSwitchItem("salud", "portalEstudios", "🔬", "Portal Paciente y Estudios", "Código PAC-XXXX, PDFs y recetas RP/", f.salud.portalEstudios)}
+                ${renderSwitchItem("salud", "equipo", "👥", "Equipo de Profesionales", "Multi-profesional y comisiones (apagar si trabaja sola)", f.salud.equipo)}
+            </div>
+        </div>
+
+        <!-- BLOQUE B: INTERRUPTORES DEL MUNDO DEPORTES / GIMNASIO -->
+        <div id="panelSwitchesDeporte14" style="background:rgba(2, 132, 199, 0.06); border:1px solid rgba(2, 132, 199, 0.25); border-radius:13px; padding:0.75rem; margin-bottom:0.75rem; transition:opacity 0.2s;">
+            <strong style="font-size:0.72rem; color:#0369a1; text-transform:uppercase; display:block; margin-bottom:0.5rem;">
+                ⚽🏋️ Herramientas de Deportes y Gimnasio
+            </strong>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(195px, 1fr)); gap:0.45rem;">
+                ${renderSwitchItem("deporte", "cobranza", "💳", "Cobranza y Cuotas", "Control de pagos, morosidad y caja", f.deporte.cobranza)}
+                ${renderSwitchItem("deporte", "rutinasVideos", "🎥", "Rutinas y Videoteca", "Armador de rutinas y videos técnicos", f.deporte.rutinasVideos)}
+                ${renderSwitchItem("deporte", "evaluaciones1RM", "📈", "Evaluaciones 1RM y Radar", "Curvas de fuerza, tabla % 1RM y comparador", f.deporte.evaluaciones1RM)}
+                ${renderSwitchItem("deporte", "partidosPizarra", "📋", "Pizarra Táctica y Partidos", "Cancha en vivo, marcador y citaciones", f.deporte.partidosPizarra)}
+                ${renderSwitchItem("deporte", "ranking", "🏆", "Ranking Oficial (1 a 10)", "Puntajes y clasificación por categoría", f.deporte.ranking)}
+                ${renderSwitchItem("deporte", "planSemanal", "🗓️", "Plan Semanal y Buena Fe", "Microciclo semanal y nómina habilitada", f.deporte.planSemanal)}
+            </div>
+        </div>
+
+        <!-- BLOQUE C: HERRAMIENTAS GENERALES -->
+        <div style="display:grid; grid-template-columns:1fr; gap:0.45rem;">
+            ${renderSwitchItem("general", "notasRapidas", "📝", "Bloc de Notas Rápidas (Barra Superior)", "Panel deslizable de recordatorios y checklist rápidos", f.general.notasRapidas)}
+        </div>
+    `;
+
+    if (bloqueCredenciales) {
+        bloqueCredenciales.insertAdjacentElement("beforebegin", panel);
+    } else {
+        form.appendChild(panel);
+    }
+
+    // Sincronizar el viejo checkbox "Bloquear Cobranza" con el switch de Cobranza
+    const chkBloqCob = document.getElementById("mcBloquearCobranza");
+    const swCob = panel.querySelector('.mc-feat-switch-14[data-grupo="deporte"][data-clave="cobranza"]');
+    if (chkBloqCob && swCob) {
+        chkBloqCob.addEventListener("change", () => { swCob.checked = !chkBloqCob.checked; });
+        swCob.addEventListener("change", () => { chkBloqCob.checked = !swCob.checked; });
+    }
+
+    modal.querySelectorAll("#mcModFutbol, #mcModHockey, #mcModGym, .mc-chk-profesion").forEach(el => {
+        el.addEventListener("change", actualizarVisibilidadBloquesInterruptores14);
+    });
+    actualizarVisibilidadBloquesInterruptores14();
+};
+
+// 6. Guardar las funciones elegidas al confirmar el formulario del comercio
+const _origGuardarComercio14 = guardarComercioDesdeModal;
+guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
+    const funcionesCapturadas = leerFuncionesDesdeModalSuperAdmin14();
+    window.__cdmPendingFunciones14 = funcionesCapturadas;
+
+    // Mantener sincronizado el flag clásico bloquearCobranza
+    const chkBloqCob = document.getElementById("mcBloquearCobranza");
+    if (chkBloqCob) chkBloqCob.checked = !funcionesCapturadas.deporte.cobranza;
+
+    const nombreInput = (document.getElementById("mcNombreEntidad")?.value || "").trim().toLowerCase();
+
+    await _origGuardarComercio14.apply(this, arguments);
+
+    const mapa = obtenerMapaLocalClubesCDM();
+    let claveTarget = claveClubExistente;
+    if (!claveTarget && nombreInput) {
+        const match = Object.values(mapa).find(c => (c.licenciaConfig?.nombreEntidad || "").toLowerCase() === nombreInput);
+        if (match) claveTarget = match.claveClub;
+    }
+
+    if (claveTarget && mapa[claveTarget]?.licenciaConfig) {
+        mapa[claveTarget].licenciaConfig.funciones = funcionesCapturadas;
+        mapa[claveTarget].licenciaConfig.bloquearCobranza = !funcionesCapturadas.deporte.cobranza;
+        localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+
+        if (obtenerClaveClubActivoCDM() === claveTarget) {
+            localStorage.setItem(STORAGE_LICENCIA_KEY, JSON.stringify(mapa[claveTarget].licenciaConfig));
+        }
+
+        if (window.location.protocol !== "file:") {
+            try {
+                const respEst = await fetch(`/api/cdm/estado?club=${encodeURIComponent(claveTarget)}`);
+                if (respEst.ok) {
+                    const dEst = await respEst.json();
+                    const estActual = dEst.estado || {};
+                    estActual.licenciaConfig = mapa[claveTarget].licenciaConfig;
+                    await fetch("/api/cdm/estado", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...estActual, claveClub: claveTarget })
+                    });
+                }
+            } catch {}
+        }
+    }
+
+    window.__cdmPendingFunciones14 = null;
+    sincronizarAtributosFuncionesBody14();
+
+    const enLogin = window.location.pathname.toLowerCase().includes("login.html") || document.body.classList.contains("login-page");
+    if (enLogin && !document.getElementById("vistaHubSuperAdmin")?.classList.contains("hidden")) {
+        await mostrarHubSelectorDeComercios();
+    }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    sincronizarAtributosFuncionesBody14();
+    setTimeout(sincronizarAtributosFuncionesBody14, 150);
+});
+// =========================================================================
+// 15. INTERRUPTORES DEL PAQUETE 1 EN SUPERADMIN (LOTE MUTUALES, AUMENTO
+//     MASIVO DE CUOTAS + ALIAS/CBU Y CIERRE DE CAJA POR MEDIO DE PAGO)
+// Pegar al final de login.js (debajo del Bloque 14)
+// =========================================================================
+
+if (typeof FUNCIONES_DEFECTO_SUPERADMIN_14 !== "undefined") {
+    FUNCIONES_DEFECTO_SUPERADMIN_14.salud.loteMutuales = true;
+    FUNCIONES_DEFECTO_SUPERADMIN_14.deporte.aumentoMasivo = true;
+    FUNCIONES_DEFECTO_SUPERADMIN_14.general.cierreCaja = true;
+}
+
+const _origNormalizarFunc15 = typeof normalizarFuncionesLicencia14 === "function" ? normalizarFuncionesLicencia14 : null;
+normalizarFuncionesLicencia14 = function (lic = {}) {
+    const base = _origNormalizarFunc15 ? _origNormalizarFunc15(lic) : { salud: {}, deporte: {}, general: {} };
+    const raw = (lic && typeof lic.funciones === "object" && lic.funciones) ? lic.funciones : {};
+
+    base.salud.loteMutuales = raw.salud?.loteMutuales !== undefined ? Boolean(raw.salud.loteMutuales) : true;
+    base.deporte.aumentoMasivo = raw.deporte?.aumentoMasivo !== undefined ? Boolean(raw.deporte.aumentoMasivo) : true;
+    base.general.cierreCaja = raw.general?.cierreCaja !== undefined ? Boolean(raw.general.cierreCaja) : true;
+    return base;
+};
+
+const _origSincronizarBody15 = typeof sincronizarAtributosFuncionesBody14 === "function" ? sincronizarAtributosFuncionesBody14 : null;
+sincronizarAtributosFuncionesBody14 = function () {
+    if (_origSincronizarBody15) _origSincronizarBody15();
+    if (!document.body) return;
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes("login.html") || document.body.classList.contains("login-page")) return;
+
+    const lic = obtenerLicenciaConfigCDM();
+    const f = normalizarFuncionesLicencia14(lic);
+    document.body.setAttribute("data-feat-sal-lote", f.salud.loteMutuales ? "on" : "off");
+    document.body.setAttribute("data-feat-dep-aumento", f.deporte.aumentoMasivo ? "on" : "off");
+    document.body.setAttribute("data-feat-gen-caja", f.general.cierreCaja ? "on" : "off");
+};
+
+const _origAplicarPreset15 = typeof aplicarPresetRubroYFunciones14 === "function" ? aplicarPresetRubroYFunciones14 : null;
+aplicarPresetRubroYFunciones14 = function (presetKey) {
+    if (_origAplicarPreset15) _origAplicarPreset15(presetKey);
+    const setSw = (g, k, v) => {
+        const el = document.querySelector(`.mc-feat-switch-14[data-grupo="${g}"][data-clave="${k}"]`);
+        if (el) el.checked = Boolean(v);
+    };
+
+    if (presetKey === "psicologa_individual" || presetKey === "kine_centro") {
+        setSw("salud", "loteMutuales", true);
+        setSw("general", "cierreCaja", true);
+    } else if (presetKey === "gym_simple" || presetKey === "club_completo") {
+        setSw("deporte", "aumentoMasivo", true);
+        setSw("general", "cierreCaja", true);
+    }
+};
+
+const _origAbrirModalComercio15 = abrirModalCrearOEditarComercio;
+abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+    await _origAbrirModalComercio15.apply(this, arguments);
+    const modal = document.getElementById("modalSuperAdminCDM");
+    const panel = document.getElementById("panelInterruptoresGranulares14");
+    if (!modal || !panel) return;
+
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const existente = claveClubEditar ? lista.find(x => x.claveClub === claveClubEditar) : null;
+    const lic = existente?.licenciaConfig || {};
+    const f = normalizarFuncionesLicencia14(lic);
+
+    const crearSwitchHTML = (grupo, clave, icono, titulo, desc, checked) => `
+        <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.55rem; background:#ffffff; border:1px solid #cbd5e1; border-radius:11px; padding:0.5rem 0.65rem; cursor:pointer;">
+            <div style="min-width:0;">
+                <strong style="font-size:0.77rem; color:#0f172a; display:block; line-height:1.2;">${icono} ${titulo}</strong>
+                <small style="font-size:0.66rem; color:#64748b; display:block; margin-top:2px; line-height:1.25;">${desc}</small>
+            </div>
+            <input type="checkbox" class="mc-feat-switch-14" data-grupo="${grupo}" data-clave="${clave}"
+                style="width:18px; height:18px; min-height:auto; flex-shrink:0; margin-top:2px; accent-color:#0284c7;"
+                ${checked ? "checked" : ""}>
+        </label>
+    `;
+
+    // 1. Inyectar switch de Lote Mensual por Mutual en Salud
+    const gridSalud = document.querySelector("#panelSwitchesSalud14 > div");
+    if (gridSalud && !gridSalud.querySelector('[data-clave="loteMutuales"]')) {
+        gridSalud.insertAdjacentHTML("beforeend", crearSwitchHTML(
+            "salud", "loteMutuales", "📊", "Lote Mensual por Mutual",
+            "Exportar Excel (CSV) y PDF A4 listo para facturar a obras sociales", f.salud.loteMutuales
+        ));
+    }
+
+    // 2. Inyectar switch de Aumento Masivo de Cuotas + Alias en Deporte/Gym
+    const gridDep = document.querySelector("#panelSwitchesDeporte14 > div");
+    if (gridDep && !gridDep.querySelector('[data-clave="aumentoMasivo"]')) {
+        gridDep.insertAdjacentHTML("beforeend", crearSwitchHTML(
+            "deporte", "aumentoMasivo", "📈", "Aumento Masivo + Alias WA",
+            "Subir cuotas por % o plan y enviar recordatorios con Alias/CBU", f.deporte.aumentoMasivo
+        ));
+    }
+
+    // 3. Inyectar switch de Cierre de Caja + campos de Alias/CBU en General
+    const bloqueGen = panel.lastElementChild;
+    if (bloqueGen && !bloqueGen.querySelector('[data-clave="cierreCaja"]')) {
+        bloqueGen.style.gridTemplateColumns = "repeat(auto-fit, minmax(220px, 1fr))";
+        bloqueGen.insertAdjacentHTML("beforeend", crearSwitchHTML(
+            "general", "cierreCaja", "💵", "Cierre de Caja por Medio de Pago",
+            "Resumen de Efectivo, Transferencia/MP y Pendiente de Mutuales", f.general.cierreCaja
+        ));
+    }
+
+    if (!document.getElementById("bloqueAliasCobrosModal15")) {
+        const boxAlias = document.createElement("div");
+        boxAlias.id = "bloqueAliasCobrosModal15";
+        boxAlias.style = "margin-top:0.75rem; padding-top:0.75rem; border-top:1.5px dashed #cbd5e1;";
+        boxAlias.innerHTML = `
+            <strong style="font-size:0.72rem; color:#0369a1; text-transform:uppercase; display:block; margin-bottom:0.45rem;">
+                🏦 Datos de Transferencia del Comercio / Profesional (Se envían en avisos de WhatsApp)
+            </strong>
+            <div class="grid-2">
+                <div class="field">
+                    <label>Alias o CBU / CVU</label>
+                    <input type="text" id="mcAliasTransferencia15" placeholder="Ej: consultorio.psi.mp / club.cdm.mp" value="${(lic.aliasTransferencia || "").replace(/"/g, "&quot;")}">
+                </div>
+                <div class="field">
+                    <label>Titular / Banco o Billetera</label>
+                    <input type="text" id="mcTitularTransferencia15" placeholder="Ej: Lic. Camila Rojas (Mercado Pago)" value="${(lic.titularTransferencia || "").replace(/"/g, "&quot;")}">
+                </div>
+            </div>
+        `;
+        panel.appendChild(boxAlias);
+    }
+};
+
+const _origGuardarComercio15 = guardarComercioDesdeModal;
+guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
+    const aliasVal = (document.getElementById("mcAliasTransferencia15")?.value || "").trim();
+    const titularVal = (document.getElementById("mcTitularTransferencia15")?.value || "").trim();
+    const nombreInput = (document.getElementById("mcNombreEntidad")?.value || "").trim().toLowerCase();
+
+    await _origGuardarComercio15.apply(this, arguments);
+
+    const mapa = obtenerMapaLocalClubesCDM();
+    let claveTarget = claveClubExistente;
+    if (!claveTarget && nombreInput) {
+        const match = Object.values(mapa).find(c => (c.licenciaConfig?.nombreEntidad || "").toLowerCase() === nombreInput);
+        if (match) claveTarget = match.claveClub;
+    }
+
+    if (claveTarget && mapa[claveTarget]?.licenciaConfig) {
+        mapa[claveTarget].licenciaConfig.aliasTransferencia = aliasVal;
+        mapa[claveTarget].licenciaConfig.titularTransferencia = titularVal;
+        localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+
+        if (obtenerClaveClubActivoCDM() === claveTarget) {
+            localStorage.setItem(STORAGE_LICENCIA_KEY, JSON.stringify(mapa[claveTarget].licenciaConfig));
+        }
+
+        if (window.location.protocol !== "file:") {
+            try {
+                const respEst = await fetch(`/api/cdm/estado?club=${encodeURIComponent(claveTarget)}`);
+                if (respEst.ok) {
+                    const dEst = await respEst.json();
+                    const estActual = dEst.estado || {};
+                    estActual.licenciaConfig = mapa[claveTarget].licenciaConfig;
+                    await fetch("/api/cdm/estado", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...estActual, claveClub: claveTarget })
+                    });
+                }
+            } catch {}
+        }
+    }
+    sincronizarAtributosFuncionesBody14();
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(sincronizarAtributosFuncionesBody14, 180);
+});
+// =========================================================================
+// 16. INTERRUPTORES DEL PAQUETE 2 EN SUPERADMIN:
+//     - SALUD: CONSENTIMIENTO CON FIRMA TÁCTIL + MAPA CORPORAL INTERACTIVO
+//     - GYM: MODO TÓTEM RECEPCIÓN Y CUPOS POR HORARIO
+//     - DEPORTES: SEMÁFORO APTO MÉDICO (EMMAC) Y ESTADÍSTICAS DE TEMPORADA
+// Pegar al final de login.js (debajo del Bloque 15)
+// =========================================================================
+
+if (typeof FUNCIONES_DEFECTO_SUPERADMIN_14 !== "undefined") {
+    FUNCIONES_DEFECTO_SUPERADMIN_14.salud.consentimiento = true;
+    FUNCIONES_DEFECTO_SUPERADMIN_14.salud.mapaCorporal = true;
+    FUNCIONES_DEFECTO_SUPERADMIN_14.deporte.totemYCupos = true;
+    FUNCIONES_DEFECTO_SUPERADMIN_14.deporte.emmacYEstadisticas = true;
+}
+
+const _origNormalizarFunc16 = typeof normalizarFuncionesLicencia14 === "function" ? normalizarFuncionesLicencia14 : null;
+normalizarFuncionesLicencia14 = function (lic = {}) {
+    const base = _origNormalizarFunc16 ? _origNormalizarFunc16(lic) : { salud: {}, deporte: {}, general: {} };
+    const raw = (lic && typeof lic.funciones === "object" && lic.funciones) ? lic.funciones : {};
+
+    base.salud.consentimiento = raw.salud?.consentimiento !== undefined ? Boolean(raw.salud.consentimiento) : true;
+    base.salud.mapaCorporal = raw.salud?.mapaCorporal !== undefined ? Boolean(raw.salud.mapaCorporal) : true;
+    base.deporte.totemYCupos = raw.deporte?.totemYCupos !== undefined ? Boolean(raw.deporte.totemYCupos) : true;
+    base.deporte.emmacYEstadisticas = raw.deporte?.emmacYEstadisticas !== undefined ? Boolean(raw.deporte.emmacYEstadisticas) : true;
+    return base;
+};
+
+const _origSincronizarBody16 = typeof sincronizarAtributosFuncionesBody14 === "function" ? sincronizarAtributosFuncionesBody14 : null;
+sincronizarAtributosFuncionesBody14 = function () {
+    if (_origSincronizarBody16) _origSincronizarBody16();
+    if (!document.body) return;
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes("login.html") || document.body.classList.contains("login-page")) return;
+
+    const lic = obtenerLicenciaConfigCDM();
+    const f = normalizarFuncionesLicencia14(lic);
+    document.body.setAttribute("data-feat-sal-consentimiento", f.salud.consentimiento ? "on" : "off");
+    document.body.setAttribute("data-feat-sal-mapa", f.salud.mapaCorporal ? "on" : "off");
+    document.body.setAttribute("data-feat-dep-totem", f.deporte.totemYCupos ? "on" : "off");
+    document.body.setAttribute("data-feat-dep-emmac", f.deporte.emmacYEstadisticas ? "on" : "off");
+};
+
+const _origAplicarPreset16 = typeof aplicarPresetRubroYFunciones14 === "function" ? aplicarPresetRubroYFunciones14 : null;
+aplicarPresetRubroYFunciones14 = function (presetKey) {
+    if (_origAplicarPreset16) _origAplicarPreset16(presetKey);
+    const setSw = (g, k, v) => {
+        const el = document.querySelector(`.mc-feat-switch-14[data-grupo="${g}"][data-clave="${k}"]`);
+        if (el) el.checked = Boolean(v);
+    };
+
+    if (presetKey === "psicologa_individual") {
+        setSw("salud", "consentimiento", true);
+        setSw("salud", "mapaCorporal", false);
+    } else if (presetKey === "kine_centro") {
+        setSw("salud", "consentimiento", true);
+        setSw("salud", "mapaCorporal", true);
+    } else if (presetKey === "gym_simple") {
+        setSw("deporte", "totemYCupos", true);
+        setSw("deporte", "emmacYEstadisticas", false);
+    } else if (presetKey === "club_completo") {
+        setSw("salud", "consentimiento", true);
+        setSw("salud", "mapaCorporal", true);
+        setSw("deporte", "totemYCupos", true);
+        setSw("deporte", "emmacYEstadisticas", true);
+    }
+};
+
+const _origAbrirModalComercio16 = abrirModalCrearOEditarComercio;
+abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+    await _origAbrirModalComercio16.apply(this, arguments);
+    const panel = document.getElementById("panelInterruptoresGranulares14");
+    if (!panel) return;
+
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const existente = claveClubEditar ? lista.find(x => x.claveClub === claveClubEditar) : null;
+    const lic = existente?.licenciaConfig || {};
+    const f = normalizarFuncionesLicencia14(lic);
+
+    const crearSw = (grupo, clave, icono, titulo, desc, checked) => `
+        <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.55rem; background:#ffffff; border:1px solid #cbd5e1; border-radius:11px; padding:0.5rem 0.65rem; cursor:pointer;">
+            <div style="min-width:0;">
+                <strong style="font-size:0.77rem; color:#0f172a; display:block; line-height:1.2;">${icono} ${titulo}</strong>
+                <small style="font-size:0.66rem; color:#64748b; display:block; margin-top:2px; line-height:1.25;">${desc}</small>
+            </div>
+            <input type="checkbox" class="mc-feat-switch-14" data-grupo="${grupo}" data-clave="${clave}"
+                style="width:18px; height:18px; min-height:auto; flex-shrink:0; margin-top:2px; accent-color:#0284c7;"
+                ${checked ? "checked" : ""}>
+        </label>
+    `;
+
+    const gridSalud = document.querySelector("#panelSwitchesSalud14 > div");
+    if (gridSalud && !gridSalud.querySelector('[data-clave="consentimiento"]')) {
+        gridSalud.insertAdjacentHTML("beforeend", crearSw(
+            "salud", "consentimiento", "✍️", "Consentimiento + Firma Táctil",
+            "Firma digital en pantalla (adultos/menores) y PDF A4", f.salud.consentimiento
+        ));
+        gridSalud.insertAdjacentHTML("beforeend", crearSw(
+            "salud", "mapaCorporal", "🧍", "Mapa Corporal Interactivo",
+            "Silueta Frente/Espalda para marcar dolor y lesiones (Kine/Quiro)", f.salud.mapaCorporal
+        ));
+    }
+
+    const gridDep = document.querySelector("#panelSwitchesDeporte14 > div");
+    if (gridDep && !gridDep.querySelector('[data-clave="totemYCupos"]')) {
+        gridDep.insertAdjacentHTML("beforeend", crearSw(
+            "deporte", "totemYCupos", "🖥️", "Modo Tótem y Cupos Horarios",
+            "Recepción pantalla completa por DNI y turnos con cupo (Gym)", f.deporte.totemYCupos
+        ));
+        gridDep.insertAdjacentHTML("beforeend", crearSw(
+            "deporte", "emmacYEstadisticas", "🏥", "Apto EMMAC y Estadísticas",
+            "Semáforo apto médico anual + Goleadores y tabla de temporada", f.deporte.emmacYEstadisticas
+        ));
+    }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(sincronizarAtributosFuncionesBody14, 210);
+});
+// =========================================================================
+// 17. BACKUP Y RESTAURACIÓN INDIVIDUAL POR COMERCIO DESDE EL HUB SUPERADMIN
+//     - EXPORTA E IMPORTA UN ÚNICO CLIENTE (.JSON) SIN PISAR OTROS COMERCIOS
+//     - INCLUYE PLANTELES, RUTINAS, CONSULTORIO, PACIENTES, GENOGRAMAS, CAJA Y NOTAS
+// Pegar al final de login.js (debajo del Bloque 16)
+// =========================================================================
+
+function exportarBackupIndividualComercio17(claveClub) {
+    if (!claveClub) return;
+    guardarSnapshotClubActualEnMapaLocal();
+    const mapa = obtenerMapaLocalClubesCDM();
+    const clubData = mapa[claveClub];
+    if (!clubData) {
+        alert("No se encontraron datos guardados para este comercio.");
+        return;
+    }
+
+    // Recolectar también los módulos satélites aislados de este comercio (Consultorio, Caja, Notas, Cupos, Aranceles, Pacientes)
+    let consultorioClub = null;
+    try {
+        const allCons = JSON.parse(localStorage.getItem("cdm_consultorio_pro_v1") || "{}");
+        if (allCons && allCons[claveClub]) consultorioClub = allCons[claveClub];
+    } catch {}
+
+    let notasClub = [];
+    try {
+        const allNotas = JSON.parse(localStorage.getItem("cdm_notas_rapidas_pro_v23") || "{}");
+        if (allNotas && Array.isArray(allNotas[claveClub])) notasClub = allNotas[claveClub];
+    } catch {}
+
+    let pacientesUniversalesClub = {};
+    try {
+        const allUniv = JSON.parse(localStorage.getItem("cdm_registro_universal_pacientes_v19") || "{}");
+        Object.entries(allUniv).forEach(([k, v]) => {
+            if (v && (!v.claveClub || v.claveClub === claveClub)) {
+                pacientesUniversalesClub[k] = v;
+            }
+        });
+    } catch {}
+
+    let cajaClub = [], cuposClub = null, arancelesClub = {};
+    try { cajaClub = JSON.parse(localStorage.getItem(`cdm_caja_movs_v25_${claveClub}`) || "[]"); } catch {}
+    try { cuposClub = JSON.parse(localStorage.getItem(`cdm_gym_cupos_v26_${claveClub}`) || "null"); } catch {}
+    try { arancelesClub = JSON.parse(localStorage.getItem(`cdm_aranceles_lote_v25_${claveClub}`) || "{}"); } catch {}
+
+    const paqueteBackup = {
+        tipoBackup: "COMERCIO_INDIVIDUAL_SAAS_V1",
+        fechaExportacion: new Date().toISOString(),
+        claveClub,
+        nombreEntidad: clubData.licenciaConfig?.nombreEntidad || claveClub,
+        datosPrincipales: clubData,
+        extrasComercio: {
+            consultorio: consultorioClub,
+            notasRapidas: notasClub,
+            pacientesUniversales: pacientesUniversalesClub,
+            cajaMovimientos: cajaClub,
+            gymCupos: cuposClub,
+            arancelesLote: arancelesClub
+        }
+    };
+
+    const hoy = new Date().toISOString().split("T")[0];
+    const blob = new Blob([JSON.stringify(paqueteBackup, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `backup_${claveClub}_${hoy}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    if (typeof mostrarToast === "function") {
+        mostrarToast(`💾 Backup individual de "${paqueteBackup.nombreEntidad}" descargado.`);
+    }
+}
+
+function importarBackupIndividualComercio17(event, claveClubDestino) {
+    const file = event.target.files?.[0];
+    if (!file || !claveClubDestino) return;
+
+    const reader = new FileReader();
+    reader.onload = async function (ev) {
+        try {
+            const parsed = JSON.parse(ev.target.result);
+            const esFormatoIndividual = parsed && parsed.tipoBackup === "COMERCIO_INDIVIDUAL_SAAS_V1" && parsed.datosPrincipales;
+            const datosClub = esFormatoIndividual ? parsed.datosPrincipales : parsed;
+
+            if (!datosClub || typeof datosClub !== "object" || (!Array.isArray(datosClub.personas) && !datosClub.licenciaConfig)) {
+                throw new Error("El archivo no corresponde a una copia de seguridad válida.");
+            }
+
+            const mapa = obtenerMapaLocalClubesCDM();
+            const nombreDestino = mapa[claveClubDestino]?.licenciaConfig?.nombreEntidad || claveClubDestino;
+            if (!confirm(`⚠️ ¿Restaurar este backup únicamente dentro de "${nombreDestino}"?\n\nLos demás comercios de tu Hub NO se modificarán.`)) {
+                event.target.value = "";
+                return;
+            }
+
+            // Mantener la claveClub destino para aislarlo siempre dentro de este cliente
+            const licRestaurada = {
+                ...(mapa[claveClubDestino]?.licenciaConfig || {}),
+                ...(datosClub.licenciaConfig || {}),
+                claveClub: claveClubDestino
+            };
+
+            mapa[claveClubDestino] = {
+                claveClub: claveClubDestino,
+                ultimaActualizacionISO: new Date().toISOString(),
+                personas: Array.isArray(datosClub.personas) ? datosClub.personas : [],
+                rutinas: Array.isArray(datosClub.rutinas) ? datosClub.rutinas : [],
+                partidos: Array.isArray(datosClub.partidos) ? datosClub.partidos : [],
+                alineaciones: datosClub.alineaciones && typeof datosClub.alineaciones === "object" ? datosClub.alineaciones : {},
+                microciclos: datosClub.microciclos && typeof datosClub.microciclos === "object" ? datosClub.microciclos : {},
+                licenciaConfig: licRestaurada
+            };
+            localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+
+            // Restaurar módulos satélites del comercio si vienen en el backup individual
+            if (esFormatoIndividual && parsed.extrasComercio) {
+                const ex = parsed.extrasComercio;
+                if (ex.consultorio) {
+                    const allCons = JSON.parse(localStorage.getItem("cdm_consultorio_pro_v1") || "{}");
+                    allCons[claveClubDestino] = ex.consultorio;
+                    localStorage.setItem("cdm_consultorio_pro_v1", JSON.stringify(allCons));
+                }
+                if (Array.isArray(ex.notasRapidas)) {
+                    const allNotas = JSON.parse(localStorage.getItem("cdm_notas_rapidas_pro_v23") || "{}");
+                    allNotas[claveClubDestino] = ex.notasRapidas;
+                    localStorage.setItem("cdm_notas_rapidas_pro_v23", JSON.stringify(allNotas));
+                }
+                if (ex.pacientesUniversales && typeof ex.pacientesUniversales === "object") {
+                    const allUniv = JSON.parse(localStorage.getItem("cdm_registro_universal_pacientes_v19") || "{}");
+                    Object.entries(ex.pacientesUniversales).forEach(([k, v]) => {
+                        allUniv[k] = { ...v, claveClub: claveClubDestino };
+                    });
+                    localStorage.setItem("cdm_registro_universal_pacientes_v19", JSON.stringify(allUniv));
+                }
+                if (Array.isArray(ex.cajaMovimientos)) {
+                    localStorage.setItem(`cdm_caja_movs_v25_${claveClubDestino}`, JSON.stringify(ex.cajaMovimientos));
+                }
+                if (Array.isArray(ex.gymCupos)) {
+                    localStorage.setItem(`cdm_gym_cupos_v26_${claveClubDestino}`, JSON.stringify(ex.gymCupos));
+                }
+                if (ex.arancelesLote && typeof ex.arancelesLote === "object") {
+                    localStorage.setItem(`cdm_aranceles_lote_v25_${claveClubDestino}`, JSON.stringify(ex.arancelesLote));
+                }
+            }
+
+            // Si es el comercio actualmente cargado en memoria local, refrescar también las claves activas
+            if (obtenerClaveClubActivoCDM() === claveClubDestino) {
+                cargarEstadoClubEnLocalStorage(mapa[claveClubDestino], claveClubDestino);
+            }
+
+            // Sincronizar con el servidor si está activo
+            if (window.location.protocol !== "file:") {
+                try {
+                    await fetch("/api/cdm/estado", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(mapa[claveClubDestino])
+                    });
+                } catch {}
+            }
+
+            alert(`✅ Backup restaurado correctamente en "${licRestaurada.nombreEntidad || nombreDestino}".`);
+            await mostrarHubSelectorDeComercios();
+        } catch (err) {
+            alert("❌ Error al restaurar backup: " + err.message);
+        } finally {
+            event.target.value = "";
+        }
+    };
+    reader.readAsText(file);
+}
+
+// Inyectar los botones "💾 Backup" y "📂 Restaurar" en cada tarjeta del Hub SuperAdmin
+const _origMostrarHub17 = mostrarHubSelectorDeComercios;
+mostrarHubSelectorDeComercios = async function () {
+    await _origMostrarHub17.apply(this, arguments);
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const cards = document.querySelectorAll("#gridTarjetasComerciosHub .hub-comercio-card");
+
+    cards.forEach((card, idx) => {
+        const item = lista[idx];
+        if (!item || !item.claveClub || card.querySelector(".hub-backup-row-17")) return;
+
+        const pieBotones = card.lastElementChild;
+        if (!pieBotones) return;
+
+        const filaBackup = document.createElement("div");
+        filaBackup.className = "hub-backup-row-17";
+        filaBackup.style = "display:flex; gap:0.35rem;";
+        filaBackup.innerHTML = `
+            <button type="button" class="btn btn-ghost btn-sm" style="flex:1; font-size:0.71rem; min-height:29px;" onclick="exportarBackupIndividualComercio17('${item.claveClub}')" title="Descargar copia de seguridad JSON solo de este comercio">
+                💾 Backup
+            </button>
+            <label class="btn btn-ghost btn-sm" style="flex:1; font-size:0.71rem; min-height:29px; cursor:pointer; margin:0;" title="Restaurar copia JSON solo en este comercio">
+                📂 Restaurar
+                <input type="file" accept=".json" onchange="importarBackupIndividualComercio17(event, '${item.claveClub}')" style="display:none;">
+            </label>
+        `;
+        pieBotones.appendChild(filaBackup);
+    });
+};

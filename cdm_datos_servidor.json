@@ -1,6 +1,6 @@
 {
   "claveClub": "cdm_adelia_maria_principal",
-  "ultimaActualizacionISO": "2026-11-17T18:40:01.232Z",
+  "ultimaActualizacionISO": "2026-11-19T18:42:43.694Z",
   "personas": [
     {
       "id": 101,
@@ -31,14 +31,14 @@
       "pagoEstado": "Al Día",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
-        "2026-11-15",
-        "2026-11-17"
+        "2026-11-14",
+        "2026-11-16",
+        "2026-11-18"
       ],
       "clinico": [
         {
           "id": 1,
-          "fecha": "2026-11-17",
+          "fecha": "2026-11-18",
           "peso": 54,
           "rpe": 6,
           "sueno": 5,
@@ -48,7 +48,7 @@
       "evaluaciones": [
         {
           "id": 11,
-          "fecha": "2026-10-23",
+          "fecha": "2026-10-24",
           "ejercicio": "Sentadilla Trasera",
           "tipo": "fuerza_kg",
           "valor": 65,
@@ -58,7 +58,7 @@
         },
         {
           "id": 12,
-          "fecha": "2026-11-05",
+          "fecha": "2026-11-06",
           "ejercicio": "Sentadilla Trasera",
           "tipo": "fuerza_kg",
           "valor": 72,
@@ -68,7 +68,7 @@
         },
         {
           "id": 13,
-          "fecha": "2026-11-17",
+          "fecha": "2026-11-18",
           "ejercicio": "Sentadilla Trasera",
           "tipo": "fuerza_kg",
           "valor": 80,
@@ -77,9 +77,19 @@
           "nota": "Récord"
         }
       ],
-      "codigoAcceso": "CDM-AC6U",
+      "codigoAcceso": "CDM-Z8CX",
       "historialPagos": [],
-      "puntosCategoria": 9
+      "puntosCategoria": 9,
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 25000,
+      "_saldoPendienteCalculado": 0,
+      "ultimoPagoFecha": "2026-11-18",
+      "foto": null,
+      "puedeCrearRutinas": false,
+      "modoVistaRutina": "simple",
+      "fechaNacimiento": "2026-11-18"
     },
     {
       "id": 102,
@@ -107,18 +117,23 @@
       "motivoPuntos": "Asistencia de gol",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
-        "2026-11-15",
-        "2026-11-17"
+        "2026-11-14",
+        "2026-11-16",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-672C",
+      "codigoAcceso": "CDM-9QR3",
       "historialPagos": [],
-      "puntosCategoria": 8.3
+      "puntosCategoria": 8.3,
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 103,
@@ -146,17 +161,22 @@
       "motivoPuntos": "Gran despliegue físico",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-14",
-        "2026-11-17"
+        "2026-11-15",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-VPDV",
+      "codigoAcceso": "CDM-ZWRA",
       "historialPagos": [],
-      "puntosCategoria": 8.3
+      "puntosCategoria": 8.3,
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 104,
@@ -184,18 +204,23 @@
       "motivoPuntos": "Valla firme",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
-        "2026-11-15",
-        "2026-11-17"
+        "2026-11-14",
+        "2026-11-16",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-AWW5",
+      "codigoAcceso": "CDM-QKWK",
       "historialPagos": [],
-      "puntosCategoria": 8.2
+      "puntosCategoria": 8.2,
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 105,
@@ -223,18 +248,23 @@
       "motivoPuntos": "Relevo desequilibrante",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
-        "2026-11-15",
-        "2026-11-17"
+        "2026-11-14",
+        "2026-11-16",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-M9GN",
+      "codigoAcceso": "CDM-7JTX",
       "historialPagos": [],
-      "puntosCategoria": 8.2
+      "puntosCategoria": 8.2,
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 106,
@@ -262,19 +292,24 @@
       "motivoPuntos": "Capitán Primera División",
       "frecuenciaSemanal": 4,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
         "2026-11-14",
-        "2026-11-16",
-        "2026-11-17"
+        "2026-11-15",
+        "2026-11-17",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-BA3G",
+      "codigoAcceso": "CDM-2ZSQ",
       "historialPagos": [],
-      "puntosCategoria": 9.4
+      "puntosCategoria": 9.4,
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 201,
@@ -302,18 +337,23 @@
       "motivoPuntos": "Gol de córner corto",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
-        "2026-11-15",
-        "2026-11-17"
+        "2026-11-14",
+        "2026-11-16",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-K4JM",
+      "codigoAcceso": "CDM-SXUK",
       "historialPagos": [],
-      "puntosCategoria": 8.9
+      "puntosCategoria": 8.9,
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 202,
@@ -341,18 +381,23 @@
       "motivoPuntos": "Distribución y quites",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
-        "2026-11-15",
-        "2026-11-17"
+        "2026-11-14",
+        "2026-11-16",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-CSRL",
+      "codigoAcceso": "CDM-N7F4",
       "historialPagos": [],
-      "puntosCategoria": 8.5
+      "puntosCategoria": 8.5,
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 203,
@@ -380,18 +425,23 @@
       "motivoPuntos": "Arrastrada en córner corto",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
-        "2026-11-15",
-        "2026-11-17"
+        "2026-11-14",
+        "2026-11-16",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-XLN3",
+      "codigoAcceso": "CDM-6ED5",
       "historialPagos": [],
-      "puntosCategoria": 8.5
+      "puntosCategoria": 8.5,
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 301,
@@ -414,18 +464,18 @@
       "motivoPuntos": "",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
-        "2026-11-15",
-        "2026-11-17"
+        "2026-11-14",
+        "2026-11-16",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [
         {
           "id": 51,
-          "fecha": "2026-10-23",
+          "fecha": "2026-10-24",
           "ejercicio": "Press de Banca Plano",
           "tipo": "fuerza_kg",
           "valor": 88,
@@ -435,7 +485,7 @@
         },
         {
           "id": 52,
-          "fecha": "2026-11-17",
+          "fecha": "2026-11-18",
           "ejercicio": "Press de Banca Plano",
           "tipo": "fuerza_kg",
           "valor": 102,
@@ -445,7 +495,7 @@
         },
         {
           "id": 53,
-          "fecha": "2026-11-17",
+          "fecha": "2026-11-18",
           "ejercicio": "Sentadilla Trasera con Barra",
           "tipo": "fuerza_kg",
           "valor": 130,
@@ -454,8 +504,15 @@
           "nota": "Excelente profundidad"
         }
       ],
-      "codigoAcceso": "CDM-8SA7",
-      "historialPagos": []
+      "codigoAcceso": "CDM-G63R",
+      "historialPagos": [],
+      "puedeCrearRutinas": true,
+      "modoVistaRutina": "avanzado",
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 302,
@@ -481,14 +538,15 @@
       "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-14",
-        "2026-11-16"
+        "2026-11-15",
+        "2026-11-17",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [
         {
           "id": 54,
-          "fecha": "2026-11-17",
+          "fecha": "2026-11-18",
           "ejercicio": "Peso Muerto Rumano",
           "tipo": "fuerza_kg",
           "valor": 95,
@@ -497,8 +555,13 @@
           "nota": ""
         }
       ],
-      "codigoAcceso": "CDM-MKGV",
-      "historialPagos": []
+      "codigoAcceso": "CDM-W7W8",
+      "historialPagos": [],
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     },
     {
       "id": 303,
@@ -521,18 +584,18 @@
       "motivoPuntos": "",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-13",
-        "2026-11-15",
-        "2026-11-17"
+        "2026-11-14",
+        "2026-11-16",
+        "2026-11-18"
       ],
       "clinico": [],
       "evaluaciones": [
         {
           "id": 55,
-          "fecha": "2026-11-17",
+          "fecha": "2026-11-18",
           "ejercicio": "Hip Thrust con Barra",
           "tipo": "fuerza_kg",
           "valor": 125,
@@ -541,8 +604,13 @@
           "nota": "Récord Femenino Gym"
         }
       ],
-      "codigoAcceso": "CDM-FFWP",
-      "historialPagos": []
+      "codigoAcceso": "CDM-TUQC",
+      "historialPagos": [],
+      "becaPct": 0,
+      "recargoMora": 0,
+      "_cuotaNetaCalculada": 25000,
+      "_pagadoCalculado": 0,
+      "_saldoPendienteCalculado": 25000
     }
   ],
   "rutinas": [
@@ -553,7 +621,7 @@
       "categoriaDestino": "Sub 13",
       "personaId": null,
       "etiquetaDestino": "🏟️ Plantel Futbol Sub 13",
-      "fecha": "17/11/2026",
+      "fecha": "18/11/2026",
       "nombre": "Potencia Explosiva y Prevención",
       "objetivo": "Potencia y Transferencia",
       "dias": "Martes y Jueves",
@@ -584,7 +652,7 @@
       "categoriaDestino": "General",
       "personaId": 301,
       "etiquetaDestino": "👤 Lucas Peralta",
-      "fecha": "17/11/2026",
+      "fecha": "18/11/2026",
       "nombre": "Día 1 - Hipertrofia Empuje y Tracción",
       "objetivo": "Hipertrofia Estructural",
       "dias": "Lunes, Miércoles y Viernes",
@@ -623,7 +691,7 @@
       "categoriaDestino": "General",
       "personaId": 303,
       "etiquetaDestino": "👤 Sofía Navarro",
-      "fecha": "17/11/2026",
+      "fecha": "18/11/2026",
       "nombre": "Día 1 - Fuerza Tren Inferior y Glúteos",
       "objetivo": "Fuerza Máxima",
       "dias": "Lunes, Miércoles y Viernes",
@@ -656,41 +724,7 @@
       ]
     }
   ],
-  "partidos": [
-    {
-      "id": 601,
-      "fecha": "2026-11-16",
-      "deporte": "Futbol",
-      "categoria": "Sub 13",
-      "rival": "vs. San Basilio",
-      "resultado": "2 - 1",
-      "formacion": "4-3-3",
-      "eventos": [
-        {
-          "id": 1,
-          "minuto": 24,
-          "minutoDisplay": "1T • 24'",
-          "jugadorId": 101,
-          "jugadorNombre": "Gómez, Mateo",
-          "puestoEnCancha": "#9 DC",
-          "tipo": "⚽ Gol Convertido",
-          "detalle": "Remate cruzado",
-          "impactoPuntos": 0.3
-        }
-      ],
-      "conclusion": "Resumen vs San Basilio (2 - 1): Se registraron 1 intervenciones con 0 modificaciones tácticas (1 goles, 0 recuperaciones, 0 pérdidas). Destacados: Gómez, Mateo (#9 DC: +0.3).",
-      "resumenJugadores": [
-        {
-          "id": 101,
-          "nombre": "Gómez, Mateo",
-          "puesto": "#9 DC",
-          "eventos": 1,
-          "puntosSugeridos": 0.3
-        }
-      ],
-      "puntosAplicadosAlRanking": true
-    }
-  ],
+  "partidos": [],
   "alineaciones": {
     "Futbol_Sub 13_4-3-3": {
       "0": 104,
@@ -704,7 +738,40 @@
       "8": 201
     }
   },
-  "microciclos": {},
+  "microciclos": {
+    "Futbol_Sub 13": {
+      "Lunes": {
+        "foco": "Descanso / Regenerativo",
+        "carga": "Baja (RPE 3-4)",
+        "detalle": "Movilidad articular y elongación"
+      },
+      "Martes": {
+        "foco": "Físico + Circuito Técnico",
+        "carga": "Alta (RPE 8)",
+        "detalle": "Fuerza preventiva + Espacio reducido"
+      },
+      "Miércoles": {
+        "foco": "Táctico Colectivo",
+        "carga": "Media-Alta (RPE 7)",
+        "detalle": "Salidas, presión y transiciones"
+      },
+      "Jueves": {
+        "foco": "Práctica Formal de Juego",
+        "carga": "Alta (RPE 8)",
+        "detalle": "Bloques tácticos 11 vs 11"
+      },
+      "Viernes": {
+        "foco": "Pelota Parada / Córner Corto",
+        "carga": "Baja-Media (RPE 5)",
+        "detalle": "Velocidad de reacción y táctica fija"
+      },
+      "Sábado (Partido)": {
+        "foco": "Competencia Oficial",
+        "carga": "Máxima (RPE 9-10)",
+        "detalle": "Fecha oficial de liga"
+      }
+    }
+  },
   "videoteca": [
     {
       "id": 9001,
@@ -932,12 +999,13 @@
     "claveClub": "cdm_adelia_maria_principal",
     "deportesExtra": [],
     "bloquearCobranza": false,
-    "profesionesHabilitadas": []
+    "profesionesHabilitadas": [],
+    "modoComplejidad": "simple"
   },
   "clubes": {
     "cdm_adelia_maria_principal": {
       "claveClub": "cdm_adelia_maria_principal",
-      "ultimaActualizacionISO": "2026-11-17T18:40:01.232Z",
+      "ultimaActualizacionISO": "2026-11-19T18:42:43.694Z",
       "personas": [
         {
           "id": 101,
@@ -968,14 +1036,14 @@
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
-            "2026-11-15",
-            "2026-11-17"
+            "2026-11-14",
+            "2026-11-16",
+            "2026-11-18"
           ],
           "clinico": [
             {
               "id": 1,
-              "fecha": "2026-11-17",
+              "fecha": "2026-11-18",
               "peso": 54,
               "rpe": 6,
               "sueno": 5,
@@ -985,7 +1053,7 @@
           "evaluaciones": [
             {
               "id": 11,
-              "fecha": "2026-10-23",
+              "fecha": "2026-10-24",
               "ejercicio": "Sentadilla Trasera",
               "tipo": "fuerza_kg",
               "valor": 65,
@@ -995,7 +1063,7 @@
             },
             {
               "id": 12,
-              "fecha": "2026-11-05",
+              "fecha": "2026-11-06",
               "ejercicio": "Sentadilla Trasera",
               "tipo": "fuerza_kg",
               "valor": 72,
@@ -1005,7 +1073,7 @@
             },
             {
               "id": 13,
-              "fecha": "2026-11-17",
+              "fecha": "2026-11-18",
               "ejercicio": "Sentadilla Trasera",
               "tipo": "fuerza_kg",
               "valor": 80,
@@ -1014,9 +1082,19 @@
               "nota": "Récord"
             }
           ],
-          "codigoAcceso": "CDM-AC6U",
+          "codigoAcceso": "CDM-Z8CX",
           "historialPagos": [],
-          "puntosCategoria": 9
+          "puntosCategoria": 9,
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 25000,
+          "_saldoPendienteCalculado": 0,
+          "ultimoPagoFecha": "2026-11-18",
+          "foto": null,
+          "puedeCrearRutinas": false,
+          "modoVistaRutina": "simple",
+          "fechaNacimiento": "2026-11-18"
         },
         {
           "id": 102,
@@ -1044,18 +1122,23 @@
           "motivoPuntos": "Asistencia de gol",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
-            "2026-11-15",
-            "2026-11-17"
+            "2026-11-14",
+            "2026-11-16",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-672C",
+          "codigoAcceso": "CDM-9QR3",
           "historialPagos": [],
-          "puntosCategoria": 8.3
+          "puntosCategoria": 8.3,
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 103,
@@ -1083,17 +1166,22 @@
           "motivoPuntos": "Gran despliegue físico",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-14",
-            "2026-11-17"
+            "2026-11-15",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-VPDV",
+          "codigoAcceso": "CDM-ZWRA",
           "historialPagos": [],
-          "puntosCategoria": 8.3
+          "puntosCategoria": 8.3,
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 104,
@@ -1121,18 +1209,23 @@
           "motivoPuntos": "Valla firme",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
-            "2026-11-15",
-            "2026-11-17"
+            "2026-11-14",
+            "2026-11-16",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-AWW5",
+          "codigoAcceso": "CDM-QKWK",
           "historialPagos": [],
-          "puntosCategoria": 8.2
+          "puntosCategoria": 8.2,
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 105,
@@ -1160,18 +1253,23 @@
           "motivoPuntos": "Relevo desequilibrante",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
-            "2026-11-15",
-            "2026-11-17"
+            "2026-11-14",
+            "2026-11-16",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-M9GN",
+          "codigoAcceso": "CDM-7JTX",
           "historialPagos": [],
-          "puntosCategoria": 8.2
+          "puntosCategoria": 8.2,
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 106,
@@ -1199,19 +1297,24 @@
           "motivoPuntos": "Capitán Primera División",
           "frecuenciaSemanal": 4,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
             "2026-11-14",
-            "2026-11-16",
-            "2026-11-17"
+            "2026-11-15",
+            "2026-11-17",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-BA3G",
+          "codigoAcceso": "CDM-2ZSQ",
           "historialPagos": [],
-          "puntosCategoria": 9.4
+          "puntosCategoria": 9.4,
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 201,
@@ -1239,18 +1342,23 @@
           "motivoPuntos": "Gol de córner corto",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
-            "2026-11-15",
-            "2026-11-17"
+            "2026-11-14",
+            "2026-11-16",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-K4JM",
+          "codigoAcceso": "CDM-SXUK",
           "historialPagos": [],
-          "puntosCategoria": 8.9
+          "puntosCategoria": 8.9,
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 202,
@@ -1278,18 +1386,23 @@
           "motivoPuntos": "Distribución y quites",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
-            "2026-11-15",
-            "2026-11-17"
+            "2026-11-14",
+            "2026-11-16",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-CSRL",
+          "codigoAcceso": "CDM-N7F4",
           "historialPagos": [],
-          "puntosCategoria": 8.5
+          "puntosCategoria": 8.5,
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 203,
@@ -1317,18 +1430,23 @@
           "motivoPuntos": "Arrastrada en córner corto",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
-            "2026-11-15",
-            "2026-11-17"
+            "2026-11-14",
+            "2026-11-16",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-XLN3",
+          "codigoAcceso": "CDM-6ED5",
           "historialPagos": [],
-          "puntosCategoria": 8.5
+          "puntosCategoria": 8.5,
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 301,
@@ -1351,18 +1469,18 @@
           "motivoPuntos": "",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
-            "2026-11-15",
-            "2026-11-17"
+            "2026-11-14",
+            "2026-11-16",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [
             {
               "id": 51,
-              "fecha": "2026-10-23",
+              "fecha": "2026-10-24",
               "ejercicio": "Press de Banca Plano",
               "tipo": "fuerza_kg",
               "valor": 88,
@@ -1372,7 +1490,7 @@
             },
             {
               "id": 52,
-              "fecha": "2026-11-17",
+              "fecha": "2026-11-18",
               "ejercicio": "Press de Banca Plano",
               "tipo": "fuerza_kg",
               "valor": 102,
@@ -1382,7 +1500,7 @@
             },
             {
               "id": 53,
-              "fecha": "2026-11-17",
+              "fecha": "2026-11-18",
               "ejercicio": "Sentadilla Trasera con Barra",
               "tipo": "fuerza_kg",
               "valor": 130,
@@ -1391,8 +1509,15 @@
               "nota": "Excelente profundidad"
             }
           ],
-          "codigoAcceso": "CDM-8SA7",
-          "historialPagos": []
+          "codigoAcceso": "CDM-G63R",
+          "historialPagos": [],
+          "puedeCrearRutinas": true,
+          "modoVistaRutina": "avanzado",
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 302,
@@ -1418,14 +1543,15 @@
           "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-14",
-            "2026-11-16"
+            "2026-11-15",
+            "2026-11-17",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [
             {
               "id": 54,
-              "fecha": "2026-11-17",
+              "fecha": "2026-11-18",
               "ejercicio": "Peso Muerto Rumano",
               "tipo": "fuerza_kg",
               "valor": 95,
@@ -1434,8 +1560,13 @@
               "nota": ""
             }
           ],
-          "codigoAcceso": "CDM-MKGV",
-          "historialPagos": []
+          "codigoAcceso": "CDM-W7W8",
+          "historialPagos": [],
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         },
         {
           "id": 303,
@@ -1458,18 +1589,18 @@
           "motivoPuntos": "",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-13",
-            "2026-11-15",
-            "2026-11-17"
+            "2026-11-14",
+            "2026-11-16",
+            "2026-11-18"
           ],
           "clinico": [],
           "evaluaciones": [
             {
               "id": 55,
-              "fecha": "2026-11-17",
+              "fecha": "2026-11-18",
               "ejercicio": "Hip Thrust con Barra",
               "tipo": "fuerza_kg",
               "valor": 125,
@@ -1478,8 +1609,13 @@
               "nota": "Récord Femenino Gym"
             }
           ],
-          "codigoAcceso": "CDM-FFWP",
-          "historialPagos": []
+          "codigoAcceso": "CDM-TUQC",
+          "historialPagos": [],
+          "becaPct": 0,
+          "recargoMora": 0,
+          "_cuotaNetaCalculada": 25000,
+          "_pagadoCalculado": 0,
+          "_saldoPendienteCalculado": 25000
         }
       ],
       "rutinas": [
@@ -1490,7 +1626,7 @@
           "categoriaDestino": "Sub 13",
           "personaId": null,
           "etiquetaDestino": "🏟️ Plantel Futbol Sub 13",
-          "fecha": "17/11/2026",
+          "fecha": "18/11/2026",
           "nombre": "Potencia Explosiva y Prevención",
           "objetivo": "Potencia y Transferencia",
           "dias": "Martes y Jueves",
@@ -1521,7 +1657,7 @@
           "categoriaDestino": "General",
           "personaId": 301,
           "etiquetaDestino": "👤 Lucas Peralta",
-          "fecha": "17/11/2026",
+          "fecha": "18/11/2026",
           "nombre": "Día 1 - Hipertrofia Empuje y Tracción",
           "objetivo": "Hipertrofia Estructural",
           "dias": "Lunes, Miércoles y Viernes",
@@ -1560,7 +1696,7 @@
           "categoriaDestino": "General",
           "personaId": 303,
           "etiquetaDestino": "👤 Sofía Navarro",
-          "fecha": "17/11/2026",
+          "fecha": "18/11/2026",
           "nombre": "Día 1 - Fuerza Tren Inferior y Glúteos",
           "objetivo": "Fuerza Máxima",
           "dias": "Lunes, Miércoles y Viernes",
@@ -1593,41 +1729,7 @@
           ]
         }
       ],
-      "partidos": [
-        {
-          "id": 601,
-          "fecha": "2026-11-16",
-          "deporte": "Futbol",
-          "categoria": "Sub 13",
-          "rival": "vs. San Basilio",
-          "resultado": "2 - 1",
-          "formacion": "4-3-3",
-          "eventos": [
-            {
-              "id": 1,
-              "minuto": 24,
-              "minutoDisplay": "1T • 24'",
-              "jugadorId": 101,
-              "jugadorNombre": "Gómez, Mateo",
-              "puestoEnCancha": "#9 DC",
-              "tipo": "⚽ Gol Convertido",
-              "detalle": "Remate cruzado",
-              "impactoPuntos": 0.3
-            }
-          ],
-          "conclusion": "Resumen vs San Basilio (2 - 1): Se registraron 1 intervenciones con 0 modificaciones tácticas (1 goles, 0 recuperaciones, 0 pérdidas). Destacados: Gómez, Mateo (#9 DC: +0.3).",
-          "resumenJugadores": [
-            {
-              "id": 101,
-              "nombre": "Gómez, Mateo",
-              "puesto": "#9 DC",
-              "eventos": 1,
-              "puntosSugeridos": 0.3
-            }
-          ],
-          "puntosAplicadosAlRanking": true
-        }
-      ],
+      "partidos": [],
       "alineaciones": {
         "Futbol_Sub 13_4-3-3": {
           "0": 104,
@@ -1641,7 +1743,40 @@
           "8": 201
         }
       },
-      "microciclos": {},
+      "microciclos": {
+        "Futbol_Sub 13": {
+          "Lunes": {
+            "foco": "Descanso / Regenerativo",
+            "carga": "Baja (RPE 3-4)",
+            "detalle": "Movilidad articular y elongación"
+          },
+          "Martes": {
+            "foco": "Físico + Circuito Técnico",
+            "carga": "Alta (RPE 8)",
+            "detalle": "Fuerza preventiva + Espacio reducido"
+          },
+          "Miércoles": {
+            "foco": "Táctico Colectivo",
+            "carga": "Media-Alta (RPE 7)",
+            "detalle": "Salidas, presión y transiciones"
+          },
+          "Jueves": {
+            "foco": "Práctica Formal de Juego",
+            "carga": "Alta (RPE 8)",
+            "detalle": "Bloques tácticos 11 vs 11"
+          },
+          "Viernes": {
+            "foco": "Pelota Parada / Córner Corto",
+            "carga": "Baja-Media (RPE 5)",
+            "detalle": "Velocidad de reacción y táctica fija"
+          },
+          "Sábado (Partido)": {
+            "foco": "Competencia Oficial",
+            "carga": "Máxima (RPE 9-10)",
+            "detalle": "Fecha oficial de liga"
+          }
+        }
+      },
       "videoteca": [
         {
           "id": 9001,
@@ -1869,7 +2004,8 @@
         "claveClub": "cdm_adelia_maria_principal",
         "deportesExtra": [],
         "bloquearCobranza": false,
-        "profesionesHabilitadas": []
+        "profesionesHabilitadas": [],
+        "modoComplejidad": "simple"
       }
     },
     "gimasio_426": {
@@ -2813,6 +2949,281 @@
         "estadoServicio": "activo",
         "deportesExtra": [],
         "bloquearCobranza": false
+      }
+    },
+    "lic_alina_caudana_425": {
+      "claveClub": "lic_alina_caudana_425",
+      "ultimaActualizacionISO": "2026-11-18T23:51:13.961Z",
+      "personas": [],
+      "rutinas": [],
+      "partidos": [],
+      "alineaciones": {},
+      "microciclos": {},
+      "videoteca": [
+        {
+          "id": 9001,
+          "nombre": "Sentadilla Trasera con Barra",
+          "grupo": "Tren Inferior",
+          "grupoSecundario": "Piernas y Glúteos",
+          "nivel": "Intermedio / Avanzado",
+          "equipo": "Barra Olímpica y Rack",
+          "seriesSugeridas": 4,
+          "repsSugeridas": "6-8",
+          "pausaSugerida": "2m",
+          "videoUrl": "https://www.youtube.com/watch?v=ultWZbUMPL8",
+          "imagenPreview": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Pies al ancho de hombros, tomar aire profundo (bracing abdominal), descender controlando cadera y rodillas en línea con la punta de los pies, subir empujando el piso con fuerza.",
+          "erroresComunes": "Evitar que las rodillas colapsen hacia adentro (valgo) o despegar los talones del suelo."
+        },
+        {
+          "id": 9002,
+          "nombre": "Press de Banca Plano",
+          "grupo": "Empuje / Torso",
+          "grupoSecundario": "Pecho y Empuje",
+          "nivel": "Todos los niveles",
+          "equipo": "Banco Plano y Barra",
+          "seriesSugeridas": 4,
+          "repsSugeridas": "8-10",
+          "pausaSugerida": "90s",
+          "videoUrl": "https://www.youtube.com/watch?v=rT7DgCr-3pg",
+          "imagenPreview": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Retraer escápulas contra el banco, apoyar firme los pies en el piso, bajar la barra de forma controlada hasta la línea media del esternón con codos a 45°.",
+          "erroresComunes": "No abrir los codos a 90° a la altura del cuello ni rebotar la barra contra el pecho."
+        },
+        {
+          "id": 9003,
+          "nombre": "Peso Muerto Rumano (Isquios y Glúteos)",
+          "grupo": "Tren Inferior",
+          "grupoSecundario": "Piernas y Glúteos",
+          "nivel": "Intermedio",
+          "equipo": "Barra o Mancuernas",
+          "seriesSugeridas": 4,
+          "repsSugeridas": "8-10",
+          "pausaSugerida": "90s",
+          "videoUrl": "https://www.youtube.com/watch?v=JCXUYuzwNrM",
+          "imagenPreview": "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Bisagra de cadera llevando la cola hacia atrás con leve flexión de rodillas. Mantener la barra pegada a los muslos y espalda 100% neutra sintiendo el estiramiento femoral.",
+          "erroresComunes": "Encorvar la zona lumbar o bajar flexionando demasiado las rodillas como si fuera una sentadilla."
+        },
+        {
+          "id": 9004,
+          "nombre": "Dominadas / Jalón al Pecho en Polea",
+          "grupo": "Tracción / Espalda",
+          "grupoSecundario": "Espalda y Tracción",
+          "nivel": "Todos los niveles",
+          "equipo": "Barra Fija o Polea Alta",
+          "seriesSugeridas": 4,
+          "repsSugeridas": "8-12",
+          "pausaSugerida": "90s",
+          "videoUrl": "https://www.youtube.com/watch?v=eGo4IYlbE5g",
+          "imagenPreview": "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Iniciar el movimiento deprimiendo las escápulas (hombros lejos de las orejas) y traccionar llevando los codos hacia las costillas hasta pasar el mentón o tocar el pecho superior.",
+          "erroresComunes": "Balancear las piernas o tirar encogiendo los hombros y adelantando el cuello."
+        },
+        {
+          "id": 9005,
+          "nombre": "Sentadilla Búlgara Unilateral",
+          "grupo": "Tren Inferior",
+          "grupoSecundario": "Piernas y Glúteos",
+          "nivel": "Intermedio",
+          "equipo": "Banco y Mancuernas",
+          "seriesSugeridas": 3,
+          "repsSugeridas": "8-10 c/pierna",
+          "pausaSugerida": "75s",
+          "videoUrl": "https://www.youtube.com/watch?v=2C-uNgKwPLE",
+          "imagenPreview": "https://images.unsplash.com/photo-1579758629938-03607ccdbaba?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Empezar siempre por la pierna menos hábil. Inclinarse levemente hacia adelante para enfatizar glúteo y cuádriceps, bajando hasta que la rodilla trasera quede cerca del piso.",
+          "erroresComunes": "Perder la alineación de la rodilla delantera o apoyar demasiado peso en el pie de atrás."
+        },
+        {
+          "id": 9006,
+          "nombre": "Hip Thrust con Barra (Empuje de Cadera)",
+          "grupo": "Tren Inferior",
+          "grupoSecundario": "Piernas y Glúteos",
+          "nivel": "Todos los niveles",
+          "equipo": "Banco, Almohadilla y Barra",
+          "seriesSugeridas": 4,
+          "repsSugeridas": "10-12",
+          "pausaSugerida": "90s",
+          "videoUrl": "https://www.youtube.com/watch?v=SEdqd1n0cvg",
+          "imagenPreview": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Apoyar el borde inferior de las escápulas en el banco, mirada al frente (mentón pegado), empujar con los talones y sostener 1 segundo de contracción máxima arriba.",
+          "erroresComunes": "Hiperextender la espalda baja arriba en vez de bloquear con la pelvis."
+        },
+        {
+          "id": 9007,
+          "nombre": "Remo Unilateral con Mancuerna",
+          "grupo": "Tracción / Espalda",
+          "grupoSecundario": "Espalda y Tracción",
+          "nivel": "Todos los niveles",
+          "equipo": "Banco y Mancuerna",
+          "seriesSugeridas": 3,
+          "repsSugeridas": "10-12 c/lado",
+          "pausaSugerida": "60s",
+          "videoUrl": "https://www.youtube.com/watch?v=pYcpY20QaE8",
+          "imagenPreview": "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Tronco firme paralelo al suelo, llevar la mancuerna en trayectoria curva hacia el bolsillo de la cadera sintiendo el dorsal ancho.",
+          "erroresComunes": "Rotar excesivamente el torso o tirar solo con el bíceps hacia el hombro."
+        },
+        {
+          "id": 9008,
+          "nombre": "Press Militar de Hombros (Overhead Press)",
+          "grupo": "Empuje / Torso",
+          "grupoSecundario": "Pecho y Empuje",
+          "nivel": "Intermedio",
+          "equipo": "Barra o Mancuernas",
+          "seriesSugeridas": 4,
+          "repsSugeridas": "8-10",
+          "pausaSugerida": "90s",
+          "videoUrl": "https://www.youtube.com/watch?v=2yjwXTZQDDI",
+          "imagenPreview": "https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Contraer glúteos y abdomen para proteger la columna lumbar. Empujar en línea vertical desde la clavícula hasta bloquear arriba de la corona de la cabeza.",
+          "erroresComunes": "Arquear la cintura hacia atrás para compensar falta de estabilidad en el core."
+        },
+        {
+          "id": 9009,
+          "nombre": "Plancha Abdominal RKC y Core Antirotacional",
+          "grupo": "Core y Funcional",
+          "grupoSecundario": "Core y Funcional",
+          "nivel": "Todos los niveles",
+          "equipo": "Colchoneta / Peso Corporal",
+          "seriesSugeridas": 4,
+          "repsSugeridas": "35s sostén",
+          "pausaSugerida": "45s",
+          "videoUrl": "https://www.youtube.com/watch?v=ASdvN_XEl_c",
+          "imagenPreview": "https://images.unsplash.com/photo-1566241440091-ec10de8db2e1?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Codos debajo de los hombros, traccionar codos hacia las puntas de los pies isométricamente, glúteos y abdomen contraídos al 100%.",
+          "erroresComunes": "Dejar caer la cadera generando tensión lumbar o contener la respiración."
+        },
+        {
+          "id": 9010,
+          "nombre": "Salto al Cajón Explosivo (Box Jump / Pliometría)",
+          "grupo": "Potencia y Pliometría",
+          "grupoSecundario": "Piernas y Glúteos",
+          "nivel": "Intermedio / Avanzado",
+          "equipo": "Cajón Pliométrico",
+          "seriesSugeridas": 4,
+          "repsSugeridas": "5 saltos",
+          "pausaSugerida": "90s",
+          "videoUrl": "https://www.youtube.com/watch?v=52r_Ul5k03g",
+          "imagenPreview": "https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Triple extensión rápida de tobillo, rodilla y cadera. Aterrizar suave en el cajón en posición de media sentadilla amortiguando el impacto.",
+          "erroresComunes": "Aterrizar con las rodillas rígidas o en valgo, o bajar saltando de espaldas."
+        },
+        {
+          "id": 9011,
+          "nombre": "Protocolo Isométrico y Estabilidad de Rodilla",
+          "grupo": "Movilidad y Rehab",
+          "grupoSecundario": "Rehabilitación",
+          "nivel": "Readaptación / Preventivo",
+          "equipo": "Banda Elástica / Pared",
+          "seriesSugeridas": 4,
+          "repsSugeridas": "30-40s sin dolor",
+          "pausaSugerida": "60s",
+          "videoUrl": "https://www.youtube.com/watch?v=y28L1k1vW9s",
+          "imagenPreview": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=700&q=80",
+          "clavesTecnicas": "Mantener ángulo controlado libre de dolor articular, activando el vasto interno del cuádriceps y glúteo medio con banda en rodillas.",
+          "erroresComunes": "Trabajar por encima del umbral de dolor o hacer rebotes bruscos."
+        }
+      ],
+      "catalogoEjercicios": [
+        {
+          "id": "ej_1",
+          "nombre": "Sentadilla Trasera con Barra",
+          "tipo": "fuerza_1rm"
+        },
+        {
+          "id": "ej_2",
+          "nombre": "Press de Banca Plano",
+          "tipo": "fuerza_1rm"
+        },
+        {
+          "id": "ej_3",
+          "nombre": "Peso Muerto Rumano",
+          "tipo": "fuerza_1rm"
+        },
+        {
+          "id": "ej_4",
+          "nombre": "Sentadilla Búlgara Unilateral",
+          "tipo": "unilateral_asimetria"
+        },
+        {
+          "id": "ej_5",
+          "nombre": "Dominadas Lastradas",
+          "tipo": "peso_corporal_lastre"
+        },
+        {
+          "id": "ej_6",
+          "nombre": "Salto al Cajón / CMJ",
+          "tipo": "salto_watts"
+        },
+        {
+          "id": "ej_7",
+          "nombre": "Sprint 20 Metros",
+          "tipo": "tiempo_sprint"
+        },
+        {
+          "id": "ej_8",
+          "nombre": "Yo-Yo Test Intermitente",
+          "tipo": "resistencia_yoyo"
+        }
+      ],
+      "licenciaConfig": {
+        "claveClub": "lic_alina_caudana_425",
+        "nombreEntidad": "LIC. ALINA CAUDANA",
+        "subtituloEntidad": "Río Cuarto",
+        "siglaCodigo": "KIN",
+        "logoUrl": "",
+        "planActivo": "solo_consultorio",
+        "modulos": {
+          "futbol": false,
+          "hockey": false,
+          "gym": false,
+          "consultorio": true
+        },
+        "deportesExtra": [],
+        "adminUsuario": "alina",
+        "adminClave": "ALI123",
+        "estadoServicio": "activo",
+        "bloquearCobranza": false,
+        "modoComplejidad": "simple",
+        "profesionesHabilitadas": [
+          "Quiropraxia",
+          "Kinesiología",
+          "Psicología",
+          "Nutrición"
+        ],
+        "funciones": {
+          "salud": {
+            "agenda": true,
+            "mutuales": true,
+            "genograma": true,
+            "evolucion": true,
+            "eva": true,
+            "portalEstudios": true,
+            "equipo": true,
+            "loteMutuales": true,
+            "consentimiento": true,
+            "mapaCorporal": true
+          },
+          "deporte": {
+            "cobranza": true,
+            "rutinasVideos": true,
+            "evaluaciones1RM": true,
+            "partidosPizarra": true,
+            "ranking": true,
+            "planSemanal": true,
+            "aumentoMasivo": true,
+            "totemYCupos": true,
+            "emmacYEstadisticas": true
+          },
+          "general": {
+            "notasRapidas": true,
+            "cierreCaja": true
+          }
+        },
+        "aliasTransferencia": "",
+        "titularTransferencia": ""
       }
     }
   }
