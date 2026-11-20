@@ -1,6 +1,6 @@
 {
   "claveClub": "cdm_adelia_maria_principal",
-  "ultimaActualizacionISO": "2026-11-19T19:49:47.794Z",
+  "ultimaActualizacionISO": "2026-11-20T04:41:05.065Z",
   "personas": [
     {
       "id": 101,
@@ -11,7 +11,7 @@
       "apellido": "Gómez",
       "dni": "48111222",
       "whatsapp": "5493584112233",
-      "edad": 13,
+      "edad": 0,
       "sangre": "0+",
       "peso": 54,
       "altura": 162,
@@ -21,7 +21,7 @@
       "pilares": {
         "fisico": 8.6,
         "gym": 8.2,
-        "tecnico": 9,
+        "tecnico": 2.7,
         "actitud": 9.2,
         "bonus": 0.3
       },
@@ -79,7 +79,7 @@
       ],
       "codigoAcceso": "CDM-CBJK",
       "historialPagos": [],
-      "puntosCategoria": 9,
+      "puntosCategoria": 7.4,
       "becaPct": 0,
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
@@ -89,7 +89,21 @@
       "foto": null,
       "puedeCrearRutinas": true,
       "modoVistaRutina": "simple",
-      "fechaNacimiento": "2026-11-18"
+      "fechaNacimiento": "2026-11-18",
+      "historialScore": [
+        {
+          "id": 1795143832445.7234,
+          "fecha": "2026-11-20",
+          "anterior": 9,
+          "nuevo": 7.4,
+          "delta": -1.6,
+          "origen": "Evaluación 360°",
+          "motivo": "Figura vs. San Basilio (+0.3 bonus)"
+        }
+      ],
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2026
     },
     {
       "id": 102,
@@ -133,7 +147,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2013
     },
     {
       "id": 103,
@@ -176,7 +193,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2013
     },
     {
       "id": 104,
@@ -220,7 +240,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2013
     },
     {
       "id": 105,
@@ -264,7 +287,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2013
     },
     {
       "id": 106,
@@ -309,7 +335,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2001
     },
     {
       "id": 201,
@@ -353,7 +382,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2013
     },
     {
       "id": 202,
@@ -397,7 +429,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2013
     },
     {
       "id": 203,
@@ -441,7 +476,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2013
     },
     {
       "id": 301,
@@ -512,7 +550,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2000
     },
     {
       "id": 302,
@@ -561,7 +602,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2003
     },
     {
       "id": 303,
@@ -610,7 +654,10 @@
       "recargoMora": 0,
       "_cuotaNetaCalculada": 25000,
       "_pagadoCalculado": 0,
-      "_saldoPendienteCalculado": 25000
+      "_saldoPendienteCalculado": 25000,
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "anioNacimiento": 2002
     }
   ],
   "rutinas": [
@@ -724,7 +771,41 @@
       ]
     }
   ],
-  "partidos": [],
+  "partidos": [
+    {
+      "id": 1795142973894,
+      "fecha": "2026-11-20",
+      "deporte": "Futbol",
+      "categoria": "Sub 13",
+      "rival": "Partido Oficial",
+      "resultado": "1 - 0",
+      "formacion": "4-3-3",
+      "eventos": [
+        {
+          "id": 1795142965751,
+          "minuto": 0,
+          "minutoDisplay": "1T • 00'",
+          "jugadorId": 101,
+          "jugadorNombre": "Gómez, Mateo",
+          "puestoEnCancha": "#9 DC",
+          "tipo": "⚽ Gol Convertido",
+          "detalle": "Intervención en puesto #9 (DC)",
+          "impactoPuntos": 0.5
+        }
+      ],
+      "conclusion": "Resumen vs Partido Oficial (1 - 0): Se registraron 1 intervenciones con 0 modificaciones tácticas (1 goles, 0 recuperaciones, 0 pérdidas). Destacados: Gómez, Mateo (#9 DC: +0.5).",
+      "resumenJugadores": [
+        {
+          "id": 101,
+          "nombre": "Gómez, Mateo",
+          "puesto": "#9 DC",
+          "eventos": 1,
+          "puntosSugeridos": 0.5
+        }
+      ],
+      "puntosAplicadosAlRanking": false
+    }
+  ],
   "alineaciones": {
     "Futbol_Sub 13_4-3-3": {
       "0": 104,
@@ -937,6 +1018,105 @@
       "imagenPreview": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=700&q=80",
       "clavesTecnicas": "Mantener ángulo controlado libre de dolor articular, activando el vasto interno del cuádriceps y glúteo medio con banda en rodillas.",
       "erroresComunes": "Trabajar por encima del umbral de dolor o hacer rebotes bruscos."
+    },
+    {
+      "id": 1,
+      "nombre": "Sentadilla Trasera",
+      "titulo": "Sentadilla Trasera",
+      "grupo": "Piernas",
+      "categoria": "Piernas",
+      "url": "",
+      "video": "",
+      "patron": "squat",
+      "notas": "Base Maestra • Medición: fuerza_kg"
+    },
+    {
+      "id": 2,
+      "nombre": "Press de Banca",
+      "titulo": "Press de Banca",
+      "grupo": "Empuje / Pecho",
+      "categoria": "Empuje / Pecho",
+      "url": "",
+      "video": "",
+      "patron": "bench",
+      "notas": "Base Maestra • Medición: fuerza_kg"
+    },
+    {
+      "id": 3,
+      "nombre": "Peso Muerto Rumano",
+      "titulo": "Peso Muerto Rumano",
+      "grupo": "Cadena Posterior",
+      "categoria": "Cadena Posterior",
+      "url": "",
+      "video": "",
+      "patron": "deadlift",
+      "notas": "Base Maestra • Medición: fuerza_kg"
+    },
+    {
+      "id": 5,
+      "nombre": "Dominadas",
+      "titulo": "Dominadas",
+      "grupo": "Tracción / Espalda",
+      "categoria": "Tracción / Espalda",
+      "url": "",
+      "video": "",
+      "patron": "pullup",
+      "notas": "Base Maestra • Medición: reps_puntos"
+    },
+    {
+      "id": 6,
+      "nombre": "Salto al Cajón / CMJ",
+      "titulo": "Salto al Cajón / CMJ",
+      "grupo": "Potencia",
+      "categoria": "Potencia",
+      "url": "",
+      "video": "",
+      "patron": "jump",
+      "notas": "Base Maestra • Medición: salto_cm"
+    },
+    {
+      "id": 7,
+      "nombre": "Sprint 20 metros",
+      "titulo": "Sprint 20 metros",
+      "grupo": "Velocidad",
+      "categoria": "Velocidad",
+      "url": "",
+      "video": "",
+      "patron": "jump",
+      "notas": "Base Maestra • Medición: tiempo_seg"
+    },
+    {
+      "id": 8,
+      "nombre": "Hip Thrust",
+      "titulo": "Hip Thrust",
+      "grupo": "Glúteos / Potencia",
+      "categoria": "Glúteos / Potencia",
+      "url": "",
+      "video": "",
+      "patron": "deadlift",
+      "notas": "Base Maestra • Medición: fuerza_kg"
+    },
+    {
+      "id": 9,
+      "nombre": "Press Militar",
+      "titulo": "Press Militar",
+      "grupo": "Hombros",
+      "categoria": "Hombros",
+      "url": "",
+      "video": "",
+      "patron": "press",
+      "notas": "Base Maestra • Medición: fuerza_kg"
+    },
+    {
+      "id": 10,
+      "nombre": "Plancha Isométrica",
+      "titulo": "Plancha Isométrica",
+      "grupo": "Core / Zona Media",
+      "categoria": "Core / Zona Media",
+      "url": "",
+      "video": "",
+      "patron": "plank",
+      "notas": "Base Maestra • Medición: tiempo_seg"
     }
   ],
   "catalogoEjercicios": [
@@ -1005,7 +1185,7 @@
   "clubes": {
     "cdm_adelia_maria_principal": {
       "claveClub": "cdm_adelia_maria_principal",
-      "ultimaActualizacionISO": "2026-11-19T19:49:47.794Z",
+      "ultimaActualizacionISO": "2026-11-20T04:41:05.065Z",
       "personas": [
         {
           "id": 101,
@@ -1016,7 +1196,7 @@
           "apellido": "Gómez",
           "dni": "48111222",
           "whatsapp": "5493584112233",
-          "edad": 13,
+          "edad": 0,
           "sangre": "0+",
           "peso": 54,
           "altura": 162,
@@ -1026,7 +1206,7 @@
           "pilares": {
             "fisico": 8.6,
             "gym": 8.2,
-            "tecnico": 9,
+            "tecnico": 2.7,
             "actitud": 9.2,
             "bonus": 0.3
           },
@@ -1084,7 +1264,7 @@
           ],
           "codigoAcceso": "CDM-CBJK",
           "historialPagos": [],
-          "puntosCategoria": 9,
+          "puntosCategoria": 7.4,
           "becaPct": 0,
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
@@ -1094,7 +1274,21 @@
           "foto": null,
           "puedeCrearRutinas": true,
           "modoVistaRutina": "simple",
-          "fechaNacimiento": "2026-11-18"
+          "fechaNacimiento": "2026-11-18",
+          "historialScore": [
+            {
+              "id": 1795143832445.7234,
+              "fecha": "2026-11-20",
+              "anterior": 9,
+              "nuevo": 7.4,
+              "delta": -1.6,
+              "origen": "Evaluación 360°",
+              "motivo": "Figura vs. San Basilio (+0.3 bonus)"
+            }
+          ],
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2026
         },
         {
           "id": 102,
@@ -1138,7 +1332,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2013
         },
         {
           "id": 103,
@@ -1181,7 +1378,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2013
         },
         {
           "id": 104,
@@ -1225,7 +1425,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2013
         },
         {
           "id": 105,
@@ -1269,7 +1472,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2013
         },
         {
           "id": 106,
@@ -1314,7 +1520,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2001
         },
         {
           "id": 201,
@@ -1358,7 +1567,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2013
         },
         {
           "id": 202,
@@ -1402,7 +1614,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2013
         },
         {
           "id": 203,
@@ -1446,7 +1661,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2013
         },
         {
           "id": 301,
@@ -1517,7 +1735,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2000
         },
         {
           "id": 302,
@@ -1566,7 +1787,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2003
         },
         {
           "id": 303,
@@ -1615,7 +1839,10 @@
           "recargoMora": 0,
           "_cuotaNetaCalculada": 25000,
           "_pagadoCalculado": 0,
-          "_saldoPendienteCalculado": 25000
+          "_saldoPendienteCalculado": 25000,
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "anioNacimiento": 2002
         }
       ],
       "rutinas": [
@@ -1729,7 +1956,41 @@
           ]
         }
       ],
-      "partidos": [],
+      "partidos": [
+        {
+          "id": 1795142973894,
+          "fecha": "2026-11-20",
+          "deporte": "Futbol",
+          "categoria": "Sub 13",
+          "rival": "Partido Oficial",
+          "resultado": "1 - 0",
+          "formacion": "4-3-3",
+          "eventos": [
+            {
+              "id": 1795142965751,
+              "minuto": 0,
+              "minutoDisplay": "1T • 00'",
+              "jugadorId": 101,
+              "jugadorNombre": "Gómez, Mateo",
+              "puestoEnCancha": "#9 DC",
+              "tipo": "⚽ Gol Convertido",
+              "detalle": "Intervención en puesto #9 (DC)",
+              "impactoPuntos": 0.5
+            }
+          ],
+          "conclusion": "Resumen vs Partido Oficial (1 - 0): Se registraron 1 intervenciones con 0 modificaciones tácticas (1 goles, 0 recuperaciones, 0 pérdidas). Destacados: Gómez, Mateo (#9 DC: +0.5).",
+          "resumenJugadores": [
+            {
+              "id": 101,
+              "nombre": "Gómez, Mateo",
+              "puesto": "#9 DC",
+              "eventos": 1,
+              "puntosSugeridos": 0.5
+            }
+          ],
+          "puntosAplicadosAlRanking": false
+        }
+      ],
       "alineaciones": {
         "Futbol_Sub 13_4-3-3": {
           "0": 104,
@@ -1942,6 +2203,105 @@
           "imagenPreview": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=700&q=80",
           "clavesTecnicas": "Mantener ángulo controlado libre de dolor articular, activando el vasto interno del cuádriceps y glúteo medio con banda en rodillas.",
           "erroresComunes": "Trabajar por encima del umbral de dolor o hacer rebotes bruscos."
+        },
+        {
+          "id": 1,
+          "nombre": "Sentadilla Trasera",
+          "titulo": "Sentadilla Trasera",
+          "grupo": "Piernas",
+          "categoria": "Piernas",
+          "url": "",
+          "video": "",
+          "patron": "squat",
+          "notas": "Base Maestra • Medición: fuerza_kg"
+        },
+        {
+          "id": 2,
+          "nombre": "Press de Banca",
+          "titulo": "Press de Banca",
+          "grupo": "Empuje / Pecho",
+          "categoria": "Empuje / Pecho",
+          "url": "",
+          "video": "",
+          "patron": "bench",
+          "notas": "Base Maestra • Medición: fuerza_kg"
+        },
+        {
+          "id": 3,
+          "nombre": "Peso Muerto Rumano",
+          "titulo": "Peso Muerto Rumano",
+          "grupo": "Cadena Posterior",
+          "categoria": "Cadena Posterior",
+          "url": "",
+          "video": "",
+          "patron": "deadlift",
+          "notas": "Base Maestra • Medición: fuerza_kg"
+        },
+        {
+          "id": 5,
+          "nombre": "Dominadas",
+          "titulo": "Dominadas",
+          "grupo": "Tracción / Espalda",
+          "categoria": "Tracción / Espalda",
+          "url": "",
+          "video": "",
+          "patron": "pullup",
+          "notas": "Base Maestra • Medición: reps_puntos"
+        },
+        {
+          "id": 6,
+          "nombre": "Salto al Cajón / CMJ",
+          "titulo": "Salto al Cajón / CMJ",
+          "grupo": "Potencia",
+          "categoria": "Potencia",
+          "url": "",
+          "video": "",
+          "patron": "jump",
+          "notas": "Base Maestra • Medición: salto_cm"
+        },
+        {
+          "id": 7,
+          "nombre": "Sprint 20 metros",
+          "titulo": "Sprint 20 metros",
+          "grupo": "Velocidad",
+          "categoria": "Velocidad",
+          "url": "",
+          "video": "",
+          "patron": "jump",
+          "notas": "Base Maestra • Medición: tiempo_seg"
+        },
+        {
+          "id": 8,
+          "nombre": "Hip Thrust",
+          "titulo": "Hip Thrust",
+          "grupo": "Glúteos / Potencia",
+          "categoria": "Glúteos / Potencia",
+          "url": "",
+          "video": "",
+          "patron": "deadlift",
+          "notas": "Base Maestra • Medición: fuerza_kg"
+        },
+        {
+          "id": 9,
+          "nombre": "Press Militar",
+          "titulo": "Press Militar",
+          "grupo": "Hombros",
+          "categoria": "Hombros",
+          "url": "",
+          "video": "",
+          "patron": "press",
+          "notas": "Base Maestra • Medición: fuerza_kg"
+        },
+        {
+          "id": 10,
+          "nombre": "Plancha Isométrica",
+          "titulo": "Plancha Isométrica",
+          "grupo": "Core / Zona Media",
+          "categoria": "Core / Zona Media",
+          "url": "",
+          "video": "",
+          "patron": "plank",
+          "notas": "Base Maestra • Medición: tiempo_seg"
         }
       ],
       "catalogoEjercicios": [

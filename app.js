@@ -27010,3 +27010,3213 @@ window.guardarMovDesdeModalCaja35 = function (e, mesSel) {
         renderizarModuloContabilidadCompletoCDM();
     }
 };
+// =========================================================================
+// 36. FICHA BENTO INTELIGENTE (PARTIDOS EN PRIMER PLANO + EJERCICIOS OPCIONALES)
+//     - CHECKBOX PARA HABILITAR/OCULTAR EJERCICIOS DE GYM EN DEPORTES (POR DEFECTO OFF)
+//     - VISOR DETALLADO "👁️ VER PARTIDOS" DESDE LA TARJETA SUPERIOR + PANEL PRINCIPAL
+//     - FLUJO CANCHA ➔ JUGADOR (FOTOS EN INDEXEDDB + VIDEOS) + INFORME ÚNICO A4
+// Reemplaza al Apartado 36 anterior al final de app.js
+// =========================================================================
+
+(function () {
+    const IDB_NAME_36 = "cdm_partidos_media_idb_v36";
+    const IDB_STORE_36 = "fotos";
+
+    function clubKey36() {
+        if (typeof obtenerClaveClubActivoCDM === "function") return obtenerClaveClubActivoCDM();
+        return localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal";
+    }
+
+    function hoyISO36() {
+        return typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+    }
+
+    // =====================================================================
+    // 0. PREFERENCIA DEL PROFESOR: ¿CONTEMPLAR EJERCICIOS / GYM?
+    //    - En Gimnasio siempre activo.
+    //    - En Deportes (Fútbol, Hockey, etc.) viene DESACTIVADO hasta que el profe lo tilde.
+    // =====================================================================
+    function claveEjerciciosHab36(deporte) {
+        return `cdm_hab_ejercicios_v36_${clubKey36()}_${String(deporte || "Futbol").toLowerCase()}`;
+    }
+
+    function ejerciciosEstanHabilitados36(p) {
+        if (!p) return false;
+        if (p.deporte === "Gimnasio") return true;
+        return localStorage.getItem(claveEjerciciosHab36(p.deporte)) === "1";
+    }
+
+    window.toggleHabilitarEjercicios36 = function (deporte, habilitado) {
+        localStorage.setItem(claveEjerciciosHab36(deporte), habilitado ? "1" : "0");
+        if (habilitado) {
+            window._bento36EvoModo = "ejercicio";
+        } else {
+            if (window._bento36EvoModo === "ejercicio") window._bento36EvoModo = "partidos";
+            if (window._bento36HistModo === "marcas") window._bento36HistModo = "salud";
+        }
+        const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+        if (p) {
+            renderizarCabeceraBento36(p);
+            renderizarDashboardBentoPro36(p);
+        }
+        if (typeof mostrarToast === "function") {
+            mostrarToast(habilitado
+                ? "🏋️ Ejercicios y Progresión de Gym habilitados para este deporte."
+                : "⚽ Modo Campo activo (Ejercicios de Gym ocultos).");
+        }
+    };
+
+    // =====================================================================
+    // 1. ESTILOS BENTO FULL-WIDTH (100% RESPONSIVE)
+    // =====================================================================
+    document.getElementById("cdmCssBentoPro36")?.remove();
+    const st = document.createElement("style");
+    st.id = "cdmCssBentoPro36";
+    st.textContent = `
+        .bento36-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 0.95rem;
+        }
+        /* Barra de configuración rápida del profesor */
+        .bento36-pref-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            background: var(--surface-solid, #ffffff);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            border-radius: 13px;
+            padding: 0.55rem 0.9rem;
+            font-size: 0.79rem;
+        }
+        .bento36-check-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 800;
+            color: var(--ink-800, #1e293b);
+            cursor: pointer;
+            user-select: none;
+        }
+        .bento36-check-label input[type="checkbox"] {
+            width: 17px;
+            height: 17px;
+            min-height: auto !important;
+            accent-color: #0284c7;
+            cursor: pointer;
+        }
+
+        /* Fila 1: Tarjetas KPI (3 columnas si Gym OFF, 4 si Gym ON) */
+        .bento36-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.8rem;
+        }
+        .bento36-kpis.cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .bento36-kpi {
+            background: var(--surface-solid, #ffffff);
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            border-top: 4px solid #0284c7;
+            border-radius: 16px;
+            padding: 0.85rem 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.42rem;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+        }
+        .bento36-kpi.k-score { border-top-color: #6366f1; }
+        .bento36-kpi.k-campo { border-top-color: #10b981; }
+        .bento36-kpi.k-gym { border-top-color: #0284c7; }
+        .bento36-kpi.k-salud { border-top-color: #f59e0b; }
+        .bento36-kpi-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .bento36-kpi-lbl {
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--ink-500, #64748b);
+        }
+        .bento36-kpi-big {
+            font-size: 1.45rem;
+            font-weight: 900;
+            color: var(--ink-900, #0f172a);
+            line-height: 1.1;
+        }
+        .bento36-kpi-sub {
+            font-size: 0.74rem;
+            color: var(--ink-600, #475569);
+            line-height: 1.32;
+        }
+        .bento36-mini-btn {
+            border: 1px solid var(--line-strong, #cbd5e1);
+            background: var(--surface-subtle, #f8fafc);
+            color: var(--cdm-700, #0369a1);
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 0.22rem 0.6rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.14s ease;
+            white-space: nowrap;
+        }
+        .bento36-mini-btn:hover {
+            background: #0284c7;
+            border-color: #0284c7;
+            color: #ffffff;
+        }
+        .bento36-mini-btn.ok {
+            color: #047857;
+            border-color: rgba(16, 185, 129, 0.45);
+            background: rgba(16, 185, 129, 0.08);
+        }
+        .bento36-mini-btn.ok:hover {
+            background: #10b981;
+            border-color: #10b981;
+            color: #ffffff;
+        }
+
+        /* Fila 2: Análisis Principal */
+        .bento36-row-main {
+            display: grid;
+            grid-template-columns: minmax(310px, 0.9fr) minmax(0, 1.3fr);
+            gap: 1rem;
+            align-items: stretch;
+        }
+        .bento36-card {
+            background: var(--surface-solid, #ffffff);
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            border-radius: 18px;
+            padding: 1.05rem 1.15rem;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+        }
+        .bento36-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.85rem;
+            padding-bottom: 0.6rem;
+            border-bottom: 1px solid var(--line, #e2e8f0);
+        }
+        .bento36-card-title {
+            font-size: 0.96rem;
+            font-weight: 800;
+            color: var(--ink-900, #0f172a);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .bento36-seg {
+            display: inline-flex;
+            background: var(--surface-subtle, #f1f5f9);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            border-radius: 10px;
+            padding: 3px;
+            gap: 2px;
+            flex-wrap: wrap;
+        }
+        .bento36-seg button {
+            border: none;
+            background: transparent;
+            color: var(--ink-600, #475569);
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 0.32rem 0.65rem;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.14s ease;
+        }
+        .bento36-seg button.active {
+            background: #0284c7;
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(2, 132, 199, 0.28);
+        }
+
+        /* Ocultar bloque de ejercicios dentro de Comparar Meses cuando Gym está desactivado */
+        .bento36-sin-ejercicios #panelVista33_comparar .chart-canvas-box,
+        .bento36-sin-ejercicios #panelVista33_comparar .table-wrap,
+        .bento36-sin-ejercicios #panelVista33_comparar .empty-box {
+            display: none !important;
+        }
+
+        .bento36-ex-chips {
+            display: flex;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.8rem;
+        }
+        .bento36-ex-chip {
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            background: var(--surface-subtle, #f8fafc);
+            color: var(--ink-800, #1e293b);
+            border-radius: 12px;
+            padding: 0.4rem 0.7rem;
+            font-size: 0.74rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.38rem;
+        }
+        .bento36-ex-chip.active {
+            background: #0284c7;
+            border-color: #0284c7;
+            color: #ffffff;
+        }
+        .bento36-ex-chip.active .badge {
+            background: rgba(255, 255, 255, 0.22) !important;
+            color: #ffffff !important;
+        }
+        .bento36-pilares-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.4rem;
+            margin-bottom: 0.7rem;
+        }
+        .bento36-pilar-pill {
+            background: var(--surface-subtle, #f8fafc);
+            border: 1px solid var(--line, #e2e8f0);
+            border-radius: 10px;
+            padding: 0.4rem 0.3rem;
+            text-align: center;
+        }
+        .bento36-pilar-pill small { display: block; font-size: 0.63rem; font-weight: 700; color: var(--ink-500, #64748b); }
+        .bento36-pilar-pill strong { font-size: 0.88rem; font-weight: 900; color: var(--ink-900, #0f172a); }
+
+        .bento36-curva-stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.45rem;
+            margin-bottom: 0.75rem;
+        }
+        .bento36-stat-box {
+            background: var(--surface-subtle, #f8fafc);
+            border: 1px solid var(--line, #e2e8f0);
+            border-radius: 10px;
+            padding: 0.45rem 0.6rem;
+        }
+        .bento36-stat-box small { display: block; font-size: 0.64rem; color: var(--ink-500, #64748b); font-weight: 700; }
+        .bento36-stat-box strong { font-size: 0.92rem; color: var(--ink-900, #0f172a); font-weight: 900; }
+
+        .cm36-media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+            gap: 0.6rem;
+        }
+        .cm36-media-card {
+            background: var(--surface-subtle, #f8fafc);
+            border: 1px solid var(--line-strong, #cbd5e1);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .cm36-media-card img {
+            width: 100%;
+            height: 105px;
+            object-fit: cover;
+            display: block;
+            cursor: pointer;
+        }
+        .bento36-match-item {
+            padding: 0.6rem 0.8rem;
+            background: var(--surface-subtle, #f8fafc);
+            border: 1px solid var(--line, #e2e8f0);
+            border-left: 4px solid #10b981;
+            border-radius: 11px;
+            font-size: 0.8rem;
+        }
+        .bento36-scroll {
+            max-height: 310px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .bento36-quick-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+            gap: 0.7rem;
+        }
+        .bento36-quick-opt {
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            background: var(--surface-subtle, #f8fafc);
+            border-radius: 14px;
+            padding: 1rem 0.75rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            color: var(--ink-900, #0f172a);
+        }
+        .bento36-quick-opt:hover {
+            border-color: #0284c7;
+            background: var(--cdm-50, #f0f9ff);
+            transform: translateY(-2px);
+        }
+        .cm36-pdf-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.55rem;
+            margin-bottom: 0.95rem;
+        }
+
+        @media (max-width: 1080px) {
+            .bento36-kpis, .bento36-kpis.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .bento36-row-main { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+            .bento36-kpis, .bento36-kpis.cols-3 { grid-template-columns: 1fr; gap: 0.55rem; }
+            .bento36-curva-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+    `;
+    document.head.appendChild(st);
+
+    // =====================================================================
+    // 2. STORAGE MULTIMEDIA (INDEXEDDB) + BÓVEDA DE NODOS NATIVOS
+    // =====================================================================
+    function obtenerMediaPartidos36() {
+        try { return JSON.parse(localStorage.getItem(`cdm_partido_media_v36_${clubKey36()}`) || "[]") || []; }
+        catch { return []; }
+    }
+    function guardarMediaPartidos36(lista) {
+        localStorage.setItem(`cdm_partido_media_v36_${clubKey36()}`, JSON.stringify(lista));
+    }
+
+    function abrirIDB36() {
+        return new Promise((resolve, reject) => {
+            if (!window.indexedDB) return reject("Sin IndexedDB");
+            const req = indexedDB.open(IDB_NAME_36, 1);
+            req.onupgradeneeded = e => {
+                if (!e.target.result.objectStoreNames.contains(IDB_STORE_36)) {
+                    e.target.result.createObjectStore(IDB_STORE_36, { keyPath: "key" });
+                }
+            };
+            req.onsuccess = e => resolve(e.target.result);
+            req.onerror = e => reject(e.target.error);
+        });
+    }
+
+    async function guardarFotoIDB36(key, dataUrl) {
+        const db = await abrirIDB36();
+        return new Promise((res, rej) => {
+            const tx = db.transaction(IDB_STORE_36, "readwrite");
+            tx.objectStore(IDB_STORE_36).put({ key, dataUrl });
+            tx.oncomplete = () => res(true);
+            tx.onerror = e => rej(e.target.error);
+        });
+    }
+
+    async function leerFotoIDB36(key) {
+        try {
+            const db = await abrirIDB36();
+            return await new Promise(res => {
+                const req = db.transaction(IDB_STORE_36, "readonly").objectStore(IDB_STORE_36).get(key);
+                req.onsuccess = () => res(req.result?.dataUrl || null);
+                req.onerror = () => res(null);
+            });
+        } catch { return null; }
+    }
+
+    function comprimirFoto36(file, maxW = 920) {
+        return new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const img = new Image();
+                img.onload = () => {
+                    const scale = Math.min(1, maxW / img.width);
+                    const c = document.createElement("canvas");
+                    c.width = Math.round(img.width * scale);
+                    c.height = Math.round(img.height * scale);
+                    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+                    resolve(c.toDataURL("image/jpeg", 0.75));
+                };
+                img.onerror = () => resolve(null);
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function asegurarVaultNativo36() {
+        let v = document.getElementById("cdmBentoNativeVault36");
+        if (!v) {
+            v = document.createElement("div");
+            v.id = "cdmBentoNativeVault36";
+            v.style.display = "none";
+            document.body.appendChild(v);
+        }
+        return v;
+    }
+
+    function rescatarNodosNativos36() {
+        const vault = asegurarVaultNativo36();
+        const formMarca = document.getElementById("formNuevoAvance");
+        if (formMarca) vault.appendChild(formMarca);
+
+        let formSalud = document.getElementById("cdmFormSaludNativo36") || document.querySelector("#jug-sec-clinica form") || document.querySelector("#panelCarga33_salud form");
+        if (formSalud) {
+            formSalud.id = "cdmFormSaludNativo36";
+            vault.appendChild(formSalud);
+        }
+
+        ["contenedorHistorialJugador", "contenedorClinicoJugador", "selectFiltroEjercicioGrafico", "kpisEvolucionEjercicio"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) vault.appendChild(el);
+        });
+
+        const canvasOld = document.getElementById("canvasEvolucionJugador");
+        if (canvasOld && canvasOld.closest(".chart-canvas-box")) {
+            vault.appendChild(canvasOld.closest(".chart-canvas-box"));
+        }
+    }
+
+    function asegurarModal36() {
+        let m = document.getElementById("modalCanchaMedia36");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalCanchaMedia36";
+            m.className = "modal-backdrop hidden";
+            document.body.appendChild(m);
+        }
+        return m;
+    }
+
+    window.cerrarModal36 = function () {
+        const m = document.getElementById("modalCanchaMedia36");
+        if (m) {
+            const vault = asegurarVaultNativo36();
+            const f1 = m.querySelector("#formNuevoAvance");
+            const f2 = m.querySelector("#cdmFormSaludNativo36");
+            if (f1) vault.appendChild(f1);
+            if (f2) vault.appendChild(f2);
+            m.classList.add("hidden");
+        }
+    };
+
+    // =====================================================================
+    // 3. VISOR DETALLADO DE PARTIDOS Y MULTIMEDIA (DESDE EL BOTÓN SUPERIOR)
+    // =====================================================================
+    window.abrirVisorPartidosJugador36 = function (idPersona) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        if (!p) return;
+
+        const an = typeof analizarJugador360Admin32 === "function"
+            ? analizarJugador360Admin32(p)
+            : { partidosStats: { pj: 0, goles: 0, asistencias: 0, quites: 0, errores: 0, tarjetas: 0, detallePartidos: [] } };
+        const stP = an.partidosStats;
+        const mediaJug = obtenerMediaPartidos36().filter(m => (m.jugadoresIds || []).includes(Number(p.id)));
+
+        const modal = asegurarModal36();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:860px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-ok">⚽ HISTORIAL DE CANCHA EN VIVO</span>
+                        <h3 style="margin-top:4px;">Partidos y Evidencia — ${p.apellido}, ${p.nombre}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModal36()">✕</button>
+                </div>
+
+                <div class="bento36-curva-stats" style="margin-bottom:1rem;">
+                    <div class="bento36-stat-box"><small>Partidos Jugados</small><strong>${stP.pj} PJ</strong></div>
+                    <div class="bento36-stat-box"><small>Goles / Asistencias</small><strong style="color:#059669;">${stP.goles}G / ${stP.asistencias}A</strong></div>
+                    <div class="bento36-stat-box"><small>Quites / Recup.</small><strong style="color:#0284c7;">${stP.quites}</strong></div>
+                    <div class="bento36-stat-box"><small>Errores / Tarjetas</small><strong style="color:${(stP.errores + stP.tarjetas) > 0 ? "#dc2626" : "var(--ink-900)"};">${stP.errores}E / ${stP.tarjetas}T</strong></div>
+                </div>
+
+                <strong style="font-size:0.84rem; display:block; margin-bottom:0.5rem;">📋 Detalle Partido por Partido (${stP.detallePartidos.length}):</strong>
+                <div class="bento36-scroll" style="max-height:280px; margin-bottom:1rem;">
+                    ${stP.detallePartidos.length === 0
+                        ? `<div class="empty-box" style="padding:1.2rem;">Todavía no hay partidos registrados para ${p.nombre}.<br><small style="color:var(--ink-500);">Cuando cierres un partido desde <b>Cancha Partido</b>, aparecerá aquí con todas sus acciones.</small></div>`
+                        : stP.detallePartidos.map(dp => `
+                            <div class="bento36-match-item">
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem; margin-bottom:4px;">
+                                    <strong style="font-size:0.86rem; color:var(--ink-900);">📅 ${dp.partido.fecha} vs ${dp.partido.rival} (${dp.partido.resultado || "S/D"})</strong>
+                                    ${dp.resJ ? `<span class="badge badge-celeste">Impacto: ${dp.resJ.puntosSugeridos >= 0 ? "+" : ""}${dp.resJ.puntosSugeridos} pts</span>` : ""}
+                                </div>
+                                ${dp.evs.length === 0
+                                    ? `<small style="color:var(--ink-500);">Convocado / Participación sin eventos puntuales.</small>`
+                                    : `<div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                                        ${dp.evs.map(e => `<span class="badge badge-purple" style="font-size:0.69rem;">${e.minutoDisplay || ""} ${e.tipo}${e.detalle ? ` (${e.detalle})` : ""}</span>`).join("")}
+                                       </div>`}
+                            </div>
+                        `).join("")}
+                </div>
+
+                <strong style="font-size:0.84rem; display:block; margin-bottom:0.5rem;">📸 Fotos y Videos de Partidos (${mediaJug.length}):</strong>
+                ${mediaJug.length === 0
+                    ? `<small style="color:var(--ink-500);">Sin fotos ni videos vinculados aún (se cargan desde el botón <b>📸 Fotos / Videos</b> en Cancha Partido).</small>`
+                    : `<div class="cm36-media-grid">
+                        ${mediaJug.map(it => `
+                            <div class="cm36-media-card">
+                                ${it.tipo === "foto"
+                                    ? `<img data-vis36-idb="${it.idbKey}" src="" alt="${it.titulo}" onclick="window.open(this.src,'_blank')">`
+                                    : `<a href="${it.url}" target="_blank" style="height:105px; background:#0f172a; color:#38bdf8; display:flex; align-items:center; justify-content:center; text-decoration:none; font-weight:800;">▶ Ver Video</a>`}
+                                <div style="padding:0.38rem 0.5rem; font-size:0.72rem;">
+                                    <strong style="display:block;">${it.titulo}</strong>
+                                    <small style="color:var(--ink-500);">${it.fecha} • ${it.rival}</small>
+                                </div>
+                            </div>
+                        `).join("")}
+                       </div>`}
+            </div>
+        `;
+        modal.classList.remove("hidden");
+
+        modal.querySelectorAll("img[data-vis36-idb]").forEach(async img => {
+            const url = await leerFotoIDB36(img.dataset.vis36Idb);
+            if (url) img.src = url;
+        });
+    };
+
+    // =====================================================================
+    // 4. MODALES LIMPIOS DE CARGA (SCORE, MARCA SOLO SI HABILITADO, SALUD)
+    // =====================================================================
+    window.abrirSelectorCargaRapida36 = function (idPersona) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        if (!p) return;
+        const esGym = p.deporte === "Gimnasio";
+        const habEj = ejerciciosEstanHabilitados36(p);
+
+        const modal = asegurarModal36();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:560px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">⚡ CARGA RÁPIDA</span>
+                        <h3 style="margin-top:4px;">¿Qué querés cargar para ${p.nombre}?</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModal36()">✕</button>
+                </div>
+                <div class="bento36-quick-grid">
+                    ${!esGym ? `
+                        <button type="button" class="bento36-quick-opt" onclick="abrirModalEvaluarScore36(${p.id})">
+                            <div style="font-size:1.8rem; margin-bottom:0.35rem;">⭐</div>
+                            <strong style="display:block; font-size:0.86rem;">Evaluar Score</strong>
+                            <small style="color:var(--ink-500); font-size:0.72rem;">Nota 1–10 + Sugerencia</small>
+                        </button>
+                    ` : ""}
+                    ${habEj ? `
+                        <button type="button" class="bento36-quick-opt" onclick="abrirModalCargarMarca36(${p.id})">
+                            <div style="font-size:1.8rem; margin-bottom:0.35rem;">🏋️</div>
+                            <strong style="display:block; font-size:0.86rem;">Nueva Marca</strong>
+                            <small style="color:var(--ink-500); font-size:0.72rem;">Kilos, salto, tiempo</small>
+                        </button>
+                    ` : ""}
+                    <button type="button" class="bento36-quick-opt" onclick="abrirModalCargarSalud36(${p.id})">
+                        <div style="font-size:1.8rem; margin-bottom:0.35rem;">🏥</div>
+                        <strong style="display:block; font-size:0.86rem;">Peso y Salud</strong>
+                        <small style="color:var(--ink-500); font-size:0.72rem;">Peso, fatiga, apto</small>
+                    </button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.sugerirScorePorDatos36 = function (idPersona) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        if (!p || p.deporte === "Gimnasio") return;
+
+        const habEj = ejerciciosEstanHabilitados36(p);
+        const an = typeof analizarJugador360Admin32 === "function"
+            ? analizarJugador360Admin32(p)
+            : { partidosStats: { pj: 0, goles: 0, asistencias: 0, quites: 0, errores: 0, tarjetas: 0 }, progresosGym: [], asist7d: 0, pactado: 3, ultClin: null };
+
+        const clamp = (v) => Math.max(1, Math.min(10, Math.round(v * 10) / 10));
+        const promProg = (habEj && an.progresosGym.length) ? (an.progresosGym.reduce((a, x) => a + x.pct, 0) / an.progresosGym.length) : 0;
+        const ratioAs = Math.min(1.2, (an.asist7d || 0) / Math.max(1, an.pactado || 3));
+
+        let fis = habEj ? (7.0 + Math.max(-1.5, Math.min(2.2, promProg / 10))) : (6.6 + ratioAs * 2.2);
+        if (p.estadoMedico && p.estadoMedico !== "Óptimo") fis -= 1.0;
+        if (an.ultClin && Number(an.ultClin.rpe || 5) >= 8) fis -= 0.4;
+        fis = clamp(fis);
+
+        let gym = habEj
+            ? clamp(6.8 + Math.min(1.2, (p.evaluaciones?.length || 0) * 0.25) + Math.max(-1.0, Math.min(1.8, promProg / 12)))
+            : (p.pilares?.gym || fis);
+
+        const st = an.partidosStats;
+        const impPart = (st.goles * 0.5) + (st.asistencias * 0.35) + (st.quites * 0.2) - (st.errores * 0.25) - (st.tarjetas * 0.3);
+        let tec = clamp(7.4 + Math.max(-1.5, Math.min(2.2, impPart)));
+        let act = clamp(5.8 + ratioAs * 3.4);
+
+        const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        setV("m36Fis", fis); setV("m36Gym", gym); setV("m36Tec", tec); setV("m36Act", act);
+
+        const mot = document.getElementById("m36Mot");
+        if (mot) {
+            mot.value = habEj
+                ? `Sugerido: ${an.asist7d}/${an.pactado}d asist., ${st.pj} PJ, Gym ${promProg >= 0 ? "+" : ""}${Math.round(promProg)}%`
+                : `Sugerido (Modo Campo): ${an.asist7d}/${an.pactado}d asist., ${st.pj} PJ (${st.goles}G/${st.asistencias}A)`;
+        }
+        actualizarPreviewModalScore36();
+        if (typeof mostrarToast === "function") mostrarToast("🤖 Valores sugeridos calculados.");
+    };
+
+    window.actualizarPreviewModalScore36 = function () {
+        const fis = parseFloat(document.getElementById("m36Fis")?.value) || 7;
+        const gym = parseFloat(document.getElementById("m36Gym")?.value) || 7;
+        const tec = parseFloat(document.getElementById("m36Tec")?.value) || 7;
+        const act = parseFloat(document.getElementById("m36Act")?.value) || 7;
+        const bon = parseFloat(document.getElementById("m36Bon")?.value) || 0;
+        const tot = Math.min(10, Math.max(1, Math.round(((fis * 0.30) + (gym * 0.25) + (tec * 0.25) + (act * 0.20) + bon) * 10) / 10));
+
+        const setT = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+        setT("m36ValFis", `${fis.toFixed(1)} / 10`);
+        setT("m36ValGym", `${gym.toFixed(1)} / 10`);
+        setT("m36ValTec", `${tec.toFixed(1)} / 10`);
+        setT("m36ValAct", `${act.toFixed(1)} / 10`);
+        setT("m36ValBon", `${bon >= 0 ? "+" : ""}${bon.toFixed(1)} pts`);
+        setT("m36TotalNum", tot.toFixed(1));
+    };
+
+    window.guardarModalScore36 = function (e, idPersona) {
+        e.preventDefault();
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        if (!p) return;
+        const ant = p.puntosCategoria;
+        p.pilares = {
+            fisico: normalizarNota1a10(document.getElementById("m36Fis")?.value, 7),
+            gym: normalizarNota1a10(document.getElementById("m36Gym")?.value, 7),
+            tecnico: normalizarNota1a10(document.getElementById("m36Tec")?.value, 7),
+            actitud: normalizarNota1a10(document.getElementById("m36Act")?.value, 7),
+            bonus: normalizarBonus1a10(document.getElementById("m36Bon")?.value)
+        };
+        recalcularPuntajePonderado(p);
+        p.motivoPuntos = (document.getElementById("m36Mot")?.value || "").trim() || "Evaluación actualizada por el profesor";
+        if (typeof registrarEventoScore32 === "function") registrarEventoScore32(p, ant, p.puntosCategoria, "Evaluación 360°", p.motivoPuntos);
+        guardarDatosCDM();
+        cerrarModal36();
+        if (typeof mostrarToast === "function") mostrarToast(`⭐ Score actualizado: ${p.puntosCategoria}/10`);
+        renderizarCabeceraBento36(p);
+        renderizarDashboardBentoPro36(p);
+    };
+
+    window.abrirModalEvaluarScore36 = function (idPersona) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        if (!p || p.deporte === "Gimnasio") return;
+        const pil = p.pilares || { fisico: 7, gym: 7, tecnico: 7, actitud: 7, bonus: 0 };
+
+        const modal = asegurarModal36();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:540px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">⭐ EVALUACIÓN 360°</span>
+                        <h3 style="margin-top:4px;">Calificar a ${p.nombre} ${p.apellido}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModal36()">✕</button>
+                </div>
+
+                <div class="eval33-score-hero" style="margin-bottom:0.65rem;">
+                    <div>
+                        <span class="badge badge-celeste" style="font-size:0.64rem;">SCORE RESULTANTE</span>
+                        <div style="font-size:0.78rem; color:#e0f2fe; margin-top:3px;">${p.deporte} • ${p.categoria}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div id="m36TotalNum" class="eval33-score-num">${Number(p.puntosCategoria || 7).toFixed(1)}</div>
+                        <small style="color:#94a3b8; font-size:0.68rem;">de 10.0 pts</small>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:0.75rem; font-weight:800;" onclick="sugerirScorePorDatos36(${p.id})">
+                    🤖 Sugerir Score según datos reales
+                </button>
+
+                <form onsubmit="guardarModalScore36(event, ${p.id})">
+                    <div class="eval33-slider-box">
+                        <div class="eval33-slider-head"><span>🏃 <b>Físico</b> (30%)</span><span id="m36ValFis" class="eval33-slider-val">${pil.fisico.toFixed(1)} / 10</span></div>
+                        <input type="range" id="m36Fis" class="eval33-range" min="1" max="10" step="0.1" value="${pil.fisico}" oninput="actualizarPreviewModalScore36()">
+                    </div>
+                    <div class="eval33-slider-box">
+                        <div class="eval33-slider-head"><span>🏋️ <b>Gimnasio / Fuerza</b> (25%)</span><span id="m36ValGym" class="eval33-slider-val">${pil.gym.toFixed(1)} / 10</span></div>
+                        <input type="range" id="m36Gym" class="eval33-range" min="1" max="10" step="0.1" value="${pil.gym}" oninput="actualizarPreviewModalScore36()">
+                    </div>
+                    <div class="eval33-slider-box">
+                        <div class="eval33-slider-head"><span>⚽ <b>Técnico</b> (25%)</span><span id="m36ValTec" class="eval33-slider-val">${pil.tecnico.toFixed(1)} / 10</span></div>
+                        <input type="range" id="m36Tec" class="eval33-range" min="1" max="10" step="0.1" value="${pil.tecnico}" oninput="actualizarPreviewModalScore36()">
+                    </div>
+                    <div class="eval33-slider-box">
+                        <div class="eval33-slider-head"><span>🔥 <b>Actitud</b> (20%)</span><span id="m36ValAct" class="eval33-slider-val">${pil.actitud.toFixed(1)} / 10</span></div>
+                        <input type="range" id="m36Act" class="eval33-range" min="1" max="10" step="0.1" value="${pil.actitud}" oninput="actualizarPreviewModalScore36()">
+                    </div>
+                    <div class="eval33-slider-box" style="background:var(--cdm-50);">
+                        <div class="eval33-slider-head"><span>⭐ <b>Bonus / Ajuste</b></span><span id="m36ValBon" class="eval33-slider-val">${pil.bonus >= 0 ? "+" : ""}${Number(pil.bonus || 0).toFixed(1)} pts</span></div>
+                        <input type="range" id="m36Bon" class="eval33-range" min="-2" max="2" step="0.1" value="${pil.bonus || 0}" oninput="actualizarPreviewModalScore36()">
+                    </div>
+                    <div class="field" style="margin-bottom:0.75rem;">
+                        <label>Motivo / Observación del Profe</label>
+                        <input type="text" id="m36Mot" value="${(p.motivoPuntos || "").replace(/"/g, "&quot;")}" placeholder="Ej: Gran partido, mejorar velocidad...">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">💾 Guardar Evaluación</button>
+                </form>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.abrirModalCargarMarca36 = function (idPersona) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        const formMarca = document.getElementById("formNuevoAvance");
+        if (!p || !formMarca) return;
+
+        const modal = asegurarModal36();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:540px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">🏋️ PROGRESIÓN FÍSICA</span>
+                        <h3 style="margin-top:4px;">Registrar Marca — ${p.nombre} ${p.apellido}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModal36()">✕</button>
+                </div>
+                <div id="slotModalFormMarca36"></div>
+            </div>
+        `;
+        document.getElementById("slotModalFormMarca36")?.appendChild(formMarca);
+        if (!formMarca.dataset.closeHook36) {
+            formMarca.dataset.closeHook36 = "1";
+            formMarca.addEventListener("submit", () => setTimeout(() => cerrarModal36(), 50));
+        }
+        modal.classList.remove("hidden");
+    };
+
+    window.abrirModalCargarSalud36 = function (idPersona) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        const formSalud = document.getElementById("cdmFormSaludNativo36") || document.querySelector("#jug-sec-clinica form");
+        if (!p || !formSalud) return;
+        formSalud.id = "cdmFormSaludNativo36";
+
+        const modal = asegurarModal36();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:540px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-warn">🏥 SALUD, PESO Y WELLNESS</span>
+                        <h3 style="margin-top:4px;">Nuevo Control — ${p.nombre} ${p.apellido}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModal36()">✕</button>
+                </div>
+                <div id="slotModalFormSalud36"></div>
+            </div>
+        `;
+        document.getElementById("slotModalFormSalud36")?.appendChild(formSalud);
+        if (!formSalud.dataset.closeHook36) {
+            formSalud.dataset.closeHook36 = "1";
+            formSalud.addEventListener("submit", () => setTimeout(() => cerrarModal36(), 50));
+        }
+        modal.classList.remove("hidden");
+    };
+
+    // =====================================================================
+    // 5. TABLERO BENTO PRINCIPAL (PARTIDOS ARRIBA + EJERCICIOS SOLO SI ESTÁN TILDADOS)
+    // =====================================================================
+    window._bento36EvoModo = null;      // 'partidos' | 'meses' | 'ejercicio'
+    window._bento36HistModo = null;     // 'salud' | 'movimientos' | 'marcas'
+    window._bento36EjSel = "";
+    let _chartCurvaBento36 = null;
+
+    function dibujarCurvaEjercicioBento36(p, nombreEj) {
+        const canvas = document.getElementById("canvasCurvaBento36");
+        if (!canvas || typeof Chart === "undefined") return;
+        if (_chartCurvaBento36) { _chartCurvaBento36.destroy(); _chartCurvaBento36 = null; }
+
+        const lista = (p.evaluaciones || [])
+            .filter(e => e.ejercicio === nombreEj)
+            .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        if (!lista.length) return;
+
+        _chartCurvaBento36 = new Chart(canvas.getContext("2d"), {
+            type: "line",
+            data: {
+                labels: lista.map(e => e.fecha),
+                datasets: [{
+                    label: `${nombreEj} (${lista[0].unidad || ""})`,
+                    data: lista.map(e => Number(e.valor) || 0),
+                    borderColor: "#0284c7",
+                    backgroundColor: "rgba(2, 132, 199, 0.14)",
+                    borderWidth: 3,
+                    pointRadius: 4.5,
+                    pointBackgroundColor: "#0284c7",
+                    tension: 0.32,
+                    fill: true
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    window.cambiarModoEvolucionBento36 = function (modo) {
+        window._bento36EvoModo = modo;
+        const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+        if (p) renderizarPanelDerechoPrincipal36(p);
+    };
+
+    window.seleccionarEjercicioBento36 = function (nombreEj) {
+        window._bento36EjSel = nombreEj;
+        const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+        if (p) renderizarPanelDerechoPrincipal36(p);
+    };
+
+    window.cambiarModoHistorialBento36 = function (modo) {
+        window._bento36HistModo = modo;
+        ["marcas", "salud", "movimientos"].forEach(k => {
+            document.getElementById(`bento36Hist_${k}`)?.classList.toggle("hidden", k !== modo);
+        });
+        document.querySelectorAll(".bento36-hist-btn").forEach(b => {
+            b.classList.toggle("active", b.dataset.h === modo);
+        });
+    };
+
+    function renderizarPanelDerechoPrincipal36(p) {
+        const body = document.getElementById("bento36EvoBody");
+        if (!body || !p) return;
+
+        const esGym = p.deporte === "Gimnasio";
+        const habEj = ejerciciosEstanHabilitados36(p);
+        let modo = window._bento36EvoModo;
+        if (!modo) modo = esGym ? "ejercicio" : "partidos";
+        if (modo === "ejercicio" && !habEj) modo = "partidos";
+        if (modo === "partidos" && esGym) modo = "ejercicio";
+        window._bento36EvoModo = modo;
+
+        document.querySelectorAll(".bento36-evo-btn").forEach(b => {
+            b.classList.toggle("active", b.dataset.evo === modo);
+        });
+
+        // VISTA A: PARTIDOS Y MULTIMEDIA (EN PRIMER PLANO PARA DEPORTES)
+        if (modo === "partidos") {
+            const an = typeof analizarJugador360Admin32 === "function"
+                ? analizarJugador360Admin32(p)
+                : { partidosStats: { pj: 0, goles: 0, asistencias: 0, quites: 0, errores: 0, tarjetas: 0, detallePartidos: [] } };
+            const stP = an.partidosStats;
+            const mediaJug = obtenerMediaPartidos36().filter(m => (m.jugadoresIds || []).includes(Number(p.id)));
+
+            body.innerHTML = `
+                <div class="bento36-curva-stats">
+                    <div class="bento36-stat-box"><small>Jugados</small><strong>${stP.pj} PJ</strong></div>
+                    <div class="bento36-stat-box"><small>Goles / Asist.</small><strong style="color:#059669;">${stP.goles}G / ${stP.asistencias}A</strong></div>
+                    <div class="bento36-stat-box"><small>Quites / Rec.</small><strong style="color:#0284c7;">${stP.quites}</strong></div>
+                    <div class="bento36-stat-box"><small>Fotos / Videos</small><strong>${mediaJug.length} arch.</strong></div>
+                </div>
+
+                <div class="bento36-scroll" style="max-height:230px; margin-bottom:${mediaJug.length ? "0.8rem" : "0"};">
+                    ${stP.detallePartidos.length === 0
+                        ? `<div class="empty-box" style="padding:1.35rem 1rem;">
+                            Todavía no tiene partidos registrados en Cancha.<br>
+                            <small style="color:var(--ink-500);">Todo lo que marques al finalizar en <b>Cancha Partido</b> aparecerá automáticamente aquí.</small>
+                           </div>`
+                        : stP.detallePartidos.map(dp => `
+                            <div class="bento36-match-item">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                                    <b>${dp.partido.fecha} vs ${dp.partido.rival} (${dp.partido.resultado || "S/D"})</b>
+                                    ${dp.resJ ? `<span class="badge badge-celeste">${dp.resJ.puntosSugeridos >= 0 ? "+" : ""}${dp.resJ.puntosSugeridos} pts</span>` : ""}
+                                </div>
+                                <div style="color:var(--ink-600); margin-top:2px; font-size:0.76rem;">
+                                    ${dp.evs.map(e => `${e.minutoDisplay || ""} ${e.tipo}`).join(" • ") || "Participación"}
+                                </div>
+                            </div>
+                        `).join("")}
+                </div>
+
+                ${mediaJug.length > 0 ? `
+                    <strong style="font-size:0.75rem; color:var(--ink-600); display:block; margin-bottom:0.4rem;">📸 Evidencia de Partidos:</strong>
+                    <div class="cm36-media-grid">
+                        ${mediaJug.slice(0, 4).map(it => `
+                            <div class="cm36-media-card">
+                                ${it.tipo === "foto"
+                                    ? `<img data-bento36-idb="${it.idbKey}" src="" alt="${it.titulo}" onclick="window.open(this.src,'_blank')">`
+                                    : `<a href="${it.url}" target="_blank" style="height:105px; background:#0f172a; color:#38bdf8; display:flex; align-items:center; justify-content:center; text-decoration:none; font-weight:800; font-size:0.78rem;">▶ Ver Video</a>`}
+                                <div style="padding:0.3rem 0.45rem; font-size:0.7rem;">
+                                    <strong style="display:block;">${it.titulo}</strong>
+                                    <small style="color:var(--ink-500);">${it.fecha}</small>
+                                </div>
+                            </div>
+                        `).join("")}
+                    </div>
+                ` : ""}
+            `;
+
+            body.querySelectorAll("img[data-bento36-idb]").forEach(async img => {
+                const url = await leerFotoIDB36(img.dataset.bento36Idb);
+                if (url) img.src = url;
+            });
+            return;
+        }
+
+        // VISTA B: COMPARAR MESES
+        if (modo === "meses" && typeof renderizarComparativaMeses34 === "function") {
+            body.innerHTML = `<div id="panelVista33_comparar"></div>`;
+            renderizarComparativaMeses34(p);
+            return;
+        }
+
+        // VISTA C: EJERCICIOS / PROGRESIÓN FÍSICA (SOLO SI EL PROFE LO TILDÓ O ES GIMNASIO)
+        const porEj = {};
+        (p.evaluaciones || []).forEach(ev => {
+            if (!porEj[ev.ejercicio]) porEj[ev.ejercicio] = [];
+            porEj[ev.ejercicio].push(ev);
+        });
+        const ejercicios = Object.entries(porEj).map(([nom, lista]) => {
+            const ord = [...lista].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+            const ini = ord[0], fin = ord[ord.length - 1];
+            const esT = ini.tipo === "tiempo_seg";
+            const pr = esT ? Math.min(...ord.map(x => Number(x.valor) || 0)) : Math.max(...ord.map(x => Number(x.valor) || 0));
+            const pct = ini.valor > 0 ? Math.round(((esT ? (ini.valor - fin.valor) : (fin.valor - ini.valor)) / ini.valor) * 1000) / 10 : 0;
+            return { nombre: nom, unidad: fin.unidad || "", ini: ini.valor, fin: fin.valor, pr, pct };
+        });
+
+        if (!ejercicios.length) {
+            body.innerHTML = `
+                <div class="empty-box" style="padding:1.6rem 1rem;">
+                    Todavía no hay marcas de ejercicios registradas para ${p.nombre}.<br>
+                    <button type="button" class="btn btn-primary btn-sm" style="margin-top:0.7rem;" onclick="abrirModalCargarMarca36(${p.id})">🏋️ Cargar Primera Marca</button>
+                </div>
+            `;
+            return;
+        }
+
+        if (!window._bento36EjSel || !ejercicios.some(e => e.nombre === window._bento36EjSel)) {
+            window._bento36EjSel = ejercicios[0].nombre;
+        }
+        const act = ejercicios.find(e => e.nombre === window._bento36EjSel) || ejercicios[0];
+
+        body.innerHTML = `
+            <div class="bento36-ex-chips">
+                ${ejercicios.map(e => `
+                    <button type="button" class="bento36-ex-chip ${e.nombre === act.nombre ? "active" : ""}" onclick="seleccionarEjercicioBento36('${e.nombre.replace(/'/g, "\\'")}')">
+                        <span>${e.nombre}</span>
+                        <span class="badge ${e.pct >= 0 ? "badge-ok" : "badge-danger"}" style="font-size:0.64rem; padding:1px 6px;">${e.fin} ${e.unidad} (${e.pct > 0 ? "+" : ""}${e.pct}%)</span>
+                    </button>
+                `).join("")}
+            </div>
+            <div class="bento36-curva-stats">
+                <div class="bento36-stat-box"><small>Inicial</small><strong>${act.ini} ${act.unidad}</strong></div>
+                <div class="bento36-stat-box"><small>Actual</small><strong style="color:#0284c7;">${act.fin} ${act.unidad}</strong></div>
+                <div class="bento36-stat-box"><small>Récord (PR)</small><strong>🏆 ${act.pr} ${act.unidad}</strong></div>
+                <div class="bento36-stat-box"><small>Avance</small><strong style="color:${act.pct >= 0 ? "#059669" : "#dc2626"};">${act.pct > 0 ? "+" : ""}${act.pct}%</strong></div>
+            </div>
+            <div class="chart-canvas-box" style="height:215px;">
+                <canvas id="canvasCurvaBento36"></canvas>
+            </div>
+        `;
+        setTimeout(() => dibujarCurvaEjercicioBento36(p, act.nombre), 25);
+    }
+
+    function renderizarCabeceraBento36(p) {
+        if (typeof renderizarCabeceraLimpia33 === "function") renderizarCabeceraLimpia33(p);
+        const cabAcc = document.querySelector("#fichaCabeceraJugador .cab33-actions");
+        if (!cabAcc) return;
+
+        if (!document.getElementById("btnCargaRapidaCab36")) {
+            const bC = document.createElement("button");
+            bC.type = "button";
+            bC.id = "btnCargaRapidaCab36";
+            bC.className = "btn btn-secondary btn-sm";
+            bC.style = "font-weight:800;";
+            bC.onclick = () => abrirSelectorCargaRapida36(p.id);
+            bC.innerHTML = "⚡ Cargar Dato";
+            cabAcc.insertBefore(bC, cabAcc.lastElementChild);
+        }
+        if (!document.getElementById("btnInformeUnicoCab36")) {
+            const bInf = document.createElement("button");
+            bInf.type = "button";
+            bInf.id = "btnInformeUnicoCab36";
+            bInf.className = "btn btn-secondary btn-sm";
+            bInf.onclick = () => abrirInformeUnico36(p.id);
+            bInf.innerHTML = "📄 Informe PDF";
+            cabAcc.insertBefore(bInf, cabAcc.lastElementChild);
+        }
+    }
+
+    window.renderizarDashboardBentoPro36 = function (p) {
+        if (!p || document.body?.dataset.page !== "perfil-individual" || document.body?.getAttribute("data-rol") === "usuario") return;
+
+        const sec = document.getElementById("jug-sec-control33");
+        if (!sec) return;
+
+        rescatarNodosNativos36();
+
+        const an = typeof analizarJugador360Admin32 === "function"
+            ? analizarJugador360Admin32(p)
+            : { esGym: p.deporte === "Gimnasio", pares: [], puestoRanking: null, partidosStats: { pj: 0, goles: 0, asistencias: 0, quites: 0, tarjetas: 0, detallePartidos: [] }, evals: p.evaluaciones || [], progresosGym: [], asist7d: 0, pactado: 3, ultClin: null, timeline: [], fortalezas: [], mejoras: [] };
+
+        const esGym = an.esGym;
+        const habEj = ejerciciosEstanHabilitados36(p);
+        const pil = p.pilares || { fisico: 7, gym: 7, tecnico: 7, actitud: 7, bonus: 0 };
+        const promAvanceGym = an.progresosGym.length
+            ? Math.round((an.progresosGym.reduce((a, x) => a + x.pct, 0) / an.progresosGym.length) * 10) / 10
+            : 0;
+        const mediaJug = obtenerMediaPartidos36().filter(m => (m.jugadoresIds || []).includes(Number(p.id)));
+        const ultPart = an.partidosStats.detallePartidos[0]?.partido || null;
+
+        if (!window._bento36HistModo) window._bento36HistModo = habEj ? "marcas" : "salud";
+        if (!habEj && window._bento36HistModo === "marcas") window._bento36HistModo = "salud";
+
+        sec.innerHTML = `
+            <div class="bento36-wrap ${!habEj ? "bento36-sin-ejercicios" : ""}">
+                ${!esGym ? `
+                    <!-- INTERRUPTOR DEL PROFESOR PARA HABILITAR O OCULTAR EJERCICIOS / GYM -->
+                    <div class="bento36-pref-bar">
+                        <label class="bento36-check-label">
+                            <input type="checkbox" ${habEj ? "checked" : ""} onchange="toggleHabilitarEjercicios36('${p.deporte.replace(/'/g, "\\'")}', this.checked)">
+                            <span>🏋️ Contemplar Ejercicios y Progresión de Gimnasio en ${p.deporte}</span>
+                        </label>
+                        <small style="color:var(--ink-500);">
+                            ${habEj ? "Activo: incluye cargas, curvas de fuerza y tabla de gym en el informe." : "Desactivado: enfocado en Partidos, Score, Asistencia y Salud."}
+                        </small>
+                    </div>
+                ` : ""}
+
+                <!-- FILA 1: TARJETAS KPI DE ESTADO INMEDIATO -->
+                <div class="bento36-kpis ${(!esGym && !habEj) ? "cols-3" : ""}">
+                    <div class="bento36-kpi k-score">
+                        <div class="bento36-kpi-top">
+                            <span class="bento36-kpi-lbl">${esGym ? "🏋️ Plan Activo" : "⭐ Score & Ranking"}</span>
+                            ${!esGym ? `<button type="button" class="bento36-mini-btn" onclick="abrirModalEvaluarScore36(${p.id})">✏️ Evaluar</button>` : ""}
+                        </div>
+                        <div class="bento36-kpi-big">${esGym ? "Socio Gym" : `${Number(p.puntosCategoria || 7).toFixed(1)} <small style="font-size:0.8rem; color:var(--ink-500);">/10</small>`}</div>
+                        <div class="bento36-kpi-sub">${esGym ? (p.puesto || "Entrenamiento General") : (an.puestoRanking ? `Puesto <b>#${an.puestoRanking}°</b> de ${an.pares.length} en ${p.categoria}` : p.categoria)}</div>
+                    </div>
+
+                    ${!esGym ? `
+                        <div class="bento36-kpi k-campo">
+                            <div class="bento36-kpi-top">
+                                <span class="bento36-kpi-lbl">⚽ Cancha y Partidos</span>
+                                <button type="button" class="bento36-mini-btn ok" onclick="abrirVisorPartidosJugador36(${p.id})">👁️ Ver Partidos</button>
+                            </div>
+                            <div class="bento36-kpi-big">${an.partidosStats.pj} PJ <small style="font-size:0.78rem; color:#059669;">(${an.partidosStats.goles}G / ${an.partidosStats.asistencias}A)</small></div>
+                            <div class="bento36-kpi-sub">
+                                ${ultPart ? `Últ: <b>vs ${ultPart.rival}</b> (${ultPart.resultado || "S/D"}) • ${mediaJug.length} media` : `Sin partidos aún • ${mediaJug.length} foto/video`}
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bento36-kpi k-campo">
+                            <div class="bento36-kpi-top">
+                                <span class="bento36-kpi-lbl">📅 Constancia</span>
+                            </div>
+                            <div class="bento36-kpi-big">${(p.asistencias || []).length} días</div>
+                            <div class="bento36-kpi-sub">Esta semana: ${an.asist7d}/${an.pactado} días</div>
+                        </div>
+                    `}
+
+                    ${habEj ? `
+                        <div class="bento36-kpi k-gym">
+                            <div class="bento36-kpi-top">
+                                <span class="bento36-kpi-lbl">🏋️ Progreso Ejercicios</span>
+                                <button type="button" class="bento36-mini-btn" onclick="abrirModalCargarMarca36(${p.id})">+ Marca</button>
+                            </div>
+                            <div class="bento36-kpi-big" style="color:${promAvanceGym >= 0 ? "#059669" : "#dc2626"};">${promAvanceGym > 0 ? "+" : ""}${promAvanceGym}%</div>
+                            <div class="bento36-kpi-sub">${an.evals.length} registro(s) físicos y de fuerza</div>
+                        </div>
+                    ` : ""}
+
+                    <div class="bento36-kpi k-salud">
+                        <div class="bento36-kpi-top">
+                            <span class="bento36-kpi-lbl">🏥 Salud y Asist.</span>
+                            <button type="button" class="bento36-mini-btn" onclick="abrirModalCargarSalud36(${p.id})">+ Control</button>
+                        </div>
+                        <div class="bento36-kpi-big" style="font-size:1.18rem;">${p.estadoMedico && p.estadoMedico !== "Óptimo" ? `⚠️ ${p.estadoMedico}` : "🟢 Apto"}</div>
+                        <div class="bento36-kpi-sub">${an.asist7d}/${an.pactado}d sem. • ${an.ultClin ? `${an.ultClin.peso} kg (RPE ${an.ultClin.rpe || 5})` : `${p.peso} kg`}</div>
+                    </div>
+                </div>
+
+                <!-- FILA 2: PERFIL 360° + PARTIDOS / EVOLUCIÓN EN PRIMER PLANO -->
+                <div class="bento36-row-main">
+                    <div class="bento36-card">
+                        <div class="bento36-card-head">
+                            <h3 class="bento36-card-title">🕸️ Perfil 360°</h3>
+                            ${!esGym ? `<button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalEvaluarScore36(${p.id})">✏️ Ajustar Nota</button>` : ""}
+                        </div>
+
+                        ${!esGym ? `
+                            <div class="bento36-pilares-strip">
+                                <div class="bento36-pilar-pill"><small>Físico</small><strong>${pil.fisico}</strong></div>
+                                <div class="bento36-pilar-pill"><small>Gym</small><strong>${pil.gym}</strong></div>
+                                <div class="bento36-pilar-pill"><small>Técnico</small><strong>${pil.tecnico}</strong></div>
+                                <div class="bento36-pilar-pill"><small>Actitud</small><strong>${pil.actitud}</strong></div>
+                            </div>
+                        ` : ""}
+
+                        <div class="chart-canvas-box" style="height:225px; margin-bottom:0.7rem;">
+                            <canvas id="canvasRadarUnif33"></canvas>
+                        </div>
+
+                        <div class="rad32-pill-list">
+                            ${(an.fortalezas || []).slice(0, 2).map(f => `<div class="rad32-diag-item ok">✅ ${f}</div>`).join("")}
+                            ${(an.mejoras || []).slice(0, 1).map(m => `<div class="rad32-diag-item warn">🎯 <b>Foco:</b> ${m}</div>`).join("")}
+                        </div>
+                    </div>
+
+                    <div class="bento36-card">
+                        <div class="bento36-card-head">
+                            <h3 class="bento36-card-title">${esGym ? "📈 Progresión y Meses" : "⚽ Partidos y Evolución"}</h3>
+                            <div class="bento36-seg">
+                                ${!esGym ? `<button type="button" class="bento36-evo-btn" data-evo="partidos" onclick="cambiarModoEvolucionBento36('partidos')">⚽ Partidos</button>` : ""}
+                                ${habEj ? `<button type="button" class="bento36-evo-btn" data-evo="ejercicio" onclick="cambiarModoEvolucionBento36('ejercicio')">🏋️ Ejercicios</button>` : ""}
+                                <button type="button" class="bento36-evo-btn" data-evo="meses" onclick="cambiarModoEvolucionBento36('meses')">📅 Meses</button>
+                            </div>
+                        </div>
+                        <div id="bento36EvoBody"></div>
+                    </div>
+                </div>
+
+                <!-- FILA 3: REGISTROS E HISTORIAL LIMPIO -->
+                <div class="bento36-card">
+                    <div class="bento36-card-head">
+                        <h3 class="bento36-card-title">🗂️ Registros e Historial</h3>
+                        <div class="bento36-seg">
+                            ${habEj ? `<button type="button" class="bento36-hist-btn" data-h="marcas" onclick="cambiarModoHistorialBento36('marcas')">🏋️ Marcas</button>` : ""}
+                            <button type="button" class="bento36-hist-btn" data-h="salud" onclick="cambiarModoHistorialBento36('salud')">🏥 Salud y Peso</button>
+                            <button type="button" class="bento36-hist-btn" data-h="movimientos" onclick="cambiarModoHistorialBento36('movimientos')">🕒 Timeline (${an.timeline.length})</button>
+                        </div>
+                    </div>
+
+                    <div id="bento36Hist_marcas" class="hidden"></div>
+                    <div id="bento36Hist_salud" class="hidden"></div>
+                    <div id="bento36Hist_movimientos" class="hidden">
+                        <div class="bento36-scroll">
+                            ${an.timeline.length === 0 ? `<div class="empty-box" style="padding:1rem;">Sin movimientos registrados todavía.</div>` :
+                            an.timeline.slice(0, 18).map(it => `
+                                <div class="rad32-tl-item tl-${it.tipo}">
+                                    <span style="font-size:1rem;">${it.icono}</span>
+                                    <div style="min-width:0; flex:1;">
+                                        <div style="display:flex; justify-content:space-between; gap:0.4rem;">
+                                            <strong>${it.titulo}</strong>
+                                            <small style="color:var(--ink-500);">${it.fecha || "-"}</small>
+                                        </div>
+                                        <div style="color:var(--ink-600);">${it.detalle}</div>
+                                    </div>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const histMarcas = document.getElementById("contenedorHistorialJugador");
+        if (histMarcas) document.getElementById("bento36Hist_marcas")?.appendChild(histMarcas);
+        const histSalud = document.getElementById("contenedorClinicoJugador");
+        if (histSalud) document.getElementById("bento36Hist_salud")?.appendChild(histSalud);
+
+        cambiarModoHistorialBento36(window._bento36HistModo);
+        renderizarPanelDerechoPrincipal36(p);
+        setTimeout(() => {
+            if (typeof dibujarRadarUnificado33 === "function") dibujarRadarUnificado33(p);
+        }, 30);
+    };
+
+    // =====================================================================
+    // 6. MODAL DE FOTOS Y VIDEOS DESDE "CANCHA PARTIDO"
+    // =====================================================================
+    function obtenerJugadoresDelPartido36(partidoObj, plantelCat) {
+        if (!partidoObj) return plantelCat.map(p => Number(p.id));
+        const ids = new Set();
+        (partidoObj.eventos || []).forEach(ev => { if (ev.jugadorId) ids.add(Number(ev.jugadorId)); });
+        (partidoObj.resumenJugadores || []).forEach(rj => { if (rj.id) ids.add(Number(rj.id)); });
+        return ids.size > 0 ? Array.from(ids) : plantelCat.map(p => Number(p.id));
+    }
+
+    window.abrirModalMediaDesdeCancha36 = async function (partidoIdOpt = null) {
+        const dep = (typeof deportePagina !== "undefined" && deportePagina) ? deportePagina : "Futbol";
+        const cat = (typeof categoriaActiva !== "undefined" && categoriaActiva) ? categoriaActiva : "Sub 13";
+        const partidos = (typeof basePartidos !== "undefined" ? basePartidos : [])
+            .filter(m => m && m.deporte === dep && m.categoria === cat)
+            .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+
+        const partidoSel = partidoIdOpt ? partidos.find(m => Number(m.id) === Number(partidoIdOpt)) : (partidos[0] || null);
+        const plantel = (typeof basePersonas !== "undefined" ? basePersonas : []).filter(p => p && p.activo && p.deporte === dep && p.categoria === cat);
+        const idsPre = obtenerJugadoresDelPartido36(partidoSel, plantel);
+        const mediaLista = obtenerMediaPartidos36().filter(it => !partidoSel || Number(it.partidoId) === Number(partidoSel.id));
+
+        const modal = asegurarModal36();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:820px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">📸 MULTIMEDIA POST-PARTIDO — ${dep.toUpperCase()} (${cat})</span>
+                        <h3 style="margin-top:4px;">Fotos y Videos desde la Cancha</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModal36()">✕</button>
+                </div>
+
+                <form onsubmit="guardarMediaDesdeCancha36(event)" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:15px; padding:0.9rem; margin-bottom:1rem;">
+                    <div class="grid-3" style="margin-bottom:0.65rem;">
+                        <div class="field"><label>Partido / Práctica</label>
+                            <select id="cm36Partido" onchange="abrirModalMediaDesdeCancha36(this.value)">
+                                ${partidos.length === 0 ? `<option value="">📌 Práctica de hoy (${hoyISO36()})</option>` :
+                                partidos.map(m => `<option value="${m.id}" ${partidoSel && Number(m.id) === Number(partidoSel.id) ? "selected" : ""}>${m.fecha} vs ${m.rival} (${m.resultado || "S/D"})</option>`).join("")}
+                            </select>
+                        </div>
+                        <div class="field"><label>Título / Jugada *</label><input type="text" id="cm36Titulo" required placeholder="Ej: Gol de tiro libre / Resumen 1T"></div>
+                        <div class="field"><label>Tipo *</label>
+                            <select id="cm36Tipo" onchange="document.getElementById('cm36WrapFoto').classList.toggle('hidden', this.value!=='foto'); document.getElementById('cm36WrapVideo').classList.toggle('hidden', this.value==='foto');">
+                                <option value="foto">📸 Subir Foto</option>
+                                <option value="video">🎥 Link Video (YouTube / Drive)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="cm36WrapFoto" class="field" style="margin-bottom:0.65rem;"><label>Elegir Foto *</label><input type="file" id="cm36Archivo" accept="image/*"></div>
+                    <div id="cm36WrapVideo" class="grid-2 hidden" style="margin-bottom:0.65rem;">
+                        <div class="field"><label>Link YouTube / Drive *</label><input type="url" id="cm36Url" placeholder="https://youtu.be/..."></div>
+                        <div class="field"><label>Minuto (opcional)</label><input type="text" id="cm36Min" placeholder="Ej: Min 18:30"></div>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.75rem;">
+                        <label>👥 Jugadores vinculados (aparecerá automático en sus fichas e Informe PDF):</label>
+                        <div style="display:flex; gap:0.35rem; flex-wrap:wrap; max-height:95px; overflow-y:auto; padding:0.45rem; background:var(--surface-solid); border:1px solid var(--line); border-radius:10px;">
+                            ${plantel.map(p => `
+                                <label style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.75rem; font-weight:700; padding:0.2rem 0.55rem; background:var(--surface-subtle); border-radius:99px; cursor:pointer;">
+                                    <input type="checkbox" class="cm36-tag-jug" value="${p.id}" ${idsPre.includes(Number(p.id)) ? "checked" : ""} style="width:14px; height:14px; min-height:auto;">
+                                    <span>${p.apellido}</span>
+                                </label>
+                            `).join("")}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">💾 Guardar y Enviar a las Fichas</button>
+                </form>
+
+                <div class="cm36-media-grid">
+                    ${mediaLista.length === 0 ? `<div class="empty-box" style="grid-column:1/-1; padding:1rem;">Sin archivos cargados para este partido.</div>` :
+                    mediaLista.map(it => `
+                        <div class="cm36-media-card">
+                            ${it.tipo === "foto"
+                                ? `<img data-cm36-idb="${it.idbKey}" src="" alt="${it.titulo}" onclick="window.open(this.src,'_blank')">`
+                                : `<a href="${it.url}" target="_blank" style="height:105px; background:#0f172a; color:#38bdf8; display:flex; align-items:center; justify-content:center; text-decoration:none; font-weight:800;">▶ Ver Video</a>`}
+                            <div style="padding:0.4rem 0.5rem; font-size:0.72rem;">
+                                <strong style="display:block;">${it.titulo}</strong>
+                                <small style="color:var(--ink-500);">${it.fecha} • ${(it.jugadoresIds || []).length} jug.</small>
+                                <button type="button" class="btn btn-danger btn-sm" style="width:100%; margin-top:4px; min-height:22px; font-size:0.68rem;" onclick="eliminarMediaCancha36(${it.id}, '${partidoSel ? partidoSel.id : ""}')">🗑️ Quitar</button>
+                            </div>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+        modal.querySelectorAll("img[data-cm36-idb]").forEach(async img => {
+            const url = await leerFotoIDB36(img.dataset.cm36Idb);
+            if (url) img.src = url;
+        });
+    };
+
+    window.guardarMediaDesdeCancha36 = async function (e) {
+        e.preventDefault();
+        const partidoId = document.getElementById("cm36Partido")?.value || null;
+        const titulo = document.getElementById("cm36Titulo").value.trim();
+        const tipo = document.getElementById("cm36Tipo").value;
+        const minuto = (document.getElementById("cm36Min")?.value || "").trim();
+        const jugadoresIds = Array.from(document.querySelectorAll(".cm36-tag-jug:checked")).map(c => Number(c.value));
+        const partidoObj = partidoId ? (basePartidos || []).find(m => Number(m.id) === Number(partidoId)) : null;
+
+        const item = { id: Date.now(), fecha: partidoObj?.fecha || hoyISO36(), partidoId: partidoId ? Number(partidoId) : null, rival: partidoObj?.rival || "Práctica / Partido", titulo, minuto, tipo, jugadoresIds };
+        if (tipo === "foto") {
+            const file = document.getElementById("cm36Archivo")?.files?.[0];
+            if (!file) return alert("Seleccioná una foto.");
+            const dataUrl = await comprimirFoto36(file);
+            if (!dataUrl) return alert("No se pudo leer la imagen.");
+            item.idbKey = `cm36_${item.id}`;
+            await guardarFotoIDB36(item.idbKey, dataUrl);
+        } else {
+            item.url = (document.getElementById("cm36Url")?.value || "").trim();
+            if (!item.url) return alert("Pegá el link del video.");
+        }
+
+        const lista = obtenerMediaPartidos36();
+        lista.unshift(item);
+        guardarMediaPartidos36(lista);
+        if (typeof mostrarToast === "function") mostrarToast(`📸 Guardado y vinculado a ${jugadoresIds.length} jugador(es).`);
+        abrirModalMediaDesdeCancha36(partidoId);
+    };
+
+    window.eliminarMediaCancha36 = function (idMed, partidoIdOpt) {
+        if (!confirm("🗑️ ¿Quitar este archivo?")) return;
+        guardarMediaPartidos36(obtenerMediaPartidos36().filter(x => Number(x.id) !== Number(idMed)));
+        abrirModalMediaDesdeCancha36(partidoIdOpt || null);
+    };
+
+    // =====================================================================
+    // 7. INFORME ÚNICO A4 (RESPETA SI EJERCICIOS ESTÁ HABILITADO O NO)
+    // =====================================================================
+    window.abrirInformeUnico36 = async function (idPersona) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        if (!p) return;
+
+        const habEj = ejerciciosEstanHabilitados36(p);
+        const an = typeof analizarJugador360Admin32 === "function"
+            ? analizarJugador360Admin32(p)
+            : { partidosStats: { pj: 0, goles: 0, asistencias: 0, quites: 0, detallePartidos: [] }, progresosGym: [], fortalezas: [], mejoras: [], asist7d: 0, pactado: 3 };
+        const media = obtenerMediaPartidos36().filter(m => (m.jugadoresIds || []).includes(Number(p.id)));
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const pil = p.pilares || { fisico: 7, gym: 7, tecnico: 7, actitud: 7 };
+        const conclusion = p.conclusionDT36 || `Enfocarse en: ${(an.mejoras || [])[0] || "sostener la constancia semanal."}`;
+
+        const fotos = [];
+        for (const it of media.filter(m => m.tipo === "foto").slice(0, 6)) {
+            const src = await leerFotoIDB36(it.idbKey);
+            if (src) fotos.push({ titulo: it.titulo, fecha: it.fecha, rival: it.rival, src });
+        }
+        const videos = media.filter(m => m.tipo !== "foto");
+
+        const modal = asegurarModal36();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:880px;">
+                <div class="modal-top no-print-pdf">
+                    <h3>📄 Informe Único — ${p.apellido}, ${p.nombre}</h3>
+                    <div style="display:flex; gap:0.4rem;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Imprimir / PDF A4</button>
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModal36()">✕</button>
+                    </div>
+                </div>
+
+                <div class="no-print-pdf" style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:12px; padding:0.65rem 0.85rem; margin-bottom:0.85rem;">
+                    <label style="font-size:0.72rem; font-weight:800; color:var(--cdm-700); display:block; margin-bottom:3px;">✍️ Conclusión del Entrenador (editable antes de imprimir):</label>
+                    <textarea rows="2" style="width:100%; font-size:0.82rem;" oninput="document.getElementById('cm36ConcPrint').innerText=this.value; const per=(basePersonas||[]).find(x=>x.id===${p.id}); if(per){per.conclusionDT36=this.value; guardarDatosCDM();}">${conclusion}</textarea>
+                </div>
+
+                <div class="tactical-pdf-sheet" style="padding:1.6rem;">
+                    <div style="display:flex; justify-content:space-between; border-bottom:2.5px solid #0284c7; padding-bottom:0.8rem; margin-bottom:1rem; flex-wrap:wrap; gap:0.8rem;">
+                        <div>
+                            <span style="font-size:0.7rem; font-weight:800; color:#0284c7;">EXPEDIENTE INTEGRAL DEL DEPORTISTA</span>
+                            <h2 style="font-size:1.38rem; font-weight:900; color:#0f172a; margin:2px 0;">${p.nombre} ${p.apellido}</h2>
+                            <small style="color:#475569; font-weight:700;">${lic.nombreEntidad || "Club"} • ${p.deporte} (${p.categoria}) • ${p.puesto} • ${p.peso} kg / ${p.altura} cm</small>
+                        </div>
+                        <div style="text-align:right;">
+                            ${p.deporte !== "Gimnasio" ? `<strong style="font-size:1.25rem; color:#0284c7;">⭐ Score ${p.puntosCategoria ?? "-"}/10</strong><br><small>Fís: ${pil.fisico} | Gym: ${pil.gym} | Téc: ${pil.tecnico} | Act: ${pil.actitud}</small><br>` : ""}
+                            <small style="color:#64748b;">Emitido: ${new Date().toLocaleDateString("es-AR")}</small>
+                        </div>
+                    </div>
+
+                    <div class="cm36-pdf-grid" style="font-size:0.78rem;">
+                        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.6rem;"><b>⚽ Partidos</b><br>${an.partidosStats.pj} PJ • ${an.partidosStats.goles}G • ${an.partidosStats.asistencias}A</div>
+                        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.6rem;"><b>🛡️ Defensa</b><br>${an.partidosStats.quites} Quites / Rec.</div>
+                        ${habEj ? `<div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.6rem;"><b>🏋️ Marcas Gym</b><br>${(p.evaluaciones || []).length} registros</div>` : ""}
+                        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.6rem;"><b>🏥 Salud / Asist.</b><br>${an.asist7d}/${an.pactado}d • ${p.estadoMedico || "Óptimo"}</div>
+                    </div>
+
+                    ${(habEj && an.progresosGym.length) ? `
+                        <b style="font-size:0.82rem; display:block; margin-bottom:4px;">🏋️ Progresión Física y Gimnasio:</b>
+                        <table class="app-table" style="font-size:0.76rem; margin-bottom:0.9rem;">
+                            <thead><tr><th>Ejercicio</th><th>Inicial</th><th>Actual</th><th>Avance</th></tr></thead>
+                            <tbody>${an.progresosGym.map(pr => `<tr><td><b>${pr.ejercicio}</b></td><td>${pr.ini} ${pr.unidad}</td><td><b>${pr.fin} ${pr.unidad}</b></td><td><b>${pr.pct > 0 ? "+" : ""}${pr.pct}%</b></td></tr>`).join("")}</tbody>
+                        </table>
+                    ` : ""}
+
+                    ${an.partidosStats.detallePartidos.length ? `
+                        <b style="font-size:0.82rem; display:block; margin-bottom:4px;">⚽ Partidos Jugados:</b>
+                        <div style="font-size:0.77rem; margin-bottom:0.85rem;">
+                            ${an.partidosStats.detallePartidos.slice(0, 6).map(dp => `<div>• <b>${dp.partido.fecha} vs ${dp.partido.rival}</b> (${dp.partido.resultado || "S/D"}): ${dp.evs.map(e => e.tipo).join(", ") || "Participación"}</div>`).join("")}
+                        </div>
+                    ` : ""}
+
+                    <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:0.75rem 0.9rem; margin-bottom:0.9rem; font-size:0.8rem;">
+                        <div><b>✅ Fortalezas:</b> ${(an.fortalezas || []).slice(0, 3).join(" • ") || "-"}</div>
+                        <div style="margin-top:4px;"><b>🎯 Plan de Mejora:</b> ${(an.mejoras || []).slice(0, 3).join(" • ") || "-"}</div>
+                        <div style="margin-top:6px; padding-top:6px; border-top:1px dashed #7dd3fc;"><b>✍️ Conclusión del Entrenador:</b> <span id="cm36ConcPrint">${conclusion}</span></div>
+                    </div>
+
+                    ${fotos.length ? `
+                        <b style="font-size:0.82rem; display:block; margin-bottom:5px;">📸 Registro Fotográfico de Partidos:</b>
+                        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:0.55rem; margin-bottom:0.85rem;">
+                            ${fotos.map(f => `<div style="border:1px solid #cbd5e1; border-radius:9px; overflow:hidden;"><img src="${f.src}" style="width:100%; height:145px; object-fit:cover;"><div style="padding:0.25rem 0.45rem; font-size:0.72rem;"><b>${f.titulo}</b> (${f.fecha} • ${f.rival})</div></div>`).join("")}
+                        </div>
+                    ` : ""}
+
+                    ${videos.length ? `<div style="font-size:0.78rem;"><b>🎥 Videos:</b> ${videos.map(v => `<a href="${v.url}" target="_blank" style="margin-right:10px;">${v.titulo}</a>`).join("")}</div>` : ""}
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    // =====================================================================
+    // 8. ACTIVACIÓN EN CANCHA PARTIDO Y EN JUGADOR.HTML
+    // =====================================================================
+    function activarRedisenioCompleto36() {
+        if (document.body?.getAttribute("data-rol") === "usuario") return;
+
+        const pitchHead = document.querySelector("#dep-sec-partido .panel-head");
+        if (pitchHead && !document.getElementById("btnMediaPartidoCancha36")) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.id = "btnMediaPartidoCancha36";
+            btn.className = "btn btn-secondary btn-sm";
+            btn.onclick = () => abrirModalMediaDesdeCancha36(null);
+            btn.innerHTML = "📸 Fotos / Videos";
+            const grp = pitchHead.querySelector("div:last-child");
+            if (grp) grp.appendChild(btn);
+            else pitchHead.appendChild(btn);
+        }
+
+        if (document.body?.dataset.page === "perfil-individual" && typeof obtenerJugadorActualPorURL === "function") {
+            const p = obtenerJugadorActualPorURL();
+            if (p) {
+                renderizarCabeceraBento36(p);
+                renderizarDashboardBentoPro36(p);
+            }
+        }
+    }
+
+    if (typeof aplicarReorganizacionFicha33 === "function" && !window.__bentoPro36Wrapped) {
+        window.__bentoPro36Wrapped = true;
+        const _origReorg36 = aplicarReorganizacionFicha33;
+        aplicarReorganizacionFicha33 = function () {
+            rescatarNodosNativos36();
+            _origReorg36.apply(this, arguments);
+            const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+            if (p) {
+                setTimeout(() => {
+                    renderizarCabeceraBento36(p);
+                    renderizarDashboardBentoPro36(p);
+                }, 25);
+            }
+        };
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(activarRedisenioCompleto36, 260);
+    });
+    document.addEventListener("click", () => {
+        const pitchHead = document.querySelector("#dep-sec-partido .panel-head");
+        if (pitchHead && !document.getElementById("btnMediaPartidoCancha36")) activarRedisenioCompleto36();
+    });
+})();
+// =========================================================================
+// 37. BASE GENERAL DE JUGADORES POR AÑOS CUMPLIDOS + BASE MAESTRA DE EJERCICIOS
+//     + ABSORCIÓN POR EDAD Y MIGRACIÓN ENTRE CATEGORÍAS POR DEPORTE
+// Pegar al final de app.js (debajo del Apartado 36)
+// =========================================================================
+
+(function () {
+    function clubKey37() {
+        if (typeof obtenerClaveClubActivoCDM === "function") return obtenerClaveClubActivoCDM();
+        return localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal";
+    }
+
+    function hoyISO37() {
+        return typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+    }
+
+    // =====================================================================
+    // 37.1 ESTILOS RESPONSIVE
+    // =====================================================================
+    if (!document.getElementById("cdmCssBaseGeneral37")) {
+        const st = document.createElement("style");
+        st.id = "cdmCssBaseGeneral37";
+        st.textContent = `
+            .bg37-cat-tools {
+                display: flex;
+                gap: 0.45rem;
+                flex-wrap: wrap;
+                align-items: center;
+                margin-left: auto;
+            }
+            .bg37-age-pills {
+                display: flex;
+                gap: 0.35rem;
+                flex-wrap: wrap;
+                margin-bottom: 0.85rem;
+            }
+            .bg37-age-pill {
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-solid, #fff);
+                color: var(--ink-700, #334155);
+                font-size: 0.74rem;
+                font-weight: 800;
+                padding: 0.3rem 0.68rem;
+                border-radius: 999px;
+                cursor: pointer;
+                transition: all 0.14s ease;
+            }
+            .bg37-age-pill.active, .bg37-age-pill:hover {
+                background: #0284c7;
+                border-color: #0284c7;
+                color: #ffffff;
+            }
+            .bg37-pick-list {
+                max-height: 310px;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 0.42rem;
+                margin-bottom: 0.9rem;
+            }
+            .bg37-pick-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.65rem;
+                flex-wrap: wrap;
+                padding: 0.55rem 0.75rem;
+                background: var(--surface-solid, #fff);
+                border: 1.5px solid var(--line, #e2e8f0);
+                border-radius: 12px;
+                cursor: pointer;
+                transition: border-color 0.14s ease;
+            }
+            .bg37-pick-row:hover {
+                border-color: #0284c7;
+            }
+            .bg37-pick-row.selected {
+                border-color: #0284c7;
+                background: var(--cdm-50, #f0f9ff);
+            }
+            @media (max-width: 720px) {
+                .bg37-cat-tools {
+                    width: 100%;
+                    margin-left: 0;
+                    margin-top: 0.5rem;
+                }
+                .bg37-cat-tools button {
+                    flex: 1;
+                }
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    // =====================================================================
+    // 37.2 CÁLCULO DE AÑOS CUMPLIDOS Y MIGRACIÓN AUTOMÁTICA DE PERSONAS
+    // =====================================================================
+    const RANGOS_EDAD_CATEGORIA_37 = {
+        "Sub 13": { min: 6, max: 13 },
+        "Sub 15": { min: 13, max: 15 },
+        "Sub 17": { min: 15, max: 17 },
+        "Reserva": { min: 16, max: 23 },
+        "Primera": { min: 16, max: 60 }
+    };
+
+    const CATEGORIAS_BASE_37 = ["Sub 13", "Sub 15", "Sub 17", "Reserva", "Primera"];
+
+    window.calcularEdadExacta37 = function (p) {
+        if (!p) return 0;
+        if (p.fechaNacimiento && /^\d{4}-\d{2}-\d{2}$/.test(p.fechaNacimiento)) {
+            const [y, m, d] = p.fechaNacimiento.split("-").map(Number);
+            const hoy = new Date();
+            let edad = hoy.getFullYear() - y;
+            const mm = hoy.getMonth() + 1;
+            if (mm < m || (mm === m && hoy.getDate() < d)) edad--;
+            return Math.max(0, edad);
+        }
+        return parseInt(p.edad, 10) || 0;
+    };
+
+    function obtenerAnioNacimiento37(p) {
+        if (p?.fechaNacimiento && /^\d{4}/.test(p.fechaNacimiento)) return parseInt(p.fechaNacimiento.slice(0, 4), 10);
+        if (p?.anioNacimiento) return parseInt(p.anioNacimiento, 10);
+        const ed = parseInt(p?.edad, 10) || 15;
+        return new Date().getFullYear() - ed;
+    }
+
+    function asegurarDatosEdadBaseGeneral37() {
+        if (typeof basePersonas === "undefined" || !Array.isArray(basePersonas)) return;
+        let cambio = false;
+        const anioHoy = new Date().getFullYear();
+
+        basePersonas.forEach(p => {
+            if (!p) return;
+            if (!Array.isArray(p.categoriasExtra)) { p.categoriasExtra = []; cambio = true; }
+            if (!Array.isArray(p.historialCategorias)) { p.historialCategorias = []; cambio = true; }
+
+            if (!p.anioNacimiento) {
+                p.anioNacimiento = p.fechaNacimiento ? parseInt(p.fechaNacimiento.slice(0, 4), 10) : (anioHoy - (parseInt(p.edad, 10) || 15));
+                cambio = true;
+            }
+            if (p.fechaNacimiento) {
+                const calc = calcularEdadExacta37(p);
+                if (Number(p.edad) !== calc) { p.edad = calc; cambio = true; }
+            }
+        });
+
+        if (cambio && typeof guardarDatosCDM === "function") guardarDatosCDM();
+    }
+
+    function obtenerDeportesDisponibles37() {
+        const set = new Set(["Futbol", "Hockey", "Gimnasio"]);
+        try {
+            const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+            (lic.deportesExtra || []).forEach(d => {
+                const limpio = String(d).replace(/^[^\wÁÉÍÓÚáéíóúÑñ]+/, "").trim();
+                if (limpio) set.add(limpio);
+            });
+        } catch {}
+        (typeof basePersonas !== "undefined" ? basePersonas : []).forEach(p => { if (p?.deporte) set.add(p.deporte); });
+        return Array.from(set);
+    }
+
+    function obtenerCategoriasDeporte37(deporte) {
+        if (deporte === "Gimnasio") return ["General"];
+        const set = new Set(CATEGORIAS_BASE_37);
+        document.querySelectorAll("#barraCategorias .seg-btn").forEach(b => {
+            const t = (b.innerText || "").trim();
+            if (t) set.add(t);
+        });
+        return Array.from(set);
+    }
+
+    // =====================================================================
+    // 37.3 ENVOLVER EL FILTRO DE PLANTEL PARA ABSORBER DOBLE CATEGORÍA
+    //      (Compatible 100% con Plantel, Cancha Partido, Rutinas y Ranking)
+    // =====================================================================
+    if (typeof obtenerPersonasFiltradasDeporte === "function" && !window.__filtroBaseGeneral37Wrapped) {
+        window.__filtroBaseGeneral37Wrapped = true;
+        obtenerPersonasFiltradasDeporte = function (ignorarFiltros = false) {
+            if (typeof basePersonas === "undefined" || typeof deportePagina === "undefined" || !deportePagina) return [];
+            const esGym = deportePagina === "Gimnasio";
+            const catAct = typeof categoriaActiva !== "undefined" ? categoriaActiva : "Sub 13";
+            const busq = ignorarFiltros ? "" : (document.getElementById("inputBuscar")?.value || "").toLowerCase().trim();
+            const est = ignorarFiltros ? "activos" : (document.getElementById("filtroEstado")?.value || "activos");
+
+            return basePersonas.filter(p => {
+                if (!p) return false;
+                if (esGym) {
+                    const enGym = p.deporte === "Gimnasio" || (Array.isArray(p.categoriasExtra) && p.categoriasExtra.some(ce => ce.deporte === "Gimnasio"));
+                    if (!enGym) return false;
+                } else {
+                    const enPrincipal = p.deporte === deportePagina && p.categoria === catAct;
+                    const enExtra = Array.isArray(p.categoriasExtra) && p.categoriasExtra.some(ce => ce.deporte === deportePagina && ce.categoria === catAct);
+                    if (!enPrincipal && !enExtra) return false;
+                }
+
+                if (est === "activos" && !p.activo) return false;
+                if (est === "alerta_frecuencia") {
+                    if (!p.activo) return false;
+                    const sem = typeof contarAsistenciasUltimos7Dias === "function" ? contarAsistenciasUltimos7Dias(p) : 0;
+                    if (sem >= (p.frecuenciaSemanal || 3)) return false;
+                }
+                if (est === "lesionados" && (!p.activo || !p.estadoMedico || p.estadoMedico === "Óptimo")) return false;
+                if (est === "pagos_pendientes" && (!p.activo || (p.pagoEstado || "Al Día") === "Al Día")) return false;
+
+                if (busq) {
+                    const txt = `${p.nombre || ""} ${p.apellido || ""} ${p.dni || ""} ${p.puesto || ""} ${obtenerAnioNacimiento37(p)}`.toLowerCase();
+                    if (!txt.includes(busq)) return false;
+                }
+                return true;
+            });
+        };
+    }
+
+    // =====================================================================
+    // 37.4 BASE MAESTRA DE EJERCICIOS (ALIMENTA RUTINAS Y TESTS FÍSICOS)
+    // =====================================================================
+    const EJERCICIOS_BASE_37 = [
+        { id: 1, nombre: "Sentadilla Trasera", grupo: "Piernas", tipo: "fuerza_kg", video: "" },
+        { id: 2, nombre: "Press de Banca", grupo: "Empuje / Pecho", tipo: "fuerza_kg", video: "" },
+        { id: 3, nombre: "Peso Muerto Rumano", grupo: "Cadena Posterior", tipo: "fuerza_kg", video: "" },
+        { id: 4, nombre: "Sentadilla Búlgara Unilateral", grupo: "Piernas / Unilateral", tipo: "unilateral", video: "" },
+        { id: 5, nombre: "Dominadas", grupo: "Tracción / Espalda", tipo: "reps_puntos", video: "" },
+        { id: 6, nombre: "Salto al Cajón / CMJ", grupo: "Potencia", tipo: "salto_cm", video: "" },
+        { id: 7, nombre: "Sprint 20 metros", grupo: "Velocidad", tipo: "tiempo_seg", video: "" },
+        { id: 8, nombre: "Hip Thrust", grupo: "Glúteos / Potencia", tipo: "fuerza_kg", video: "" },
+        { id: 9, nombre: "Press Militar", grupo: "Hombros", tipo: "fuerza_kg", video: "" },
+        { id: 10, nombre: "Plancha Isométrica", grupo: "Core / Zona Media", tipo: "tiempo_seg", video: "" }
+    ];
+
+    window.obtenerCatalogoEjercicios37 = function () {
+        const key = `cdm_catalogo_ejercicios_v37_${clubKey37()}`;
+        try {
+            const g = JSON.parse(localStorage.getItem(key) || "null");
+            if (Array.isArray(g) && g.length > 0) return g;
+        } catch {}
+        localStorage.setItem(key, JSON.stringify(EJERCICIOS_BASE_37));
+        return [...EJERCICIOS_BASE_37];
+    };
+
+    function guardarCatalogoEjercicios37(lista) {
+        localStorage.setItem(`cdm_catalogo_ejercicios_v37_${clubKey37()}`, JSON.stringify(lista));
+        sincronizarDatalistEjerciciosDOM37();
+    }
+
+    function sincronizarDatalistEjerciciosDOM37() {
+        const dl = document.getElementById("listaEjerciciosSugeridos");
+        if (!dl) return;
+        const lista = obtenerCatalogoEjercicios37();
+        dl.innerHTML = lista.map(e => `<option value="${String(e.nombre).replace(/"/g, "&quot;")}">${e.grupo}</option>`).join("");
+    }
+
+    // =====================================================================
+    // 37.5 ACCIONES DE ABSORCIÓN Y MIGRACIÓN DE CATEGORÍAS
+    // =====================================================================
+    function asegurarModal37() {
+        let m = document.getElementById("modalBaseGeneral37");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalBaseGeneral37";
+            m.className = "modal-backdrop hidden";
+            document.body.appendChild(m);
+        }
+        return m;
+    }
+
+    window.cerrarModalBase37 = function () {
+        document.getElementById("modalBaseGeneral37")?.classList.add("hidden");
+    };
+
+    window.migrarOAbsorberJugadores37 = function (ids, depDestino, catDestino, modo = "migrar") {
+        if (!Array.isArray(ids) || !ids.length) return;
+        asegurarDatosEdadBaseGeneral37();
+        const hoy = hoyISO37();
+        let cant = 0;
+
+        ids.forEach(id => {
+            const p = (basePersonas || []).find(x => Number(x.id) === Number(id));
+            if (!p) return;
+
+            if (modo === "migrar") {
+                const origenTxt = `${p.deporte} ${p.categoria}`;
+                if (p.deporte !== depDestino || p.categoria !== catDestino) {
+                    p.historialCategorias.unshift({
+                        fecha: hoy,
+                        de: origenTxt,
+                        a: `${depDestino} ${catDestino}`,
+                        tipo: "Migración"
+                    });
+                }
+                p.deporte = depDestino;
+                p.categoria = catDestino;
+                p.activo = true;
+                // Limpiar duplicado en extras si ya estaba ahí
+                p.categoriasExtra = (p.categoriasExtra || []).filter(ce => !(ce.deporte === depDestino && ce.categoria === catDestino));
+                cant++;
+            } else {
+                // Modo "absorber_extra": mantiene su categoría base y lo suma también a esta categoría
+                if (p.deporte === depDestino && p.categoria === catDestino) return;
+                const yaEsta = (p.categoriasExtra || []).some(ce => ce.deporte === depDestino && ce.categoria === catDestino);
+                if (!yaEsta) {
+                    p.categoriasExtra.push({ deporte: depDestino, categoria: catDestino, fecha: hoy });
+                    p.historialCategorias.unshift({
+                        fecha: hoy,
+                        de: `${p.deporte} ${p.categoria}`,
+                        a: `${depDestino} ${catDestino} (Doble Cat.)`,
+                        tipo: "Absorción"
+                    });
+                    cant++;
+                }
+            }
+        });
+
+        if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+        if (typeof renderizarPaginaDeporte === "function" && typeof deportePagina !== "undefined" && deportePagina) renderizarPaginaDeporte();
+        if (typeof inicializarIndex === "function" && document.getElementById("countFutbol")) inicializarIndex();
+        if (!document.getElementById("cdmSeccionBaseGeneral37")?.classList.contains("hidden")) renderizarSeccionBaseGeneral37();
+
+        if (typeof mostrarToast === "function") {
+            mostrarToast(modo === "migrar"
+                ? `🔀 ${cant} jugador(es) migrados a ${depDestino} (${catDestino}).`
+                : `📥 ${cant} jugador(es) absorbidos en doble categoría (${catDestino}).`);
+        }
+    };
+
+    window.quitarDeCategoriaExtra37 = function (idPersona, dep, cat) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        if (!p) return;
+        p.categoriasExtra = (p.categoriasExtra || []).filter(ce => !(ce.deporte === dep && ce.categoria === cat));
+        if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+        if (typeof renderizarPaginaDeporte === "function" && typeof deportePagina !== "undefined" && deportePagina) renderizarPaginaDeporte();
+        if (!document.getElementById("cdmSeccionBaseGeneral37")?.classList.contains("hidden")) renderizarSeccionBaseGeneral37();
+        if (typeof mostrarToast === "function") mostrarToast(`✓ ${p.apellido} quitado de ${cat} (sigue en su categoría base).`);
+    };
+
+    // =====================================================================
+    // 37.6 MODAL "📥 ABSORBER DE BASE GENERAL POR EDAD" (EN FÚTBOL / HOCKEY)
+    // =====================================================================
+    window.abrirModalAbsorberPorEdad37 = function (soloRangoEdad = true, edadPuntual = "TODAS", busq = "") {
+        asegurarDatosEdadBaseGeneral37();
+        const dep = (typeof deportePagina !== "undefined" && deportePagina) ? deportePagina : "Futbol";
+        const cat = (typeof categoriaActiva !== "undefined" && categoriaActiva) ? categoriaActiva : "Sub 13";
+        const rango = RANGOS_EDAD_CATEGORIA_37[cat] || { min: 5, max: 60 };
+
+        const todos = (basePersonas || []).filter(p => p && p.activo);
+        const edadesUnicas = [...new Set(todos.map(p => calcularEdadExacta37(p)))].sort((a, b) => a - b);
+
+        const candidatos = todos.filter(p => {
+            const yaEnPrincipal = p.deporte === dep && p.categoria === cat;
+            const yaEnExtra = (p.categoriasExtra || []).some(ce => ce.deporte === dep && ce.categoria === cat);
+            if (yaEnPrincipal || yaEnExtra) return false;
+
+            const ed = calcularEdadExacta37(p);
+            if (edadPuntual !== "TODAS" && ed !== Number(edadPuntual)) return false;
+            if (edadPuntual === "TODAS" && soloRangoEdad && (ed < rango.min || ed > rango.max)) return false;
+
+            if (busq) {
+                const txt = `${p.nombre} ${p.apellido} ${p.dni} ${p.deporte} ${p.categoria} ${obtenerAnioNacimiento37(p)}`.toLowerCase();
+                if (!txt.includes(busq.toLowerCase())) return false;
+            }
+            return true;
+        }).sort((a, b) => calcularEdadExacta37(a) - calcularEdadExacta37(b) || a.apellido.localeCompare(b.apellido));
+
+        const modal = asegurarModal37();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:780px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">🗄️ BASE DE DATOS GENERAL POR EDAD</span>
+                        <h3 style="margin-top:4px;">📥 Absorber Jugadores hacia ${dep} — ${cat}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalBase37()">✕</button>
+                </div>
+
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin-bottom:0.7rem;">
+                    <input type="text" id="bg37BusqAbs" value="${busq.replace(/"/g, "&quot;")}" placeholder="Buscar por apellido, DNI o año..." style="flex:1; min-width:190px;"
+                        oninput="abrirModalAbsorberPorEdad37(${soloRangoEdad}, '${edadPuntual}', this.value)">
+                    <button type="button" class="btn ${soloRangoEdad && edadPuntual === "TODAS" ? "btn-primary" : "btn-ghost"} btn-sm"
+                        onclick="abrirModalAbsorberPorEdad37(true, 'TODAS', document.getElementById('bg37BusqAbs').value)">
+                        🎯 Edad Sugerida (${rango.min}–${rango.max} años)
+                    </button>
+                    <button type="button" class="btn ${!soloRangoEdad && edadPuntual === "TODAS" ? "btn-primary" : "btn-ghost"} btn-sm"
+                        onclick="abrirModalAbsorberPorEdad37(false, 'TODAS', document.getElementById('bg37BusqAbs').value)">
+                        👥 Ver Todas las Edades
+                    </button>
+                </div>
+
+                <div class="bg37-age-pills">
+                    ${edadesUnicas.map(ed => `
+                        <button type="button" class="bg37-age-pill ${String(edadPuntual) === String(ed) ? "active" : ""}"
+                            onclick="abrirModalAbsorberPorEdad37(false, '${ed}', document.getElementById('bg37BusqAbs').value)">
+                            ${ed} años
+                        </button>
+                    `).join("")}
+                </div>
+
+                <div class="bg37-pick-list">
+                    ${candidatos.length === 0 ? `
+                        <div class="empty-box" style="padding:1.2rem;">
+                            No hay jugadores disponibles con este filtro de edad fuera de <b>${cat}</b>.<br>
+                            <small style="color:var(--ink-500);">Tocá <b>"👥 Ver Todas las Edades"</b> o cargá un nuevo jugador en la Base General.</small>
+                        </div>
+                    ` : candidatos.map(p => {
+                        const ed = calcularEdadExacta37(p);
+                        const anio = obtenerAnioNacimiento37(p);
+                        return `
+                            <label class="bg37-pick-row" onclick="setTimeout(()=>this.classList.toggle('selected', this.querySelector('input').checked), 10)">
+                                <div style="display:flex; align-items:center; gap:0.6rem;">
+                                    <input type="checkbox" class="bg37-chk-abs" value="${p.id}" style="width:18px; height:18px; min-height:auto;">
+                                    <div>
+                                        <strong style="font-size:0.88rem; color:var(--ink-900);">${p.apellido}, ${p.nombre}</strong>
+                                        <small style="display:block; color:var(--ink-500);">DNI ${p.dni} • ${p.puesto || "Jugador"}</small>
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:0.35rem; flex-wrap:wrap; align-items:center;">
+                                    <span class="badge badge-celeste">🎂 ${ed} años (Cat. ${anio})</span>
+                                    <span class="badge badge-purple">Hoy en: ${p.deporte} ${p.categoria}</span>
+                                </div>
+                            </label>
+                        `;
+                    }).join("")}
+                </div>
+
+                <div style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:12px; padding:0.75rem; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                    <small style="color:var(--ink-600);">Todos conservan su ficha, partidos, score e historial único.</small>
+                    <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="confirmarAbsorcionModal37('${dep}', '${cat}', 'absorber_extra')">
+                            ➕ Sumar como Doble Categoría
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="confirmarAbsorcionModal37('${dep}', '${cat}', 'migrar')">
+                            🔀 Migrar a ${cat}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.confirmarAbsorcionModal37 = function (dep, cat, modo) {
+        const ids = Array.from(document.querySelectorAll(".bg37-chk-abs:checked")).map(c => Number(c.value));
+        if (!ids.length) return alert("Tildá al menos un jugador de la lista.");
+        migrarOAbsorberJugadores37(ids, dep, cat, modo);
+        cerrarModalBase37();
+    };
+
+    // =====================================================================
+    // 37.7 MODAL "🔀 MIGRAR JUGADORES DESDE ESTA CATEGORÍA"
+    // =====================================================================
+    window.abrirModalMigrarDesdeCategoria37 = function () {
+        asegurarDatosEdadBaseGeneral37();
+        const dep = (typeof deportePagina !== "undefined" && deportePagina) ? deportePagina : "Futbol";
+        const cat = (typeof categoriaActiva !== "undefined" && categoriaActiva) ? categoriaActiva : "Sub 13";
+        const plantel = typeof obtenerPersonasFiltradasDeporte === "function" ? obtenerPersonasFiltradasDeporte(true) : [];
+        const cats = obtenerCategoriasDeporte37(dep);
+        const deps = obtenerDeportesDisponibles37();
+
+        const modal = asegurarModal37();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:740px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">🔀 PASE / CAMBIO DE CATEGORÍA</span>
+                        <h3 style="margin-top:4px;">Migrar Jugadores desde ${dep} (${cat})</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalBase37()">✕</button>
+                </div>
+
+                <div class="grid-2" style="margin-bottom:0.85rem;">
+                    <div class="field">
+                        <label>Deporte Destino</label>
+                        <select id="bg37MigDep">${deps.map(d => `<option value="${d}" ${d === dep ? "selected" : ""}>${d}</option>`).join("")}</select>
+                    </div>
+                    <div class="field">
+                        <label>Categoría Destino</label>
+                        <select id="bg37MigCat">${cats.map(c => `<option value="${c}" ${c !== cat ? "" : ""}>${c}</option>`).join("")}</select>
+                    </div>
+                </div>
+
+                <div class="bg37-pick-list">
+                    ${plantel.length === 0 ? `<div class="empty-box">No hay jugadores en ${cat}.</div>` :
+                    plantel.map(p => {
+                        const ed = calcularEdadExacta37(p);
+                        const esExtra = !(p.deporte === dep && p.categoria === cat);
+                        return `
+                            <div class="bg37-pick-row">
+                                <label style="display:flex; align-items:center; gap:0.55rem; flex:1; cursor:pointer;">
+                                    <input type="checkbox" class="bg37-chk-mig" value="${p.id}" style="width:18px; height:18px; min-height:auto;">
+                                    <div>
+                                        <strong>${p.apellido}, ${p.nombre}</strong>
+                                        <small style="display:block; color:var(--ink-500);">🎂 ${ed} años (Cat. ${obtenerAnioNacimiento37(p)}) ${esExtra ? `• Base: ${p.deporte} ${p.categoria}` : ""}</small>
+                                    </div>
+                                </label>
+                                ${esExtra ? `<button type="button" class="btn btn-danger btn-sm" onclick="quitarDeCategoriaExtra37(${p.id}, '${dep}', '${cat}'); abrirModalMigrarDesdeCategoria37();">Quitar Doble Cat.</button>` : ""}
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.45rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="ejecutarMigracionModal37('absorber_extra')">➕ Sumar también en Destino</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="ejecutarMigracionModal37('migrar')">🔀 Migrar Seleccionados</button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.ejecutarMigracionModal37 = function (modo) {
+        const ids = Array.from(document.querySelectorAll(".bg37-chk-mig:checked")).map(c => Number(c.value));
+        if (!ids.length) return alert("Seleccioná al menos un jugador.");
+        const depDest = document.getElementById("bg37MigDep").value;
+        const catDest = depDest === "Gimnasio" ? "General" : document.getElementById("bg37MigCat").value;
+        migrarOAbsorberJugadores37(ids, depDest, catDest, modo);
+        cerrarModalBase37();
+    };
+
+    // =====================================================================
+    // 37.8 SECCIÓN PRINCIPAL "🗄️ BASE GENERAL" (JUGADORES POR EDAD + EJERCICIOS)
+    // =====================================================================
+    window._bg37State = { tab: "jugadores", edadFiltro: "TODAS", depFiltro: "TODOS", busq: "" };
+
+    window.abrirModuloBaseGeneral37 = function (tabOpt = null) {
+        if (tabOpt) window._bg37State.tab = tabOpt;
+        asegurarDatosEdadBaseGeneral37();
+        if (typeof alternarSidebarMovil33 === "function") alternarSidebarMovil33(true);
+
+        const main = document.querySelector(".app-content");
+        if (!main) return;
+
+        document.querySelectorAll(".app-sidebar .side-link").forEach(l => l.classList.toggle("active", l.dataset.nav === "base_general"));
+        Array.from(main.children).forEach(ch => { if (ch.id !== "cdmSeccionBaseGeneral37") ch.classList.add("hidden"); });
+
+        let sec = document.getElementById("cdmSeccionBaseGeneral37");
+        if (!sec) {
+            sec = document.createElement("section");
+            sec.id = "cdmSeccionBaseGeneral37";
+            sec.className = "animate-in";
+            main.appendChild(sec);
+        }
+        sec.classList.remove("hidden");
+
+        const topTitle = document.querySelector(".topbar-title h2");
+        if (topTitle) topTitle.innerHTML = `🗄️ Base de Datos General <span class="cat-active-pill">Por Años Cumplidos + Ejercicios</span>`;
+
+        renderizarSeccionBaseGeneral37();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    window.actualizarFechaNacPersona37 = function (idPersona, fechaISO) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        if (!p || !fechaISO) return;
+        p.fechaNacimiento = fechaISO;
+        p.anioNacimiento = parseInt(fechaISO.slice(0, 4), 10);
+        p.edad = calcularEdadExacta37(p);
+        if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+        if (typeof mostrarToast === "function") mostrarToast(`🎂 ${p.apellido}: ${p.edad} años cumplidos (Cat. ${p.anioNacimiento}).`);
+        renderizarSeccionBaseGeneral37();
+    };
+
+    window.migrarRapidoDesdeBase37 = function (idPersona) {
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
+        if (!p) return;
+        const deps = obtenerDeportesDisponibles37();
+        const cats = CATEGORIAS_BASE_37;
+
+        const modal = asegurarModal37();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:480px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">🔀 ASIGNAR / MIGRAR CATEGORÍA</span>
+                        <h3 style="margin-top:4px;">${p.apellido}, ${p.nombre} (${calcularEdadExacta37(p)} años)</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalBase37()">✕</button>
+                </div>
+
+                <div class="field" style="margin-bottom:0.7rem;">
+                    <label>Fecha de Nacimiento (calcula años cumplidos exactos)</label>
+                    <input type="date" id="bg37EdFechaNac" value="${p.fechaNacimiento || `${obtenerAnioNacimiento37(p)}-06-15`}">
+                </div>
+
+                <div class="grid-2" style="margin-bottom:0.85rem;">
+                    <div class="field"><label>Deporte</label>
+                        <select id="bg37IndDep">${deps.map(d => `<option value="${d}" ${d === p.deporte ? "selected" : ""}>${d}</option>`).join("")}</select>
+                    </div>
+                    <div class="field"><label>Categoría</label>
+                        <select id="bg37IndCat">${cats.map(c => `<option value="${c}" ${c === p.categoria ? "selected" : ""}>${c}</option>`).join("")}</select>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:0.45rem; flex-wrap:wrap; justify-content:flex-end;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="aplicarCambioIndividualBase37(${p.id}, 'absorber_extra')">➕ Sumar Doble Categoría</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="aplicarCambioIndividualBase37(${p.id}, 'migrar')">🔀 Migrar Categoría</button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.aplicarCambioIndividualBase37 = function (idPersona, modo) {
+        const fn = document.getElementById("bg37EdFechaNac")?.value;
+        if (fn) actualizarFechaNacPersona37(idPersona, fn);
+        const dep = document.getElementById("bg37IndDep").value;
+        const cat = dep === "Gimnasio" ? "General" : document.getElementById("bg37IndCat").value;
+        migrarOAbsorberJugadores37([idPersona], dep, cat, modo);
+        cerrarModalBase37();
+    };
+
+    window.guardarNuevoEjercicioBase37 = function (e) {
+        e.preventDefault();
+        const nom = document.getElementById("bg37EjNom").value.trim();
+        const grp = document.getElementById("bg37EjGrp").value.trim() || "General";
+        const tip = document.getElementById("bg37EjTip").value;
+        const vid = (document.getElementById("bg37EjVid")?.value || "").trim();
+        if (!nom) return;
+
+        const lista = obtenerCatalogoEjercicios37();
+        lista.unshift({ id: Date.now(), nombre: nom, grupo: grp, tipo: tip, video: vid });
+        guardarCatalogoEjercicios37(lista);
+        if (typeof mostrarToast === "function") mostrarToast(`🏋️ Ejercicio "${nom}" guardado en la Base Maestra.`);
+        renderizarSeccionBaseGeneral37();
+    };
+
+    window.eliminarEjercicioBase37 = function (idEj) {
+        if (!confirm("🗑️ ¿Quitar este ejercicio de la Base Maestra?")) return;
+        guardarCatalogoEjercicios37(obtenerCatalogoEjercicios37().filter(x => Number(x.id) !== Number(idEj)));
+        renderizarSeccionBaseGeneral37();
+    };
+
+    window.renderizarSeccionBaseGeneral37 = function () {
+        const sec = document.getElementById("cdmSeccionBaseGeneral37");
+        if (!sec) return;
+
+        const st = window._bg37State;
+        const todos = (typeof basePersonas !== "undefined" ? basePersonas : []).filter(p => p && p.activo);
+        const edades = [...new Set(todos.map(p => calcularEdadExacta37(p)))].sort((a, b) => a - b);
+        const deps = obtenerDeportesDisponibles37();
+        const ejercicios = obtenerCatalogoEjercicios37();
+
+        sec.innerHTML = `
+            <div class="module-tabs tabs-2" style="margin-bottom:1.1rem;">
+                <button type="button" class="mod-tab ${st.tab === "jugadores" ? "active" : ""}" onclick="window._bg37State.tab='jugadores'; renderizarSeccionBaseGeneral37();">
+                    <i class="ri-group-line"></i><span>👥 Base de Jugadores por Edad (${todos.length})</span>
+                </button>
+                <button type="button" class="mod-tab ${st.tab === "ejercicios" ? "active" : ""}" onclick="window._bg37State.tab='ejercicios'; renderizarSeccionBaseGeneral37();">
+                    <i class="ri-dumbbell-line"></i><span>🏋️ Base Maestra de Ejercicios (${ejercicios.length})</span>
+                </button>
+            </div>
+            <div id="bg37Body"></div>
+        `;
+
+        const body = document.getElementById("bg37Body");
+        if (!body) return;
+
+        if (st.tab === "jugadores") {
+            const filtrados = todos.filter(p => {
+                const ed = calcularEdadExacta37(p);
+                if (st.edadFiltro !== "TODAS" && ed !== Number(st.edadFiltro)) return false;
+                if (st.depFiltro !== "TODOS" && p.deporte !== st.depFiltro) return false;
+                if (st.busq) {
+                    const txt = `${p.nombre} ${p.apellido} ${p.dni} ${p.categoria} ${obtenerAnioNacimiento37(p)}`.toLowerCase();
+                    if (!txt.includes(st.busq.toLowerCase())) return false;
+                }
+                return true;
+            }).sort((a, b) => calcularEdadExacta37(a) - calcularEdadExacta37(b) || a.apellido.localeCompare(b.apellido));
+
+            body.innerHTML = `
+                <div class="app-panel">
+                    <div class="panel-head">
+                        <div>
+                            <h3><i class="ri-database-2-line"></i> Padrón Maestro del Club (Agrupado por Años Cumplidos)</h3>
+                            <small style="color:var(--ink-500);">Cargá cada persona una sola vez y absorbela o migrala a cualquier categoría conservando 100% de su historial.</small>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalPersona()">+ Nueva Persona en Base</button>
+                    </div>
+
+                    <div class="bg37-age-pills">
+                        <button type="button" class="bg37-age-pill ${st.edadFiltro === "TODAS" ? "active" : ""}" onclick="window._bg37State.edadFiltro='TODAS'; renderizarSeccionBaseGeneral37();">Todas (${todos.length})</button>
+                        ${edades.map(ed => {
+                            const cnt = todos.filter(p => calcularEdadExacta37(p) === ed).length;
+                            return `<button type="button" class="bg37-age-pill ${String(st.edadFiltro) === String(ed) ? "active" : ""}" onclick="window._bg37State.edadFiltro='${ed}'; renderizarSeccionBaseGeneral37();">${ed} años (${cnt})</button>`;
+                        }).join("")}
+                    </div>
+
+                    <div class="filter-strip" style="grid-template-columns: 1fr auto; margin-bottom:0.9rem;">
+                        <div class="search-box">
+                            <i class="ri-search-line"></i>
+                            <input type="text" value="${st.busq.replace(/"/g, "&quot;")}" placeholder="Buscar por apellido, nombre, DNI o año de nacimiento..."
+                                oninput="window._bg37State.busq=this.value; renderizarSeccionBaseGeneral37();">
+                        </div>
+                        <select onchange="window._bg37State.depFiltro=this.value; renderizarSeccionBaseGeneral37();" style="width:auto;">
+                            <option value="TODOS" ${st.depFiltro === "TODOS" ? "selected" : ""}>🏢 Todos los Deportes</option>
+                            ${deps.map(d => `<option value="${d}" ${st.depFiltro === d ? "selected" : ""}>${d}</option>`).join("")}
+                        </select>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table class="app-table" style="font-size:0.82rem;">
+                            <thead>
+                                <tr>
+                                    <th>Deportista / DNI</th>
+                                    <th>Años Cumplidos / Año</th>
+                                    <th>Deporte y Categoría Actual</th>
+                                    <th>Doble Categoría</th>
+                                    <th style="text-align:right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${filtrados.map(p => {
+                                    const ed = calcularEdadExacta37(p);
+                                    const anio = obtenerAnioNacimiento37(p);
+                                    const extras = Array.isArray(p.categoriasExtra) ? p.categoriasExtra : [];
+                                    return `
+                                        <tr>
+                                            <td><strong>${p.apellido}, ${p.nombre}</strong><br><small style="color:var(--ink-500);">DNI ${p.dni} • ${p.puesto || "-"}</small></td>
+                                            <td><span class="badge badge-celeste">🎂 ${ed} años</span><br><small style="color:var(--ink-500);">Cat. ${anio}</small></td>
+                                            <td><strong>${p.deporte}</strong> <span class="badge badge-purple">${p.categoria}</span></td>
+                                            <td>
+                                                ${extras.length === 0 ? `<small style="color:var(--ink-400);">-</small>` :
+                                                extras.map(ce => `<span class="badge badge-ok" style="margin:2px;">${ce.deporte} ${ce.categoria} <a href="#" style="color:inherit; margin-left:3px;" onclick="event.preventDefault(); quitarDeCategoriaExtra37(${p.id}, '${ce.deporte}', '${ce.categoria}')">✕</a></span>`).join("")}
+                                            </td>
+                                            <td style="text-align:right;">
+                                                <div style="display:flex; gap:0.35rem; justify-content:flex-end; flex-wrap:wrap;">
+                                                    <button type="button" class="btn btn-primary btn-sm" onclick="migrarRapidoDesdeBase37(${p.id})">🔀 Migrar / Edad</button>
+                                                    <button type="button" class="btn btn-secondary btn-sm" onclick="window.location.href='jugador.html?id=${p.id}'">📂 Ficha</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } else {
+            body.innerHTML = `
+                <div class="split-view">
+                    <div class="app-panel">
+                        <div class="panel-head"><h3><i class="ri-add-circle-line"></i> Nuevo Ejercicio en Base Maestra</h3></div>
+                        <form onsubmit="guardarNuevoEjercicioBase37(event)">
+                            <div class="field" style="margin-bottom:0.65rem;"><label>Nombre del Ejercicio *</label><input type="text" id="bg37EjNom" required placeholder="Ej: Sentadilla Goblet / Press Inclinado"></div>
+                            <div class="grid-2" style="margin-bottom:0.65rem;">
+                                <div class="field"><label>Grupo Muscular / Área</label><input type="text" id="bg37EjGrp" placeholder="Ej: Piernas / Potencia / Core"></div>
+                                <div class="field"><label>Tipo de Medición</label>
+                                    <select id="bg37EjTip">
+                                        <option value="fuerza_kg">🏋️ Kilos + Reps (1RM)</option>
+                                        <option value="unilateral">⚖️ Unilateral Izq/Der</option>
+                                        <option value="salto_cm">🦘 Salto (cm)</option>
+                                        <option value="tiempo_seg">⚡ Tiempo (seg)</option>
+                                        <option value="reps_puntos">🔁 Repeticiones</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="field" style="margin-bottom:0.85rem;"><label>Link de Video Técnico (Opcional)</label><input type="url" id="bg37EjVid" placeholder="https://youtube.com/..."></div>
+                            <button type="submit" class="btn btn-primary" style="width:100%;">💾 Guardar en Base de Ejercicios</button>
+                        </form>
+                    </div>
+
+                    <div class="app-panel">
+                        <div class="panel-head"><h3><i class="ri-list-check-2"></i> Catálogo Activo (${ejercicios.length})</h3></div>
+                        <div class="table-wrap">
+                            <table class="app-table" style="font-size:0.82rem;">
+                                <thead><tr><th>Ejercicio</th><th>Grupo</th><th>Medición</th><th style="text-align:right;"></th></tr></thead>
+                                <tbody>
+                                    ${ejercicios.map(ej => `
+                                        <tr>
+                                            <td><strong>${ej.nombre}</strong>${ej.video ? ` <a href="${ej.video}" target="_blank" class="badge badge-celeste">▶ Video</a>` : ""}</td>
+                                            <td>${ej.grupo}</td>
+                                            <td><span class="badge badge-purple">${ej.tipo}</span></td>
+                                            <td style="text-align:right;"><button type="button" class="btn btn-danger btn-sm" onclick="eliminarEjercicioBase37(${ej.id})">🗑️</button></td>
+                                        </tr>
+                                    `).join("")}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    };
+
+    // =====================================================================
+    // 37.9 INYECCIÓN EN MENÚ LATERAL + BOTONES EN CADA CATEGORÍA DE DEPORTE
+    // =====================================================================
+    function inyectarAccesosBaseGeneral37() {
+        if (document.body?.getAttribute("data-rol") === "usuario" || document.body?.classList.contains("login-page")) return;
+        asegurarDatosEdadBaseGeneral37();
+        sincronizarDatalistEjerciciosDOM37();
+
+        // 1. Link "Base General" en el menú lateral
+        const nav = document.querySelector(".app-sidebar .sidebar-nav");
+        if (nav && !nav.querySelector('[data-nav="base_general"]')) {
+            const a = document.createElement("a");
+            a.href = "#base-general";
+            a.className = "side-link";
+            a.dataset.nav = "base_general";
+            a.onclick = (e) => { e.preventDefault(); abrirModuloBaseGeneral37("jugadores"); };
+            a.innerHTML = `<i class="ri-database-2-line"></i><span>Base General</span>`;
+            nav.appendChild(a);
+        }
+
+        // 2. Botones "📥 Absorber de Base" y "🔀 Migrar" en la barra de categorías de Fútbol / Hockey / Deportes
+        const catBarPanel = document.querySelector(".category-bar-panel");
+        if (catBarPanel && typeof deportePagina !== "undefined" && deportePagina && deportePagina !== "Gimnasio" && !document.getElementById("bg37CatTools")) {
+            const tools = document.createElement("div");
+            tools.id = "bg37CatTools";
+            tools.className = "bg37-cat-tools";
+            tools.innerHTML = `
+                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalAbsorberPorEdad37(true, 'TODAS', '')">📥 Absorber de Base</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalMigrarDesdeCategoria37()">🔀 Migrar</button>
+            `;
+            catBarPanel.appendChild(tools);
+        }
+    }
+
+    document.addEventListener("click", (e) => {
+        const link = e.target.closest(".app-sidebar .side-link");
+        if (link && link.dataset.nav !== "base_general") {
+            document.getElementById("cdmSeccionBaseGeneral37")?.classList.add("hidden");
+        }
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(inyectarAccesosBaseGeneral37, 260);
+        setTimeout(inyectarAccesosBaseGeneral37, 650);
+    });
+})();
+// =========================================================================
+// 38. BARRA INFERIOR FIJA SIEMPRE VIGENTE (CON DESPLEGABLES DE DEPORTES/SALUD)
+//     + MENÚ HAMBURGUESA DEDICADO A ACCESOS RÁPIDOS Y BACKUP (SIN DUPLICAR BUSCAR)
+// Reemplaza al Apartado 38 anterior al final de app.js
+// =========================================================================
+
+(function () {
+    function inyectarCSSMenuPro38() {
+        document.getElementById("cdmCssMenuPro38")?.remove();
+        const st = document.createElement("style");
+        st.id = "cdmCssMenuPro38";
+        st.textContent = `
+            .menu38-close-btn {
+                display: none;
+                align-items: center;
+                justify-content: center;
+                width: 34px;
+                height: 34px;
+                border-radius: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                background: rgba(255, 255, 255, 0.08);
+                color: #ffffff;
+                font-size: 1.05rem;
+                cursor: pointer;
+                flex-shrink: 0;
+            }
+
+            /* Desplegables en barra lateral de PC */
+            .menu38-acc {
+                display: flex;
+                flex-direction: column;
+                gap: 0.22rem;
+                width: 100%;
+            }
+            .menu38-acc-btn {
+                width: 100%;
+                border: none;
+                background: transparent;
+                color: rgba(226, 232, 240, 0.9);
+                font-size: 0.86rem;
+                font-weight: 700;
+                padding: 0.62rem 0.8rem;
+                border-radius: 11px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.6rem;
+                text-align: left;
+                transition: background 0.15s ease, color 0.15s ease;
+            }
+            .menu38-acc-btn:hover,
+            .menu38-acc.open > .menu38-acc-btn {
+                background: rgba(56, 189, 248, 0.14);
+                color: #ffffff;
+            }
+            .menu38-acc-left {
+                display: flex;
+                align-items: center;
+                gap: 0.65rem;
+                min-width: 0;
+            }
+            .menu38-acc-arrow {
+                transition: transform 0.2s ease;
+                font-size: 1rem;
+                opacity: 0.8;
+            }
+            .menu38-acc.open > .menu38-acc-btn .menu38-acc-arrow {
+                transform: rotate(180deg);
+            }
+            .menu38-acc-list {
+                display: none;
+                flex-direction: column;
+                gap: 0.18rem;
+                padding: 0.15rem 0 0.25rem 1.05rem;
+                margin-left: 0.75rem;
+                border-left: 2px solid rgba(56, 189, 248, 0.28);
+            }
+            .menu38-acc.open > .menu38-acc-list {
+                display: flex !important;
+            }
+            .menu38-sublink {
+                width: 100%;
+                border: none;
+                background: transparent;
+                color: rgba(203, 213, 225, 0.92);
+                text-decoration: none;
+                font-size: 0.81rem;
+                font-weight: 600;
+                padding: 0.48rem 0.7rem;
+                border-radius: 9px;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                cursor: pointer;
+                text-align: left;
+                transition: background 0.14s ease, color 0.14s ease;
+            }
+            .menu38-sublink:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #ffffff;
+            }
+            .menu38-sublink.active {
+                background: #0284c7;
+                color: #ffffff;
+                font-weight: 800;
+            }
+
+            /* Accesos rápidos dentro del menú hamburguesa (solo móvil/tablet) */
+            .menu38-quick-box {
+                display: none;
+                margin-top: 0.35rem;
+            }
+            .menu38-quick-title {
+                font-size: 0.68rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: rgba(148, 163, 184, 0.95);
+                margin-bottom: 0.5rem;
+                display: block;
+            }
+            .menu38-quick-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.45rem;
+            }
+            .menu38-quick-btn {
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                background: rgba(255, 255, 255, 0.06);
+                color: #f1f5f9;
+                font-size: 0.76rem;
+                font-weight: 700;
+                padding: 0.6rem 0.55rem;
+                border-radius: 11px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 0.42rem;
+                justify-content: flex-start;
+                text-align: left;
+                transition: background 0.15s ease;
+            }
+            .menu38-quick-btn:hover {
+                background: rgba(56, 189, 248, 0.22);
+                border-color: rgba(56, 189, 248, 0.48);
+            }
+            .menu38-quick-btn.danger {
+                border-color: rgba(244, 63, 94, 0.42);
+                background: rgba(244, 63, 94, 0.15);
+                color: #fda4af;
+            }
+
+            /* Barra Inferior Fija (oculta en PC, siempre vigente abajo en móvil/tablet) */
+            #cdmBottomNav38 {
+                display: none;
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                height: 66px;
+                background: rgba(12, 25, 44, 0.97);
+                backdrop-filter: blur(12px);
+                border-top: 1px solid rgba(148, 163, 184, 0.22);
+                padding: 0.3rem 0.35rem calc(0.3rem + env(safe-area-inset-bottom, 0px));
+                z-index: 8800;
+                align-items: center;
+                justify-content: space-around;
+                gap: 0.2rem;
+                box-shadow: 0 -8px 26px rgba(2, 6, 23, 0.32);
+            }
+            .bnav38-item {
+                flex: 1;
+                min-width: 0;
+                max-width: 96px;
+                border: none;
+                background: transparent;
+                color: rgba(203, 213, 225, 0.88);
+                text-decoration: none;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 2px;
+                padding: 0.34rem 0.2rem;
+                border-radius: 11px;
+                cursor: pointer;
+                font-size: 0.63rem;
+                font-weight: 700;
+                line-height: 1.1;
+                transition: background 0.15s ease, color 0.15s ease;
+            }
+            .bnav38-item i {
+                font-size: 1.18rem;
+                line-height: 1;
+            }
+            .bnav38-item span {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 100%;
+            }
+            .bnav38-item.active,
+            .bnav38-item.sheet-open {
+                background: #0284c7;
+                color: #ffffff;
+                box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+            }
+
+            /* Panel desplegable hacia arriba (Deportes / Consultorio desde barra inferior) */
+            #cdmBottomSheetBg38 {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(2, 6, 23, 0.45);
+                backdrop-filter: blur(2px);
+                z-index: 8900;
+            }
+            #cdmBottomSheetBg38.open { display: block; }
+            #cdmBottomSheet38 {
+                display: none;
+                position: fixed;
+                left: 0.65rem;
+                right: 0.65rem;
+                bottom: 74px;
+                max-width: 440px;
+                margin: 0 auto;
+                background: #0f172a;
+                color: #f8fafc;
+                border: 1.5px solid rgba(56, 189, 248, 0.35);
+                border-radius: 18px;
+                padding: 0.85rem;
+                z-index: 8950;
+                box-shadow: 0 18px 42px rgba(2, 6, 23, 0.55);
+                max-height: 55vh;
+                overflow-y: auto;
+            }
+            #cdmBottomSheet38.open { display: block; }
+            .bsheet38-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 0.6rem;
+                padding-bottom: 0.45rem;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+            }
+            .bsheet38-head strong {
+                font-size: 0.86rem;
+                color: #ffffff;
+            }
+            .bsheet38-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.45rem;
+            }
+            .bsheet38-opt {
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                background: rgba(255, 255, 255, 0.06);
+                color: #f1f5f9;
+                text-decoration: none;
+                border-radius: 12px;
+                padding: 0.65rem 0.7rem;
+                font-size: 0.8rem;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                gap: 0.45rem;
+                cursor: pointer;
+                text-align: left;
+            }
+            .bsheet38-opt:hover,
+            .bsheet38-opt.active {
+                background: #0284c7;
+                border-color: #38bdf8;
+                color: #ffffff;
+            }
+
+            /* =============================================================
+               MODO MÓVIL / TABLET (<= 1024px):
+               - ABAJO SIEMPRE VIGENTE: Navegación Principal (cdmBottomNav38)
+               - MENÚ HAMBURGUESA (☰): Solo Buscar + Accesos Rápidos + Backup
+               ============================================================= */
+            @media (max-width: 1024px) {
+                #cdmBottomNav38 {
+                    display: flex !important;
+                }
+                .menu38-close-btn {
+                    display: inline-flex !important;
+                }
+                .menu38-quick-box {
+                    display: block !important;
+                }
+                /* Ocultar la lista de navegación dentro del drawer móvil porque ya está fija abajo */
+                body .app-shell > aside.app-sidebar .sidebar-nav,
+                body .app-shell > aside.app-sidebar .sidebar-group-label {
+                    display: none !important;
+                }
+                body .app-shell > aside.app-sidebar {
+                    position: fixed !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    bottom: 0 !important;
+                    right: auto !important;
+                    width: min(305px, 86vw) !important;
+                    max-width: 86vw !important;
+                    height: 100dvh !important;
+                    min-height: 100vh !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    align-items: stretch !important;
+                    justify-content: flex-start !important;
+                    padding: 0.95rem 0.85rem 1.35rem !important;
+                    overflow-y: auto !important;
+                    overflow-x: hidden !important;
+                    z-index: 9500 !important;
+                    transform: translateX(-105%) !important;
+                    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1) !important;
+                    box-shadow: 16px 0 42px rgba(2, 6, 23, 0.45) !important;
+                }
+                body.sidebar-mobile-open-33 .app-shell > aside.app-sidebar {
+                    transform: translateX(0) !important;
+                }
+                body #cdmSidebarBackdrop33 {
+                    z-index: 9400 !important;
+                }
+                body .app-shell > aside.app-sidebar .sidebar-brand {
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: space-between !important;
+                    gap: 0.55rem !important;
+                    margin-bottom: 0.8rem !important;
+                    padding-bottom: 0.7rem !important;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+                    flex-shrink: 0 !important;
+                }
+                body .app-shell > aside.app-sidebar .sidebar-demo-box {
+                    display: block !important;
+                    margin-top: 1rem !important;
+                    flex-shrink: 0 !important;
+                }
+                /* Espacio inferior para que la barra fija nunca tape el contenido ni el reloj */
+                body .app-main {
+                    margin-left: 0 !important;
+                    padding-bottom: 84px !important;
+                    width: 100% !important;
+                }
+                #cdmFloatingDropletClock {
+                    bottom: 78px !important;
+                }
+            }
+
+            /* Topbar móvil limpia en 1 sola línea */
+            @media (max-width: 768px) {
+                .app-topbar {
+                    flex-wrap: nowrap !important;
+                    min-height: 56px !important;
+                }
+                .app-topbar .topbar-left {
+                    min-width: 0 !important;
+                    flex: 1 !important;
+                }
+                .app-topbar .topbar-title {
+                    min-width: 0 !important;
+                }
+                .app-topbar .topbar-title h2 {
+                    font-size: 0.96rem !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                }
+                .app-topbar .topbar-right #btnToggleTemaCDM,
+                .app-topbar .topbar-right #cdmBarraSesionActiva,
+                .app-topbar .topbar-right #topbarMenuWrap33,
+                .app-topbar .topbar-right button[onclick*="notas"],
+                .app-topbar .topbar-right button[onclick*="Notas"] {
+                    display: none !important;
+                }
+                .app-topbar .topbar-right button[onclick*="abrirModalPersona"],
+                .app-topbar .topbar-right button[onclick*="abrirModalJugador"] {
+                    white-space: nowrap !important;
+                    padding: 0.42rem 0.68rem !important;
+                    font-size: 0.78rem !important;
+                }
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    // =====================================================================
+    // HELPERS DE NAVEGACIÓN Y DESPLEGABLES
+    // =====================================================================
+    window.alternarAcordeonMenu38 = function (idAcc) {
+        document.getElementById(idAcc)?.classList.toggle("open");
+    };
+
+    window.cerrarBottomSheet38 = function () {
+        document.getElementById("cdmBottomSheet38")?.classList.remove("open");
+        document.getElementById("cdmBottomSheetBg38")?.classList.remove("open");
+        document.querySelectorAll("#cdmBottomNav38 .bnav38-item").forEach(b => b.classList.remove("sheet-open"));
+    };
+
+    window.irAProfesionConsultorio38 = function (claveEsp) {
+        cerrarBottomSheet38();
+        if (typeof alternarSidebarMovil33 === "function") alternarSidebarMovil33(true);
+        document.getElementById("cdmSeccionBaseGeneral37")?.classList.add("hidden");
+        document.getElementById("cdmSeccionContabilidadGlobal")?.classList.add("hidden");
+
+        if (typeof especialidadFiltroConsultorioCDM !== "undefined") {
+            especialidadFiltroConsultorioCDM = claveEsp || "TODAS";
+        }
+        if (typeof abrirModuloConsultorioIndependienteCDM === "function") {
+            abrirModuloConsultorioIndependienteCDM("agenda");
+            if (typeof cambiarEspecialidadFiltroConsultorioCDM === "function") {
+                cambiarEspecialidadFiltroConsultorioCDM(claveEsp || "TODAS");
+            }
+        } else {
+            window.location.href = "index.html";
+        }
+    };
+
+    window.ejecutarAccesoRapido38 = function (accion) {
+        cerrarBottomSheet38();
+        if (typeof alternarSidebarMovil33 === "function") alternarSidebarMovil33(true);
+        if (accion === "tema" && typeof alternarTemaVisualCDM === "function") alternarTemaVisualCDM();
+        else if (accion === "buscar" && typeof abrirBuscadorUniversal27 === "function") abrirBuscadorUniversal27();
+        else if (accion === "caja" && typeof abrirModalCierreCaja25 === "function") abrirModalCierreCaja25();
+        else if (accion === "comercio") window.location.href = "login.html?hub=1";
+        else if (accion === "salir" && typeof cerrarSesionCDM === "function") cerrarSesionCDM();
+        else if (accion === "modulos") {
+            const b = document.querySelector('button[onclick*="abrirModalSuperAdminCDM"]');
+            if (b) b.click();
+            else if (typeof abrirModalSuperAdminCDM === "function") abrirModalSuperAdminCDM();
+        } else if (accion === "notas") {
+            const b = document.querySelector('button[onclick*="Notas"], button[onclick*="notas"]');
+            if (b) b.click();
+        }
+    };
+
+    window.abrirBottomSheet38 = function (tipo, btnEl) {
+        const sheet = document.getElementById("cdmBottomSheet38");
+        const bg = document.getElementById("cdmBottomSheetBg38");
+        if (!sheet || !bg) return;
+
+        const yaEstaba = sheet.classList.contains("open") && sheet.dataset.tipo === tipo;
+        cerrarBottomSheet38();
+        if (yaEstaba) return;
+
+        const depActual = typeof deportePagina !== "undefined" ? String(deportePagina || "") : "";
+        let titulo = "";
+        let contenido = "";
+
+        if (tipo === "deportes") {
+            const lista = window.__listaDeportes38 || [];
+            titulo = `🏆 Seleccionar Deporte (${lista.length})`;
+            contenido = lista.map(d => `
+                <a href="${d.href}" class="bsheet38-opt ${depActual.toLowerCase() === d.key.toLowerCase() ? "active" : ""}">
+                    <span>${d.icono}</span><span>${d.nombre}</span>
+                </a>
+            `).join("");
+        } else if (tipo === "consultorio") {
+            const profs = window.__listaProfesiones38 || [];
+            titulo = `🩺 Especialidades de Consultorio (${profs.length})`;
+            contenido = `
+                <button type="button" class="bsheet38-opt" onclick="irAProfesionConsultorio38('TODAS')">
+                    <span>📅</span><span>Agenda y Todas</span>
+                </button>
+                ${profs.map(pr => `
+                    <button type="button" class="bsheet38-opt" onclick="irAProfesionConsultorio38('${pr.clave.replace(/'/g, "\\'")}')">
+                        <span>${pr.icono || "🩺"}</span><span>${pr.clave}</span>
+                    </button>
+                `).join("")}
+            `;
+        }
+
+        sheet.dataset.tipo = tipo;
+        sheet.innerHTML = `
+            <div class="bsheet38-head">
+                <strong>${titulo}</strong>
+                <button type="button" class="menu38-close-btn" style="display:inline-flex; width:28px; height:28px; font-size:0.85rem;" onclick="cerrarBottomSheet38()">✕</button>
+            </div>
+            <div class="bsheet38-grid">${contenido}</div>
+        `;
+        sheet.classList.add("open");
+        bg.classList.add("open");
+        if (btnEl) btnEl.classList.add("sheet-open");
+    };
+
+    // =====================================================================
+    // CONSTRUCCIÓN DE SIDEBAR (PC + HAMBURGUESA MÓVIL) Y BARRA INFERIOR FIJA
+    // =====================================================================
+    function construirNavegacionCompleta38() {
+        if (document.body?.classList.contains("login-page") || document.body?.getAttribute("data-rol") === "usuario") return;
+        const sidebar = document.querySelector(".app-sidebar");
+        const nav = sidebar?.querySelector(".sidebar-nav");
+        if (!sidebar || !nav) return;
+
+        // Botón cerrar ✕ en cabecera del menú hamburguesa
+        const brand = sidebar.querySelector(".sidebar-brand");
+        if (brand && !brand.querySelector(".menu38-close-btn")) {
+            const bClose = document.createElement("button");
+            bClose.type = "button";
+            bClose.className = "menu38-close-btn";
+            bClose.title = "Cerrar menú";
+            bClose.innerHTML = "✕";
+            bClose.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof alternarSidebarMovil33 === "function") alternarSidebarMovil33(true);
+            };
+            brand.appendChild(bClose);
+        }
+
+        // Capturar deportes extra ya existentes antes de reconstruir
+        if (!window.__deportesExtraCapturados38) {
+            window.__deportesExtraCapturados38 = [];
+            nav.querySelectorAll("a.side-link").forEach(a => {
+                const dn = a.dataset.nav || "";
+                if (dn && !["index", "futbol", "hockey", "gym", "consultorio", "contabilidad", "base_general"].includes(dn)) {
+                    window.__deportesExtraCapturados38.push({
+                        nombre: (a.innerText || "").trim(),
+                        href: a.getAttribute("href") || "#",
+                        nav: dn
+                    });
+                }
+            });
+        }
+
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const mod = lic?.modulos || { futbol: true, hockey: true, gym: true, consultorio: false };
+        const cobranzaBloq = typeof cobranzaEstaBloqueadaAppCDM === "function" ? cobranzaEstaBloqueadaAppCDM() : false;
+
+        // Lista de Deportes activos
+        const deportesLista = [];
+        if (mod.futbol !== false) deportesLista.push({ icono: "⚽", nombre: "Fútbol Oficial", href: "futbol.html", key: "Futbol" });
+        if (mod.hockey !== false) deportesLista.push({ icono: "🏑", nombre: "Hockey de Piso", href: "hockey.html", key: "Hockey" });
+        (window.__deportesExtraCapturados38 || []).forEach(ex => {
+            if (!deportesLista.some(d => d.nombre.toLowerCase() === ex.nombre.toLowerCase())) {
+                deportesLista.push({ icono: "🏆", nombre: ex.nombre, href: ex.href, key: ex.nombre });
+            }
+        });
+        (lic?.deportesExtra || []).forEach(raw => {
+            const nom = String(raw || "").replace(/^[^\wÁÉÍÓÚáéíóúÑñ]+/, "").trim();
+            if (nom && !deportesLista.some(d => d.key.toLowerCase() === nom.toLowerCase())) {
+                deportesLista.push({ icono: "🏆", nombre: nom, href: `futbol.html?deporte=${encodeURIComponent(nom)}`, key: nom });
+            }
+        });
+        window.__listaDeportes38 = deportesLista;
+
+        // Lista de Profesiones de Consultorio
+        const profesiones = typeof obtenerEspecialidadesHabilitadasConsultorioCDM === "function"
+            ? obtenerEspecialidadesHabilitadasConsultorioCDM()
+            : [];
+        const tieneConsultorio = (mod.consultorio !== false) && profesiones.length > 0;
+        window.__listaProfesiones38 = profesiones;
+
+        const path = (window.location.pathname || "").toLowerCase();
+        const depActual = typeof deportePagina !== "undefined" ? String(deportePagina || "") : "";
+        const esIndex = path.endsWith("index.html") || path.endsWith("/") || (!depActual && document.body?.dataset.page !== "perfil-individual");
+        const esEnDeporte = Boolean(depActual && depActual !== "Gimnasio");
+        const esEnGym = depActual === "Gimnasio" || path.includes("gym.html");
+
+        // 1. SIDEBAR DE PC (SIN BUSCADOR DUPLICADO)
+        nav.innerHTML = `
+            <a href="index.html" class="side-link ${esIndex ? "active" : ""}" data-nav="index">
+                <i class="ri-home-5-line"></i><span>Inicio</span>
+            </a>
+
+            ${deportesLista.length > 0 ? `
+                <div id="accDeportes38" class="menu38-acc ${esEnDeporte ? "open" : ""}">
+                    <button type="button" class="menu38-acc-btn" onclick="alternarAcordeonMenu38('accDeportes38')">
+                        <span class="menu38-acc-left"><i class="ri-trophy-line"></i><span>Deportes (${deportesLista.length})</span></span>
+                        <i class="ri-arrow-down-s-line menu38-acc-arrow"></i>
+                    </button>
+                    <div class="menu38-acc-list">
+                        ${deportesLista.map(d => `
+                            <a href="${d.href}" class="menu38-sublink ${depActual.toLowerCase() === d.key.toLowerCase() ? "active" : ""}">
+                                <span>${d.icono}</span><span>${d.nombre}</span>
+                            </a>
+                        `).join("")}
+                    </div>
+                </div>
+            ` : ""}
+
+            ${mod.gym !== false ? `
+                <a href="gym.html" class="side-link ${esEnGym ? "active" : ""}" data-nav="gym">
+                    <i class="ri-heart-pulse-line"></i><span>Gimnasio</span>
+                </a>
+            ` : ""}
+
+            ${tieneConsultorio ? `
+                <div id="accConsultorio38" class="menu38-acc">
+                    <button type="button" class="menu38-acc-btn" onclick="alternarAcordeonMenu38('accConsultorio38')">
+                        <span class="menu38-acc-left"><i class="ri-stethoscope-line"></i><span>Consultorio (${profesiones.length})</span></span>
+                        <i class="ri-arrow-down-s-line menu38-acc-arrow"></i>
+                    </button>
+                    <div class="menu38-acc-list">
+                        <button type="button" class="menu38-sublink" onclick="irAProfesionConsultorio38('TODAS')">
+                            <span>📅</span><span>Agenda y Todas</span>
+                        </button>
+                        ${profesiones.map(pr => `
+                            <button type="button" class="menu38-sublink" onclick="irAProfesionConsultorio38('${pr.clave.replace(/'/g, "\\'")}')">
+                                <span>${pr.icono || "🩺"}</span><span>${pr.clave}</span>
+                            </button>
+                        `).join("")}
+                    </div>
+                </div>
+            ` : ""}
+
+            <a href="#base-general" class="side-link" data-nav="base_general" onclick="event.preventDefault(); if(typeof abrirModuloBaseGeneral37==='function') abrirModuloBaseGeneral37('jugadores');">
+                <i class="ri-database-2-line"></i><span>Base General</span>
+            </a>
+
+            ${!cobranzaBloq ? `
+                <a href="#contabilidad" class="side-link" data-nav="contabilidad" onclick="event.preventDefault(); document.getElementById('cdmSeccionBaseGeneral37')?.classList.add('hidden'); document.getElementById('cdmSeccionConsultorioGlobal')?.classList.add('hidden'); if(typeof abrirModuloContabilidadIndependienteCDM==='function') abrirModuloContabilidadIndependienteCDM();">
+                    <i class="ri-wallet-3-line"></i><span>Contabilidad y Caja</span>
+                </a>
+            ` : ""}
+        `;
+
+        // 2. ACCESOS RÁPIDOS DENTRO DEL MENÚ HAMBURGUESA (MÓVIL/TABLET)
+        let quick = document.getElementById("menu38QuickBox");
+        if (!quick) {
+            quick = document.createElement("div");
+            quick.id = "menu38QuickBox";
+            quick.className = "menu38-quick-box";
+            const demoBox = sidebar.querySelector(".sidebar-demo-box");
+            if (demoBox) sidebar.insertBefore(quick, demoBox);
+            else sidebar.appendChild(quick);
+        }
+        quick.innerHTML = `
+            <span class="menu38-quick-title">⚡ Accesos Rápidos</span>
+            <div class="menu38-quick-grid">
+                <button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapido38('tema')"><i class="ri-moon-clear-line"></i><span>Modo Día/Noche</span></button>
+                <button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapido38('notas')"><i class="ri-sticky-note-line"></i><span>Notas</span></button>
+                ${!cobranzaBloq ? `<button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapido38('caja')"><i class="ri-safe-2-line"></i><span>Caja Rápida</span></button>` : ""}
+                <button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapido38('modulos')"><i class="ri-settings-3-line"></i><span>Módulos</span></button>
+                <button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapido38('comercio')"><i class="ri-store-2-line"></i><span>Comercios</span></button>
+                <button type="button" class="menu38-quick-btn danger" onclick="ejecutarAccesoRapido38('salir')"><i class="ri-logout-box-r-line"></i><span>Salir</span></button>
+            </div>
+        `;
+
+        // 3. BARRA INFERIOR FIJA SIEMPRE VIGENTE EN MÓVIL/TABLET
+        let bnav = document.getElementById("cdmBottomNav38");
+        if (!bnav) {
+            bnav = document.createElement("nav");
+            bnav.id = "cdmBottomNav38";
+            document.body.appendChild(bnav);
+        }
+        if (!document.getElementById("cdmBottomSheetBg38")) {
+            const bg = document.createElement("div");
+            bg.id = "cdmBottomSheetBg38";
+            bg.onclick = cerrarBottomSheet38;
+            document.body.appendChild(bg);
+        }
+        if (!document.getElementById("cdmBottomSheet38")) {
+            const sh = document.createElement("div");
+            sh.id = "cdmBottomSheet38";
+            document.body.appendChild(sh);
+        }
+
+        bnav.innerHTML = `
+            <a href="index.html" class="bnav38-item ${esIndex ? "active" : ""}">
+                <i class="ri-home-5-line"></i><span>Inicio</span>
+            </a>
+
+            ${deportesLista.length > 0 ? `
+                <button type="button" class="bnav38-item ${esEnDeporte ? "active" : ""}" onclick="abrirBottomSheet38('deportes', this)">
+                    <i class="ri-trophy-line"></i><span>Deportes ▴</span>
+                </button>
+            ` : ""}
+
+            ${mod.gym !== false ? `
+                <a href="gym.html" class="bnav38-item ${esEnGym ? "active" : ""}">
+                    <i class="ri-heart-pulse-line"></i><span>Gym</span>
+                </a>
+            ` : ""}
+
+            ${tieneConsultorio ? `
+                <button type="button" class="bnav38-item" onclick="abrirBottomSheet38('consultorio', this)">
+                    <i class="ri-stethoscope-line"></i><span>Salud ▴</span>
+                </button>
+            ` : ""}
+
+            <button type="button" class="bnav38-item" onclick="cerrarBottomSheet38(); if(typeof abrirModuloBaseGeneral37==='function') abrirModuloBaseGeneral37('jugadores');">
+                <i class="ri-database-2-line"></i><span>Base</span>
+            </button>
+
+            ${!cobranzaBloq ? `
+                <button type="button" class="bnav38-item" onclick="cerrarBottomSheet38(); document.getElementById('cdmSeccionBaseGeneral37')?.classList.add('hidden'); document.getElementById('cdmSeccionConsultorioGlobal')?.classList.add('hidden'); if(typeof abrirModuloContabilidadIndependienteCDM==='function') abrirModuloContabilidadIndependienteCDM();">
+                    <i class="ri-wallet-3-line"></i><span>Caja</span>
+                </button>
+            ` : ""}
+        `;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        inyectarCSSMenuPro38();
+        setTimeout(() => {
+            inyectarCSSMenuPro38();
+            construirNavegacionCompleta38();
+        }, 340);
+        setTimeout(construirNavegacionCompleta38, 850);
+    });
+})();
+// =========================================================================
+// 39. UNIFICACIÓN TOTAL: BASE MAESTRA DE EJERCICIOS ➔ VIDEOTECA ➔ RUTINAS ➔ HOMBRECITO
+//     - AGREGA SELECTOR DE PATRÓN BIOMECÁNICO + PREVIEW EN VIVO AL CREAR EJERCICIOS
+//     - SINCRONIZA AUTOMÁTICAMENTE CON VIDEOTECA, CREADORES DE RUTINAS Y MARCAS
+// Pegar al final de app.js (debajo del Apartado 38)
+// =========================================================================
+
+(function () {
+    const PATRONES_HOMBRECITO_39 = [
+        { clave: "squat", label: "🦵 Sentadilla / Piernas (Squat)" },
+        { clave: "bench", label: "🏋️ Empuje Horizontal / Press Banca" },
+        { clave: "deadlift", label: "⛓️ Bisagra de Cadera / Peso Muerto" },
+        { clave: "lunge", label: "⚡ Estocada / Búlgara / Unilateral" },
+        { clave: "row", label: "🚣 Tracción Horizontal / Remo" },
+        { clave: "pullup", label: "🧗 Tracción Vertical / Dominadas" },
+        { clave: "press", label: "🙌 Empuje Vertical / Hombros" },
+        { clave: "plank", label: "🧱 Core / Plancha / Zona Media" },
+        { clave: "jump", label: "🦘 Salto / Pliometría / Explosivo" }
+    ];
+
+    function inferirPatronPorDefecto39(ej) {
+        if (ej?.patron) return ej.patron;
+        const t = `${ej?.nombre || ""} ${ej?.grupo || ""}`.toLowerCase();
+        if (t.includes("búlgar") || t.includes("bulgar") || t.includes("estocad")) return "lunge";
+        if (t.includes("sentadilla") || t.includes("squat")) return "squat";
+        if (t.includes("banca") || t.includes("pecho") || t.includes("flexion")) return "bench";
+        if (t.includes("muerto") || t.includes("hip") || t.includes("glúteo") || t.includes("posterior")) return "deadlift";
+        if (t.includes("dominad") || t.includes("jalon") || t.includes("jalón")) return "pullup";
+        if (t.includes("remo") || t.includes("espalda")) return "row";
+        if (t.includes("militar") || t.includes("hombro")) return "press";
+        if (t.includes("plancha") || t.includes("core") || t.includes("abdom")) return "plank";
+        if (t.includes("salto") || t.includes("sprint") || t.includes("cmj") || t.includes("cajón")) return "jump";
+        return "squat";
+    }
+
+    // ---------------------------------------------------------------------
+    // 1. SINCRONIZAR BASE MAESTRA ➔ DATALISTS DE RUTINAS + VIDEOTECA GYM
+    // ---------------------------------------------------------------------
+    window.sincronizarBaseEjerciciosConTodo39 = function () {
+        if (typeof obtenerCatalogoEjercicios37 !== "function") return;
+        const catalogo = obtenerCatalogoEjercicios37();
+
+        // A) Actualizar todos los datalists de ejercicios (jugador.html, gym.html, futbol.html, etc.)
+        let dlGlobal = document.getElementById("dlBaseMaestraEjercicios39");
+        if (!dlGlobal) {
+            dlGlobal = document.createElement("datalist");
+            dlGlobal.id = "dlBaseMaestraEjercicios39";
+            document.body.appendChild(dlGlobal);
+        }
+        const opcionesHtml = catalogo.map(e =>
+            `<option value="${String(e.nombre).replace(/"/g, "&quot;")}">${e.grupo || "General"}</option>`
+        ).join("");
+
+        dlGlobal.innerHTML = opcionesHtml;
+        ["listaEjerciciosSugeridos", "listaSugerenciasGym"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = opcionesHtml;
+        });
+
+        // Vincular inputs de nombre de ejercicio en creadores de rutinas al catálogo maestro
+        document.querySelectorAll(
+            "#contenedorFilasAdminGym input[type='text']:first-child, #contenedorFilasRutinaIndividual input[type='text']:first-child, .ex-nombre"
+        ).forEach(inp => {
+            if (!inp.getAttribute("list")) inp.setAttribute("list", "dlBaseMaestraEjercicios39");
+        });
+
+        // B) Sincronizar con la Videoteca de Gimnasio (baseVideoteca en app.js)
+        if (typeof baseVideoteca !== "undefined" && Array.isArray(baseVideoteca)) {
+            let agrego = false;
+            catalogo.forEach(ej => {
+                const nomNorm = String(ej.nombre || "").trim().toLowerCase();
+                if (!nomNorm) return;
+                const existe = baseVideoteca.find(v => String(v.nombre || v.titulo || "").trim().toLowerCase() === nomNorm);
+                const patron = inferirPatronPorDefecto39(ej);
+                if (!existe) {
+                    baseVideoteca.push({
+                        id: ej.id || Date.now() + Math.floor(Math.random() * 1000),
+                        nombre: ej.nombre,
+                        titulo: ej.nombre,
+                        grupo: ej.grupo || "General",
+                        categoria: ej.grupo || "General",
+                        url: ej.video || "",
+                        video: ej.video || "",
+                        patron,
+                        notas: `Base Maestra • Medición: ${ej.tipo || "fuerza_kg"}`
+                    });
+                    agrego = true;
+                } else {
+                    if (ej.patron) existe.patron = patron;
+                    if (ej.video && !existe.url) { existe.url = ej.video; existe.video = ej.video; }
+                }
+            });
+            if (agrego && typeof guardarDatosCDM === "function") guardarDatosCDM();
+            if (typeof renderizarVideotecaGym === "function" && typeof deportePagina !== "undefined" && deportePagina === "Gimnasio") {
+                renderizarVideotecaGym();
+            }
+        }
+
+        // C) Aplicar el patrón del hombrecito a tarjetas ya dibujadas en pantalla
+        aplicarPatronesBaseEnStickmans39(catalogo);
+    };
+
+    function aplicarPatronesBaseEnStickmans39(catalogo) {
+        if (!Array.isArray(catalogo) || !catalogo.length) return;
+        const mapa = {};
+        catalogo.forEach(e => {
+            mapa[String(e.nombre || "").trim().toLowerCase()] = inferirPatronPorDefecto39(e);
+        });
+
+        document.querySelectorAll(".stickman-tech-card").forEach(card => {
+            const titulo = (card.querySelector("h4, h3, strong, .stickman-title")?.innerText || "").trim().toLowerCase();
+            if (titulo && mapa[titulo]) card.dataset.patron = mapa[titulo];
+        });
+
+        document.querySelectorAll(".routine-stickman-mini canvas").forEach(cv => {
+            const cont = cv.closest(".plan-ex-row, .routine-ex-item, .exercise-card, .card, li, div");
+            const titulo = (cont?.querySelector("strong, h4, .ex-title")?.innerText || "").replace(/^\d+\.\s*/, "").trim().toLowerCase();
+            if (titulo && mapa[titulo]) cv.dataset.patron = mapa[titulo];
+        });
+    }
+
+    // ---------------------------------------------------------------------
+    // 2. MEJORAR EL FORMULARIO DE "BASE MAESTRA DE EJERCICIOS" (APARTADO 37)
+    //    CON SELECTOR DE PATRÓN + PREVIEW ANIMADO EN VIVO DEL HOMBRECITO
+    // ---------------------------------------------------------------------
+    function enriquecerFormEjerciciosBase39() {
+        const form = document.querySelector('#bg37Body form[onsubmit*="guardarNuevoEjercicioBase37"]');
+        if (!form || document.getElementById("bg39EjPatron")) return;
+
+        const fieldVideo = document.getElementById("bg37EjVid")?.closest(".field");
+        const wrap = document.createElement("div");
+        wrap.className = "field";
+        wrap.style.marginBottom = "0.65rem";
+        wrap.innerHTML = `
+            <label>🏃 Animación del Hombrecito (Patrón de Movimiento)</label>
+            <div style="display:flex; gap:0.6rem; align-items:center;">
+                <select id="bg39EjPatron" style="flex:1;" onchange="const c=document.getElementById('bg39PreviewStickman'); if(c) c.dataset.patron=this.value;">
+                    ${PATRONES_HOMBRECITO_39.map(p => `<option value="${p.clave}">${p.label}</option>`).join("")}
+                </select>
+                <div class="routine-stickman-mini" style="width:62px; height:62px; background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <canvas id="bg39PreviewStickman" data-patron="squat" width="58" height="58" style="width:58px; height:58px;"></canvas>
+                </div>
+            </div>
+        `;
+
+        if (fieldVideo) form.insertBefore(wrap, fieldVideo);
+        else form.appendChild(wrap);
+    }
+
+    // Envolver guardarNuevoEjercicioBase37 para guardar también el patrón y sincronizar todo
+    if (typeof window.guardarNuevoEjercicioBase37 === "function" && !window.__ejBase39Wrapped) {
+        window.__ejBase39Wrapped = true;
+        const _origGuardarEj37 = window.guardarNuevoEjercicioBase37;
+        window.guardarNuevoEjercicioBase37 = function (e) {
+            const patronSel = document.getElementById("bg39EjPatron")?.value || "squat";
+            _origGuardarEj37.apply(this, arguments);
+            // Guardar el patrón en el ejercicio recién creado (el primero de la lista)
+            const lista = obtenerCatalogoEjercicios37();
+            if (lista.length > 0) {
+                lista[0].patron = patronSel;
+                const key = `cdm_catalogo_ejercicios_v37_${typeof obtenerClaveClubActivoCDM === "function" ? obtenerClaveClubActivoCDM() : (localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal")}`;
+                localStorage.setItem(key, JSON.stringify(lista));
+            }
+            sincronizarBaseEjerciciosConTodo39();
+        };
+    }
+
+    if (typeof window.renderizarSeccionBaseGeneral37 === "function" && !window.__renderBase39Wrapped) {
+        window.__renderBase39Wrapped = true;
+        const _origRenderBase37 = window.renderizarSeccionBaseGeneral37;
+        window.renderizarSeccionBaseGeneral37 = function () {
+            _origRenderBase37.apply(this, arguments);
+            setTimeout(enriquecerFormEjerciciosBase39, 20);
+        };
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(sincronizarBaseEjerciciosConTodo39, 450);
+    });
+    document.addEventListener("click", () => {
+        setTimeout(() => {
+            if (document.querySelector('#bg37Body form[onsubmit*="guardarNuevoEjercicioBase37"]') && !document.getElementById("bg39EjPatron")) {
+                enriquecerFormEjerciciosBase39();
+            }
+        }, 60);
+    });
+})();
