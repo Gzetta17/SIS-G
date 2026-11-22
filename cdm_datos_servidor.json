@@ -1,6 +1,6 @@
 {
   "claveClub": "cdm_adelia_maria_principal",
-  "ultimaActualizacionISO": "2026-11-22T03:05:48.169Z",
+  "ultimaActualizacionISO": "2026-11-22T04:11:10.014Z",
   "personas": [
     {
       "id": 101,
@@ -33,33 +33,24 @@
       "pagoEstado": "Al Día",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-17",
-        "2026-11-19",
-        "2026-11-21"
+        "2026-11-18",
+        "2026-11-20",
+        "2026-11-22"
       ],
       "clinico": [
         {
           "id": 1,
-          "fecha": "2026-11-21",
+          "fecha": "2026-11-22",
           "peso": 54,
           "rpe": 6,
           "sueno": 5,
           "dolor": "Sin molestias"
-        },
-        {
-          "id": 1795316748158,
-          "fecha": "2026-11-22",
-          "peso": 54,
-          "altura": 162,
-          "sueno": 4,
-          "rpe": 6,
-          "dolor": "Check-in: Bien para entrenar"
         }
       ],
       "evaluaciones": [
         {
           "id": 11,
-          "fecha": "2026-10-27",
+          "fecha": "2026-10-28",
           "ejercicio": "Sentadilla Trasera con Barra",
           "tipo": "fuerza_kg",
           "valor": 65,
@@ -69,7 +60,7 @@
         },
         {
           "id": 12,
-          "fecha": "2026-11-09",
+          "fecha": "2026-11-10",
           "ejercicio": "Sentadilla Trasera con Barra",
           "tipo": "fuerza_kg",
           "valor": 72,
@@ -79,7 +70,7 @@
         },
         {
           "id": 13,
-          "fecha": "2026-11-21",
+          "fecha": "2026-11-22",
           "ejercicio": "Sentadilla Trasera con Barra",
           "tipo": "fuerza_kg",
           "valor": 80,
@@ -88,28 +79,12 @@
           "nota": "Récord"
         }
       ],
-      "codigoAcceso": "CDM-W6ZV",
+      "codigoAcceso": "GYM-MVD9",
       "historialPagos": [],
       "categoriasExtra": [],
       "historialCategorias": [],
       "historialScore": [],
-      "puntosCategoria": 9,
-      "asistenciasDetalle": {
-        "2026-11-17": {
-          "estado": "presente",
-          "nota": ""
-        },
-        "2026-11-19": {
-          "estado": "presente",
-          "nota": ""
-        },
-        "2026-11-21": {
-          "estado": "presente",
-          "nota": ""
-        }
-      },
-      "lesionesHistorial": [],
-      "snapshotsMensuales": []
+      "puntosCategoria": 9
     },
     {
       "id": 102,
@@ -134,26 +109,54 @@
         "gym": 7.6,
         "tecnico": 8.8,
         "actitud": 8.5,
-        "bonus": 0.1
+        "bonus": 0.8
       },
-      "motivoPuntos": "Asistencia de gol",
+      "motivoPuntos": "Partido Partido Oficial (+0.7)",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
       "pagoEstado": "Al Día",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-17",
-        "2026-11-19",
-        "2026-11-21"
+        "2026-11-18",
+        "2026-11-20",
+        "2026-11-22"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-WNB8",
+      "codigoAcceso": "GYM-YGJL",
       "historialPagos": [],
       "categoriasExtra": [],
       "historialCategorias": [],
-      "historialScore": [],
-      "puntosCategoria": 8.3
+      "historialScore": [
+        {
+          "id": 1795319764442.6526,
+          "fecha": "2026-11-22",
+          "anterior": 8.3,
+          "nuevo": 9,
+          "delta": 0.7,
+          "origen": "Partido Partido Oficial",
+          "motivo": "Resultado 1 - 0"
+        }
+      ],
+      "puntosCategoria": 9,
+      "asistenciasDetalle": {
+        "2026-11-18": {
+          "estado": "presente",
+          "nota": ""
+        },
+        "2026-11-20": {
+          "estado": "presente",
+          "nota": ""
+        },
+        "2026-11-22": {
+          "estado": "presente",
+          "nota": ""
+        }
+      },
+      "lesionesHistorial": [],
+      "snapshotsMensuales": [],
+      "modoVistaRutina": "simple",
+      "puedeCrearRutinas": false
     },
     {
       "id": 103,
@@ -186,30 +189,17 @@
       "pagoEstado": "Al Día",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-18",
-        "2026-11-21"
+        "2026-11-19",
+        "2026-11-22"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-W3CD",
+      "codigoAcceso": "GYM-38DW",
       "historialPagos": [],
       "categoriasExtra": [],
       "historialCategorias": [],
       "historialScore": [],
-      "puntosCategoria": 8.3,
-      "asistenciasDetalle": {
-        "2026-11-18": {
-          "estado": "presente",
-          "nota": ""
-        },
-        "2026-11-21": {
-          "estado": "presente",
-          "nota": ""
-        }
-      },
-      "lesionesHistorial": [],
-      "snapshotsMensuales": [],
-      "modoVistaRutina": "simple"
+      "puntosCategoria": 8.3
     },
     {
       "id": 201,
@@ -242,13 +232,13 @@
       "pagoEstado": "Al Día",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-17",
-        "2026-11-19",
-        "2026-11-21"
+        "2026-11-18",
+        "2026-11-20",
+        "2026-11-22"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-AAJV",
+      "codigoAcceso": "GYM-ZUVA",
       "historialPagos": [],
       "categoriasExtra": [],
       "historialCategorias": [],
@@ -257,8 +247,8 @@
     },
     {
       "id": 301,
-      "deporte": "Futbol",
-      "categoria": "Primera",
+      "deporte": "Gimnasio",
+      "categoria": "General",
       "puesto": "Musculación e Hipertrofia",
       "nombre": "Lucas",
       "apellido": "Peralta",
@@ -273,29 +263,23 @@
       "pierna": "Derecha",
       "brazo": "Derecho",
       "activo": true,
-      "pilares": {
-        "fisico": 7,
-        "gym": 7,
-        "tecnico": 7,
-        "actitud": 7,
-        "bonus": 0
-      },
-      "puntosCategoria": 7,
+      "pilares": null,
+      "puntosCategoria": null,
       "motivoPuntos": "",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
       "pagoEstado": "Al Día",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-17",
-        "2026-11-19",
-        "2026-11-21"
+        "2026-11-18",
+        "2026-11-20",
+        "2026-11-22"
       ],
       "clinico": [],
       "evaluaciones": [
         {
           "id": 51,
-          "fecha": "2026-10-27",
+          "fecha": "2026-10-28",
           "ejercicio": "Press de Banca Plano",
           "tipo": "fuerza_kg",
           "valor": 88,
@@ -305,7 +289,7 @@
         },
         {
           "id": 52,
-          "fecha": "2026-11-21",
+          "fecha": "2026-11-22",
           "ejercicio": "Press de Banca Plano",
           "tipo": "fuerza_kg",
           "valor": 102,
@@ -314,24 +298,27 @@
           "nota": "PR en Banca"
         }
       ],
-      "codigoAcceso": "CDM-DAAH",
+      "codigoAcceso": "GYM-P4XT",
       "historialPagos": [],
       "categoriasExtra": [],
-      "historialCategorias": [
-        {
-          "fecha": "2026-11-21",
-          "de": "Futbol Sub 17",
-          "a": "Futbol Primera",
-          "tipo": "Migración"
+      "historialCategorias": [],
+      "historialScore": [],
+      "asistenciasDetalle": {
+        "2026-11-18": {
+          "estado": "presente",
+          "nota": ""
         },
-        {
-          "fecha": "2026-11-21",
-          "de": "Gimnasio General",
-          "a": "Futbol Sub 17",
-          "tipo": "Migración"
+        "2026-11-20": {
+          "estado": "presente",
+          "nota": ""
+        },
+        "2026-11-22": {
+          "estado": "presente",
+          "nota": ""
         }
-      ],
-      "historialScore": []
+      },
+      "lesionesHistorial": [],
+      "snapshotsMensuales": []
     },
     {
       "id": 302,
@@ -359,16 +346,29 @@
       "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
-        "2026-11-18",
-        "2026-11-20"
+        "2026-11-19",
+        "2026-11-21",
+        "2026-11-22"
       ],
       "clinico": [],
       "evaluaciones": [],
-      "codigoAcceso": "CDM-799N",
+      "codigoAcceso": "GYM-Y6YW",
       "historialPagos": [],
       "categoriasExtra": [],
       "historialCategorias": [],
-      "historialScore": []
+      "historialScore": [],
+      "asistenciasDetalle": {
+        "2026-11-19": {
+          "estado": "presente",
+          "nota": ""
+        },
+        "2026-11-21": {
+          "estado": "presente",
+          "nota": ""
+        }
+      },
+      "lesionesHistorial": [],
+      "snapshotsMensuales": []
     }
   ],
   "rutinas": [
@@ -484,50 +484,84 @@
   ],
   "partidos": [
     {
-      "id": 601,
-      "fecha": "2026-11-20",
+      "id": 1795320358910,
+      "fecha": "2026-11-22",
+      "anio": "2026",
       "deporte": "Futbol",
       "categoria": "Sub 13",
-      "rival": "vs. San Basilio",
-      "resultado": "2 - 1",
+      "rival": "Partido Oficial",
+      "resultado": "1 - 0",
+      "golesLocal": 1,
+      "golesVisita": 0,
       "formacion": "4-3-3",
+      "titulares": [
+        {
+          "id": 101,
+          "num": 9,
+          "sigla": "DC",
+          "nombre": "Gómez, Mateo"
+        }
+      ],
       "eventos": [
         {
-          "id": 1,
-          "minuto": 24,
-          "minutoDisplay": "1T • 24'",
+          "id": 1795320313141.8975,
+          "minuto": 0,
+          "minutoDisplay": "1T • 25'",
+          "jugadorId": 102,
+          "jugadorNombre": "Torres, Bautista",
+          "puestoEnCancha": "#9 DC",
+          "tipo": "⚽ Gol Convertido",
+          "detalle": "Buena pegada",
+          "impactoPuntos": 0.5
+        },
+        {
+          "id": 1795320329832,
+          "minuto": 0,
+          "minutoDisplay": "1T • 0'",
+          "jugadorId": 101,
+          "jugadorNombre": "Gómez, Mateo",
+          "jugadorSaleId": 102,
+          "jugadorSaleNombre": "Torres, Bautista",
+          "puestoEnCancha": "#9 DC",
+          "tipo": "🔄 Cambio / Sustitución",
+          "detalle": "Entra Gómez por Torres (Cansancio / Fatiga)",
+          "impactoPuntos": 0
+        },
+        {
+          "id": 1795320355421.9563,
+          "minuto": 0,
+          "minutoDisplay": "1T • 36'",
           "jugadorId": 101,
           "jugadorNombre": "Gómez, Mateo",
           "puestoEnCancha": "#9 DC",
-          "tipo": "⚽ Gol Convertido",
-          "detalle": "Remate cruzado",
-          "impactoPuntos": 0.3
+          "tipo": "🥅 Remate al Arco",
+          "detalle": "Muy cruzado y afuera",
+          "impactoPuntos": 0.2
         }
       ],
-      "conclusion": "Victoria 2-1 con gran partido de Mateo Gómez.",
+      "conclusion": "vs Partido Oficial (1 - 0): 3 registros (2 anotaciones, 0 defensas, 1 cambios).",
       "resumenJugadores": [
         {
           "id": 101,
           "nombre": "Gómez, Mateo",
           "puesto": "#9 DC",
           "eventos": 1,
-          "puntosSugeridos": 0.3
+          "puntosSugeridos": 0.2
+        },
+        {
+          "id": 102,
+          "nombre": "Torres, Bautista",
+          "puesto": "#9 DC",
+          "eventos": 1,
+          "puntosSugeridos": 0.5
         }
       ],
-      "puntosAplicadosAlRanking": true
+      "puntosAplicadosAlRanking": false
     }
   ],
   "alineaciones": {
     "Futbol_Sub 13_4-3-3": {
-      "7": 102,
       "9": 101
-    },
-    "Futbol_Sub 15_4-3-3": {},
-    "Futbol_Sub 17_4-3-3": {},
-    "Futbol_Reserva_4-3-3": {},
-    "Futbol_Primera_4-3-3": {},
-    "Hockey_Sub 13_3-4-3": {
-      "9": 201
     }
   },
   "microciclos": {
@@ -1094,7 +1128,7 @@
   "clubes": {
     "cdm_adelia_maria_principal": {
       "claveClub": "cdm_adelia_maria_principal",
-      "ultimaActualizacionISO": "2026-11-22T03:05:48.169Z",
+      "ultimaActualizacionISO": "2026-11-22T04:11:10.014Z",
       "personas": [
         {
           "id": 101,
@@ -1127,33 +1161,24 @@
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-17",
-            "2026-11-19",
-            "2026-11-21"
+            "2026-11-18",
+            "2026-11-20",
+            "2026-11-22"
           ],
           "clinico": [
             {
               "id": 1,
-              "fecha": "2026-11-21",
+              "fecha": "2026-11-22",
               "peso": 54,
               "rpe": 6,
               "sueno": 5,
               "dolor": "Sin molestias"
-            },
-            {
-              "id": 1795316748158,
-              "fecha": "2026-11-22",
-              "peso": 54,
-              "altura": 162,
-              "sueno": 4,
-              "rpe": 6,
-              "dolor": "Check-in: Bien para entrenar"
             }
           ],
           "evaluaciones": [
             {
               "id": 11,
-              "fecha": "2026-10-27",
+              "fecha": "2026-10-28",
               "ejercicio": "Sentadilla Trasera con Barra",
               "tipo": "fuerza_kg",
               "valor": 65,
@@ -1163,7 +1188,7 @@
             },
             {
               "id": 12,
-              "fecha": "2026-11-09",
+              "fecha": "2026-11-10",
               "ejercicio": "Sentadilla Trasera con Barra",
               "tipo": "fuerza_kg",
               "valor": 72,
@@ -1173,7 +1198,7 @@
             },
             {
               "id": 13,
-              "fecha": "2026-11-21",
+              "fecha": "2026-11-22",
               "ejercicio": "Sentadilla Trasera con Barra",
               "tipo": "fuerza_kg",
               "valor": 80,
@@ -1182,28 +1207,12 @@
               "nota": "Récord"
             }
           ],
-          "codigoAcceso": "CDM-W6ZV",
+          "codigoAcceso": "GYM-MVD9",
           "historialPagos": [],
           "categoriasExtra": [],
           "historialCategorias": [],
           "historialScore": [],
-          "puntosCategoria": 9,
-          "asistenciasDetalle": {
-            "2026-11-17": {
-              "estado": "presente",
-              "nota": ""
-            },
-            "2026-11-19": {
-              "estado": "presente",
-              "nota": ""
-            },
-            "2026-11-21": {
-              "estado": "presente",
-              "nota": ""
-            }
-          },
-          "lesionesHistorial": [],
-          "snapshotsMensuales": []
+          "puntosCategoria": 9
         },
         {
           "id": 102,
@@ -1228,26 +1237,54 @@
             "gym": 7.6,
             "tecnico": 8.8,
             "actitud": 8.5,
-            "bonus": 0.1
+            "bonus": 0.8
           },
-          "motivoPuntos": "Asistencia de gol",
+          "motivoPuntos": "Partido Partido Oficial (+0.7)",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-17",
-            "2026-11-19",
-            "2026-11-21"
+            "2026-11-18",
+            "2026-11-20",
+            "2026-11-22"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-WNB8",
+          "codigoAcceso": "GYM-YGJL",
           "historialPagos": [],
           "categoriasExtra": [],
           "historialCategorias": [],
-          "historialScore": [],
-          "puntosCategoria": 8.3
+          "historialScore": [
+            {
+              "id": 1795319764442.6526,
+              "fecha": "2026-11-22",
+              "anterior": 8.3,
+              "nuevo": 9,
+              "delta": 0.7,
+              "origen": "Partido Partido Oficial",
+              "motivo": "Resultado 1 - 0"
+            }
+          ],
+          "puntosCategoria": 9,
+          "asistenciasDetalle": {
+            "2026-11-18": {
+              "estado": "presente",
+              "nota": ""
+            },
+            "2026-11-20": {
+              "estado": "presente",
+              "nota": ""
+            },
+            "2026-11-22": {
+              "estado": "presente",
+              "nota": ""
+            }
+          },
+          "lesionesHistorial": [],
+          "snapshotsMensuales": [],
+          "modoVistaRutina": "simple",
+          "puedeCrearRutinas": false
         },
         {
           "id": 103,
@@ -1280,30 +1317,17 @@
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-18",
-            "2026-11-21"
+            "2026-11-19",
+            "2026-11-22"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-W3CD",
+          "codigoAcceso": "GYM-38DW",
           "historialPagos": [],
           "categoriasExtra": [],
           "historialCategorias": [],
           "historialScore": [],
-          "puntosCategoria": 8.3,
-          "asistenciasDetalle": {
-            "2026-11-18": {
-              "estado": "presente",
-              "nota": ""
-            },
-            "2026-11-21": {
-              "estado": "presente",
-              "nota": ""
-            }
-          },
-          "lesionesHistorial": [],
-          "snapshotsMensuales": [],
-          "modoVistaRutina": "simple"
+          "puntosCategoria": 8.3
         },
         {
           "id": 201,
@@ -1336,13 +1360,13 @@
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-17",
-            "2026-11-19",
-            "2026-11-21"
+            "2026-11-18",
+            "2026-11-20",
+            "2026-11-22"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-AAJV",
+          "codigoAcceso": "GYM-ZUVA",
           "historialPagos": [],
           "categoriasExtra": [],
           "historialCategorias": [],
@@ -1351,8 +1375,8 @@
         },
         {
           "id": 301,
-          "deporte": "Futbol",
-          "categoria": "Primera",
+          "deporte": "Gimnasio",
+          "categoria": "General",
           "puesto": "Musculación e Hipertrofia",
           "nombre": "Lucas",
           "apellido": "Peralta",
@@ -1367,29 +1391,23 @@
           "pierna": "Derecha",
           "brazo": "Derecho",
           "activo": true,
-          "pilares": {
-            "fisico": 7,
-            "gym": 7,
-            "tecnico": 7,
-            "actitud": 7,
-            "bonus": 0
-          },
-          "puntosCategoria": 7,
+          "pilares": null,
+          "puntosCategoria": null,
           "motivoPuntos": "",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-17",
-            "2026-11-19",
-            "2026-11-21"
+            "2026-11-18",
+            "2026-11-20",
+            "2026-11-22"
           ],
           "clinico": [],
           "evaluaciones": [
             {
               "id": 51,
-              "fecha": "2026-10-27",
+              "fecha": "2026-10-28",
               "ejercicio": "Press de Banca Plano",
               "tipo": "fuerza_kg",
               "valor": 88,
@@ -1399,7 +1417,7 @@
             },
             {
               "id": 52,
-              "fecha": "2026-11-21",
+              "fecha": "2026-11-22",
               "ejercicio": "Press de Banca Plano",
               "tipo": "fuerza_kg",
               "valor": 102,
@@ -1408,24 +1426,27 @@
               "nota": "PR en Banca"
             }
           ],
-          "codigoAcceso": "CDM-DAAH",
+          "codigoAcceso": "GYM-P4XT",
           "historialPagos": [],
           "categoriasExtra": [],
-          "historialCategorias": [
-            {
-              "fecha": "2026-11-21",
-              "de": "Futbol Sub 17",
-              "a": "Futbol Primera",
-              "tipo": "Migración"
+          "historialCategorias": [],
+          "historialScore": [],
+          "asistenciasDetalle": {
+            "2026-11-18": {
+              "estado": "presente",
+              "nota": ""
             },
-            {
-              "fecha": "2026-11-21",
-              "de": "Gimnasio General",
-              "a": "Futbol Sub 17",
-              "tipo": "Migración"
+            "2026-11-20": {
+              "estado": "presente",
+              "nota": ""
+            },
+            "2026-11-22": {
+              "estado": "presente",
+              "nota": ""
             }
-          ],
-          "historialScore": []
+          },
+          "lesionesHistorial": [],
+          "snapshotsMensuales": []
         },
         {
           "id": 302,
@@ -1453,16 +1474,29 @@
           "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-18",
-            "2026-11-20"
+            "2026-11-19",
+            "2026-11-21",
+            "2026-11-22"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "CDM-799N",
+          "codigoAcceso": "GYM-Y6YW",
           "historialPagos": [],
           "categoriasExtra": [],
           "historialCategorias": [],
-          "historialScore": []
+          "historialScore": [],
+          "asistenciasDetalle": {
+            "2026-11-19": {
+              "estado": "presente",
+              "nota": ""
+            },
+            "2026-11-21": {
+              "estado": "presente",
+              "nota": ""
+            }
+          },
+          "lesionesHistorial": [],
+          "snapshotsMensuales": []
         }
       ],
       "rutinas": [
@@ -1578,50 +1612,84 @@
       ],
       "partidos": [
         {
-          "id": 601,
-          "fecha": "2026-11-20",
+          "id": 1795320358910,
+          "fecha": "2026-11-22",
+          "anio": "2026",
           "deporte": "Futbol",
           "categoria": "Sub 13",
-          "rival": "vs. San Basilio",
-          "resultado": "2 - 1",
+          "rival": "Partido Oficial",
+          "resultado": "1 - 0",
+          "golesLocal": 1,
+          "golesVisita": 0,
           "formacion": "4-3-3",
+          "titulares": [
+            {
+              "id": 101,
+              "num": 9,
+              "sigla": "DC",
+              "nombre": "Gómez, Mateo"
+            }
+          ],
           "eventos": [
             {
-              "id": 1,
-              "minuto": 24,
-              "minutoDisplay": "1T • 24'",
+              "id": 1795320313141.8975,
+              "minuto": 0,
+              "minutoDisplay": "1T • 25'",
+              "jugadorId": 102,
+              "jugadorNombre": "Torres, Bautista",
+              "puestoEnCancha": "#9 DC",
+              "tipo": "⚽ Gol Convertido",
+              "detalle": "Buena pegada",
+              "impactoPuntos": 0.5
+            },
+            {
+              "id": 1795320329832,
+              "minuto": 0,
+              "minutoDisplay": "1T • 0'",
+              "jugadorId": 101,
+              "jugadorNombre": "Gómez, Mateo",
+              "jugadorSaleId": 102,
+              "jugadorSaleNombre": "Torres, Bautista",
+              "puestoEnCancha": "#9 DC",
+              "tipo": "🔄 Cambio / Sustitución",
+              "detalle": "Entra Gómez por Torres (Cansancio / Fatiga)",
+              "impactoPuntos": 0
+            },
+            {
+              "id": 1795320355421.9563,
+              "minuto": 0,
+              "minutoDisplay": "1T • 36'",
               "jugadorId": 101,
               "jugadorNombre": "Gómez, Mateo",
               "puestoEnCancha": "#9 DC",
-              "tipo": "⚽ Gol Convertido",
-              "detalle": "Remate cruzado",
-              "impactoPuntos": 0.3
+              "tipo": "🥅 Remate al Arco",
+              "detalle": "Muy cruzado y afuera",
+              "impactoPuntos": 0.2
             }
           ],
-          "conclusion": "Victoria 2-1 con gran partido de Mateo Gómez.",
+          "conclusion": "vs Partido Oficial (1 - 0): 3 registros (2 anotaciones, 0 defensas, 1 cambios).",
           "resumenJugadores": [
             {
               "id": 101,
               "nombre": "Gómez, Mateo",
               "puesto": "#9 DC",
               "eventos": 1,
-              "puntosSugeridos": 0.3
+              "puntosSugeridos": 0.2
+            },
+            {
+              "id": 102,
+              "nombre": "Torres, Bautista",
+              "puesto": "#9 DC",
+              "eventos": 1,
+              "puntosSugeridos": 0.5
             }
           ],
-          "puntosAplicadosAlRanking": true
+          "puntosAplicadosAlRanking": false
         }
       ],
       "alineaciones": {
         "Futbol_Sub 13_4-3-3": {
-          "7": 102,
           "9": 101
-        },
-        "Futbol_Sub 15_4-3-3": {},
-        "Futbol_Sub 17_4-3-3": {},
-        "Futbol_Reserva_4-3-3": {},
-        "Futbol_Primera_4-3-3": {},
-        "Hockey_Sub 13_3-4-3": {
-          "9": 201
         }
       },
       "microciclos": {
@@ -2188,7 +2256,7 @@
     },
     "gimasio_426": {
       "claveClub": "gimasio_426",
-      "ultimaActualizacionISO": "2026-11-17T00:19:33.963Z",
+      "ultimaActualizacionISO": "2026-11-22T04:13:27.760Z",
       "personas": [
         {
           "id": 101,
@@ -2200,6 +2268,8 @@
           "dni": "48111222",
           "whatsapp": "5493584112233",
           "edad": 13,
+          "fechaNacimiento": "2013-04-12",
+          "anioNacimiento": 2013,
           "sangre": "0+",
           "peso": 54,
           "altura": 162,
@@ -2213,20 +2283,20 @@
             "actitud": 9.2,
             "bonus": 0.3
           },
-          "motivoPuntos": "Figura vs. San Basilio (+0.3 bonus)",
+          "motivoPuntos": "Figura vs. San Basilio",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-10",
-            "2026-11-12",
-            "2026-11-14"
+            "2026-11-18",
+            "2026-11-20",
+            "2026-11-22"
           ],
           "clinico": [
             {
               "id": 1,
-              "fecha": "2026-11-14",
+              "fecha": "2026-11-22",
               "peso": 54,
               "rpe": 6,
               "sueno": 5,
@@ -2236,37 +2306,40 @@
           "evaluaciones": [
             {
               "id": 11,
-              "fecha": "2026-10-20",
-              "ejercicio": "Sentadilla Trasera",
+              "fecha": "2026-10-28",
+              "ejercicio": "Sentadilla Trasera con Barra",
               "tipo": "fuerza_kg",
               "valor": 65,
               "unidad": "kg (1RM)",
-              "detalle": "55 kg × 6 reps (1RM: 65 kg • F.Rel: 1.20x)",
+              "detalle": "55 kg × 6 reps (1RM: 65 kg)",
               "nota": "Base"
             },
             {
               "id": 12,
-              "fecha": "2026-11-02",
-              "ejercicio": "Sentadilla Trasera",
+              "fecha": "2026-11-10",
+              "ejercicio": "Sentadilla Trasera con Barra",
               "tipo": "fuerza_kg",
               "valor": 72,
               "unidad": "kg (1RM)",
-              "detalle": "62 kg × 5 reps (1RM: 72 kg • F.Rel: 1.33x)",
+              "detalle": "62 kg × 5 reps (1RM: 72 kg)",
               "nota": "Progreso"
             },
             {
               "id": 13,
-              "fecha": "2026-11-14",
-              "ejercicio": "Sentadilla Trasera",
+              "fecha": "2026-11-22",
+              "ejercicio": "Sentadilla Trasera con Barra",
               "tipo": "fuerza_kg",
               "valor": 80,
               "unidad": "kg (1RM)",
-              "detalle": "70 kg × 4 reps (1RM: 80 kg • F.Rel: 1.48x)",
+              "detalle": "70 kg × 4 reps (1RM: 80 kg)",
               "nota": "Récord"
             }
           ],
-          "codigoAcceso": "GYM-KPCR",
+          "codigoAcceso": "GYM-H6BZ",
           "historialPagos": [],
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "historialScore": [],
           "puntosCategoria": 9
         },
         {
@@ -2279,6 +2352,8 @@
           "dni": "48222333",
           "whatsapp": "5493584223344",
           "edad": 13,
+          "fechaNacimiento": "2013-08-20",
+          "anioNacimiento": 2013,
           "sangre": "A+",
           "peso": 51,
           "altura": 159,
@@ -2298,29 +2373,34 @@
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-10",
-            "2026-11-12",
-            "2026-11-14"
+            "2026-11-18",
+            "2026-11-20",
+            "2026-11-22"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "GYM-FC3N",
+          "codigoAcceso": "GYM-AXGB",
           "historialPagos": [],
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "historialScore": [],
           "puntosCategoria": 8.3
         },
         {
           "id": 103,
           "deporte": "Futbol",
-          "categoria": "Sub 13",
+          "categoria": "Sub 15",
           "puesto": "Volante Central (#5)",
           "nombre": "Joaquín",
           "apellido": "Ledesma",
-          "dni": "48333444",
+          "dni": "47333444",
           "whatsapp": "5493584334455",
-          "edad": 13,
+          "edad": 15,
+          "fechaNacimiento": "2011-02-10",
+          "anioNacimiento": 2011,
           "sangre": "0+",
-          "peso": 55,
-          "altura": 163,
+          "peso": 60,
+          "altura": 168,
           "pierna": "Derecha",
           "brazo": "Derecho",
           "activo": true,
@@ -2331,138 +2411,23 @@
             "actitud": 9,
             "bonus": 0
           },
-          "motivoPuntos": "Gran despliegue físico",
+          "motivoPuntos": "Gran despliegue",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-11",
-            "2026-11-14"
+            "2026-11-19",
+            "2026-11-22"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "GYM-58QY",
+          "codigoAcceso": "GYM-MTK6",
           "historialPagos": [],
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "historialScore": [],
           "puntosCategoria": 8.3
-        },
-        {
-          "id": 104,
-          "deporte": "Futbol",
-          "categoria": "Sub 13",
-          "puesto": "Arquero (#1)",
-          "nombre": "Santino",
-          "apellido": "Ferreira",
-          "dni": "48444555",
-          "whatsapp": "5493584445566",
-          "edad": 13,
-          "sangre": "B+",
-          "peso": 58,
-          "altura": 168,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": {
-            "fisico": 7.8,
-            "gym": 8,
-            "tecnico": 8.2,
-            "actitud": 8.8,
-            "bonus": 0
-          },
-          "motivoPuntos": "Valla firme",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-10",
-            "2026-11-12",
-            "2026-11-14"
-          ],
-          "clinico": [],
-          "evaluaciones": [],
-          "codigoAcceso": "GYM-ENCT",
-          "historialPagos": [],
-          "puntosCategoria": 8.2
-        },
-        {
-          "id": 105,
-          "deporte": "Futbol",
-          "categoria": "Sub 13",
-          "puesto": "Extremo Derecho (#7)",
-          "nombre": "Thiago",
-          "apellido": "Mansilla",
-          "dni": "48999000",
-          "whatsapp": "5493584771122",
-          "edad": 13,
-          "sangre": "0+",
-          "peso": 52,
-          "altura": 160,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": {
-            "fisico": 8.3,
-            "gym": 7.5,
-            "tecnico": 8.4,
-            "actitud": 8.6,
-            "bonus": 0
-          },
-          "motivoPuntos": "Relevo desequilibrante",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-10",
-            "2026-11-12",
-            "2026-11-14"
-          ],
-          "clinico": [],
-          "evaluaciones": [],
-          "codigoAcceso": "GYM-TFM2",
-          "historialPagos": [],
-          "puntosCategoria": 8.2
-        },
-        {
-          "id": 106,
-          "deporte": "Futbol",
-          "categoria": "Primera",
-          "puesto": "Marcador Central (#2)",
-          "nombre": "Facundo",
-          "apellido": "Quiroga",
-          "dni": "36999888",
-          "whatsapp": "5493584334455",
-          "edad": 25,
-          "sangre": "0-",
-          "peso": 81,
-          "altura": 184,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": {
-            "fisico": 9.1,
-            "gym": 9.2,
-            "tecnico": 8.5,
-            "actitud": 9.5,
-            "bonus": 0.3
-          },
-          "motivoPuntos": "Capitán Primera División",
-          "frecuenciaSemanal": 4,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-10",
-            "2026-11-11",
-            "2026-11-13",
-            "2026-11-14"
-          ],
-          "clinico": [],
-          "evaluaciones": [],
-          "codigoAcceso": "GYM-NQZL",
-          "historialPagos": [],
-          "puntosCategoria": 9.4
         },
         {
           "id": 201,
@@ -2474,6 +2439,8 @@
           "dni": "48555666",
           "whatsapp": "5493584556677",
           "edad": 13,
+          "fechaNacimiento": "2013-05-14",
+          "anioNacimiento": 2013,
           "sangre": "B+",
           "peso": 49,
           "altura": 158,
@@ -2493,93 +2460,18 @@
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-10",
-            "2026-11-12",
-            "2026-11-14"
+            "2026-11-18",
+            "2026-11-20",
+            "2026-11-22"
           ],
           "clinico": [],
           "evaluaciones": [],
-          "codigoAcceso": "GYM-KLFU",
+          "codigoAcceso": "GYM-T7CU",
           "historialPagos": [],
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "historialScore": [],
           "puntosCategoria": 8.9
-        },
-        {
-          "id": 202,
-          "deporte": "Hockey",
-          "categoria": "Sub 13",
-          "puesto": "Cinco / Volante Central (#5)",
-          "nombre": "Martina",
-          "apellido": "Sosa",
-          "dni": "48666777",
-          "whatsapp": "5493584667788",
-          "edad": 13,
-          "sangre": "0+",
-          "peso": 50,
-          "altura": 160,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": {
-            "fisico": 8.5,
-            "gym": 7.8,
-            "tecnico": 8.4,
-            "actitud": 9,
-            "bonus": 0.1
-          },
-          "motivoPuntos": "Distribución y quites",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-10",
-            "2026-11-12",
-            "2026-11-14"
-          ],
-          "clinico": [],
-          "evaluaciones": [],
-          "codigoAcceso": "GYM-WZHH",
-          "historialPagos": [],
-          "puntosCategoria": 8.5
-        },
-        {
-          "id": 203,
-          "deporte": "Hockey",
-          "categoria": "Sub 13",
-          "puesto": "Líbero / Cierre (#2)",
-          "nombre": "Catalina",
-          "apellido": "Moyano",
-          "dni": "48777888",
-          "whatsapp": "5493584778899",
-          "edad": 13,
-          "sangre": "A+",
-          "peso": 52,
-          "altura": 162,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": {
-            "fisico": 8.2,
-            "gym": 8.4,
-            "tecnico": 8.6,
-            "actitud": 8.8,
-            "bonus": 0
-          },
-          "motivoPuntos": "Arrastrada en córner corto",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-10",
-            "2026-11-12",
-            "2026-11-14"
-          ],
-          "clinico": [],
-          "evaluaciones": [],
-          "codigoAcceso": "GYM-YQ7E",
-          "historialPagos": [],
-          "puntosCategoria": 8.5
         },
         {
           "id": 301,
@@ -2591,6 +2483,8 @@
           "dni": "39111444",
           "whatsapp": "5493584889900",
           "edad": 26,
+          "fechaNacimiento": "2000-09-03",
+          "anioNacimiento": 2000,
           "sangre": "0+",
           "peso": 78,
           "altura": 176,
@@ -2605,45 +2499,38 @@
           "pagoEstado": "Al Día",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-10",
-            "2026-11-12",
-            "2026-11-14"
+            "2026-11-18",
+            "2026-11-20",
+            "2026-11-22"
           ],
           "clinico": [],
           "evaluaciones": [
             {
               "id": 51,
-              "fecha": "2026-10-20",
+              "fecha": "2026-10-28",
               "ejercicio": "Press de Banca Plano",
               "tipo": "fuerza_kg",
               "valor": 88,
               "unidad": "kg (1RM)",
-              "detalle": "78 kg × 4 reps (1RM: 88 kg • F.Rel: 1.13x)",
+              "detalle": "78 kg × 4 reps (1RM: 88 kg)",
               "nota": ""
             },
             {
               "id": 52,
-              "fecha": "2026-11-14",
+              "fecha": "2026-11-22",
               "ejercicio": "Press de Banca Plano",
               "tipo": "fuerza_kg",
               "valor": 102,
               "unidad": "kg (1RM)",
-              "detalle": "88 kg × 5 reps (1RM: 102 kg • F.Rel: 1.31x)",
+              "detalle": "88 kg × 5 reps (1RM: 102 kg)",
               "nota": "PR en Banca"
-            },
-            {
-              "id": 53,
-              "fecha": "2026-11-14",
-              "ejercicio": "Sentadilla Trasera con Barra",
-              "tipo": "fuerza_kg",
-              "valor": 130,
-              "unidad": "kg (1RM)",
-              "detalle": "115 kg × 4 reps (1RM: 130 kg • F.Rel: 1.67x)",
-              "nota": "Excelente profundidad"
             }
           ],
-          "codigoAcceso": "GYM-A9Q2",
-          "historialPagos": []
+          "codigoAcceso": "GYM-MM66",
+          "historialPagos": [],
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "historialScore": []
         },
         {
           "id": 302,
@@ -2655,6 +2542,8 @@
           "dni": "41222555",
           "whatsapp": "5493584990011",
           "edad": 23,
+          "fechaNacimiento": "2003-11-18",
+          "anioNacimiento": 2003,
           "sangre": "A+",
           "peso": 84,
           "altura": 179,
@@ -2669,76 +2558,16 @@
           "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
-            "2026-11-11",
-            "2026-11-13"
+            "2026-11-19",
+            "2026-11-21"
           ],
           "clinico": [],
-          "evaluaciones": [
-            {
-              "id": 54,
-              "fecha": "2026-11-14",
-              "ejercicio": "Peso Muerto Rumano",
-              "tipo": "fuerza_kg",
-              "valor": 95,
-              "unidad": "kg (1RM)",
-              "detalle": "80 kg × 6 reps (1RM: 95 kg • F.Rel: 1.13x)",
-              "nota": ""
-            }
-          ],
-          "codigoAcceso": "GYM-AFEU",
-          "historialPagos": [
-            {
-              "id": 1794696687598,
-              "fecha": "2026-11-14",
-              "monto": 25000,
-              "medio": "Transferencia"
-            }
-          ],
-          "ultimoPagoFecha": "2026-11-14"
-        },
-        {
-          "id": 303,
-          "deporte": "Gimnasio",
-          "categoria": "General",
-          "puesto": "Fuerza y Potencia",
-          "nombre": "Sofía",
-          "apellido": "Navarro",
-          "dni": "42888999",
-          "whatsapp": "5493584778800",
-          "edad": 24,
-          "sangre": "0+",
-          "peso": 60,
-          "altura": 165,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": null,
-          "puntosCategoria": null,
-          "motivoPuntos": "",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-10",
-            "2026-11-12",
-            "2026-11-14"
-          ],
-          "clinico": [],
-          "evaluaciones": [
-            {
-              "id": 55,
-              "fecha": "2026-11-14",
-              "ejercicio": "Hip Thrust con Barra",
-              "tipo": "fuerza_kg",
-              "valor": 125,
-              "unidad": "kg (1RM)",
-              "detalle": "105 kg × 6 reps (1RM: 125 kg • F.Rel: 2.08x)",
-              "nota": "Récord Femenino Gym"
-            }
-          ],
-          "codigoAcceso": "GYM-9YUG",
-          "historialPagos": []
+          "evaluaciones": [],
+          "codigoAcceso": "GYM-55BG",
+          "historialPagos": [],
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "historialScore": []
         }
       ],
       "rutinas": [
@@ -2855,7 +2684,7 @@
       "partidos": [
         {
           "id": 601,
-          "fecha": "2026-11-13",
+          "fecha": "2026-11-21",
           "deporte": "Futbol",
           "categoria": "Sub 13",
           "rival": "vs. San Basilio",
@@ -2874,7 +2703,7 @@
               "impactoPuntos": 0.3
             }
           ],
-          "conclusion": "Resumen vs San Basilio (2 - 1): Se registraron 1 intervenciones con 0 modificaciones tácticas (1 goles, 0 recuperaciones, 0 pérdidas). Destacados: Gómez, Mateo (#9 DC: +0.3).",
+          "conclusion": "Victoria 2-1 con gran partido de Mateo Gómez.",
           "resumenJugadores": [
             {
               "id": 101,
@@ -2889,15 +2718,8 @@
       ],
       "alineaciones": {
         "Futbol_Sub 13_4-3-3": {
-          "0": 104,
-          "6": 103,
           "7": 102,
           "9": 101
-        },
-        "Hockey_Sub 13_3-4-3": {
-          "2": 203,
-          "5": 202,
-          "8": 201
         }
       },
       "microciclos": {},
@@ -3110,23 +2932,62 @@
           "tipo": "resistencia_yoyo"
         }
       ],
+      "consultorio": {
+        "pacientes": [],
+        "turnos": [],
+        "mutuales": [],
+        "profesionales": [],
+        "sesiones": []
+      },
       "licenciaConfig": {
         "claveClub": "gimasio_426",
         "nombreEntidad": "GIMASIO",
         "subtituloEntidad": "Adelia María",
         "siglaCodigo": "GYM",
-        "logoUrl": "/img/logo.png",
+        "logoUrl": "",
         "planActivo": "solo_gym",
         "modulos": {
           "futbol": false,
           "hockey": false,
-          "gym": true
+          "gym": true,
+          "consultorio": false
         },
         "adminUsuario": "gym",
         "adminClave": "GYM2026",
         "estadoServicio": "activo",
         "deportesExtra": [],
-        "bloquearCobranza": false
+        "bloquearCobranza": false,
+        "profesionesHabilitadas": [],
+        "modoComplejidad": "simple",
+        "funciones": {
+          "salud": {
+            "agenda": true,
+            "mutuales": true,
+            "genograma": true,
+            "evolucion": true,
+            "eva": true,
+            "portalEstudios": true,
+            "equipo": true,
+            "loteMutuales": true,
+            "consentimiento": true,
+            "mapaCorporal": true
+          },
+          "deporte": {
+            "cobranza": true,
+            "rutinasVideos": true,
+            "evaluaciones1RM": true,
+            "partidosPizarra": true,
+            "ranking": true,
+            "planSemanal": true,
+            "aumentoMasivo": true,
+            "totemYCupos": true,
+            "emmacYEstadisticas": true
+          },
+          "general": {
+            "notasRapidas": true,
+            "cierreCaja": true
+          }
+        }
       }
     },
     "lic_alina_caudana_425": {

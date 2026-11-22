@@ -1,15 +1,16 @@
 /**
- * js/deportes-cancha.js — Planteles, Pizarra Multi-Deporte, Multimedia Post-Partido,
- * Microciclo Semanal, Lista de Buena Fe y Ranking Oficial (1 a 10)
+ * js/deportes-cancha.js — Planteles, Pizarra Multi-Deporte, Cambios, Multimedia,
+ * Informe Partido a Partido (PDF A4), Tablero Anual de Temporada, Microciclo y Ranking (1 a 10)
+ * Aplica automáticamente a Fútbol, Hockey y todos los Deportes Extra.
  * CDM Pro Suite — Desarrollado por Gonzalo Adanchú
  */
 
 // =========================================================================
-// 1. ESTILOS DE PIZARRA, TABLERO, MICROCICLO Y MULTIMEDIA
+// 1. ESTILOS DE PIZARRA, TABLERO ANUAL, INFORME A4 Y MULTIMEDIA
 // =========================================================================
 
 (function inyectarCSSDeportesCancha() {
-    if (document.getElementById("cdmCssDeportesCancha")) return;
+    document.getElementById("cdmCssDeportesCancha")?.remove();
     const st = document.createElement("style");
     st.id = "cdmCssDeportesCancha";
     st.textContent = `
@@ -40,7 +41,7 @@
             border: 1px solid rgba(255, 255, 255, 0.15);
         }
         .bench-strip {
-            margin-top: 0.85rem;
+            margin-top: 0.95rem;
             background: var(--surface-subtle, #f8fafc);
             border: 1.5px dashed var(--line-celeste, #bae6fd);
             border-radius: 14px;
@@ -62,32 +63,46 @@
             gap: 0.5rem;
             box-shadow: var(--shadow-sm);
         }
+
+        /* Layout amplio: Cancha izquierda + Minuto a Minuto ancho derecha */
+        #dep-sec-partido .split-view {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1.12fr) minmax(360px, 1fr) !important;
+            gap: 1.1rem !important;
+            align-items: start !important;
+        }
+        #listaEventosPartidoEnVivo {
+            max-height: 560px !important;
+        }
+
+        /* Modal Cancha: acciones categorizadas y cambio */
         .cancha-quick-actions {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 0.42rem;
-            margin-bottom: 0.7rem;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 0.4rem;
+            margin-bottom: 0.65rem;
         }
         .cancha-quick-btn {
             border: 1.5px solid var(--line-strong, #cbd5e1);
             background: var(--surface-subtle, #f8fafc);
             color: var(--ink-900, #0f172a);
             border-radius: 10px;
-            padding: 0.45rem 0.55rem;
-            font-size: 0.75rem;
+            padding: 0.44rem 0.55rem;
+            font-size: 0.74rem;
             font-weight: 700;
             cursor: pointer;
             text-align: left;
             transition: all 0.14s ease;
         }
-        .cancha-quick-btn:hover {
-            border-color: #0284c7;
-            background: var(--cdm-50, #f0f9ff);
-        }
+        .cancha-quick-btn:hover { border-color: #0284c7; background: var(--cdm-50, #f0f9ff); transform: translateY(-1px); }
+        .cancha-quick-btn.is-pos { border-left: 3.5px solid #10b981; }
+        .cancha-quick-btn.is-neg { border-left: 3.5px solid #ef4444; }
+        .cancha-quick-btn.is-neu { border-left: 3.5px solid #0284c7; }
+
         .cm36-media-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
-            gap: 0.6rem;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 0.65rem;
         }
         .cm36-media-card {
             background: var(--surface-subtle, #f8fafc);
@@ -97,19 +112,132 @@
             display: flex;
             flex-direction: column;
         }
-        .cm36-media-card img {
-            width: 100%;
-            height: 105px;
-            object-fit: cover;
-            display: block;
-            cursor: pointer;
+        .cm36-media-card img { width: 100%; height: 110px; object-fit: cover; display: block; cursor: pointer; }
+
+        /* Tablero Anual de Temporada */
+        .season-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-bottom: 1rem;
+        }
+        .season-kpi {
+            background: var(--surface-subtle, #f8fafc);
+            border: 1.5px solid var(--line, #e2e8f0);
+            border-top: 4px solid #0284c7;
+            border-radius: 14px;
+            padding: 0.68rem 0.78rem;
+            text-align: center;
+        }
+        .season-kpi small { display: block; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--ink-500, #64748b); }
+        .season-kpi strong { display: block; font-size: 1.25rem; font-weight: 900; color: var(--ink-900, #0f172a); margin-top: 2px; }
+
+        .season-leaders-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .season-leader-box {
+            background: var(--surface-subtle, #f8fafc);
+            border: 1px solid var(--line, #e2e8f0);
+            border-radius: 14px;
+            padding: 0.75rem 0.85rem;
+            font-size: 0.78rem;
+        }
+        .season-leader-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.28rem 0;
+            border-bottom: 1px dashed var(--line, #e2e8f0);
+        }
+        .season-leader-row:last-child { border-bottom: none; }
+
+        /* Lista de jugadas y anotaciones del profe en el Historial */
+        .match-hist-events {
+            display: flex;
+            flex-direction: column;
+            gap: 0.32rem;
+            margin: 0.55rem 0;
+            padding: 0.55rem 0.7rem;
+            background: var(--surface-solid, #ffffff);
+            border: 1px solid var(--line, #e2e8f0);
+            border-radius: 11px;
+            font-size: 0.77rem;
+        }
+        .match-hist-ev-row {
+            display: flex;
+            align-items: baseline;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            padding: 0.2rem 0;
+            border-bottom: 1px dashed var(--line, #e2e8f0);
+        }
+        .match-hist-ev-row:last-child { border-bottom: none; }
+        .match-hist-note {
+            color: var(--ink-600, #475569);
+            font-style: italic;
+        }
+
+        /* Impresión PDF A4 para Informe de Partido */
+        #cdmPrintZoneMatchA4 { display: none; }
+        @media print {
+            @page { size: A4; margin: 12mm; }
+            body.cdm-match-printing > *:not(#cdmPrintZoneMatchA4) { display: none !important; }
+            body.cdm-match-printing #cdmPrintZoneMatchA4 {
+                display: block !important; width: 100% !important;
+                background: #ffffff !important; color: #0f172a !important;
+                font-family: 'Poppins', Arial, sans-serif;
+            }
+            body.cdm-match-printing #cdmPrintZoneMatchA4 table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+            body.cdm-match-printing #cdmPrintZoneMatchA4 th,
+            body.cdm-match-printing #cdmPrintZoneMatchA4 td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; }
+            body.cdm-match-printing #cdmPrintZoneMatchA4 th { background: #f1f5f9; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+
+        @media (max-width: 1024px) {
+            #dep-sec-partido .split-view { grid-template-columns: 1fr !important; }
+            .season-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .season-leaders-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 820px) {
             .live-scoreboard { justify-content: center; text-align: center; }
         }
+        @media (max-width: 600px) {
+            .season-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
     `;
     document.head.appendChild(st);
 })();
+
+function escMatchH(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function esEventoDeGolOAnotacion(tipo) {
+    return /gol|try|triple|doble|libre convertido|punto remate|bloqueo punto|saque ace|winner|round ganado|1° puesto|figura perfecta/i.test(String(tipo || ""));
+}
+
+function imprimirInformePartidoA4(htmlInterno) {
+    let z = document.getElementById("cdmPrintZoneMatchA4");
+    if (!z) {
+        z = document.createElement("div");
+        z.id = "cdmPrintZoneMatchA4";
+        document.body.appendChild(z);
+    }
+    z.innerHTML = `<div style="padding:0.5rem;">${htmlInterno}</div>`;
+    document.body.classList.add("cdm-match-printing");
+    const fin = () => {
+        document.body.classList.remove("cdm-match-printing");
+        z.innerHTML = "";
+        window.removeEventListener("afterprint", fin);
+    };
+    window.addEventListener("afterprint", fin);
+    setTimeout(() => window.print(), 90);
+    setTimeout(fin, 3000);
+}
 
 // =========================================================================
 // 2. AUDITORÍA DE SCORE + STORAGE MULTIMEDIA POST-PARTIDO (INDEXEDDB)
@@ -180,7 +308,7 @@ async function leerFotoIDBPartidoCDM(key) {
     } catch { return null; }
 }
 
-function comprimirFotoPartidoCDM(file, maxW = 920) {
+function comprimirFotoPartidoCDM(file, maxW = 960) {
     return new Promise(resolve => {
         const reader = new FileReader();
         reader.onload = ev => {
@@ -191,7 +319,7 @@ function comprimirFotoPartidoCDM(file, maxW = 920) {
                 c.width = Math.round(img.width * scale);
                 c.height = Math.round(img.height * scale);
                 c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-                resolve(c.toDataURL("image/jpeg", 0.75));
+                resolve(c.toDataURL("image/jpeg", 0.78));
             };
             img.onerror = () => resolve(null);
             img.src = ev.target.result;
@@ -201,7 +329,7 @@ function comprimirFotoPartidoCDM(file, maxW = 920) {
 }
 
 // =========================================================================
-// 3. INICIALIZACIÓN DEL MÓDULO DEPORTE (PLAN SEMANAL + ESCALA 1-10)
+// 3. INICIALIZACIÓN DEL MÓDULO DEPORTE (PLAN SEMANAL + TABLERO ANUAL)
 // =========================================================================
 
 function inicializarModuloDeporte() {
@@ -211,7 +339,6 @@ function inicializarModuloDeporte() {
     const tabsBar = document.querySelector(".module-tabs");
     if (!main || !tabsBar) return;
 
-    // Adaptar selector de Ranking a escala 1–10
     const selPilar = document.getElementById("selectPilarRanking");
     if (selPilar) {
         const ic = deportePagina === "Hockey" ? "🏑" : "⚽";
@@ -368,7 +495,6 @@ function alternarEstadoPago(id) {
         if (!Array.isArray(p.historialPagos)) p.historialPagos = [];
         p.historialPagos.push({ id: Date.now(), fecha: p.ultimoPagoFecha, monto: p.montoCuota, medio: medio.trim() });
 
-        // Registrar también en el Libro Mayor si finanzas.js está cargado
         if (typeof registrarAsientoCuotaEnLibroMayor === "function") {
             registrarAsientoCuotaEnLibroMayor(p, p.montoCuota, medio.trim(), p.ultimoPagoFecha);
         }
@@ -537,7 +663,7 @@ function renderizarPaginaDeporte() {
 }
 
 // =========================================================================
-// 5. PIZARRA TÁCTICA UNIFICADA MULTI-DEPORTE (SIN PARCHES)
+// 5. PIZARRA TÁCTICA UNIFICADA MULTI-DEPORTE (MOTIVOS AMPLIADOS + CAMBIOS)
 // =========================================================================
 
 const FORMACIONES_FUTBOL = {
@@ -646,13 +772,14 @@ const ESCENARIOS_MULTI_DEPORTE = {
         },
         acciones: [
             { tipo: "🥇 1° Puesto Serie (Gol)", imp: 0.5 }, { tipo: "🏊 Marca Personal", imp: 0.3 },
-            { tipo: "⚡ Salida Explosiva", imp: 0.2 }, { tipo: "🔄 Vuelta Rápida", imp: 0.2 }, { tipo: "⚠️ Salida Falsa", imp: -0.2 }
+            { tipo: "⚡ Salida Explosiva", imp: 0.2 }, { tipo: "🔄 Vuelta Rápida", imp: 0.2 },
+            { tipo: "⚠️ Salida Falsa / Descalif.", imp: -0.3 }, { tipo: "🏥 Molestia / Salida Médica", imp: 0 }
         ],
         lineasHTML: `<div class="pool-deck-top"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div><div class="pool-flags-top"></div><div class="pool-lane-lines"></div><div class="pool-flags-bottom"></div>`
     },
     basquet: {
         titulo: "🏀 Cancha de Básquet — Quinteto", clasePitch: "pitch-basquet",
-        periodos: [{ val: "1C", txt: "1° Cuarto" }, { val: "2C", txt: "2° Cuarto" }, { val: "3C", txt: "3° Cuarto" }, { val: "4C", txt: "4° Cuarto" }],
+        periodos: [{ val: "1C", txt: "1° Cuarto" }, { val: "2C", txt: "2° Cuarto" }, { val: "3C", txt: "3° Cuarto" }, { val: "4C", txt: "4° Cuarto" }, { val: "SUP", txt: "Suplementario" }],
         esquemas: {
             "Quinteto (5-Out)": [
                 { num: 4, sigla: "BASE", nombrePuesto: "Base", x: 50, y: 74 }, { num: 7, sigla: "ESC", nombrePuesto: "Escolta", x: 82, y: 58 },
@@ -661,8 +788,11 @@ const ESCENARIOS_MULTI_DEPORTE = {
             ]
         },
         acciones: [
-            { tipo: "🏀 Triple (Gol)", imp: 0.5 }, { tipo: "🏀 Doble (Gol)", imp: 0.3 }, { tipo: "🎯 Asistencia", imp: 0.3 },
-            { tipo: "🛡️ Rebote / Robo (Quite)", imp: 0.2 }, { tipo: "⚠️ Pérdida / Falta", imp: -0.2 }
+            { tipo: "🏀 Triple (Gol +3)", imp: 0.5, pts: 3 }, { tipo: "🏀 Doble (Gol +2)", imp: 0.3, pts: 2 },
+            { tipo: "🎯 Libre Convertido (Gol +1)", imp: 0.2, pts: 1 }, { tipo: "🎯 Asistencia", imp: 0.3 },
+            { tipo: "🛡️ Rebote / Robo (Quite)", imp: 0.2 }, { tipo: "🧱 Tapón / Defensa", imp: 0.3 },
+            { tipo: "⚠️ Pérdida de Balón", imp: -0.2 }, { tipo: "🟨 Falta Personal / Técnica (Tarjeta)", imp: -0.2 },
+            { tipo: "🟥 Expulsión / 5 Faltas (Tarjeta)", imp: -0.5 }, { tipo: "🏥 Lesión / Salida Médica", imp: 0 }
         ],
         lineasHTML: `<div class="pitch-line-half"></div><div class="pitch-circle-center"></div><div class="bball-arc-top"></div><div class="bball-key-top"></div><div class="bball-arc-bottom"></div><div class="bball-key-bottom"></div>`
     },
@@ -677,8 +807,10 @@ const ESCENARIOS_MULTI_DEPORTE = {
             ]
         },
         acciones: [
-            { tipo: "🏐 Punto Remate (Gol)", imp: 0.5 }, { tipo: "🧱 Bloqueo (Gol)", imp: 0.4 }, { tipo: "🚀 Saque Ace (Gol)", imp: 0.4 },
-            { tipo: "🛡️ Recepción / Defensa (Quite)", imp: 0.2 }, { tipo: "🎯 Armado (Asistencia)", imp: 0.2 }, { tipo: "⚠️ Error Saque/Red", imp: -0.2 }
+            { tipo: "🏐 Punto Remate (Gol)", imp: 0.5 }, { tipo: "🧱 Bloqueo Punto (Gol)", imp: 0.4 },
+            { tipo: "🚀 Saque Ace (Gol)", imp: 0.4 }, { tipo: "🎯 Armado Clave (Asistencia)", imp: 0.2 },
+            { tipo: "🛡️ Recepción / Defensa (Quite)", imp: 0.2 }, { tipo: "⚠️ Error Saque / Red", imp: -0.2 },
+            { tipo: "🟨 Tarjeta Amarilla", imp: -0.2 }, { tipo: "🏥 Lesión / Salida Médica", imp: 0 }
         ],
         lineasHTML: `<div class="voley-net-line"><span>RED</span></div><div class="voley-3m-top"></div><div class="voley-3m-bottom"></div>`
     },
@@ -692,8 +824,9 @@ const ESCENARIOS_MULTI_DEPORTE = {
             ]
         },
         acciones: [
-            { tipo: "🎾 Winner / Smash (Gol)", imp: 0.5 }, { tipo: "🚀 Ace (Gol)", imp: 0.4 },
-            { tipo: "🛡️ Defensa / Globo (Quite)", imp: 0.2 }, { tipo: "⚠️ Error No Forzado", imp: -0.2 }
+            { tipo: "🎾 Winner / Smash (Gol)", imp: 0.5 }, { tipo: "🚀 Saque Ace (Gol)", imp: 0.4 },
+            { tipo: "⚡ Bandeja / Víbora", imp: 0.3 }, { tipo: "🛡️ Defensa / Globo (Quite)", imp: 0.2 },
+            { tipo: "⚠️ Error No Forzado", imp: -0.2 }, { tipo: "🏥 Molestia / Pausa Médica", imp: 0 }
         ],
         lineasHTML: `<div class="voley-net-line"><span>RED</span></div><div class="padel-service-top"></div><div class="padel-service-bottom"></div><div class="padel-center-service"></div>`
     },
@@ -709,8 +842,11 @@ const ESCENARIOS_MULTI_DEPORTE = {
             ]
         },
         acciones: [
-            { tipo: "🏉 Try Apoyado (Gol)", imp: 0.5 }, { tipo: "🎯 Conversión / Penal", imp: 0.3 },
-            { tipo: "🛡️ Tackle Clave (Quite)", imp: 0.3 }, { tipo: "⚠️ Penal / Knock-on", imp: -0.2 }
+            { tipo: "🏉 Try Apoyado (Gol +5)", imp: 0.5, pts: 5 }, { tipo: "🎯 Conversión (Gol +2)", imp: 0.3, pts: 2 },
+            { tipo: "🥅 Penal / Drop (Gol +3)", imp: 0.4, pts: 3 }, { tipo: "⚡ Quiebre / Asistencia", imp: 0.3 },
+            { tipo: "🛡️ Tackle Clave (Quite)", imp: 0.3 }, { tipo: "⚠️ Penal / Knock-on", imp: -0.2 },
+            { tipo: "🟨 Tarjeta Amarilla (Sin Bin)", imp: -0.3 }, { tipo: "🟥 Tarjeta Roja", imp: -0.6 },
+            { tipo: "🏥 Lesión / Salida Médica", imp: 0 }
         ],
         lineasHTML: `<div class="pitch-line-half"></div><div class="pitch-line-23m-top"></div><div class="pitch-line-23m-bottom"></div><div class="rugby-try-top"></div><div class="rugby-try-bottom"></div>`
     },
@@ -726,8 +862,10 @@ const ESCENARIOS_MULTI_DEPORTE = {
             ]
         },
         acciones: [
-            { tipo: "🤾 Gol Convertido", imp: 0.5 }, { tipo: "🎯 Asistencia", imp: 0.3 },
-            { tipo: "🧤 Atajada / Bloqueo (Quite)", imp: 0.3 }, { tipo: "🟨 Exclusión 2 min (Tarjeta)", imp: -0.3 }
+            { tipo: "🤾 Gol Convertido", imp: 0.5 }, { tipo: "🎯 Gol de 7 Metros (Penal)", imp: 0.4 },
+            { tipo: "🎯 Asistencia", imp: 0.3 }, { tipo: "🧤 Atajada / Bloqueo (Quite)", imp: 0.3 },
+            { tipo: "⚠️ Pérdida / Pasos", imp: -0.2 }, { tipo: "🟨 Exclusión 2 min (Tarjeta)", imp: -0.3 },
+            { tipo: "🟥 Tarjeta Roja", imp: -0.6 }, { tipo: "🏥 Lesión / Salida Médica", imp: 0 }
         ],
         lineasHTML: `<div class="pitch-line-half"></div><div class="pitch-circle-center"></div><div class="handball-6m-top"></div><div class="handball-9m-top"></div><div class="handball-6m-bottom"></div><div class="handball-9m-bottom"></div>`
     },
@@ -735,7 +873,7 @@ const ESCENARIOS_MULTI_DEPORTE = {
         titulo: "🥊 Ring de Combate", clasePitch: "pitch-boxeo",
         periodos: [{ val: "R1", txt: "Round 1" }, { val: "R2", txt: "Round 2" }, { val: "R3", txt: "Round 3" }],
         esquemas: { "Ring": [{ num: 1, sigla: "AZUL", nombrePuesto: "Rincón Azul", x: 32, y: 68 }, { num: 2, sigla: "ROJO", nombrePuesto: "Rincón Rojo", x: 68, y: 32 }] },
-        acciones: [{ tipo: "🏆 Round Ganado (Gol)", imp: 0.5 }, { tipo: "🥊 Golpe Limpio", imp: 0.3 }, { tipo: "🛡️ Esquive (Quite)", imp: 0.2 }, { tipo: "⚠️ Advertencia", imp: -0.2 }],
+        acciones: [{ tipo: "🏆 Round Ganado (Gol)", imp: 0.5 }, { tipo: "🥊 Golpe Limpio", imp: 0.3 }, { tipo: "🛡️ Esquive (Quite)", imp: 0.2 }, { tipo: "⚠️ Advertencia / Descuento", imp: -0.2 }],
         lineasHTML: `<div class="ring-ropes"></div><div class="ring-center-logo">RING</div>`
     },
     patin: {
@@ -917,6 +1055,7 @@ function renderizarCanchaInteractiva() {
     const coords = obtenerCatalogoFormacionActual();
     const mapa = obtenerMapaAlineacionActual();
     const activos = obtenerPersonasFiltradasDeporte(true);
+    const splitWrap = pitch.closest(".split-view") || pitch.parentNode;
 
     pitch.className = esc ? `tactical-pitch ${esc.clasePitch}` : (deportePagina === "Hockey" ? "tactical-pitch pitch-hockey" : "tactical-pitch");
     if (esc) {
@@ -924,17 +1063,19 @@ function renderizarCanchaInteractiva() {
         if (h3) h3.innerHTML = `${esc.titulo} <span class="cat-active-pill lbl-cat-activa">${categoriaActiva}</span>`;
     }
 
+    // Marcador arriba de .split-view para mantener 2 columnas amplias
     let board = document.getElementById("liveMatchScoreboardBox");
     if (!board) {
         board = document.createElement("div");
         board.id = "liveMatchScoreboardBox";
         board.className = "live-scoreboard";
-        pitch.parentNode.insertBefore(board, pitch);
+        splitWrap.parentNode.insertBefore(board, splitWrap);
     }
 
-    const quites = eventosPartidoActual.filter(e => e.tipo.includes("Quite") || e.tipo.includes("Barrida") || e.tipo.includes("Atajada")).length;
-    const asist = eventosPartidoActual.filter(e => e.tipo.includes("Asistencia") || e.tipo.includes("Córner") || e.tipo.includes("Pase")).length;
-    const tarj = eventosPartidoActual.filter(e => e.tipo.includes("Tarjeta") || e.tipo.includes("Exclusión")).length;
+    const quites = eventosPartidoActual.filter(e => /quite|barrida|atajada|tackle|rebote|bloqueo/i.test(e.tipo)).length;
+    const asist = eventosPartidoActual.filter(e => /asistencia|córner|pase|armado/i.test(e.tipo)).length;
+    const tarj = eventosPartidoActual.filter(e => /tarjeta|exclusión|expulsión/i.test(e.tipo)).length;
+    const cambios = eventosPartidoActual.filter(e => /cambio|sustitución/i.test(e.tipo)).length;
     const club = obtenerLicenciaConfigCDM().siglaCodigo || "CDM";
 
     board.innerHTML = `
@@ -946,8 +1087,8 @@ function renderizarCanchaInteractiva() {
         </div>
         <div style="text-align:center;">
             <span class="badge badge-celeste" style="margin-bottom:4px;">EN VIVO</span>
-            <div style="display:flex; gap:0.55rem; font-size:0.75rem; color:#bae6fd; font-weight:800;">
-                <span>🛡️ Quites: ${quites}</span><span>•</span><span>⚡ Asist/Ataq: ${asist}</span><span>•</span><span>🟨 Tarj: ${tarj}</span>
+            <div style="display:flex; gap:0.55rem; font-size:0.75rem; color:#bae6fd; font-weight:800; flex-wrap:wrap; justify-content:center;">
+                <span>🛡️ Quites: ${quites}</span><span>•</span><span>⚡ Asist: ${asist}</span><span>•</span><span>🔄 Cambios: ${cambios}</span><span>•</span><span>🟨 Tarj: ${tarj}</span>
             </div>
         </div>
         <div class="score-team-box">
@@ -991,18 +1132,19 @@ function renderizarCanchaInteractiva() {
     });
     pitch.innerHTML = html;
 
+    // Banco de Relevos abajo de .split-view a ancho completo
     let bench = document.getElementById("liveBenchStripBox");
     if (!bench) {
         bench = document.createElement("div");
         bench.id = "liveBenchStripBox";
         bench.className = "bench-strip";
-        pitch.parentNode.appendChild(bench);
+        splitWrap.insertAdjacentElement("afterend", bench);
     }
     const suplentes = activos.filter(p => !titularesIds.includes(Number(p.id)));
     bench.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem; flex-wrap:wrap;">
             <strong style="font-size:0.78rem;"><i class="ri-user-shared-line"></i> BANCO DE RELEVOS (${suplentes.length})</strong>
-            <small style="color:var(--ink-500); font-size:0.72rem;">Tocá un puesto en la cancha para hacer un cambio</small>
+            <small style="color:var(--ink-500); font-size:0.72rem;">Tocá un puesto en la cancha para hacer un cambio oficial</small>
         </div>
         <div style="display:flex; gap:0.38rem; flex-wrap:wrap;">
             ${suplentes.length ? suplentes.map(s => `<span class="badge badge-celeste" style="cursor:pointer;" onclick="irAPaginaIndividual(${s.id})">👤 ${s.apellido}, ${s.nombre} (⭐${s.puntosCategoria})</span>`).join("") : `<small style="color:var(--ink-500)">Todos en cancha.</small>`}
@@ -1011,7 +1153,7 @@ function renderizarCanchaInteractiva() {
     renderizarEventosPartidoEnVivo();
 }
 
-// --- MODAL DE PUESTO EN CANCHA SIN CIERRE AUTOMÁTICO (ACUMULA ACCIONES) ---
+// --- MODAL DE PUESTO EN CANCHA MEJORADO (CAMBIO OFICIAL + TODOS LOS MOTIVOS) ---
 const _borradorSlotCancha = {};
 
 function obtenerBorradorCancha(slotIdx) {
@@ -1024,7 +1166,7 @@ function refrescarListaBorradorCancha(slotIdx) {
     if (!box) return;
     const lista = obtenerBorradorCancha(slotIdx);
     if (!lista.length) {
-        box.innerHTML = `<small style="color:var(--ink-500);">Tocá las situaciones que quieras sumar. El modal solo se cierra al apretar <b>Guardar Acciones</b>.</small>`;
+        box.innerHTML = `<small style="color:var(--ink-500);">Tocá las acciones que quieras acumular. El modal solo se cierra al apretar <b>Guardar Acciones</b>.</small>`;
         return;
     }
     box.innerHTML = `
@@ -1032,7 +1174,7 @@ function refrescarListaBorradorCancha(slotIdx) {
         <div style="display:flex; flex-direction:column; gap:0.28rem;">
             ${lista.map((it, idx) => `
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; padding:0.32rem 0.55rem; background:var(--surface-solid); border:1px solid var(--line); border-radius:8px; font-size:0.77rem;">
-                    <span><b>${idx + 1}.</b> ${it.tipo} (${it.impacto >= 0 ? "+" : ""}${it.impacto})${it.detalle ? ` — <i>${it.detalle}</i>` : ""}</span>
+                    <span><b>${idx + 1}.</b> ${escMatchH(it.tipo)} (${it.impacto >= 0 ? "+" : ""}${it.impacto})${it.detalle ? ` — <i>${escMatchH(it.detalle)}</i>` : ""}</span>
                     <button type="button" class="btn btn-danger btn-sm" style="min-height:22px; padding:0 6px;" onclick="quitarPendienteCancha(${slotIdx}, ${idx})">✕</button>
                 </div>
             `).join("")}
@@ -1040,11 +1182,11 @@ function refrescarListaBorradorCancha(slotIdx) {
     `;
 }
 
-function marcarAccionSinCerrarCancha(slotIdx, tipo, impactoDef) {
+function marcarAccionSinCerrarCancha(slotIdx, tipo, impactoDef, ptsMarcador = 0) {
     const minTxt = document.getElementById("evCanchaMinuto")?.value.trim() || `${periodoPartidoActual} • ${minutoPartidoActual}'`;
     const inpDet = document.getElementById("evCanchaDetalle");
     const det = (inpDet?.value || "").trim();
-    obtenerBorradorCancha(slotIdx).push({ minutoDisplay: minTxt, tipo, impacto: impactoDef, detalle: det });
+    obtenerBorradorCancha(slotIdx).push({ minutoDisplay: minTxt, tipo, impacto: impactoDef, pts: ptsMarcador || 0, detalle: det });
     if (inpDet) inpDet.value = "";
     refrescarListaBorradorCancha(slotIdx);
 }
@@ -1066,16 +1208,34 @@ function abrirModalPuestoCancha(slotIdx) {
 
     const acciones = esc ? esc.acciones : (deportePagina === "Hockey"
         ? [
-            { tipo: "🏑 Gol de Jugada", imp: 0.5 }, { tipo: "📐 Gol Córner Corto", imp: 0.5 },
-            { tipo: "🎯 Asistencia", imp: 0.3 }, { tipo: "⚡ Provocó Córner", imp: 0.2 },
-            { tipo: "🛡️ Quite / Barrida", imp: 0.2 }, { tipo: "⚠️ Pérdida de Bocha", imp: -0.2 },
-            { tipo: "🟩 Tarjeta Verde/Amarilla", imp: -0.3 }
+            { tipo: "🏑 Gol de Jugada", imp: 0.5, pts: 1 },
+            { tipo: "📐 Gol Córner Corto", imp: 0.5, pts: 1 },
+            { tipo: "🎯 Gol de Penal", imp: 0.4, pts: 1 },
+            { tipo: "🎯 Asistencia de Gol", imp: 0.3 },
+            { tipo: "⚡ Provocó Córner Corto", imp: 0.2 },
+            { tipo: "🥅 Remate al Arco", imp: 0.2 },
+            { tipo: "🛡️ Quite / Barrida", imp: 0.2 },
+            { tipo: "🧤 Atajada / Cierre", imp: 0.3 },
+            { tipo: "⚠️ Pérdida de Bocha / Falta", imp: -0.2 },
+            { tipo: "🟩 Tarjeta Verde (2 min)", imp: -0.2 },
+            { tipo: "🟨 Tarjeta Amarilla (5/10 min)", imp: -0.4 },
+            { tipo: "🟥 Tarjeta Roja", imp: -0.7 },
+            { tipo: "🏥 Lesión / Salida Médica", imp: 0 }
         ]
         : [
-            { tipo: "⚽ Gol Convertido", imp: 0.5 }, { tipo: "🎯 Asistencia de Gol", imp: 0.3 },
-            { tipo: "🛡️ Quite / Recuperación", imp: 0.2 }, { tipo: "⚡ Pase Filtrado / Desborde", imp: 0.2 },
-            { tipo: "🧤 Atajada / Cierre", imp: 0.3 }, { tipo: "⚠️ Pérdida / Error", imp: -0.2 },
-            { tipo: "🟨 Tarjeta Amarilla/Roja", imp: -0.3 }
+            { tipo: "⚽ Gol Convertido", imp: 0.5, pts: 1 },
+            { tipo: "🎯 Gol de Penal", imp: 0.4, pts: 1 },
+            { tipo: "🎯 Asistencia de Gol", imp: 0.3 },
+            { tipo: "🥅 Remate al Arco", imp: 0.2 },
+            { tipo: "⚡ Pase Filtrado / Desborde", imp: 0.2 },
+            { tipo: "🚩 Córner / Pelota Parada", imp: 0.1 },
+            { tipo: "🛡️ Quite / Recuperación", imp: 0.2 },
+            { tipo: "🧤 Atajada / Penal Atajado", imp: 0.4 },
+            { tipo: "⚠️ Pérdida / Error Grave", imp: -0.2 },
+            { tipo: "⚠️ Falta Cometida / Recibida", imp: -0.1 },
+            { tipo: "🟨 Tarjeta Amarilla", imp: -0.3 },
+            { tipo: "🟥 Tarjeta Roja", imp: -0.7 },
+            { tipo: "🏥 Lesión / Salida Médica", imp: 0 }
         ]);
 
     const opcJug = `<option value="">-- Dejar puesto libre --</option>` + activos.map(p => {
@@ -1085,46 +1245,61 @@ function abrirModalPuestoCancha(slotIdx) {
 
     const modal = document.getElementById("modalEventoCancha");
     modal.innerHTML = `
-        <div class="modal-window" style="max-width:580px;">
+        <div class="modal-window" style="max-width:650px;">
             <div class="modal-top">
                 <div>
-                    <span class="badge badge-celeste">Puesto #${info.num} • ${info.sigla}</span>
-                    <h3 style="margin-top:3px;">${info.nombrePuesto}</h3>
+                    <span class="badge badge-celeste">Puesto #${info.num} • ${info.sigla} • ${deportePagina}</span>
+                    <h3 style="margin-top:3px;">${info.nombrePuesto}${jAct ? ` — ${jAct.apellido}, ${jAct.nombre}` : ""}</h3>
                 </div>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalEventoCancha').classList.add('hidden')">✕</button>
             </div>
 
-            <div style="background:var(--cdm-50); border:1px solid var(--line-celeste); padding:0.8rem; border-radius:12px; margin-bottom:0.9rem;">
-                <label style="font-size:0.72rem; font-weight:800; display:block; margin-bottom:0.35rem;">👤 1. Ubicar Jugador o Hacer Cambio</label>
-                <div style="display:flex; gap:0.45rem;">
-                    <select id="selectAsignarJugadorSlot" style="flex:1;">${opcJug}</select>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="procesarCambioJugadorCancha()">🔄 Ubicar</button>
+            <!-- 1. UBICAR JUGADOR O REALIZAR CAMBIO OFICIAL (SALE / ENTRA) -->
+            <div style="background:var(--cdm-50); border:1.5px solid var(--line-celeste); padding:0.85rem; border-radius:14px; margin-bottom:0.85rem;">
+                <label style="font-size:0.73rem; font-weight:800; display:block; margin-bottom:0.4rem;">
+                    👤 1. ${jAct ? `Cambio de Jugador (Sale ${jAct.apellido}) o Reubicar` : "Ubicar Jugador Titular en este Puesto"}
+                </label>
+                <div style="display:flex; gap:0.45rem; flex-wrap:wrap; align-items:center;">
+                    <select id="selectAsignarJugadorSlot" style="flex:1; min-width:210px;">${opcJug}</select>
+                    ${jAct ? `
+                        <select id="selectMotivoCambioCancha" style="width:auto; min-width:135px; font-size:0.78rem;">
+                            <option value="Cambio Táctico">📋 Táctico</option>
+                            <option value="Cansancio / Fatiga">🥵 Cansancio</option>
+                            <option value="Lesión / Molestia">🏥 Lesión</option>
+                            <option value="Precaución por Tarjeta">🟨 Por Tarjeta</option>
+                        </select>
+                        <button type="button" class="btn btn-ok btn-sm" onclick="procesarCambioJugadorCancha(true)" title="Reemplaza en cancha y registra el cambio en el acta">🔄 Hacer Cambio</button>
+                    ` : ""}
+                    <button type="button" class="btn btn-primary btn-sm" onclick="procesarCambioJugadorCancha(false)" title="Ubicar sin anotar cambio en el acta">📍 Ubicar</button>
                 </div>
             </div>
 
             ${jAct ? `
                 <form onsubmit="guardarAccionesCanchaModal(event, ${slotIdx})">
                     <div class="grid-2" style="margin-bottom:0.6rem;">
-                        <div class="field"><label>Minuto</label><input type="text" id="evCanchaMinuto" value="${periodoPartidoActual} • ${minutoPartidoActual}'"></div>
-                        <div class="field"><label>Detalle opcional (antes de tocar acción)</label><input type="text" id="evCanchaDetalle" placeholder="Ej: Remate cruzado / Buena marca"></div>
+                        <div class="field"><label>Minuto / Período</label><input type="text" id="evCanchaMinuto" value="${periodoPartidoActual} • ${minutoPartidoActual}'"></div>
+                        <div class="field"><label>Detalle / Nota Táctica (opcional)</label><input type="text" id="evCanchaDetalle" placeholder="Ej: Remate cruzado, buena marca, gol de cabeza..."></div>
                     </div>
 
-                    <label style="font-size:0.72rem; font-weight:800; display:block; margin-bottom:0.35rem;">⚡ 2. Tocá las jugadas de ${jAct.nombre} (acumula sin cerrar):</label>
+                    <label style="font-size:0.73rem; font-weight:800; display:block; margin-bottom:0.4rem;">⚡ 2. Tocá las jugadas de ${jAct.nombre} (acumula varias sin cerrar):</label>
                     <div class="cancha-quick-actions">
-                        ${acciones.map(a => `<button type="button" class="cancha-quick-btn" onclick="marcarAccionSinCerrarCancha(${slotIdx}, '${a.tipo.replace(/'/g, "\\'")}', ${a.imp})">${a.tipo}</button>`).join("")}
+                        ${acciones.map(a => {
+                            const cls = a.imp > 0 ? "is-pos" : a.imp < 0 ? "is-neg" : "is-neu";
+                            return `<button type="button" class="cancha-quick-btn ${cls}" onclick="marcarAccionSinCerrarCancha(${slotIdx}, '${a.tipo.replace(/'/g, "\\'")}', ${a.imp}, ${a.pts || 0})">${a.tipo}</button>`;
+                        }).join("")}
                     </div>
 
                     <div id="boxPendientesCancha" style="margin-bottom:0.8rem; padding:0.65rem; background:var(--surface-subtle); border:1.5px solid var(--line-celeste); border-radius:12px;"></div>
                     <button type="submit" class="btn btn-primary" style="width:100%;">💾 Guardar Acciones y Cerrar</button>
                 </form>
-            ` : `<div class="empty-box" style="padding:1.1rem;">Elegí un jugador arriba y tocá "🔄 Ubicar" para anotarle acciones.</div>`}
+            ` : `<div class="empty-box" style="padding:1.1rem;">Elegí un jugador arriba y tocá "📍 Ubicar" para anotarle acciones o hacer cambios.</div>`}
         </div>
     `;
     modal.classList.remove("hidden");
     if (jAct) refrescarListaBorradorCancha(slotIdx);
 }
 
-function procesarCambioJugadorCancha() {
+function procesarCambioJugadorCancha(registrarEnActa = false) {
     const idVal = document.getElementById("selectAsignarJugadorSlot").value;
     const mapa = obtenerMapaAlineacionActual();
     const idNum = parseInt(idVal, 10);
@@ -1138,17 +1313,22 @@ function procesarCambioJugadorCancha() {
         return;
     }
 
-    if (idAnt && Number(idAnt) !== idNum && minutoPartidoActual > 0) {
+    if (idAnt && Number(idAnt) !== idNum && (registrarEnActa || minutoPartidoActual > 0)) {
         const jE = basePersonas.find(x => Number(x.id) === idNum);
         const jS = basePersonas.find(x => Number(x.id) === Number(idAnt));
         const info = obtenerCatalogoFormacionActual()[slotCanchaSeleccionadoIndex];
+        const mot = document.getElementById("selectMotivoCambioCancha")?.value || "Cambio Táctico";
+        const minTxt = document.getElementById("evCanchaMinuto")?.value.trim() || `${periodoPartidoActual} • ${minutoPartidoActual}'`;
         if (jE && jS) {
             eventosPartidoActual.push({
-                id: Date.now(), minuto: minutoPartidoActual, minutoDisplay: `${periodoPartidoActual} • ${minutoPartidoActual}'`,
-                jugadorId: jE.id, jugadorNombre: `${jE.apellido}, ${jE.nombre}`, puestoEnCancha: `#${info.num} ${info.sigla}`,
-                tipo: "🔄 Cambio / Sustitución", detalle: `Entra por ${jS.apellido}`, impactoPuntos: 0
+                id: Date.now(), minuto: minutoPartidoActual, minutoDisplay: minTxt,
+                jugadorId: jE.id, jugadorNombre: `${jE.apellido}, ${jE.nombre}`,
+                jugadorSaleId: jS.id, jugadorSaleNombre: `${jS.apellido}, ${jS.nombre}`,
+                puestoEnCancha: `#${info.num} ${info.sigla}`,
+                tipo: "🔄 Cambio / Sustitución", detalle: `Entra ${jE.apellido} por ${jS.apellido} (${mot})`, impactoPuntos: 0
             });
             eventosPartidoActual.sort((a, b) => a.minuto - b.minuto);
+            mostrarToast(`🔄 Cambio registrado: Entra ${jE.apellido} por ${jS.apellido}`);
         }
     }
 
@@ -1170,14 +1350,19 @@ function guardarAccionesCanchaModal(e, slotIdx) {
     const minTxt = document.getElementById("evCanchaMinuto")?.value.trim() || `${periodoPartidoActual} • ${minutoPartidoActual}'`;
 
     if (!lista.length && detLibre) {
-        lista.push({ minutoDisplay: minTxt, tipo: "📝 Observación Táctica", impacto: 0, detalle: detLibre });
+        lista.push({ minutoDisplay: minTxt, tipo: "📝 Observación Táctica", impacto: 0, pts: 0, detalle: detLibre });
+    } else if (lista.length && detLibre) {
+        lista.forEach(it => {
+            if (!it.detalle) it.detalle = detLibre;
+        });
     }
     if (!lista.length) return alert("Tocá al menos una jugada o escribí una observación.");
 
     const info = obtenerCatalogoFormacionActual()[slotIdx] || { num: slotIdx + 1, sigla: "POS" };
     lista.forEach(it => {
-        if (String(it.tipo).includes("Gol")) {
-            golesLocalActual++;
+        const sumaPts = it.pts > 0 ? it.pts : (esEventoDeGolOAnotacion(it.tipo) ? 1 : 0);
+        if (sumaPts > 0) {
+            golesLocalActual += sumaPts;
             const inpRes = document.getElementById("matchResultado");
             if (inpRes) inpRes.value = `${golesLocalActual} - ${golesVisitaActual}`;
         }
@@ -1236,47 +1421,74 @@ function renderizarEventosPartidoEnVivo() {
     const barra = `
         <div style="display:flex; gap:0.4rem; margin-bottom:0.7rem; flex-wrap:wrap;">
             <button type="button" class="btn btn-whatsapp btn-sm" style="flex:1;" onclick="enviarFormacionWhatsApp()"><i class="ri-whatsapp-line"></i> Citación WA</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="copiarFormacionPortapapeles()">📋 Copiar 11</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="copiarFormacionPortapapeles()">📋 Copiar</button>
         </div>
     `;
     if (!eventosPartidoActual.length) {
-        cont.innerHTML = barra + `<div class="empty-box">Tocá cualquier círculo de la cancha para ubicar jugadores y anotar jugadas.</div>`;
+        cont.innerHTML = barra + `<div class="empty-box">Tocá cualquier círculo de la cancha para ubicar jugadores, hacer cambios y anotar jugadas.</div>`;
         return;
     }
     cont.innerHTML = barra + eventosPartidoActual.map(ev => `
-        <div style="background:var(--surface-solid); border:1px solid var(--line); border-radius:10px; padding:0.55rem 0.75rem; margin-bottom:0.4rem; font-size:0.8rem; display:flex; justify-content:space-between; align-items:center;">
+        <div style="background:var(--surface-solid); border:1px solid var(--line); border-radius:10px; padding:0.55rem 0.75rem; margin-bottom:0.4rem; font-size:0.8rem; display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
             <div>
-                <span class="badge badge-celeste">${ev.minutoDisplay}</span>
-                <strong style="margin-left:4px;">${ev.jugadorNombre}</strong> • <b>${ev.tipo}</b>
-                <br><small style="color:var(--ink-500)">${ev.detalle}</small>
+                <span class="badge badge-celeste">${escMatchH(ev.minutoDisplay)}</span>
+                <strong style="margin-left:4px;">${escMatchH(ev.jugadorNombre)}</strong> • <b>${escMatchH(ev.tipo)}</b>
+                <br><small style="color:var(--ink-500)">📝 ${escMatchH(ev.detalle)}</small>
             </div>
             <button class="btn btn-danger btn-sm" onclick="eventosPartidoActual=eventosPartidoActual.filter(x=>x.id!==${ev.id}); renderizarCanchaInteractiva();">✕</button>
         </div>
     `).join("");
 }
 
+function parsearMarcadorPartido(m) {
+    if (typeof m.golesLocal === "number" && typeof m.golesVisita === "number") {
+        return { gf: m.golesLocal, gc: m.golesVisita };
+    }
+    const nums = String(m.resultado || "").match(/\d+/g);
+    if (nums && nums.length >= 2) return { gf: parseInt(nums[0], 10), gc: parseInt(nums[1], 10) };
+    return { gf: 0, gc: 0 };
+}
+
 function finalizarYGuardarPartido() {
-    if (!eventosPartidoActual.length) return alert("Anotá al menos una jugada o cambio antes de cerrar el partido.");
+    if (!eventosPartidoActual.length && golesLocalActual === 0 && golesVisitaActual === 0) {
+        return alert("Anotá al menos una jugada, cambio o resultado antes de cerrar el partido.");
+    }
     const rival = document.getElementById("matchRival").value.trim() || "Partido Oficial";
     const resultado = document.getElementById("matchResultado").value.trim() || `${golesLocalActual} - ${golesVisitaActual}`;
+
+    const coords = obtenerCatalogoFormacionActual();
+    const mapaAl = obtenerMapaAlineacionActual();
+    const activos = obtenerPersonasFiltradasDeporte(true);
+    const titulares = [];
+    coords.forEach((pos, idx) => {
+        const j = mapaAl[idx] ? activos.find(x => Number(x.id) === Number(mapaAl[idx])) : null;
+        if (j) titulares.push({ id: j.id, num: pos.num, sigla: pos.sigla, nombre: `${j.apellido}, ${j.nombre}` });
+    });
 
     const mapa = {};
     eventosPartidoActual.forEach(e => {
         if (!mapa[e.jugadorId]) mapa[e.jugadorId] = { id: e.jugadorId, nombre: e.jugadorNombre, puesto: e.puestoEnCancha, eventos: 0, puntosSugeridos: 0 };
-        if (!e.tipo.includes("Sustitución")) {
+        if (!/sustitución|cambio/i.test(e.tipo)) {
             mapa[e.jugadorId].eventos++;
-            mapa[e.jugadorId].puntosSugeridos = Math.round((mapa[e.jugadorId].puntosSugeridos + e.impactoPuntos) * 10) / 10;
+            mapa[e.jugadorId].puntosSugeridos = Math.round((mapa[e.jugadorId].puntosSugeridos + (e.impactoPuntos || 0)) * 10) / 10;
         }
     });
     const resumen = Object.values(mapa);
-    const goles = eventosPartidoActual.filter(e => e.tipo.includes("Gol")).length;
-    const quites = eventosPartidoActual.filter(e => e.tipo.includes("Quite") || e.tipo.includes("Barrida")).length;
-    const conclusion = `vs ${rival} (${resultado}): ${eventosPartidoActual.length} intervenciones (${goles} goles, ${quites} recuperaciones).`;
+    const goles = eventosPartidoActual.filter(e => esEventoDeGolOAnotacion(e.tipo)).length;
+    const quites = eventosPartidoActual.filter(e => /quite|barrida|atajada|tackle|rebote|bloqueo/i.test(e.tipo)).length;
+    const cambios = eventosPartidoActual.filter(e => /cambio|sustitución/i.test(e.tipo)).length;
+    const conclusion = `vs ${rival} (${resultado}): ${eventosPartidoActual.length} registros (${goles} goles/anotaciones, ${quites} defensas, ${cambios} cambios).`;
 
+    const parsed = parsearMarcadorPartido({ resultado });
     const nuevoId = Date.now();
+    const fechaHoy = obtenerHoyISO();
+
     basePartidos.unshift({
-        id: nuevoId, fecha: obtenerHoyISO(), deporte: deportePagina, categoria: categoriaActiva,
-        rival, resultado, formacion: document.getElementById("matchFormacion")?.value || "4-3-3",
+        id: nuevoId, fecha: fechaHoy, anio: fechaHoy.slice(0, 4),
+        deporte: deportePagina, categoria: categoriaActiva,
+        rival, resultado, golesLocal: parsed.gf, golesVisita: parsed.gc,
+        formacion: document.getElementById("matchFormacion")?.value || "4-3-3",
+        titulares,
         eventos: [...eventosPartidoActual], conclusion, resumenJugadores: resumen, puntosAplicadosAlRanking: false
     });
 
@@ -1287,33 +1499,247 @@ function finalizarYGuardarPartido() {
     reiniciarCronometroPartido();
     if (document.getElementById("matchRival")) document.getElementById("matchRival").value = "";
     if (document.getElementById("matchResultado")) document.getElementById("matchResultado").value = "";
-    mostrarToast("🏁 Partido guardado y conectado a la ficha de cada jugador.");
+    mostrarToast("🏁 Partido guardado. Ya podés adjuntar fotos/videos o abrir su Informe Completo.");
     renderizarCanchaInteractiva();
     renderizarHistorialPartidos();
 }
 
+// =========================================================================
+// 6. TABLERO ANUAL DE TEMPORADA + INFORME PARTIDO A PARTIDO (CON ANOTACIONES Y PDF A4)
+// =========================================================================
+
+window.__filtroAnioTemporadaCDM = String(new Date().getFullYear());
+window.__filtroCatTemporadaCDM = "ACTUAL";
+
 function renderizarHistorialPartidos() {
     const cont = document.getElementById("contenedorHistorialPartidos");
     if (!cont) return;
-    const partidosCat = basePartidos.filter(m => m.deporte === deportePagina && m.categoria === categoriaActiva);
-    if (!partidosCat.length) {
-        cont.innerHTML = `<div class="empty-box">Sin partidos registrados en ${categoriaActiva}.</div>`;
-        return;
-    }
-    cont.innerHTML = partidosCat.map(m => `
-        <div style="background:var(--surface-subtle); border:1px solid var(--line); border-radius:14px; padding:1rem; margin-bottom:0.8rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.45rem; margin-bottom:0.5rem;">
-                <strong>📅 ${m.fecha} — ${m.rival} (${m.resultado}) • ${m.formacion}</strong>
-                <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
-                    <button class="btn btn-secondary btn-sm" onclick="abrirModalMediaDesdeCancha(${m.id})">📸 Fotos / Videos</button>
-                    ${m.puntosAplicadosAlRanking ? `<span class="badge badge-ok">✓ Valorado</span>` : `<button class="btn btn-primary btn-sm" onclick="aplicarPuntosPartidoAlRanking(${m.id})">⚖️ Aplicar al Score</button>`}
-                    <button class="btn btn-danger btn-sm" onclick="if(confirm('¿Eliminar partido?')){ basePartidos=basePartidos.filter(x=>x.id!==${m.id}); guardarDatosCDM(); renderizarHistorialPartidos(); }">🗑️</button>
+
+    const todosDep = basePartidos.filter(m => m.deporte === deportePagina);
+    const aniosDisp = [...new Set([String(new Date().getFullYear()), ...todosDep.map(m => String(m.fecha || "").slice(0, 4)).filter(Boolean)])].sort().reverse();
+    const anioSel = window.__filtroAnioTemporadaCDM || String(new Date().getFullYear());
+    const catModo = window.__filtroCatTemporadaCDM || "ACTUAL";
+
+    const partidos = todosDep.filter(m => {
+        if (catModo === "ACTUAL" && m.categoria !== categoriaActiva) return false;
+        if (anioSel !== "TODOS" && !String(m.fecha || "").startsWith(anioSel)) return false;
+        return true;
+    }).sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+
+    let pg = 0, pe = 0, pp = 0, gfTot = 0, gcTot = 0;
+    const mapGoles = {}, mapAsist = {}, mapDef = {};
+
+    partidos.forEach(m => {
+        const { gf, gc } = parsearMarcadorPartido(m);
+        gfTot += gf; gcTot += gc;
+        if (gf > gc) pg++;
+        else if (gf === gc) pe++;
+        else pp++;
+
+        (m.eventos || []).forEach(ev => {
+            const nom = ev.jugadorNombre || "Jugador";
+            if (esEventoDeGolOAnotacion(ev.tipo)) mapGoles[nom] = (mapGoles[nom] || 0) + 1;
+            if (/asistencia|pase|armado/i.test(ev.tipo)) mapAsist[nom] = (mapAsist[nom] || 0) + 1;
+            if (/quite|barrida|atajada|tackle|rebote|bloqueo/i.test(ev.tipo)) mapDef[nom] = (mapDef[nom] || 0) + 1;
+        });
+    });
+
+    const pj = partidos.length;
+    const dif = gfTot - gcTot;
+    const efec = pj > 0 ? Math.round(((pg * 3 + pe) / (pj * 3)) * 100) : 0;
+    const topList = (obj) => Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const allMedia = obtenerMediaPartidosCDM();
+
+    cont.innerHTML = `
+        <!-- TABLERO ANUAL DE TEMPORADA -->
+        <div style="background:var(--surface-solid); border:1.5px solid var(--line-celeste); border-radius:16px; padding:1rem 1.1rem; margin-bottom:1.1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; flex-wrap:wrap; margin-bottom:0.85rem;">
+                <div>
+                    <strong style="font-size:0.95rem;">📊 Balance Anual de Temporada — ${deportePagina} (${catModo === "ACTUAL" ? categoriaActiva : "Todas las Categorías"})</strong>
+                    <small style="display:block; color:var(--ink-500); font-size:0.74rem;">Resultados acumulados, efectividad y líderes del año</small>
+                </div>
+                <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+                    <select style="width:auto; min-height:34px; font-weight:700; font-size:0.78rem;" onchange="window.__filtroAnioTemporadaCDM=this.value; renderizarHistorialPartidos();">
+                        <option value="TODOS" ${anioSel === "TODOS" ? "selected" : ""}>📅 Todos los Años</option>
+                        ${aniosDisp.map(a => `<option value="${a}" ${anioSel === a ? "selected" : ""}>📅 Año ${a}</option>`).join("")}
+                    </select>
+                    <select style="width:auto; min-height:34px; font-weight:700; font-size:0.78rem;" onchange="window.__filtroCatTemporadaCDM=this.value; renderizarHistorialPartidos();">
+                        <option value="ACTUAL" ${catModo === "ACTUAL" ? "selected" : ""}>Solo ${categoriaActiva}</option>
+                        <option value="TODAS" ${catModo === "TODAS" ? "selected" : ""}>Todas las Categorías</option>
+                    </select>
                 </div>
             </div>
-            <p style="font-size:0.82rem; color:var(--ink-700); margin-bottom:0.5rem;">🧠 ${m.conclusion}</p>
-            <div>${(m.resumenJugadores || []).map(rj => `<span class="badge ${rj.puntosSugeridos >= 0 ? "badge-ok" : "badge-warn"}" style="margin:2px;">${rj.nombre}: ${rj.puntosSugeridos >= 0 ? "+" : ""}${rj.puntosSugeridos} pts</span>`).join("")}</div>
+
+            <div class="season-kpi-grid">
+                <div class="season-kpi"><small>Partidos (PJ)</small><strong>${pj}</strong></div>
+                <div class="season-kpi" style="border-top-color:#10b981;"><small>Ganados (PG)</small><strong style="color:#059669;">${pg}</strong></div>
+                <div class="season-kpi" style="border-top-color:#f59e0b;"><small>Empates (PE)</small><strong style="color:#d97706;">${pe}</strong></div>
+                <div class="season-kpi" style="border-top-color:#ef4444;"><small>Perdidos (PP)</small><strong style="color:#dc2626;">${pp}</strong></div>
+                <div class="season-kpi" style="border-top-color:#6366f1;"><small>Tantos (GF / GC)</small><strong>${gfTot} / ${gcTot} <small style="display:inline; font-size:0.75rem;">(${dif >= 0 ? "+" : ""}${dif})</small></strong></div>
+                <div class="season-kpi" style="border-top-color:#0d9488;"><small>Efectividad</small><strong>${efec}%</strong></div>
+            </div>
+
+            ${pj > 0 ? `
+                <div class="season-leaders-grid">
+                    <div class="season-leader-box">
+                        <strong style="display:block; margin-bottom:0.35rem; color:#0284c7;">⚽ Goleadores / Anotadores</strong>
+                        ${topList(mapGoles).length ? topList(mapGoles).map(([n, c], i) => `<div class="season-leader-row"><span>${i + 1}. ${escMatchH(n)}</span><b>${c}</b></div>`).join("") : `<small style="color:var(--ink-500);">Sin registros</small>`}
+                    </div>
+                    <div class="season-leader-box">
+                        <strong style="display:block; margin-bottom:0.35rem; color:#7c3aed;">🎯 Asistencias / Creación</strong>
+                        ${topList(mapAsist).length ? topList(mapAsist).map(([n, c], i) => `<div class="season-leader-row"><span>${i + 1}. ${escMatchH(n)}</span><b>${c}</b></div>`).join("") : `<small style="color:var(--ink-500);">Sin registros</small>`}
+                    </div>
+                    <div class="season-leader-box">
+                        <strong style="display:block; margin-bottom:0.35rem; color:#059669;">🛡️ Quites / Atajadas</strong>
+                        ${topList(mapDef).length ? topList(mapDef).map(([n, c], i) => `<div class="season-leader-row"><span>${i + 1}. ${escMatchH(n)}</span><b>${c}</b></div>`).join("") : `<small style="color:var(--ink-500);">Sin registros</small>`}
+                    </div>
+                </div>
+            ` : ""}
         </div>
-    `).join("");
+
+        <!-- LISTA PARTIDO A PARTIDO (CON JUGADAS Y ANOTACIONES DEL PROFESOR) -->
+        ${partidos.length === 0 ? `<div class="empty-box">Sin partidos registrados para ${deportePagina} (${anioSel === "TODOS" ? "Todos los años" : anioSel}).</div>` :
+        partidos.map(m => {
+            const { gf, gc } = parsearMarcadorPartido(m);
+            const resBadge = gf > gc ? `<span class="badge badge-ok">🏆 VICTORIA</span>` : gf === gc ? `<span class="badge badge-warn">🤝 EMPATE</span>` : `<span class="badge badge-danger">🔴 DERROTA</span>`;
+            const cantMedia = allMedia.filter(it => Number(it.partidoId) === Number(m.id)).length;
+            const evs = Array.isArray(m.eventos) ? m.eventos : [];
+            return `
+                <div style="background:var(--surface-subtle); border:1px solid var(--line); border-left:4px solid ${gf > gc ? "#10b981" : gf === gc ? "#f59e0b" : "#ef4444"}; border-radius:14px; padding:0.95rem 1.05rem; margin-bottom:0.75rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.45rem; margin-bottom:0.45rem;">
+                        <div>
+                            ${resBadge}
+                            <strong style="margin-left:5px;">📅 ${escMatchH(m.fecha)} — ${escMatchH(m.rival)} (${escMatchH(m.resultado)})</strong>
+                            <small style="color:var(--ink-500); margin-left:6px;">${escMatchH(m.categoria)} • ${escMatchH(m.formacion)}</small>
+                        </div>
+                        <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                            <button class="btn btn-primary btn-sm" onclick="abrirInformePartidoCompleto(${m.id})">📋 Informe Completo</button>
+                            <button class="btn btn-secondary btn-sm" onclick="abrirModalMediaDesdeCancha(${m.id})">📸 Media (${cantMedia})</button>
+                            ${m.puntosAplicadosAlRanking ? `<span class="badge badge-ok">✓ Valorado</span>` : `<button class="btn btn-ok btn-sm" onclick="aplicarPuntosPartidoAlRanking(${m.id})">⚖️ Al Score</button>`}
+                            <button class="btn btn-danger btn-sm" onclick="if(confirm('¿Eliminar partido?')){ basePartidos=basePartidos.filter(x=>x.id!==${m.id}); guardarDatosCDM(); renderizarHistorialPartidos(); }">🗑️</button>
+                        </div>
+                    </div>
+                    <p style="font-size:0.81rem; color:var(--ink-700); margin-bottom:0.45rem;">🧠 ${escMatchH(m.conclusion)}</p>
+
+                    ${evs.length ? `
+                        <div class="match-hist-events">
+                            ${evs.map(ev => {
+                                const det = ev.detalle && ev.detalle !== "Registrado en cancha" ? ev.detalle : "";
+                                return `
+                                    <div class="match-hist-ev-row">
+                                        <span class="badge badge-celeste" style="font-size:0.68rem;">${escMatchH(ev.minutoDisplay)}</span>
+                                        <strong>${escMatchH(ev.jugadorNombre)}</strong>
+                                        <span>${escMatchH(ev.tipo)}</span>
+                                        ${det ? `<span class="match-hist-note">— 📝 "${escMatchH(det)}"</span>` : ""}
+                                    </div>
+                                `;
+                            }).join("")}
+                        </div>
+                    ` : ""}
+
+                    <div>${(m.resumenJugadores || []).map(rj => `<span class="badge ${rj.puntosSugeridos >= 0 ? "badge-ok" : "badge-warn"}" style="margin:2px;">${escMatchH(rj.nombre)}: ${rj.puntosSugeridos >= 0 ? "+" : ""}${rj.puntosSugeridos} pts</span>`).join("")}</div>
+                </div>
+            `;
+        }).join("")}
+    `;
+}
+
+// --- VISOR DE INFORME PARTIDO A PARTIDO (DATOS + ANOTACIONES + FOTOS + VIDEOS + PDF A4) ---
+async function abrirInformePartidoCompleto(idPartido) {
+    const m = basePartidos.find(x => Number(x.id) === Number(idPartido));
+    if (!m) return;
+
+    const media = obtenerMediaPartidosCDM().filter(it => Number(it.partidoId) === Number(m.id));
+    const fotosResueltas = [];
+    for (const it of media) {
+        if (it.tipo === "foto" && it.idbKey) {
+            const url = await leerFotoIDBPartidoCDM(it.idbKey);
+            if (url) fotosResueltas.push({ ...it, dataUrl: url });
+        }
+    }
+    const videos = media.filter(it => it.tipo === "video");
+    const club = obtenerLicenciaConfigCDM().nombreEntidad || "Club Deportivo";
+
+    let modal = document.getElementById("modalInformePartidoCDM");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalInformePartidoCDM";
+        modal.className = "modal-backdrop hidden";
+        modal.onclick = (e) => { if (e.target === modal) modal.classList.add("hidden"); };
+        document.body.appendChild(modal);
+    }
+
+    const htmlContenido = `
+        <div style="border-bottom:2.5px solid #0284c7; padding-bottom:0.75rem; margin-bottom:0.9rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.6rem;">
+            <div>
+                <div style="font-size:0.7rem; font-weight:800; color:#0284c7;">INFORME OFICIAL DE PARTIDO • ${escMatchH(m.deporte)} (${escMatchH(m.categoria)})</div>
+                <h2 style="margin:2px 0; font-size:1.35rem;">${escMatchH(club)} vs ${escMatchH(m.rival)}</h2>
+                <small>📅 Fecha: <b>${escMatchH(m.fecha)}</b> • Formación: <b>${escMatchH(m.formacion)}</b></small>
+            </div>
+            <div style="background:#0c192c; color:#38bdf8; padding:0.55rem 1.1rem; border-radius:14px; text-align:center;">
+                <small style="display:block; font-size:0.64rem; color:#bae6fd;">MARCADOR FINAL</small>
+                <strong style="font-size:1.55rem; font-weight:900;">${escMatchH(m.resultado)}</strong>
+            </div>
+        </div>
+
+        <p style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.65rem 0.85rem; font-size:0.83rem; margin-bottom:0.9rem;">
+            <b>🧠 Resumen Técnico:</b> ${escMatchH(m.conclusion)}
+        </p>
+
+        ${Array.isArray(m.titulares) && m.titulares.length ? `
+            <h4 style="margin:0 0 6px; font-size:0.88rem;">📋 Formación Titular (${m.titulares.length})</h4>
+            <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.9rem;">
+                ${m.titulares.map(t => `<span class="badge badge-celeste">#${t.num} ${escMatchH(t.sigla)} — ${escMatchH(t.nombre)}</span>`).join("")}
+            </div>
+        ` : ""}
+
+        <h4 style="margin:0 0 6px; font-size:0.88rem;">⏱️ Cronología Minuto a Minuto y Anotaciones del Profesor (${(m.eventos || []).length})</h4>
+        <div class="table-wrap" style="margin-bottom:0.95rem;">
+            <table class="app-table" style="font-size:0.79rem;">
+                <thead><tr><th>Minuto</th><th>Jugador</th><th>Acción / Evento</th><th>Anotación del Profesor</th></tr></thead>
+                <tbody>
+                    ${(m.eventos || []).length === 0 ? `<tr><td colspan="4">Sin eventos cargados.</td></tr>` :
+                    (m.eventos || []).map(ev => `<tr><td><b>${escMatchH(ev.minutoDisplay)}</b></td><td><b>${escMatchH(ev.jugadorNombre)}</b></td><td>${escMatchH(ev.tipo)}</td><td>${escMatchH(ev.detalle || "-")}</td></tr>`).join("")}
+                </tbody>
+            </table>
+        </div>
+
+        ${fotosResueltas.length || videos.length ? `
+            <h4 style="margin:0 0 6px; font-size:0.88rem;">📸 Galería Multimedia del Partido (${fotosResueltas.length} foto(s), ${videos.length} video(s))</h4>
+            ${fotosResueltas.length ? `
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(175px, 1fr)); gap:0.6rem; margin-bottom:0.75rem;">
+                    ${fotosResueltas.map(f => `
+                        <div style="border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; background:#fff;">
+                            <img src="${f.dataUrl}" style="width:100%; height:120px; object-fit:cover; display:block; cursor:pointer;" onclick="window.open(this.src,'_blank')">
+                            <div style="padding:4px 7px; font-size:0.72rem;"><b>${escMatchH(f.titulo)}</b></div>
+                        </div>
+                    `).join("")}
+                </div>
+            ` : ""}
+            ${videos.length ? `
+                <div style="display:flex; flex-direction:column; gap:0.35rem; margin-bottom:0.75rem;">
+                    ${videos.map(v => `<div style="padding:0.45rem 0.7rem; background:#f8fafc; border:1px solid #cbd5e1; border-radius:9px; font-size:0.79rem; display:flex; justify-content:space-between; align-items:center;"><span>🎥 <b>${escMatchH(v.titulo)}</b> ${v.minuto ? `(${escMatchH(v.minuto)})` : ""}</span><a href="${escMatchH(v.url)}" target="_blank" class="btn btn-primary btn-sm" style="min-height:24px; font-size:0.72rem;">Ver Video ↗</a></div>`).join("")}
+                </div>
+            ` : ""}
+        ` : `<div style="font-size:0.78rem; color:var(--ink-500); margin-bottom:0.75rem;">📸 Todavía no adjuntaste fotos o videos a este partido.</div>`}
+    `;
+
+    window.__ultimoInformePartidoHTML = htmlContenido;
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:860px;">
+            <div class="modal-top">
+                <h3>📋 Informe Partido a Partido</h3>
+                <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('modalInformePartidoCDM').classList.add('hidden'); abrirModalMediaDesdeCancha(${m.id});">📸 Adjuntar Fotos/Videos</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="imprimirInformePartidoA4(window.__ultimoInformePartidoHTML)">🖨️ Imprimir / PDF A4</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalInformePartidoCDM').classList.add('hidden')">✕</button>
+                </div>
+            </div>
+            ${htmlContenido}
+        </div>
+    `;
+    modal.classList.remove("hidden");
 }
 
 function aplicarPuntosPartidoAlRanking(idPartido) {
@@ -1338,7 +1764,7 @@ function aplicarPuntosPartidoAlRanking(idPartido) {
 }
 
 // =========================================================================
-// 6. MODAL DE FOTOS Y VIDEOS POST-PARTIDO (FLUJO CANCHA ➔ JUGADOR)
+// 7. MODAL DE FOTOS Y VIDEOS POST-PARTIDO (FLUJO CANCHA ➔ INFORME Y FICHAS)
 // =========================================================================
 
 async function abrirModalMediaDesdeCancha(partidoIdOpt = null) {
@@ -1368,8 +1794,8 @@ async function abrirModalMediaDesdeCancha(partidoIdOpt = null) {
         <div class="modal-window" style="max-width:800px;">
             <div class="modal-top">
                 <div>
-                    <span class="badge badge-purple">📸 MULTIMEDIA POST-PARTIDO — ${dep} (${cat})</span>
-                    <h3 style="margin-top:4px;">Fotos y Videos de la Cancha</h3>
+                    <span class="badge badge-purple">📸 MULTIMEDIA DEL PARTIDO — ${dep} (${cat})</span>
+                    <h3 style="margin-top:4px;">Fotos y Videos para el Informe Completo</h3>
                 </div>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalMediaPartidoCDM').classList.add('hidden')">✕</button>
             </div>
@@ -1379,10 +1805,10 @@ async function abrirModalMediaDesdeCancha(partidoIdOpt = null) {
                     <div class="field"><label>Partido</label>
                         <select id="cmPartido" onchange="abrirModalMediaDesdeCancha(this.value)">
                             ${partidos.length === 0 ? `<option value="">📌 Práctica de hoy (${obtenerHoyISO()})</option>` :
-                            partidos.map(m => `<option value="${m.id}" ${partSel && Number(m.id) === Number(partSel.id) ? "selected" : ""}>${m.fecha} vs ${m.rival}</option>`).join("")}
+                            partidos.map(m => `<option value="${m.id}" ${partSel && Number(m.id) === Number(partSel.id) ? "selected" : ""}>${m.fecha} vs ${m.rival} (${m.resultado})</option>`).join("")}
                         </select>
                     </div>
-                    <div class="field"><label>Título / Jugada *</label><input type="text" id="cmTitulo" required placeholder="Ej: Gol de tiro libre"></div>
+                    <div class="field"><label>Título / Jugada *</label><input type="text" id="cmTitulo" required placeholder="Ej: Gol de tiro libre / Festejo"></div>
                     <div class="field"><label>Tipo</label>
                         <select id="cmTipo" onchange="document.getElementById('cmWF').classList.toggle('hidden', this.value!=='foto'); document.getElementById('cmWV').classList.toggle('hidden', this.value==='foto');">
                             <option value="foto">📸 Foto</option>
@@ -1396,23 +1822,23 @@ async function abrirModalMediaDesdeCancha(partidoIdOpt = null) {
                     <div class="field"><label>Minuto (opcional)</label><input type="text" id="cmMin" placeholder="Ej: Min 14:20"></div>
                 </div>
                 <div class="field" style="margin-bottom:0.7rem;">
-                    <label>👥 Jugadores vinculados (aparecerá automático en sus fichas e Informe PDF):</label>
+                    <label>👥 Jugadores vinculados (se adjunta al Informe del Partido y a sus fichas):</label>
                     <div style="display:flex; gap:0.35rem; flex-wrap:wrap; max-height:90px; overflow-y:auto; padding:0.4rem; background:var(--surface-solid); border:1px solid var(--line); border-radius:10px;">
                         ${plantel.map(p => `<label style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.75rem; font-weight:700; padding:0.18rem 0.5rem; background:var(--surface-subtle); border-radius:99px; cursor:pointer;"><input type="checkbox" class="cm-tag-jug" value="${p.id}" ${preArr.includes(Number(p.id)) ? "checked" : ""} style="width:14px; height:14px; min-height:auto;"><span>${p.apellido}</span></label>`).join("")}
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">💾 Guardar y Enviar a las Fichas</button>
+                <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">💾 Guardar y Adjuntar al Informe</button>
             </form>
 
             <div class="cm36-media-grid">
-                ${media.length === 0 ? `<div class="empty-box" style="grid-column:1/-1; padding:1rem;">Sin archivos cargados aún.</div>` :
+                ${media.length === 0 ? `<div class="empty-box" style="grid-column:1/-1; padding:1rem;">Sin archivos cargados aún para este partido.</div>` :
                 media.map(it => `
                     <div class="cm36-media-card">
                         ${it.tipo === "foto"
-                            ? `<img data-cm-idb="${it.idbKey}" src="" alt="${it.titulo}" onclick="window.open(this.src,'_blank')">`
-                            : `<a href="${it.url}" target="_blank" style="height:105px; background:#0f172a; color:#38bdf8; display:flex; align-items:center; justify-content:center; text-decoration:none; font-weight:800;">▶ Ver Video</a>`}
+                            ? `<img data-cm-idb="${it.idbKey}" src="" alt="${escMatchH(it.titulo)}" onclick="window.open(this.src,'_blank')">`
+                            : `<a href="${escMatchH(it.url)}" target="_blank" style="height:110px; background:#0f172a; color:#38bdf8; display:flex; align-items:center; justify-content:center; text-decoration:none; font-weight:800;">▶ Ver Video</a>`}
                         <div style="padding:0.38rem 0.5rem; font-size:0.72rem;">
-                            <strong style="display:block;">${it.titulo}</strong>
+                            <strong style="display:block;">${escMatchH(it.titulo)}</strong>
                             <small style="color:var(--ink-500);">${it.fecha} • ${(it.jugadoresIds || []).length} jug.</small>
                             <button type="button" class="btn btn-danger btn-sm" style="width:100%; margin-top:4px; min-height:22px; font-size:0.68rem;" onclick="eliminarMediaPartido(${it.id}, '${partSel ? partSel.id : ""}')">🗑️ Quitar</button>
                         </div>
@@ -1453,18 +1879,20 @@ async function guardarMediaDesdeCancha(e) {
     const lista = obtenerMediaPartidosCDM();
     lista.unshift(item);
     guardarMediaPartidosCDM(lista);
-    mostrarToast(`📸 Guardado y vinculado a ${jugadoresIds.length} jugador(es).`);
+    mostrarToast(`📸 Guardado y adjuntado al informe del partido.`);
+    renderizarHistorialPartidos();
     abrirModalMediaDesdeCancha(partidoId);
 }
 
 function eliminarMediaPartido(idMed, partId) {
     if (!confirm("🗑️ ¿Quitar este archivo?")) return;
     guardarMediaPartidosCDM(obtenerMediaPartidosCDM().filter(x => Number(x.id) !== Number(idMed)));
+    renderizarHistorialPartidos();
     abrirModalMediaDesdeCancha(partId || null);
 }
 
 // =========================================================================
-// 7. MICROCICLO SEMANAL Y LISTA DE BUENA FE
+// 8. MICROCICLO SEMANAL Y LISTA DE BUENA FE
 // =========================================================================
 
 const DIAS_MICROCICLO = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado (Partido)"];
@@ -1476,7 +1904,7 @@ function obtenerMicrocicloActual() {
             "Lunes": { foco: "Regenerativo / Movilidad", carga: "Baja (RPE 3-4)", detalle: "Elongación y activación" },
             "Martes": { foco: "Físico + Circuito Técnico", carga: "Alta (RPE 8)", detalle: "Fuerza preventiva + Reducido" },
             "Miércoles": { foco: "Táctico Colectivo", carga: "Media-Alta (RPE 7)", detalle: "Salidas, presión y transiciones" },
-            "Jueves": { foco: "Práctica Formal", carga: "Alta (RPE 8)", detalle: "Bloques 11 vs 11" },
+            "Jueves": { foco: "Práctica Formal", carga: "Alta (RPE 8)", detalle: "Bloques formales" },
             "Viernes": { foco: "Pelota Parada / Velocidad", carga: "Baja-Media (RPE 5)", detalle: "Reacción y táctica fija" },
             "Sábado (Partido)": { foco: "Competencia Oficial", carga: "Máxima (RPE 9-10)", detalle: "Fecha oficial" }
         };
@@ -1497,7 +1925,7 @@ function renderizarMicrocicloDeporte() {
                     <strong>📅 ${dia}</strong>
                     <span class="badge badge-celeste">${d.carga}</span>
                 </div>
-                <div class="field"><label>Foco</label><input type="text" value="${d.foco}" onchange="guardarCambioMicrociclo('${dia}', 'foco', this.value)"></div>
+                <div class="field"><label>Foco</label><input type="text" value="${escMatchH(d.foco)}" onchange="guardarCambioMicrociclo('${dia}', 'foco', this.value)"></div>
                 <div class="field"><label>Intensidad</label>
                     <select onchange="guardarCambioMicrociclo('${dia}', 'carga', this.value)">
                         <option value="Baja (RPE 3-4)" ${d.carga.includes("3-4") ? "selected" : ""}>🟢 Baja</option>
@@ -1507,7 +1935,7 @@ function renderizarMicrocicloDeporte() {
                         <option value="Máxima (RPE 9-10)" ${d.carga.includes("9-10") ? "selected" : ""}>🔴 Máxima</option>
                     </select>
                 </div>
-                <div class="field"><label>Tareas / Horario</label><input type="text" value="${d.detalle}" onchange="guardarCambioMicrociclo('${dia}', 'detalle', this.value)"></div>
+                <div class="field"><label>Tareas / Horario</label><input type="text" value="${escMatchH(d.detalle)}" onchange="guardarCambioMicrociclo('${dia}', 'detalle', this.value)"></div>
             </div>
         `;
     }).join("");
@@ -1565,7 +1993,7 @@ function enviarMicrocicloWhatsApp() {
 }
 
 // =========================================================================
-// 8. RANKING OFICIAL (ESCALA 1 A 10 CON AUDITORÍA DE CAMBIOS)
+// 9. RANKING OFICIAL (ESCALA 1 A 10 CON AUDITORÍA DE CAMBIOS)
 // =========================================================================
 
 function renderizarRankingDeporte() {
