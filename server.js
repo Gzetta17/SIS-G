@@ -1,12 +1,7 @@
 /**
- * server.js - Servidor Backend Oficial Multi-Club & Multi-Gimnasio (SaaS Suite)
+ * server.js - Servidor Backend Oficial Multi-Club, Multi-Gimnasio & Consultorios (SaaS Suite)
  * Arquitectura Node.js + Express + Mongoose (Base de Datos 100% Aislada) + Respaldo Local en Disco
  * Desarrollado por Gonzalo Adanchú
- *
- * CAPACIDAD MULTI-CLIENTE (MULTI-TENANT):
- * - Permite alojar múltiples Clubes, Gimnasios y Comercios en el mismo servidor (cada uno con su claveClub).
- * - Detecta automáticamente a qué Club o Gimnasio pertenece cada Administrador o Código de Socio al iniciar sesión.
- * - Incluye persistencia espejo en disco (cdm_datos_servidor.json) por si MongoDB no está encendido.
  */
 
 const express = require('express');
@@ -21,7 +16,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // ============================================================================
-// 1. CONEXIÓN AISLADA A MONGODB (NO SE MEZCLA CON OTRAS WEBS EN MONGOOSE)
+// 1. CONEXIÓN AISLADA A MONGODB
 // ============================================================================
 
 const PORT = process.env.PORT || 3000;
@@ -42,6 +37,7 @@ const cdmClubStateSchema = new mongoose.Schema({
     microciclos: { type: Object, default: {} },
     videoteca: { type: Array, default: [] },
     catalogoEjercicios: { type: Array, default: [] },
+    consultorio: { type: Object, default: () => ({ pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] }) },
     licenciaConfig: { type: Object, default: {} }
 }, {
     timestamps: true,
@@ -79,6 +75,7 @@ function crearEstadoVacioClub(claveClub = CLAVE_CLUB_POR_DEFECTO, licenciaInicia
         microciclos: {},
         videoteca: [],
         catalogoEjercicios: [],
+        consultorio: { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] },
         licenciaConfig: {
             claveClub,
             nombreEntidad: licenciaInicial.nombreEntidad || 'Club Deportivo Municipal',
@@ -88,6 +85,7 @@ function crearEstadoVacioClub(claveClub = CLAVE_CLUB_POR_DEFECTO, licenciaInicia
             planActivo: licenciaInicial.planActivo || 'completo',
             modulos: licenciaInicial.modulos || { futbol: true, hockey: true, gym: true },
             deportesExtra: Array.isArray(licenciaInicial.deportesExtra) ? licenciaInicial.deportesExtra : [],
+            profesionesHabilitadas: Array.isArray(licenciaInicial.profesionesHabilitadas) ? licenciaInicial.profesionesHabilitadas : [],
             adminUsuario: (licenciaInicial.adminUsuario || 'cdm').toLowerCase(),
             adminClave: licenciaInicial.adminClave || 'cdm2026',
             estadoServicio: licenciaInicial.estadoServicio || 'activo'
@@ -103,7 +101,6 @@ function leerMapaClubesDesdeDisco() {
             if (parsed && parsed.clubes && typeof parsed.clubes === 'object') {
                 return parsed.clubes;
             }
-            // Migración automática si el archivo tenía un único club en la raíz
             if (parsed && (Array.isArray(parsed.personas) || parsed.claveClub)) {
                 const clave = parsed.claveClub || CLAVE_CLUB_POR_DEFECTO;
                 return { [clave]: parsed };
@@ -120,10 +117,7 @@ function leerMapaClubesDesdeDisco() {
 function guardarMapaClubesEnDisco(mapaClubes) {
     try {
         const principal = mapaClubes[CLAVE_CLUB_POR_DEFECTO] || Object.values(mapaClubes)[0] || crearEstadoVacioClub();
-        const contenedor = {
-            ...principal,
-            clubes: mapaClubes
-        };
+        const contenedor = { ...principal, clubes: mapaClubes };
         fs.writeFileSync(ARCHIVO_RESPALDO_DISCO, JSON.stringify(contenedor, null, 2), 'utf8');
     } catch (e) {
         console.error('⚠️ Error guardando respaldo en disco:', e.message);
@@ -197,6 +191,9 @@ async function guardarEstadoMaestroClub(nuevoEstado, claveClubParam = null) {
         microciclos: nuevoEstado.microciclos && typeof nuevoEstado.microciclos === 'object' ? nuevoEstado.microciclos : (previo.microciclos || {}),
         videoteca: Array.isArray(nuevoEstado.videoteca) ? nuevoEstado.videoteca : (previo.videoteca || []),
         catalogoEjercicios: Array.isArray(nuevoEstado.catalogoEjercicios) ? nuevoEstado.catalogoEjercicios : (previo.catalogoEjercicios || []),
+        consultorio: nuevoEstado.consultorio && typeof nuevoEstado.consultorio === 'object'
+            ? nuevoEstado.consultorio
+            : (previo.consultorio || { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] }),
         licenciaConfig: nuevoEstado.licenciaConfig && typeof nuevoEstado.licenciaConfig === 'object' && Object.keys(nuevoEstado.licenciaConfig).length > 0
             ? { ...previo.licenciaConfig, ...nuevoEstado.licenciaConfig, claveClub: clave }
             : (previo.licenciaConfig || {})
@@ -220,19 +217,23 @@ async function guardarEstadoMaestroClub(nuevoEstado, claveClubParam = null) {
 }
 
 function resumirListaClubes(mapaClubes) {
-    return Object.values(mapaClubes).map(c => ({
-        claveClub: c.claveClub,
-        ultimaActualizacionISO: c.ultimaActualizacionISO,
-        cantidadPersonas: Array.isArray(c.personas) ? c.personas.filter(p => p && p.activo).length : 0,
-        licenciaConfig: c.licenciaConfig || {}
-    }));
+    return Object.values(mapaClubes).map(c => {
+        const cantDep = Array.isArray(c.personas) ? c.personas.filter(p => p && p.activo).length : 0;
+        const cantPac = Array.isArray(c.consultorio?.pacientes) ? c.consultorio.pacientes.length : 0;
+        return {
+            claveClub: c.claveClub,
+            ultimaActualizacionISO: c.ultimaActualizacionISO,
+            cantidadPersonas: cantDep + cantPac,
+            cantidadPacientes: cantPac,
+            licenciaConfig: c.licenciaConfig || {}
+        };
+    });
 }
 
 // ============================================================================
 // 3. RUTAS API REST DE SINCRONIZACIÓN Y MULTI-CLIENTE
 // ============================================================================
 
-// A) Obtener estado del club activo + lista de todos los clubes para el SuperAdmin
 app.get('/api/cdm/estado', async (req, res) => {
     try {
         const clave = req.query.club || CLAVE_CLUB_POR_DEFECTO;
@@ -249,7 +250,6 @@ app.get('/api/cdm/estado', async (req, res) => {
     }
 });
 
-// B) Guardar estado completo del club activo
 app.post('/api/cdm/estado', async (req, res) => {
     try {
         const clave = req.body?.claveClub || req.query.club || CLAVE_CLUB_POR_DEFECTO;
@@ -265,50 +265,32 @@ app.post('/api/cdm/estado', async (req, res) => {
     }
 });
 
-// C) Listar todos los clubes / gimnasios dados de alta
 app.get('/api/cdm/clubes', async (req, res) => {
     try {
         const todos = await obtenerTodosLosClubes();
-        res.json({
-            ok: true,
-            clubes: resumirListaClubes(todos)
-        });
+        res.json({ ok: true, clubes: resumirListaClubes(todos) });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-// D) Crear un nuevo Club / Gimnasio limpio desde el Panel de SuperAdmin
 app.post('/api/cdm/clubes/nuevo', async (req, res) => {
     try {
         const lic = req.body?.licenciaConfig || req.body || {};
         const rawSlug = String(lic.claveClub || lic.nombreEntidad || ('cliente_' + Date.now()))
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_+|_+$/g, '');
+            .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
         const claveNueva = rawSlug || ('cliente_' + Date.now());
 
-        const estadoInicial = crearEstadoVacioClub(claveNueva, {
-            ...lic,
-            claveClub: claveNueva
-        });
-
+        const estadoInicial = crearEstadoVacioClub(claveNueva, { ...lic, claveClub: claveNueva });
         const guardado = await guardarEstadoMaestroClub(estadoInicial, claveNueva);
         const todos = await obtenerTodosLosClubes();
-        res.json({
-            ok: true,
-            claveClub: claveNueva,
-            estado: guardado,
-            clubes: resumirListaClubes(todos)
-        });
+        res.json({ ok: true, claveClub: claveNueva, estado: guardado, clubes: resumirListaClubes(todos) });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-// E) Eliminar un Club / Gimnasio secundario
 app.delete('/api/cdm/clubes/:claveClub', async (req, res) => {
     try {
         const clave = String(req.params.claveClub || '').trim();
@@ -328,7 +310,6 @@ app.delete('/api/cdm/clubes/:claveClub', async (req, res) => {
     }
 });
 
-// F) Sincronización parcial desde el celular de un Deportista / Socio
 app.post('/api/cdm/jugador/:id/sync', async (req, res) => {
     try {
         const idJugador = Number(req.params.id);
@@ -346,22 +327,52 @@ app.post('/api/cdm/jugador/:id/sync', async (req, res) => {
                 estadoActual.personas[idx] = existente;
             }
         }
-
         if (Array.isArray(catalogoEjercicios) && catalogoEjercicios.length > 0) {
             estadoActual.catalogoEjercicios = catalogoEjercicios;
         }
-
         const guardado = await guardarEstadoMaestroClub(estadoActual, estadoActual.claveClub);
-        res.json({
-            ok: true,
-            ultimaActualizacionISO: guardado.ultimaActualizacionISO
-        });
+        res.json({ ok: true, ultimaActualizacionISO: guardado.ultimaActualizacionISO });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-// G) Autenticar Administrador detectando automáticamente a qué Club o Gimnasio pertenece
+// Subida segura de estudios/datos desde el Portal del Paciente (solo si el profesional lo habilitó)
+app.post('/api/cdm/paciente/:id/estudio', async (req, res) => {
+    try {
+        const idPac = Number(req.params.id);
+        const { claveClub, estudio } = req.body || {};
+        if (!idPac || !estudio || !estudio.titulo) {
+            return res.status(400).json({ ok: false, error: 'Datos incompletos.' });
+        }
+
+        const estadoActual = await obtenerEstadoMaestroClub(claveClub || CLAVE_CLUB_POR_DEFECTO);
+        const pacs = estadoActual.consultorio?.pacientes || [];
+        const pac = pacs.find(p => Number(p.id) === idPac);
+        if (!pac) return res.status(404).json({ ok: false, error: 'Paciente no encontrado.' });
+        if (!pac.puedeSubirEstudios) {
+            return res.status(403).json({ ok: false, error: 'El profesional no habilitó la subida de archivos para este paciente.' });
+        }
+
+        if (!Array.isArray(pac.estudios)) pac.estudios = [];
+        pac.estudios.unshift({
+            id: estudio.id || Date.now(),
+            titulo: String(estudio.titulo).trim(),
+            fecha: estudio.fecha || new Date().toISOString().split('T')[0],
+            url: estudio.url || '',
+            archivoDataUrl: estudio.archivoDataUrl || '',
+            archivoNombre: estudio.archivoNombre || '',
+            nota: String(estudio.nota || '').trim(),
+            subidoPor: 'paciente'
+        });
+
+        await guardarEstadoMaestroClub(estadoActual, estadoActual.claveClub);
+        res.json({ ok: true, estudios: pac.estudios });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 app.post('/api/cdm/auth-admin', async (req, res) => {
     try {
         const usuario = String(req.body?.usuario || '').trim().toLowerCase();
@@ -382,34 +393,22 @@ app.post('/api/cdm/auth-admin', async (req, res) => {
             return coincideUsuario && p === clave;
         });
 
-        if (!match) {
-            return res.status(401).json({ ok: false, mensaje: 'Usuario o contraseña incorrectos.' });
-        }
-
+        if (!match) return res.status(401).json({ ok: false, mensaje: 'Usuario o contraseña incorrectos.' });
         if (match.licenciaConfig?.estadoServicio === 'suspendido') {
-            return res.status(403).json({
-                ok: false,
-                suspendido: true,
-                mensaje: '⚠️ Suscripción mensual en pausa. Contactá al desarrollador Gonzalo Adanchú para reactivar el servicio.'
-            });
+            return res.status(403).json({ ok: false, suspendido: true, mensaje: '⚠️ Suscripción mensual en pausa. Contactá al desarrollador Gonzalo Adanchú para reactivar el servicio.' });
         }
-
-        res.json({
-            ok: true,
-            claveClub: match.claveClub,
-            estado: match,
-            clubes: resumirListaClubes(todos)
-        });
+        res.json({ ok: true, claveClub: match.claveClub, estado: match, clubes: resumirListaClubes(todos) });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-// H) Validar código personal (Ej: CDM-XXXX, OLY-XXXX) buscando en todos los clubes registrados
+// Validar código personal: soporta Deportistas/Socios (CDM-XXXX) Y Pacientes de Consultorio (PAC-XXXX)
 app.post('/api/cdm/auth-codigo', async (req, res) => {
     try {
         const rawInput = String(req.body?.codigo || '').trim().toUpperCase();
         const limpioInput = rawInput.replace(/[^A-Z0-9]/g, '');
+        const soloNumeros = rawInput.replace(/\D/g, '');
         const clubPreferido = req.body?.claveClub || '';
         const todos = await obtenerTodosLosClubes();
 
@@ -419,6 +418,26 @@ app.post('/api/cdm/auth-codigo', async (req, res) => {
         }
 
         for (const estadoClub of listaClubes) {
+            // 1. Buscar primero en Pacientes del Consultorio (PAC-XXXX)
+            const pacs = Array.isArray(estadoClub.consultorio?.pacientes) ? estadoClub.consultorio.pacientes : [];
+            const pacHit = pacs.find(p => {
+                if (!p) return false;
+                const codP = String(p.codigoAcceso || `PAC-${p.id}`).toUpperCase();
+                const codPLimpio = codP.replace(/[^A-Z0-9]/g, '');
+                const dniP = String(p.dni || '').replace(/\D/g, '');
+                return codP === rawInput || codPLimpio === limpioInput || (soloNumeros.length >= 7 && dniP === soloNumeros);
+            });
+            if (pacHit) {
+                return res.json({
+                    ok: true,
+                    esPacienteConsultorio: true,
+                    claveClub: estadoClub.claveClub,
+                    paciente: pacHit,
+                    estado: estadoClub
+                });
+            }
+
+            // 2. Buscar en Deportistas / Socios de Club y Gimnasio
             const siglaClub = String(estadoClub.licenciaConfig?.siglaCodigo || 'CDM').toUpperCase();
             const encontrado = (estadoClub.personas || []).find(p => {
                 if (!p || !p.activo || !p.codigoAcceso) return false;
@@ -427,10 +446,10 @@ app.post('/api/cdm/auth-codigo', async (req, res) => {
                 const soloSufijo = codCompleto.replace(`${siglaClub}-`, '').replace('CDM-', '');
                 return codCompleto === rawInput || codLimpio === limpioInput || soloSufijo === rawInput;
             });
-
             if (encontrado) {
                 return res.json({
                     ok: true,
+                    esPacienteConsultorio: false,
                     claveClub: estadoClub.claveClub,
                     persona: encontrado,
                     estado: estadoClub
