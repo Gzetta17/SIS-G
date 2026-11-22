@@ -7582,3 +7582,280 @@ mostrarHubSelectorDeComercios = async function () {
         pieBotones.appendChild(filaBackup);
     });
 };
+// =========================================================================
+// 18. SISTEMA DE DEMOS POR DÍAS (7 / 10 / 15 DÍAS) + SYNC CONSULTORIO
+//     Pegar al final de js/login.js (debajo del Bloque 17)
+// =========================================================================
+
+function sumarDiasDesdeHoyISO18(dias) {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(dias || 7));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+
+function calcularDiasRestantesDemo18(fechaISO) {
+    const v = String(fechaISO || "").trim();
+    if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const [y, m, d] = v.split("-").map(Number);
+    const fin = new Date(y, m - 1, d, 0, 0, 0, 0);
+    return Math.round((fin.getTime() - hoy.getTime()) / 86400000);
+}
+
+function formatearFechaDemoAR18(iso) {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y}`;
+}
+
+window.aplicarDiasDemoModal18 = function (dias) {
+    const inp = document.getElementById("mcFechaVencimientoDemo18");
+    const lbl = document.getElementById("lblEstadoDemoModal18");
+    if (!inp) return;
+    if (!dias) {
+        inp.value = "";
+        if (lbl) lbl.innerHTML = "♾️ <b>Cliente Definitivo</b> (sin fecha de corte)";
+    } else {
+        inp.value = sumarDiasDesdeHoyISO18(dias);
+        if (lbl) lbl.innerHTML = `🎁 <b>Demo activa por ${dias} días</b> (vence el ${formatearFechaDemoAR18(inp.value)})`;
+    }
+};
+
+// 1. Asegurar carga y guardado de datos de Consultorio al cambiar de comercio
+const _origCargarEstadoClub18 = cargarEstadoClubEnLocalStorage;
+cargarEstadoClubEnLocalStorage = function (estadoClub, claveClub) {
+    _origCargarEstadoClub18.apply(this, arguments);
+    if (estadoClub && estadoClub.consultorio && typeof estadoClub.consultorio === "object") {
+        const clave = claveClub || estadoClub.claveClub || CLAVE_CLUB_DEFECTO_CDM;
+        localStorage.setItem(`cdm_consultorio_suite_v2_${clave}`, JSON.stringify(estadoClub.consultorio));
+    }
+};
+
+const _origGuardarSnapshot18 = guardarSnapshotClubActualEnMapaLocal;
+guardarSnapshotClubActualEnMapaLocal = function () {
+    const mapa = _origGuardarSnapshot18.apply(this, arguments);
+    const claveActual = obtenerClaveClubActivoCDM();
+    if (mapa && mapa[claveActual]) {
+        try {
+            const cons = JSON.parse(localStorage.getItem(`cdm_consultorio_suite_v2_${claveActual}`) || "null");
+            if (cons && typeof cons === "object") {
+                mapa[claveActual].consultorio = cons;
+                localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+            }
+        } catch {}
+    }
+    return mapa;
+};
+
+// 2. Inyectar selector de Demo (7 / 10 días / Sin límite) en el Modal de Comercio
+const _origAbrirModalComercio18 = abrirModalCrearOEditarComercio;
+abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+    await _origAbrirModalComercio18.apply(this, arguments);
+    const modal = document.getElementById("modalSuperAdminCDM");
+    const form = modal?.querySelector("form");
+    if (!form || document.getElementById("bloqueDemoDiasModal18")) return;
+
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const existente = claveClubEditar ? lista.find(x => x.claveClub === claveClubEditar) : null;
+    const venceActual = existente?.licenciaConfig?.fechaVencimientoDemo || "";
+    const diasRest = calcularDiasRestantesDemo18(venceActual);
+
+    const estadoTxt = !venceActual
+        ? "♾️ <b>Cliente Definitivo</b> (sin fecha de corte)"
+        : diasRest < 0
+        ? `🔴 <b>Demo VENCIDA</b> el ${formatearFechaDemoAR18(venceActual)} (sus datos siguen guardados)`
+        : `🎁 <b>Prueba activa</b> — vence el ${formatearFechaDemoAR18(venceActual)} (${diasRest === 0 ? "vence hoy" : `quedan ${diasRest} días`})`;
+
+    const box = document.createElement("div");
+    box.id = "bloqueDemoDiasModal18";
+    box.style = "background:linear-gradient(135deg, rgba(16,185,129,0.08), rgba(2,132,199,0.08)); border:1.5px solid #38bdf8; border-radius:16px; padding:0.9rem 1rem; margin-bottom:1rem;";
+    box.innerHTML = `
+        <label style="font-size:0.72rem; font-weight:800; color:#0369a1; text-transform:uppercase; display:block; margin-bottom:0.5rem;">
+            ⏳ VIGENCIA / DEMO TEMPORAL (BLOQUEO AUTOMÁTICO SIN BORRAR DATOS)
+        </label>
+        <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.6rem;">
+            <button type="button" class="btn btn-primary btn-sm" onclick="aplicarDiasDemoModal18(7)">🎁 Demo 7 días</button>
+            <button type="button" class="btn btn-primary btn-sm" style="background:#0d9488; border-color:#0d9488;" onclick="aplicarDiasDemoModal18(10)">🎁 Demo 10 días</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="aplicarDiasDemoModal18(15)">📅 Demo 15 días</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="aplicarDiasDemoModal18(0)">♾️ Definitivo (Sin límite)</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.65rem; flex-wrap:wrap;">
+            <div class="field" style="width:190px;">
+                <label>Fecha límite exacta</label>
+                <input type="date" id="mcFechaVencimientoDemo18" value="${venceActual}" onchange="document.getElementById('lblEstadoDemoModal18').innerHTML = this.value ? '🎁 Vence el ' + formatearFechaDemoAR18(this.value) : '♾️ Sin vencimiento'">
+            </div>
+            <small id="lblEstadoDemoModal18" style="font-size:0.78rem; color:var(--ink-700); flex:1;">${estadoTxt}</small>
+        </div>
+    `;
+
+    const pie = form.lastElementChild;
+    if (pie) pie.insertAdjacentElement("beforebegin", box);
+    else form.appendChild(box);
+};
+
+// 3. Guardar la fechaVencimientoDemo al confirmar el comercio
+const _origGuardarComercio18 = guardarComercioDesdeModal;
+guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
+    const fechaVenc = (document.getElementById("mcFechaVencimientoDemo18")?.value || "").trim();
+    const nombreInput = (document.getElementById("mcNombreEntidad")?.value || "").trim().toLowerCase();
+
+    await _origGuardarComercio18.apply(this, arguments);
+
+    const mapa = obtenerMapaLocalClubesCDM();
+    let claveTarget = claveClubExistente;
+    if (!claveTarget && nombreInput) {
+        const match = Object.values(mapa).find(c => (c.licenciaConfig?.nombreEntidad || "").toLowerCase() === nombreInput);
+        if (match) claveTarget = match.claveClub;
+    }
+
+    if (claveTarget && mapa[claveTarget]?.licenciaConfig) {
+        mapa[claveTarget].licenciaConfig.fechaVencimientoDemo = fechaVenc;
+        localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+        if (obtenerClaveClubActivoCDM() === claveTarget) {
+            localStorage.setItem(STORAGE_LICENCIA_KEY, JSON.stringify(mapa[claveTarget].licenciaConfig));
+        }
+        if (window.location.protocol !== "file:") {
+            try {
+                const respEst = await fetch(`/api/cdm/estado?club=${encodeURIComponent(claveTarget)}`);
+                if (respEst.ok) {
+                    const dEst = await respEst.json();
+                    const estActual = dEst.estado || {};
+                    estActual.licenciaConfig = { ...(estActual.licenciaConfig || {}), ...mapa[claveTarget].licenciaConfig, fechaVencimientoDemo: fechaVenc };
+                    await fetch("/api/cdm/estado", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...estActual, claveClub: claveTarget })
+                    });
+                }
+            } catch {}
+        }
+    }
+
+    const enLogin = window.location.pathname.toLowerCase().includes("login.html") || document.body?.classList.contains("login-page");
+    if (enLogin && !document.getElementById("vistaHubSuperAdmin")?.classList.contains("hidden")) {
+        await mostrarHubSelectorDeComercios();
+    }
+};
+
+// 4. Mostrar badge de Demo en cada tarjeta del Hub SuperAdmin
+const _origMostrarHub18 = mostrarHubSelectorDeComercios;
+mostrarHubSelectorDeComercios = async function () {
+    await _origMostrarHub18.apply(this, arguments);
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const cards = document.querySelectorAll("#gridTarjetasComerciosHub .hub-comercio-card");
+
+    cards.forEach((card, idx) => {
+        const lic = lista[idx]?.licenciaConfig || {};
+        if (!lic.fechaVencimientoDemo || card.querySelector(".hub-demo-pill-18")) return;
+        const dias = calcularDiasRestantesDemo18(lic.fechaVencimientoDemo);
+        const fTxt = formatearFechaDemoAR18(lic.fechaVencimientoDemo);
+        const vencida = dias !== null && dias < 0;
+
+        const pill = document.createElement("div");
+        pill.className = "hub-demo-pill-18";
+        pill.style = `font-size:0.72rem; font-weight:800; padding:0.32rem 0.6rem; border-radius:9px; text-align:center; ${
+            vencida
+                ? "background:rgba(239,68,68,0.12); color:#dc2626; border:1px solid rgba(239,68,68,0.35);"
+                : "background:rgba(245,158,11,0.14); color:#b45309; border:1px solid rgba(245,158,11,0.35);"
+        }`;
+        pill.innerHTML = vencida
+            ? `⏳ Demo VENCIDA (${fTxt}) — Tocá Editar para activar`
+            : `🎁 Demo: ${dias === 0 ? "vence HOY" : `quedan ${dias} día(s)`} (hasta ${fTxt})`;
+        card.insertBefore(pill, card.lastElementChild);
+    });
+};
+
+// 5. Mejorar el mensaje WA de credenciales (incluye link real, especialidades y fecha límite de demo)
+enviarCredencialesDeComercioEspecificoWA = async function (claveClub) {
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const item = lista.find(x => x.claveClub === claveClub);
+    const lic = item?.licenciaConfig || obtenerLicenciaConfigCDM();
+    const base = window.location.origin && window.location.origin !== "null" ? window.location.origin : "http://localhost:3000";
+    const link = `${base}/login.html`;
+
+    const modTxt = [
+        lic.modulos?.futbol ? "⚽ Fútbol" : null,
+        lic.modulos?.hockey ? "🏑 Hockey" : null,
+        lic.modulos?.gym ? "🏋️ Gimnasio" : null,
+        ...(Array.isArray(lic.deportesExtra) ? lic.deportesExtra : []),
+        ...(Array.isArray(lic.profesionesHabilitadas) ? lic.profesionesHabilitadas.map(p => `🩺 ${p}`) : [])
+    ].filter(Boolean).join(" + ");
+
+    const esDemo = Boolean(lic.fechaVencimientoDemo);
+    const fechaTxt = formatearFechaDemoAR18(lic.fechaVencimientoDemo);
+
+    let msg = `${esDemo ? "🎁 *ACCESO DEMO GRATUITA*" : "🚀 *ACCESO OFICIAL AL SISTEMA*"} — *${(lic.nombreEntidad || "PLATAFORMA").toUpperCase()}*\n`;
+    msg += `----------------------------------\n`;
+    msg += `Hola, ya está lista tu cuenta exclusiva para probar y administrar *${lic.nombreEntidad}* desde celular o PC:\n\n`;
+    msg += `🔗 *Link de Ingreso:* ${link}\n`;
+    msg += `👑 *Solapa:* Admin / Comercio\n`;
+    msg += `• *Usuario:* ${lic.adminUsuario === "admin" ? "cdm" : lic.adminUsuario}\n`;
+    msg += `• *Contraseña:* ${lic.adminClave}\n\n`;
+    if (modTxt) msg += `📦 *Áreas Habilitadas:* ${modTxt}\n`;
+    if (esDemo) msg += `⏳ *Prueba gratuita válida hasta:* *${fechaTxt}* _(todo lo que cargues queda guardado si decidís continuar)_\n`;
+    msg += `----------------------------------\n`;
+    msg += `_Desarrollo y Soporte: Gonzalo Adanchú_`;
+
+    const tel = prompt("📱 WhatsApp del profesional / club (o dejá vacío para elegir en WhatsApp):", "");
+    if (tel === null) return;
+    const limpio = tel.replace(/\D/g, "");
+    window.open(limpio ? `https://wa.me/${limpio}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+// 6. Validar vencimiento en login local + mostrar cintita de días restantes dentro de la app
+const _origLoginAdmin18 = iniciarSesionComoAdmin;
+iniciarSesionComoAdmin = async function (e) {
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
+    const user = (document.getElementById("inputAdminUser")?.value || "").trim().toLowerCase();
+    const pass = (document.getElementById("inputAdminPass")?.value || "").trim();
+
+    if (!CREDENCIALES_SUPERADMIN.usuarios.includes(user)) {
+        const mapaLocal = obtenerMapaLocalClubesCDM();
+        const localHit = Object.values(mapaLocal).find(c => {
+            const u = (c.licenciaConfig?.adminUsuario || "cdm").toLowerCase();
+            return u === user && (c.licenciaConfig?.adminClave || "cdm2026") === pass;
+        });
+        if (localHit?.licenciaConfig?.fechaVencimientoDemo) {
+            const dias = calcularDiasRestantesDemo18(localHit.licenciaConfig.fechaVencimientoDemo);
+            if (dias !== null && dias < 0) {
+                mostrarErrorLogin(`⏳ Tu prueba gratuita finalizó el ${formatearFechaDemoAR18(localHit.licenciaConfig.fechaVencimientoDemo)}. Tus datos siguen guardados. Contactá a Gonzalo Adanchú para activar el plan.`);
+                return;
+            }
+        }
+    }
+    return _origLoginAdmin18.apply(this, arguments);
+};
+
+// 7. Banner discreto de días restantes y cierre si vence con sesión abierta (no afecta al SuperAdmin)
+document.addEventListener("DOMContentLoaded", () => {
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes("login.html") || document.body?.classList.contains("login-page")) return;
+
+    const ses = obtenerSesionActivaCDM();
+    if (!ses || ses.esSuperAdmin) return;
+
+    const lic = obtenerLicenciaConfigCDM();
+    if (!lic?.fechaVencimientoDemo) return;
+
+    const dias = calcularDiasRestantesDemo18(lic.fechaVencimientoDemo);
+    if (dias !== null && dias < 0) {
+        alert(`⏳ Tu período de prueba finalizó el ${formatearFechaDemoAR18(lic.fechaVencimientoDemo)}. Tus datos están guardados de forma segura. Contactá a Gonzalo Adanchú para activar tu plan.`);
+        cerrarSesionCDM();
+        return;
+    }
+
+    if (!document.getElementById("cdmBannerDemoActiva18")) {
+        const top = document.querySelector(".app-main");
+        if (top) {
+            const b = document.createElement("div");
+            b.id = "cdmBannerDemoActiva18";
+            b.style = "background:linear-gradient(90deg, #0284c7, #0d9488); color:#fff; font-size:0.76rem; font-weight:700; text-align:center; padding:0.35rem 0.75rem;";
+            b.innerHTML = `🎁 Cuenta en Prueba Gratuita — ${dias === 0 ? "Último día" : `Te quedan ${dias} día(s)`} (hasta el ${formatearFechaDemoAR18(lic.fechaVencimientoDemo)})`;
+            top.prepend(b);
+        }
+    }
+});

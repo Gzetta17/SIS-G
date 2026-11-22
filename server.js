@@ -1,6 +1,6 @@
 /**
  * server.js - Servidor Backend Oficial Multi-Club, Multi-Gimnasio & Consultorios (SaaS Suite)
- * Arquitectura Node.js + Express + Mongoose (Base de Datos 100% Aislada) + Respaldo Local en Disco
+ * Incluye control de Demos por fecha (7/10 días) y conexión aislada a MongoDB Atlas
  * Desarrollado por Gonzalo Adanchú
  */
 
@@ -16,11 +16,11 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // ============================================================================
-// 1. CONEXIÓN AISLADA A MONGODB
+// 1. CONEXIÓN AISLADA A MONGODB ATLAS / LOCAL
 // ============================================================================
 
 const PORT = process.env.PORT || 3000;
-const CDM_MONGO_URI = process.env.CDM_MONGO_URI || 'mongodb://127.0.0.1:27017/cdm_adelia_maria_oficial_db';
+const CDM_MONGO_URI = process.env.CDM_MONGO_URI || 'mongodb://127.0.0.1:27017/cdm_pro_suite_db';
 const ARCHIVO_RESPALDO_DISCO = path.join(__dirname, 'cdm_datos_servidor.json');
 const CLAVE_CLUB_POR_DEFECTO = 'cdm_adelia_maria_principal';
 
@@ -46,23 +46,44 @@ const cdmClubStateSchema = new mongoose.Schema({
 });
 
 const cdmConnection = mongoose.createConnection(CDM_MONGO_URI, {
-    serverSelectionTimeoutMS: 3000
+    serverSelectionTimeoutMS: 8000
 });
 
 cdmConnection.on('connected', () => {
     mongoConectado = true;
     CdmStateModel = cdmConnection.model('CdmClubState', cdmClubStateSchema);
-    console.log('✅ Base de datos Mongoose AISLADA conectada: cdm_adelia_maria_oficial_db (Multi-Cliente)');
+    console.log('✅ MongoDB AISLADO conectado:', cdmConnection.name);
     inicializarEstadoEnMongoSiVacio();
 });
 
-cdmConnection.on('error', () => {
+cdmConnection.on('error', (err) => {
     mongoConectado = false;
+    console.error('⚠️ Error conexión MongoDB (usando respaldo local):', err.message);
 });
 
 // ============================================================================
-// 2. MOTOR DE PERSISTENCIA MULTI-CLIENTE (MONGOOSE + JSON EN DISCO)
+// 2. HELPERS DE VENCIMIENTO DE DEMO Y PERSISTENCIA MULTI-CLIENTE
 // ============================================================================
+
+function obtenerHoyAR() {
+    try {
+        return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+    } catch {
+        return new Date().toISOString().split('T')[0];
+    }
+}
+
+function formatearFechaAR(iso) {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso || '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+function estaDemoVencida(lic) {
+    const vence = String(lic?.fechaVencimientoDemo || '').trim();
+    if (!vence || !/^\d{4}-\d{2}-\d{2}$/.test(vence)) return false;
+    return obtenerHoyAR() > vence;
+}
 
 function crearEstadoVacioClub(claveClub = CLAVE_CLUB_POR_DEFECTO, licenciaInicial = {}) {
     return {
@@ -81,11 +102,17 @@ function crearEstadoVacioClub(claveClub = CLAVE_CLUB_POR_DEFECTO, licenciaInicia
             nombreEntidad: licenciaInicial.nombreEntidad || 'Club Deportivo Municipal',
             subtituloEntidad: licenciaInicial.subtituloEntidad || 'Adelia María',
             siglaCodigo: (licenciaInicial.siglaCodigo || 'CDM').toUpperCase(),
-            logoUrl: licenciaInicial.logoUrl || '/img/logo.png',
+            logoUrl: licenciaInicial.logoUrl !== undefined ? licenciaInicial.logoUrl : '/img/logo.png',
             planActivo: licenciaInicial.planActivo || 'completo',
             modulos: licenciaInicial.modulos || { futbol: true, hockey: true, gym: true },
             deportesExtra: Array.isArray(licenciaInicial.deportesExtra) ? licenciaInicial.deportesExtra : [],
             profesionesHabilitadas: Array.isArray(licenciaInicial.profesionesHabilitadas) ? licenciaInicial.profesionesHabilitadas : [],
+            funciones: licenciaInicial.funciones || undefined,
+            modoComplejidad: licenciaInicial.modoComplejidad || 'simple',
+            bloquearCobranza: Boolean(licenciaInicial.bloquearCobranza),
+            aliasTransferencia: licenciaInicial.aliasTransferencia || '',
+            titularTransferencia: licenciaInicial.titularTransferencia || '',
+            fechaVencimientoDemo: licenciaInicial.fechaVencimientoDemo || '',
             adminUsuario: (licenciaInicial.adminUsuario || 'cdm').toLowerCase(),
             adminClave: licenciaInicial.adminClave || 'cdm2026',
             estadoServicio: licenciaInicial.estadoServicio || 'activo'
@@ -98,9 +125,7 @@ function leerMapaClubesDesdeDisco() {
         if (fs.existsSync(ARCHIVO_RESPALDO_DISCO)) {
             const raw = fs.readFileSync(ARCHIVO_RESPALDO_DISCO, 'utf8');
             const parsed = JSON.parse(raw);
-            if (parsed && parsed.clubes && typeof parsed.clubes === 'object') {
-                return parsed.clubes;
-            }
+            if (parsed && parsed.clubes && typeof parsed.clubes === 'object') return parsed.clubes;
             if (parsed && (Array.isArray(parsed.personas) || parsed.claveClub)) {
                 const clave = parsed.claveClub || CLAVE_CLUB_POR_DEFECTO;
                 return { [clave]: parsed };
@@ -109,16 +134,13 @@ function leerMapaClubesDesdeDisco() {
     } catch (e) {
         console.error('⚠️ Error leyendo respaldo en disco:', e.message);
     }
-    return {
-        [CLAVE_CLUB_POR_DEFECTO]: crearEstadoVacioClub(CLAVE_CLUB_POR_DEFECTO)
-    };
+    return { [CLAVE_CLUB_POR_DEFECTO]: crearEstadoVacioClub(CLAVE_CLUB_POR_DEFECTO) };
 }
 
 function guardarMapaClubesEnDisco(mapaClubes) {
     try {
         const principal = mapaClubes[CLAVE_CLUB_POR_DEFECTO] || Object.values(mapaClubes)[0] || crearEstadoVacioClub();
-        const contenedor = { ...principal, clubes: mapaClubes };
-        fs.writeFileSync(ARCHIVO_RESPALDO_DISCO, JSON.stringify(contenedor, null, 2), 'utf8');
+        fs.writeFileSync(ARCHIVO_RESPALDO_DISCO, JSON.stringify({ ...principal, clubes: mapaClubes }, null, 2), 'utf8');
     } catch (e) {
         console.error('⚠️ Error guardando respaldo en disco:', e.message);
     }
@@ -148,9 +170,7 @@ async function obtenerTodosLosClubes() {
     if (mongoConectado && CdmStateModel) {
         try {
             const docs = await CdmStateModel.find({}).lean();
-            docs.forEach(d => {
-                if (d && d.claveClub) mapaDisco[d.claveClub] = d;
-            });
+            docs.forEach(d => { if (d && d.claveClub) mapaDisco[d.claveClub] = d; });
         } catch (e) {
             console.error('⚠️ Error listando clubes en Mongo:', e.message);
         }
@@ -231,8 +251,18 @@ function resumirListaClubes(mapaClubes) {
 }
 
 // ============================================================================
-// 3. RUTAS API REST DE SINCRONIZACIÓN Y MULTI-CLIENTE
+// 3. RUTAS API REST
 // ============================================================================
+
+// Verificación rápida de estado y conexión a MongoDB Atlas
+app.get('/api/cdm/salud', (req, res) => {
+    res.json({
+        ok: true,
+        mongoConectado,
+        baseDeDatos: mongoConectado ? cdmConnection.name : 'json_disco_local',
+        fechaAR: obtenerHoyAR()
+    });
+});
 
 app.get('/api/cdm/estado', async (req, res) => {
     try {
@@ -241,7 +271,7 @@ app.get('/api/cdm/estado', async (req, res) => {
         const todos = await obtenerTodosLosClubes();
         res.json({
             ok: true,
-            motor: mongoConectado ? 'mongoose_cdm_adelia_maria_oficial_db' : 'json_disco_local',
+            motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
             estado,
             clubes: resumirListaClubes(todos)
         });
@@ -257,7 +287,7 @@ app.post('/api/cdm/estado', async (req, res) => {
         res.json({
             ok: true,
             claveClub: guardado.claveClub,
-            motor: mongoConectado ? 'mongoose_cdm_adelia_maria_oficial_db' : 'json_disco_local',
+            motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
             ultimaActualizacionISO: guardado.ultimaActualizacionISO
         });
     } catch (err) {
@@ -337,7 +367,6 @@ app.post('/api/cdm/jugador/:id/sync', async (req, res) => {
     }
 });
 
-// Subida segura de estudios/datos desde el Portal del Paciente (solo si el profesional lo habilitó)
 app.post('/api/cdm/paciente/:id/estudio', async (req, res) => {
     try {
         const idPac = Number(req.params.id);
@@ -350,15 +379,15 @@ app.post('/api/cdm/paciente/:id/estudio', async (req, res) => {
         const pacs = estadoActual.consultorio?.pacientes || [];
         const pac = pacs.find(p => Number(p.id) === idPac);
         if (!pac) return res.status(404).json({ ok: false, error: 'Paciente no encontrado.' });
-        if (!pac.puedeSubirEstudios) {
-            return res.status(403).json({ ok: false, error: 'El profesional no habilitó la subida de archivos para este paciente.' });
+        if (pac.puedeSubirEstudios === false) {
+            return res.status(403).json({ ok: false, error: 'El profesional desactivó la subida de archivos para esta cuenta.' });
         }
 
         if (!Array.isArray(pac.estudios)) pac.estudios = [];
         pac.estudios.unshift({
             id: estudio.id || Date.now(),
             titulo: String(estudio.titulo).trim(),
-            fecha: estudio.fecha || new Date().toISOString().split('T')[0],
+            fecha: estudio.fecha || obtenerHoyAR(),
             url: estudio.url || '',
             archivoDataUrl: estudio.archivoDataUrl || '',
             archivoNombre: estudio.archivoNombre || '',
@@ -373,6 +402,7 @@ app.post('/api/cdm/paciente/:id/estudio', async (req, res) => {
     }
 });
 
+// Login de Comercio / Profesional (verifica suspensión y vencimiento de demo)
 app.post('/api/cdm/auth-admin', async (req, res) => {
     try {
         const usuario = String(req.body?.usuario || '').trim().toLowerCase();
@@ -394,16 +424,31 @@ app.post('/api/cdm/auth-admin', async (req, res) => {
         });
 
         if (!match) return res.status(401).json({ ok: false, mensaje: 'Usuario o contraseña incorrectos.' });
+
         if (match.licenciaConfig?.estadoServicio === 'suspendido') {
-            return res.status(403).json({ ok: false, suspendido: true, mensaje: '⚠️ Suscripción mensual en pausa. Contactá al desarrollador Gonzalo Adanchú para reactivar el servicio.' });
+            return res.status(403).json({
+                ok: false,
+                suspendido: true,
+                mensaje: '⚠️ Suscripción mensual en pausa. Contactá a Gonzalo Adanchú para reactivar el servicio.'
+            });
         }
+
+        if (estaDemoVencida(match.licenciaConfig)) {
+            return res.status(403).json({
+                ok: false,
+                suspendido: true,
+                demoVencida: true,
+                mensaje: `⏳ Tu prueba gratuita finalizó el ${formatearFechaAR(match.licenciaConfig.fechaVencimientoDemo)}. Todos tus datos siguen guardados de forma segura. Contactá a Gonzalo Adanchú para activar tu plan definitivo.`
+            });
+        }
+
         res.json({ ok: true, claveClub: match.claveClub, estado: match, clubes: resumirListaClubes(todos) });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-// Validar código personal: soporta Deportistas/Socios (CDM-XXXX) Y Pacientes de Consultorio (PAC-XXXX)
+// Login por código personal (Deportistas CDM-XXXX y Pacientes PAC-XXXX)
 app.post('/api/cdm/auth-codigo', async (req, res) => {
     try {
         const rawInput = String(req.body?.codigo || '').trim().toUpperCase();
@@ -418,7 +463,9 @@ app.post('/api/cdm/auth-codigo', async (req, res) => {
         }
 
         for (const estadoClub of listaClubes) {
-            // 1. Buscar primero en Pacientes del Consultorio (PAC-XXXX)
+            const lic = estadoClub.licenciaConfig || {};
+            const bloqueado = lic.estadoServicio === 'suspendido' || estaDemoVencida(lic);
+
             const pacs = Array.isArray(estadoClub.consultorio?.pacientes) ? estadoClub.consultorio.pacientes : [];
             const pacHit = pacs.find(p => {
                 if (!p) return false;
@@ -428,17 +475,13 @@ app.post('/api/cdm/auth-codigo', async (req, res) => {
                 return codP === rawInput || codPLimpio === limpioInput || (soloNumeros.length >= 7 && dniP === soloNumeros);
             });
             if (pacHit) {
-                return res.json({
-                    ok: true,
-                    esPacienteConsultorio: true,
-                    claveClub: estadoClub.claveClub,
-                    paciente: pacHit,
-                    estado: estadoClub
-                });
+                if (bloqueado) {
+                    return res.status(403).json({ ok: false, suspendido: true, mensaje: '⏳ El período de prueba de este consultorio finalizó. Consultá con tu profesional.' });
+                }
+                return res.json({ ok: true, esPacienteConsultorio: true, claveClub: estadoClub.claveClub, paciente: pacHit, estado: estadoClub });
             }
 
-            // 2. Buscar en Deportistas / Socios de Club y Gimnasio
-            const siglaClub = String(estadoClub.licenciaConfig?.siglaCodigo || 'CDM').toUpperCase();
+            const siglaClub = String(lic.siglaCodigo || 'CDM').toUpperCase();
             const encontrado = (estadoClub.personas || []).find(p => {
                 if (!p || !p.activo || !p.codigoAcceso) return false;
                 const codCompleto = String(p.codigoAcceso).toUpperCase();
@@ -447,13 +490,10 @@ app.post('/api/cdm/auth-codigo', async (req, res) => {
                 return codCompleto === rawInput || codLimpio === limpioInput || soloSufijo === rawInput;
             });
             if (encontrado) {
-                return res.json({
-                    ok: true,
-                    esPacienteConsultorio: false,
-                    claveClub: estadoClub.claveClub,
-                    persona: encontrado,
-                    estado: estadoClub
-                });
+                if (bloqueado) {
+                    return res.status(403).json({ ok: false, suspendido: true, mensaje: '⏳ El período de prueba de esta institución finalizó. Consultá con la administración.' });
+                }
+                return res.json({ ok: true, esPacienteConsultorio: false, claveClub: estadoClub.claveClub, persona: encontrado, estado: estadoClub });
             }
         }
 
@@ -474,8 +514,7 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor Oficial Multi-Cliente activo en: http://localhost:${PORT}`);
-    console.log(`📦 Base Mongoose aislada: ${CDM_MONGO_URI}`);
+    console.log(`🚀 Servidor Oficial Multi-Cliente activo en puerto ${PORT}`);
 });
 
 module.exports = { app, cdmConnection };
