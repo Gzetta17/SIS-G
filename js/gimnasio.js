@@ -995,12 +995,12 @@ function renderizarAsistenciasGym() {
             const pac = p.frecuenciaSemanal || 3, fue = contarAsistenciasUltimos7Dias(p), pres = p.asistencias.includes(fecha), alDia = (p.pagoEstado || "Al Día") === "Al Día";
             return `
                 <tr>
-                    <td><button type="button" class="check-btn ${pres ? "checked" : ""}" onclick="toggleAsistenciaPersona(${p.id}, '${fecha}')">✓</button></td>
-                    <td><strong style="cursor:pointer; color:var(--cdm-600);" onclick="irAPaginaIndividual(${p.id})">${p.apellido}, ${p.nombre}</strong><br><small style="color:var(--ink-500)">DNI ${p.dni} • 🔑 ${p.codigoAcceso}</small></td>
-                    <td><span class="badge badge-celeste">${p.puesto}</span></td>
-                    <td><span class="badge ${fue < pac ? "badge-warn" : "badge-ok"}">${fue}/${pac} días</span></td>
-                    <td><span class="badge ${alDia ? "badge-ok" : "badge-danger"}">${alDia ? "💳 Al Día" : "⚠️ Debe"} ($${Number(p.montoCuota || 25000).toLocaleString("es-AR")})</span></td>
-                    <td>
+                    <td data-label="Check"><button type="button" class="check-btn ${pres ? "checked" : ""}" onclick="toggleAsistenciaPersona(${p.id}, '${fecha}')">✓</button></td>
+                    <td data-label="Socio"><strong style="cursor:pointer; color:var(--cdm-600);" onclick="irAPaginaIndividual(${p.id})">${p.apellido}, ${p.nombre}</strong><br><small style="color:var(--ink-500)">DNI ${p.dni} • 🔑 ${p.codigoAcceso}</small></td>
+                    <td data-label="Plan"><span class="badge badge-celeste">${p.puesto}</span></td>
+                    <td data-label="Semana (7d)"><span class="badge ${fue < pac ? "badge-warn" : "badge-ok"}">${fue}/${pac} días</span></td>
+                    <td data-label="Cuota"><span class="badge ${alDia ? "badge-ok" : "badge-danger"}">${alDia ? "💳 Al Día" : "⚠️ Debe"} ($${Number(p.montoCuota || 25000).toLocaleString("es-AR")})</span></td>
+                    <td data-label="Acciones">
                         <div style="display:flex; gap:0.3rem; flex-wrap:wrap; justify-content:flex-end;">
                             <button class="btn ${alDia ? "btn-ghost" : "btn-ok"} btn-sm" onclick="alternarEstadoPago(${p.id})">${alDia ? "Estado" : "✓ Cobrar"}</button>
                             <button class="btn btn-secondary btn-sm" onclick="enviarReciboPagoWhatsApp(${p.id})">🧾 WA</button>
@@ -1104,29 +1104,341 @@ function renderizarMuroRecordsYRetencionGym() {
 }
 
 // =========================================================================
-// 5. CONSTRUCTOR DE RUTINAS ADMIN + WHATSAPP (USADO EN GYM Y DEPORTES)
+// 5. CONSTRUCTOR DE RUTINAS (MODAL PRO POR CATEGORÍA O PERSONA) + WHATSAPP
 // =========================================================================
 
+const CATEGORIAS_RUTINA_BASE_CDM = [
+    "Sub 13", "Sub 15", "Sub 17", "Reserva", "Primera", "General",
+    "Musculación e Hipertrofia", "Funcional & Cardio", "Fuerza & Powerlifting", "Salud y Readaptación"
+];
+
+function obtenerDeportesDisponiblesRutinasCDM() {
+    const base = ["Gimnasio", "Fútbol", "Hockey de Piso"];
+    (basePersonas || []).forEach(p => {
+        if (p.deporte && !base.includes(p.deporte)) base.push(p.deporte);
+    });
+    return base;
+}
+
+function inyectarBotonNuevaRutinaEnSeccionesCDM() {
+    ["gym-sec-rutinas", "dep-sec-rutinas"].forEach(secId => {
+        const sec = document.getElementById(secId);
+        if (!sec) return;
+        const head = sec.querySelector(".split-view > .app-panel:last-child .panel-head") || sec.querySelector(".panel-head");
+        if (!head || head.querySelector(".btn-auto-nueva-rutina-cdm") || head.querySelector("#btnAbrirModalNuevaRutinaCDM")) return;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-primary btn-sm btn-auto-nueva-rutina-cdm";
+        btn.innerHTML = `<i class="ri-add-circle-line"></i> + Nueva Rutina`;
+        btn.onclick = () => abrirModalCrearRutinaCDM();
+        head.appendChild(btn);
+    });
+}
+
+function asegurarModalRutinaCDM() {
+    let modal = document.getElementById("modalCrearRutinaCDM");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalCrearRutinaCDM";
+        modal.className = "modal-backdrop hidden";
+        document.body.appendChild(modal);
+    }
+    return modal;
+}
+
+function cerrarModalCrearRutinaCDM() {
+    const modal = document.getElementById("modalCrearRutinaCDM");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.innerHTML = "";
+}
+
+function cambiarTipoDestinoRutinaModalCDM(tipo) {
+    const esCat = tipo === "categoria";
+    const inpTipo = document.getElementById("modalRutinaTipoDest");
+    if (inpTipo) inpTipo.value = esCat ? "categoria" : "persona";
+    document.getElementById("tabDestPersonaCDM")?.classList.toggle("active", !esCat);
+    document.getElementById("tabDestCategoriaCDM")?.classList.toggle("active", esCat);
+    document.getElementById("bloqueDestPersonaModalCDM")?.classList.toggle("hidden", esCat);
+    document.getElementById("bloqueDestCategoriaModalCDM")?.classList.toggle("hidden", !esCat);
+}
+
+function agregarFilaRutinaModalCDM(datos = null) {
+    const cont = document.getElementById("modalFilasRutinaCDM");
+    if (!cont) return;
+    const n = cont.querySelectorAll(".ex-builder-row").length + 1;
+    const div = document.createElement("div");
+    div.className = "ex-builder-row";
+    div.innerHTML = `
+        <div class="ex-builder-top">
+            <span class="ex-builder-num">#${n}</span>
+            <div class="field" style="flex:1;"><input type="text" class="mr-nombre" list="listaEjerciciosGymAdmin" required placeholder="Nombre del ejercicio" value="${String(datos?.nombre || "").replace(/"/g, "&quot;")}"></div>
+            <button type="button" class="btn btn-danger btn-sm ex-builder-del" onclick="this.closest('.ex-builder-row').remove()">✕</button>
+        </div>
+        <div class="ex-builder-metrics-grid">
+            <div class="field"><label>Series</label><input type="number" class="mr-series" required min="1" value="${datos?.series || 4}"></div>
+            <div class="field"><label>Reps</label><input type="text" class="mr-reps" required value="${String(datos?.reps || "8-10").replace(/"/g, "&quot;")}"></div>
+            <div class="field"><label>Carga</label><input type="text" class="mr-peso" value="${String(datos?.peso || "").replace(/"/g, "&quot;")}" placeholder="Ej: 60kg"></div>
+            <div class="field"><label>Pausa</label><input type="text" class="mr-pausa" value="${String(datos?.pausa || "90s").replace(/"/g, "&quot;")}"></div>
+        </div>
+        <div class="field" style="margin-top:0.4rem;"><input type="text" class="mr-forma" placeholder="💡 Indicación técnica..." value="${String(datos?.forma || "").replace(/"/g, "&quot;")}"></div>
+    `;
+    cont.appendChild(div);
+}
+
+function cargarPlantillaModalRutinaCDM(tipo) {
+    const cont = document.getElementById("modalFilasRutinaCDM");
+    const inpNom = document.getElementById("modalRutinaNombre");
+    if (!cont) return;
+    cont.innerHTML = "";
+    if (tipo === "hipertrofia") {
+        if (inpNom) inpNom.value = "Tren Superior - Hipertrofia";
+        agregarFilaRutinaModalCDM({ nombre: "Press de Banca Plano", series: 4, reps: "8", peso: "Pesado", pausa: "2m" });
+        agregarFilaRutinaModalCDM({ nombre: "Dominadas / Jalón al Pecho en Polea", series: 4, reps: "8-10", peso: "Moderado", pausa: "90s" });
+    } else if (tipo === "piernas") {
+        if (inpNom) inpNom.value = "Tren Inferior - Fuerza y Potencia";
+        agregarFilaRutinaModalCDM({ nombre: "Sentadilla Trasera con Barra", series: 4, reps: "5", peso: "80% 1RM", pausa: "2m" });
+        agregarFilaRutinaModalCDM({ nombre: "Peso Muerto Rumano (Isquios y Glúteos)", series: 4, reps: "8", peso: "Controlado", pausa: "90s" });
+    } else if (tipo === "rehab") {
+        if (inpNom) inpNom.value = "Movilidad y Readaptación";
+        agregarFilaRutinaModalCDM({ nombre: "Hip Thrust con Barra (Empuje de Cadera)", series: 3, reps: "12", peso: "Suave", pausa: "60s" });
+        agregarFilaRutinaModalCDM({ nombre: "Plancha Abdominal RKC y Core", series: 3, reps: "30s", peso: "Corporal", pausa: "45s" });
+    } else {
+        if (inpNom) inpNom.value = "Funcional, Core y Preventivo";
+        agregarFilaRutinaModalCDM({ nombre: "Plancha Abdominal RKC y Core", series: 4, reps: "35s", peso: "Corporal", pausa: "45s" });
+        agregarFilaRutinaModalCDM({ nombre: "Sentadilla Búlgara Unilateral", series: 3, reps: "10 c/pierna", peso: "Moderado", pausa: "60s" });
+    }
+}
+
+function abrirModalCrearRutinaCDM(ejercicioInicial = null) {
+    asegurarVideotecaCargada();
+    const modal = asegurarModalRutinaCDM();
+    const deportes = obtenerDeportesDisponiblesRutinasCDM();
+    const depActual = (typeof deportePagina !== "undefined" && deportePagina) ? deportePagina : "Gimnasio";
+    const catActual = (typeof categoriaActiva !== "undefined" && categoriaActiva) ? categoriaActiva : "Sub 15";
+    const porDefectoCategoria = depActual !== "Gimnasio";
+
+    const activos = (basePersonas || []).filter(p => p.activo !== false);
+    const personasOrdenadas = [...activos].sort((a, b) => {
+        if (a.deporte === depActual && b.deporte !== depActual) return -1;
+        if (b.deporte === depActual && a.deporte !== depActual) return 1;
+        return `${a.apellido} ${a.nombre}`.localeCompare(`${b.apellido} ${b.nombre}`);
+    });
+
+    const optsPersonas = personasOrdenadas.length
+        ? personasOrdenadas.map(p => `<option value="${p.id}">👤 ${p.apellido}, ${p.nombre} — ${p.deporte}${p.categoria ? ` (${p.categoria})` : ""}</option>`).join("")
+        : `<option value="">Sin socios/jugadores cargados</option>`;
+
+    const optsDeportes = deportes.map(d => `<option value="${d}" ${d === depActual ? "selected" : ""}>${d === "Gimnasio" ? "🏋️" : "🏟️"} ${d}</option>`).join("");
+    const optsCategorias = CATEGORIAS_RUTINA_BASE_CDM.map(c => `<option value="${c}" ${c === catActual ? "selected" : ""}>${c}</option>`).join("");
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:720px;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-celeste">🏋️ NUEVA RUTINA</span>
+                    <h3 style="margin-top:4px;">Diseñar y Asignar Rutina</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalCrearRutinaCDM()">✕</button>
+            </div>
+
+            <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:0.85rem;">
+                <span style="font-size:0.72rem; font-weight:700; color:var(--ink-500); align-self:center;">Plantillas:</span>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaModalRutinaCDM('hipertrofia')">Hipertrofia</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaModalRutinaCDM('piernas')">Fuerza Piernas</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaModalRutinaCDM('funcional')">Funcional</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cargarPlantillaModalRutinaCDM('rehab')">Rehab</button>
+            </div>
+
+            <form id="formModalRutinaCDM" onsubmit="guardarRutinaDesdeModalCDM(event)">
+                <input type="hidden" id="modalRutinaTipoDest" value="${porDefectoCategoria ? "categoria" : "persona"}">
+
+                <div class="rutina-dest-tabs">
+                    <button type="button" id="tabDestPersonaCDM" class="rutina-dest-tab ${!porDefectoCategoria ? "active" : ""}" onclick="cambiarTipoDestinoRutinaModalCDM('persona')">
+                        <i class="ri-user-line"></i> Persona puntual
+                    </button>
+                    <button type="button" id="tabDestCategoriaCDM" class="rutina-dest-tab ${porDefectoCategoria ? "active" : ""}" onclick="cambiarTipoDestinoRutinaModalCDM('categoria')">
+                        <i class="ri-team-line"></i> Categoría / Grupo
+                    </button>
+                </div>
+
+                <div id="bloqueDestPersonaModalCDM" class="field ${porDefectoCategoria ? "hidden" : ""}" style="margin-bottom:0.75rem;">
+                    <label>Socio o Jugador Destinatario *</label>
+                    <select id="modalRutinaPersonaSelect">${optsPersonas}</select>
+                </div>
+
+                <div id="bloqueDestCategoriaModalCDM" class="grid-2 ${!porDefectoCategoria ? "hidden" : ""}" style="margin-bottom:0.75rem;">
+                    <div class="field">
+                        <label>Deporte / Área *</label>
+                        <select id="modalRutinaDeporteSelect">${optsDeportes}</select>
+                    </div>
+                    <div class="field">
+                        <label>Categoría o Programa *</label>
+                        <select id="modalRutinaCategoriaSelect">${optsCategorias}</select>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="margin-bottom:0.7rem;">
+                    <div class="field">
+                        <label>Enfoque del Programa *</label>
+                        <select id="modalRutinaObjetivo">
+                            <option value="Hipertrofia Estructural">🔴 Hipertrofia / Musculación</option>
+                            <option value="Fuerza Máxima">🔵 Fuerza Máxima</option>
+                            <option value="Potencia y Velocidad">⚡ Potencia / Explosividad</option>
+                            <option value="Funcional y Core">🟢 Funcional / Salud</option>
+                            <option value="Movilidad y Recuperación">🟡 Movilidad / Preventivo</option>
+                            <option value="Rehabilitación / Lesión">🏥 Rehabilitación / Readaptación</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Días Asignados</label>
+                        <input type="text" id="modalRutinaDias" placeholder="Ej: Lun, Mié y Vie">
+                    </div>
+                </div>
+
+                <div class="field" style="margin-bottom:0.8rem;">
+                    <label>Título de la Rutina *</label>
+                    <input type="text" id="modalRutinaNombre" required placeholder="Ej: Día 1 - Fuerza Tren Inferior / Sub 15">
+                </div>
+
+                <div id="modalFilasRutinaCDM"></div>
+
+                <button type="button" class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:0.75rem;" onclick="agregarFilaRutinaModalCDM()">
+                    + Añadir Ejercicio
+                </button>
+
+                <div class="field" style="margin-bottom:0.95rem;">
+                    <label>Indicaciones del Entrenador</label>
+                    <input type="text" id="modalRutinaNotas" placeholder="Opcional: calentamiento, tempo, RPE...">
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+                    <button type="button" class="btn btn-ghost" onclick="cerrarModalCrearRutinaCDM()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">💾 Guardar Rutina</button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    modal.classList.remove("hidden");
+    agregarFilaRutinaModalCDM(ejercicioInicial);
+}
+
+function guardarRutinaDesdeModalCDM(e) {
+    e.preventDefault();
+    const tipoDest = document.getElementById("modalRutinaTipoDest")?.value || "persona";
+    const filas = document.querySelectorAll("#modalFilasRutinaCDM .ex-builder-row");
+    if (!filas.length) {
+        mostrarToast("⚠️ Agregá al menos un ejercicio.");
+        return;
+    }
+
+    const ejercicios = Array.from(filas).map(f => {
+        const nom = f.querySelector(".mr-nombre").value.trim();
+        if (typeof agregarEjercicioInventadoAlCatalogoCDM === "function") {
+            agregarEjercicioInventadoAlCatalogoCDM(nom, "fuerza_kg", true);
+        }
+        return {
+            nombre: nom,
+            series: f.querySelector(".mr-series").value,
+            reps: f.querySelector(".mr-reps").value.trim(),
+            peso: f.querySelector(".mr-peso").value.trim() || "A ajustar",
+            pausa: f.querySelector(".mr-pausa").value.trim() || "90s",
+            forma: f.querySelector(".mr-forma").value.trim()
+        };
+    }).filter(ex => ex.nombre);
+
+    if (!ejercicios.length) {
+        mostrarToast("⚠️ Completá el nombre del ejercicio.");
+        return;
+    }
+
+    const depOrigen = (typeof deportePagina !== "undefined" && deportePagina) ? deportePagina : "Gimnasio";
+    const base = {
+        id: Date.now(),
+        fecha: new Date().toLocaleDateString("es-AR"),
+        nombre: document.getElementById("modalRutinaNombre").value.trim(),
+        objetivo: document.getElementById("modalRutinaObjetivo").value,
+        dias: document.getElementById("modalRutinaDias").value.trim() || "Semanal",
+        notas: document.getElementById("modalRutinaNotas").value.trim(),
+        origenModulo: depOrigen,
+        ejercicios
+    };
+
+    if (tipoDest === "categoria") {
+        const dep = document.getElementById("modalRutinaDeporteSelect")?.value || depOrigen;
+        const cat = document.getElementById("modalRutinaCategoriaSelect")?.value || "General";
+        baseRutinas.unshift({
+            ...base,
+            esGrupal: true,
+            deporteDestino: dep,
+            categoriaDestino: cat,
+            personaId: null,
+            etiquetaDestino: dep === "Gimnasio" ? `🏋️ Gym • ${cat}` : `🏟️ ${dep} • ${cat}`
+        });
+    } else {
+        const pId = parseInt(document.getElementById("modalRutinaPersonaSelect")?.value, 10);
+        const p = (basePersonas || []).find(x => Number(x.id) === pId);
+        if (!p) {
+            mostrarToast("⚠️ Seleccioná una persona válida.");
+            return;
+        }
+        baseRutinas.unshift({
+            ...base,
+            esGrupal: false,
+            deporteDestino: p.deporte || depOrigen,
+            categoriaDestino: p.categoria || "General",
+            personaId: p.id,
+            etiquetaDestino: `👤 ${p.nombre} ${p.apellido}`
+        });
+    }
+
+    guardarDatosCDM();
+    cerrarModalCrearRutinaCDM();
+    mostrarToast("✓ Rutina creada y asignada correctamente.");
+    if (typeof refrescarVistasActivasCDM === "function") refrescarVistasActivasCDM();
+    else if (typeof renderizarPaginaDeporte === "function") renderizarPaginaDeporte();
+    renderizarListaRutinasAdminGym();
+}
+
+// Reemplazo de la inserción desde Videoteca para abrir directamente el modal con el ejercicio cargado
+insertarEjercicioDeVideotecaEnRutina = function (idEx) {
+    const ex = (baseVideoteca || []).find(x => Number(x.id) === Number(idEx));
+    if (!ex) return;
+    abrirModalCrearRutinaCDM({
+        nombre: ex.nombre,
+        series: ex.seriesSugeridas || 4,
+        reps: ex.repsSugeridas || "8-10",
+        peso: ex.equipo,
+        pausa: ex.pausaSugerida || "90s",
+        forma: ex.clavesTecnicas
+    });
+};
+
 function poblarSelectsAdminRutinasGym() {
+    inyectarBotonNuevaRutinaEnSeccionesCDM();
     const selC = document.getElementById("adminRutinaPersonaSelect"), selF = document.getElementById("filtroPersonaRutinasAdmin");
-    if (!selC || !selF) return;
-    const prevC = selC.value, prevF = selF.value;
+    if (!selF) return;
+    const prevF = selF.value;
     const CATS = ["Sub 13", "Sub 15", "Sub 17", "Reserva", "Primera"];
-    let html = "";
 
     if (deportePagina && deportePagina !== "Gimnasio") {
-        html += `<optgroup label="👥 Categoría (${deportePagina})">${CATS.map(c => `<option value="CAT|${deportePagina}|${c}" ${c === categoriaActiva ? "selected" : ""}>🏟️ Todo ${deportePagina} ${c}</option>`).join("")}</optgroup>`;
         const jug = obtenerPersonasFiltradasDeporte(true);
-        html += `<optgroup label="👤 Jugador">${jug.map(p => `<option value="${p.id}">👤 ${p.apellido}, ${p.nombre}</option>`).join("")}</optgroup>`;
-        selC.innerHTML = html;
-        selF.innerHTML = `<option value="TODAS">Todas las rutinas</option>` + jug.map(p => `<option value="${p.id}">👤 ${p.apellido}, ${p.nombre}</option>`).join("");
+        if (selC) {
+            const prevC = selC.value;
+            selC.innerHTML = `<optgroup label="👥 Categoría (${deportePagina})">${CATS.map(c => `<option value="CAT|${deportePagina}|${c}" ${c === categoriaActiva ? "selected" : ""}>🏟️ Todo ${deportePagina} ${c}</option>`).join("")}</optgroup><optgroup label="👤 Jugador">${jug.map(p => `<option value="${p.id}">👤 ${p.apellido}, ${p.nombre}</option>`).join("")}</optgroup>`;
+            if (prevC) selC.value = prevC;
+        }
+        selF.innerHTML = `<option value="TODAS">Todas las rutinas</option><option value="SOLO_GRUPALES">🏟️ Solo Categorías / Grupales</option>` + jug.map(p => `<option value="${p.id}">👤 ${p.apellido}, ${p.nombre}</option>`).join("");
     } else {
         const soc = basePersonas.filter(p => p.deporte === "Gimnasio" && p.activo);
-        html += `<optgroup label="👤 Socios Gym">${soc.map(p => `<option value="${p.id}">👤 ${p.apellido}, ${p.nombre}</option>`).join("")}</optgroup><optgroup label="🏋️ Grupal"><option value="CAT|Gimnasio|General">🏋️ Pizarra General Gym</option></optgroup>`;
-        selC.innerHTML = html;
-        selF.innerHTML = `<option value="TODAS">Todas las rutinas</option>` + soc.map(p => `<option value="${p.id}">👤 ${p.apellido}, ${p.nombre}</option>`).join("");
+        if (selC) {
+            const prevC = selC.value;
+            selC.innerHTML = `<optgroup label="🏟️ Categorías / Grupos">${CATEGORIAS_RUTINA_BASE_CDM.map(c => `<option value="CAT|Gimnasio|${c}">🏋️ Gym • ${c}</option>`).join("")}</optgroup><optgroup label="👤 Socios Gym">${soc.map(p => `<option value="${p.id}">👤 ${p.apellido}, ${p.nombre}</option>`).join("")}</optgroup>`;
+            if (prevC) selC.value = prevC;
+        }
+        selF.innerHTML = `<option value="TODAS">Todas las rutinas</option><option value="SOLO_GRUPALES">🏟️ Solo Categorías / Grupales</option>` + soc.map(p => `<option value="${p.id}">👤 ${p.apellido}, ${p.nombre}</option>`).join("");
     }
-    if (prevC) selC.value = prevC;
     if (prevF) selF.value = prevF;
 }
 
@@ -1154,50 +1466,12 @@ function agregarFilaRutinaAdminGym(datos = null) {
 }
 
 function cargarPlantillaAdminGym(tipo) {
-    const cont = document.getElementById("contenedorFilasAdminGym");
-    if (!cont) return;
-    cont.innerHTML = "";
-    if (tipo === "hipertrofia") {
-        document.getElementById("adminRutinaNombre").value = "Tren Superior - Hipertrofia";
-        agregarFilaRutinaAdminGym({ nombre: "Press de Banca Plano", series: 4, reps: "8", peso: "Pesado", pausa: "2m" });
-        agregarFilaRutinaAdminGym({ nombre: "Dominadas / Jalón al Pecho en Polea", series: 4, reps: "8-10", peso: "Moderado", pausa: "90s" });
-    } else if (tipo === "piernas") {
-        document.getElementById("adminRutinaNombre").value = "Tren Inferior - Fuerza y Potencia";
-        agregarFilaRutinaAdminGym({ nombre: "Sentadilla Trasera con Barra", series: 4, reps: "5", peso: "80% 1RM", pausa: "2m" });
-        agregarFilaRutinaAdminGym({ nombre: "Peso Muerto Rumano (Isquios y Glúteos)", series: 4, reps: "8", peso: "Controlado", pausa: "90s" });
-    } else {
-        document.getElementById("adminRutinaNombre").value = "Funcional, Core y Preventivo";
-        agregarFilaRutinaAdminGym({ nombre: "Plancha Abdominal RKC y Core", series: 4, reps: "35s", peso: "Corporal", pausa: "45s" });
-        agregarFilaRutinaAdminGym({ nombre: "Hip Thrust con Barra (Empuje de Cadera)", series: 3, reps: "12", peso: "Moderado", pausa: "60s" });
-    }
+    cargarPlantillaModalRutinaCDM(tipo);
 }
 
 function guardarRutinaDesdeAdminGym(e) {
     e.preventDefault();
-    const val = document.getElementById("adminRutinaPersonaSelect")?.value;
-    const filas = document.querySelectorAll("#contenedorFilasAdminGym .ex-builder-row");
-    if (!val || !filas.length) return;
-    const ejercicios = Array.from(filas).map(f => {
-        const nom = f.querySelector(".ag-nombre").value.trim();
-        agregarEjercicioInventadoAlCatalogoCDM(nom, "fuerza_kg", true);
-        return { nombre: nom, series: f.querySelector(".ag-series").value, reps: f.querySelector(".ag-reps").value.trim(), peso: f.querySelector(".ag-peso").value.trim() || "A ajustar", pausa: f.querySelector(".ag-pausa").value.trim(), forma: f.querySelector(".ag-forma").value.trim() };
-    });
-
-    const base = { id: Date.now(), fecha: new Date().toLocaleDateString("es-AR"), nombre: document.getElementById("adminRutinaNombre").value.trim(), objetivo: document.getElementById("adminRutinaObjetivo").value, dias: document.getElementById("adminRutinaDias").value.trim() || "Semanal", notas: document.getElementById("adminRutinaNotas").value.trim(), ejercicios };
-    if (val.startsWith("CAT|")) {
-        const [, dep, cat] = val.split("|");
-        baseRutinas.unshift({ ...base, esGrupal: true, deporteDestino: dep, categoriaDestino: cat, personaId: null, etiquetaDestino: dep === "Gimnasio" ? "🏋️ Pizarra General Gym" : `🏟️ ${dep} ${cat}` });
-    } else {
-        const p = basePersonas.find(x => Number(x.id) === parseInt(val, 10));
-        if (!p) return;
-        baseRutinas.unshift({ ...base, esGrupal: false, deporteDestino: p.deporte, categoriaDestino: p.categoria, personaId: p.id, etiquetaDestino: `👤 ${p.nombre} ${p.apellido}` });
-    }
-    guardarDatosCDM();
-    e.target.reset();
-    document.getElementById("contenedorFilasAdminGym").innerHTML = "";
-    agregarFilaRutinaAdminGym();
-    mostrarToast("✓ Rutina guardada.");
-    renderizarPaginaDeporte();
+    abrirModalCrearRutinaCDM();
 }
 
 function renderTarjetaRutinaProAdmin(r) {
@@ -1243,15 +1517,23 @@ function renderTarjetaRutinaProAdmin(r) {
 }
 
 function renderizarListaRutinasAdminGym() {
+    inyectarBotonNuevaRutinaEnSeccionesCDM();
     const cont = document.getElementById("contenedorTarjetasRutinasAdminGym");
     if (!cont) return;
     cont.className = "routines-pro-grid";
     const fId = document.getElementById("filtroPersonaRutinasAdmin")?.value || "TODAS";
-    let lista = [...baseRutinas];
-    if (deportePagina && deportePagina !== "Gimnasio") lista = lista.filter(r => r.deporteDestino === deportePagina && r.categoriaDestino === categoriaActiva);
-    else if (deportePagina === "Gimnasio") lista = lista.filter(r => r.deporteDestino === "Gimnasio");
-    if (fId !== "TODAS") lista = lista.filter(r => String(r.personaId) === String(fId) || r.esGrupal);
-    cont.innerHTML = lista.length ? lista.map(r => renderTarjetaRutinaProAdmin(r)).join("") : `<div class="empty-box" style="grid-column:1/-1;">Sin rutinas cargadas todavía.</div>`;
+    let lista = [...(baseRutinas || [])];
+    if (deportePagina && deportePagina !== "Gimnasio") {
+        lista = lista.filter(r => r.deporteDestino === deportePagina && (r.categoriaDestino === categoriaActiva || r.categoriaDestino === "General"));
+    } else if (deportePagina === "Gimnasio") {
+        lista = lista.filter(r => r.deporteDestino === "Gimnasio" || r.origenModulo === "Gimnasio");
+    }
+    if (fId === "SOLO_GRUPALES") lista = lista.filter(r => r.esGrupal);
+    else if (fId !== "TODAS") lista = lista.filter(r => String(r.personaId) === String(fId) || r.esGrupal);
+
+    cont.innerHTML = lista.length
+        ? lista.map(r => renderTarjetaRutinaProAdmin(r)).join("")
+        : `<div class="empty-box" style="grid-column:1/-1;"><p style="margin-bottom:0.75rem;">Sin rutinas cargadas todavía.</p><button type="button" class="btn btn-primary btn-sm" onclick="abrirModalCrearRutinaCDM()"><i class="ri-add-circle-line"></i> + Crear Primera Rutina</button></div>`;
 }
 
 function armarMensajeWhatsAppRutina(r, dest) {
@@ -1284,11 +1566,117 @@ function borrarRutinaGlobal(idR) {
     if (!confirm("🗑️ ¿Eliminar esta rutina?")) return;
     baseRutinas = baseRutinas.filter(x => Number(x.id) !== Number(idR));
     guardarDatosCDM();
-    refrescarVistasActivasCDM();
+    if (typeof refrescarVistasActivasCDM === "function") refrescarVistasActivasCDM();
+    renderizarListaRutinasAdminGym();
+}
+
+// =========================================================================
+// 6. LISTA COMPACTA DESPLEGABLE DE SOCIOS + MODAL SISTEMA EN CELULAR
+// =========================================================================
+
+function aplicarModoListaSociosGymCDM(modo) {
+    const grid = document.getElementById("gridJugadoresDeporte");
+    if (!grid) return;
+    const usarLista = modo === "lista";
+    grid.classList.toggle("vista-lista-compacta", usarLista);
+    localStorage.setItem("cdm_vista_socios_modo", usarLista ? "lista" : "tarjetas");
+    document.getElementById("btnVistaListaCDM")?.classList.toggle("active", usarLista);
+    document.getElementById("btnVistaTarjetasCDM")?.classList.toggle("active", !usarLista);
+}
+
+function decorarTarjetasListaCompactaCDM() {
+    const grid = document.getElementById("gridJugadoresDeporte");
+    if (!grid) return;
+    grid.querySelectorAll(".athlete-card .ath-card-header").forEach(header => {
+        if (!header.querySelector(".ath-expand-indicator")) {
+            const flecha = document.createElement("span");
+            flecha.className = "ath-expand-indicator";
+            flecha.title = "Tocar para desplegar/ocultar detalles";
+            flecha.innerHTML = `<i class="ri-arrow-down-s-line"></i>`;
+            header.appendChild(flecha);
+        }
+    });
+}
+
+function inicializarListaCompactaSociosCDM() {
+    const grid = document.getElementById("gridJugadoresDeporte");
+    if (!grid || grid.dataset.listaCompactaInit === "1") return;
+    grid.dataset.listaCompactaInit = "1";
+
+    // Insertar switch Lista Compacta / Tarjetas encima de la grilla
+    if (!document.getElementById("gymViewSwitchBarCDM")) {
+        const bar = document.createElement("div");
+        bar.id = "gymViewSwitchBarCDM";
+        bar.className = "gym-view-switch-bar";
+        bar.innerHTML = `
+            <small style="color:var(--ink-500); font-weight:600;">Tocá un socio para desplegar su info y botones</small>
+            <div class="gym-view-switch-group">
+                <button type="button" id="btnVistaListaCDM" class="gym-view-btn" onclick="aplicarModoListaSociosGymCDM('lista')"><i class="ri-list-check-2"></i> Lista</button>
+                <button type="button" id="btnVistaTarjetasCDM" class="gym-view-btn" onclick="aplicarModoListaSociosGymCDM('tarjetas')"><i class="ri-layout-grid-line"></i> Tarjetas</button>
+            </div>
+        `;
+        grid.parentNode.insertBefore(bar, grid);
+    }
+
+    // Por defecto: lista compacta en Gimnasio o en celular
+    const guardado = localStorage.getItem("cdm_vista_socios_modo");
+    const modoInicial = guardado || ((deportePagina === "Gimnasio" || window.innerWidth <= 860) ? "lista" : "tarjetas");
+    aplicarModoListaSociosGymCDM(modoInicial);
+
+    // Capturar click en la fila para desplegar/contraer sin abrir Ficha 360° por accidente
+    grid.addEventListener("click", (e) => {
+        if (!grid.classList.contains("vista-lista-compacta")) return;
+        const card = e.target.closest(".athlete-card");
+        if (!card) return;
+        if (e.target.closest("button, a, input, select, .check-btn, .avatar-editable, .ath-bottom")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        card.classList.toggle("card-expanded");
+    }, true);
+
+    decorarTarjetasListaCompactaCDM();
+    const obs = new MutationObserver(() => decorarTarjetasListaCompactaCDM());
+    obs.observe(grid, { childList: true });
+}
+
+function abrirModalSistemaMovilCDM() {
+    let modal = document.getElementById("modalSistemaMovilCDM");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalSistemaMovilCDM";
+        modal.className = "modal-backdrop hidden";
+        document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:420px;">
+            <div class="modal-top">
+                <h3><i class="ri-database-2-line"></i> Sistema y Backup</h3>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalSistemaMovilCDM').classList.add('hidden')">✕</button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.65rem;">
+                <button type="button" class="btn btn-primary" onclick="cargarDatosDemoCDM(); document.getElementById('modalSistemaMovilCDM').classList.add('hidden');">
+                    <i class="ri-sparkling-fill"></i> Cargar Datos Demo
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="exportarBackupJSON()">
+                    <i class="ri-download-2-line"></i> Descargar Backup JSON
+                </button>
+                <label class="btn btn-ghost" style="cursor:pointer;">
+                    <i class="ri-upload-2-line"></i> Subir / Restaurar Backup JSON
+                    <input type="file" accept=".json" onchange="importarBackupJSON(event); document.getElementById('modalSistemaMovilCDM').classList.add('hidden');" style="display:none;">
+                </label>
+                <button type="button" class="btn btn-danger" onclick="limpiarTodoElSistema(); document.getElementById('modalSistemaMovilCDM').classList.add('hidden');">
+                    <i class="ri-delete-bin-line"></i> Vaciar Todos los Datos
+                </button>
+            </div>
+        </div>
+    `;
+    modal.classList.remove("hidden");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
     asegurarVideotecaCargada();
+    inyectarBotonNuevaRutinaEnSeccionesCDM();
+    inicializarListaCompactaSociosCDM();
     if (deportePagina === "Gimnasio") {
         const cont = document.getElementById("contenedorFilasAdminGym");
         if (cont && cont.children.length === 0) agregarFilaRutinaAdminGym();

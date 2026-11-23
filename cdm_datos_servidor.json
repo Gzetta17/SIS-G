@@ -1,6 +1,6 @@
 {
   "claveClub": "cdm_adelia_maria_principal",
-  "ultimaActualizacionISO": "2026-11-22T04:11:10.014Z",
+  "ultimaActualizacionISO": "2026-11-22T17:03:12.889Z",
   "personas": [
     {
       "id": 101,
@@ -1128,7 +1128,7 @@
   "clubes": {
     "cdm_adelia_maria_principal": {
       "claveClub": "cdm_adelia_maria_principal",
-      "ultimaActualizacionISO": "2026-11-22T04:11:10.014Z",
+      "ultimaActualizacionISO": "2026-11-22T17:03:12.889Z",
       "personas": [
         {
           "id": 101,
@@ -2992,7 +2992,7 @@
     },
     "lic_alina_caudana_425": {
       "claveClub": "lic_alina_caudana_425",
-      "ultimaActualizacionISO": "2026-11-18T23:51:13.961Z",
+      "ultimaActualizacionISO": "2026-11-23T14:13:24.079Z",
       "personas": [],
       "rutinas": [],
       "partidos": [],
@@ -3207,6 +3207,15 @@
           "tipo": "resistencia_yoyo"
         }
       ],
+      "consultorio": {
+        "pacientes": [],
+        "turnos": [],
+        "mutuales": [],
+        "profesionales": [],
+        "sesiones": []
+      },
+      "subAdmins": [],
+      "auditoria": [],
       "licenciaConfig": {
         "claveClub": "lic_alina_caudana_425",
         "nombreEntidad": "LIC. ALINA CAUDANA",
@@ -3227,10 +3236,7 @@
         "bloquearCobranza": false,
         "modoComplejidad": "simple",
         "profesionesHabilitadas": [
-          "Quiropraxia",
-          "Kinesiología",
-          "Psicología",
-          "Nutrición"
+          "Psicología"
         ],
         "funciones": {
           "salud": {
@@ -3258,7 +3264,8 @@
           },
           "general": {
             "notasRapidas": true,
-            "cierreCaja": true
+            "cierreCaja": true,
+            "whatsappAuto24h": false
           }
         },
         "aliasTransferencia": "",

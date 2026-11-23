@@ -2040,3 +2040,1567 @@ window.especialidadFiltroConsultorioCDM = "TODAS";
         setTimeout(sincronizarMenuYBaseDeDatosConsultorio, 1400);
     });
 })();
+// =========================================================================
+// 12. PSICOLOGÍA INTERACTIVA LIMPIA:
+//     - BOTÓN "▶ INICIAR SESIÓN" EN PRÓXIMOS PACIENTES (AL LADO DEL CALENDARIO)
+//     - ANOTACIONES A ANCHO COMPLETO (100%) SIN COLUMNAS LATERALES
+//     - GOTA FLOTANTE DE TIEMPO (💧 45:00) + BOTÓN "🌳 ÁRBOL FAMILIAR" ARRIBA DE LAS NOTAS
+//     Reemplazar por completo el Bloque 12 anterior al final de js/consultorio.js
+// =========================================================================
+
+(function () {
+    const ETIQUETAS_PSICO_VIVO = [
+        "Vínculos / Familia",
+        "Ansiedad / Estrés",
+        "Estado de ánimo",
+        "Trabajo / Estudio",
+        "Límites / Autoestima",
+        "Avance clínico",
+        "Momento de crisis",
+        "Consigna / Tarea"
+    ];
+
+    const DURACIONES_PRESET = [30, 45, 50, 60, 90];
+
+    const RAMAS_ARBOL_FAMILIAR = [
+        { clave: "Materna", icono: "🟣", label: "Rama Materna" },
+        { clave: "Paterna", icono: "🔵", label: "Rama Paterna" },
+        { clave: "Nucleo", icono: "🟢", label: "Núcleo Actual / Pareja e Hijos" },
+        { clave: "Red", icono: "🟠", label: "Red de Apoyo / Otros" }
+    ];
+
+    const PARENTESCOS_BASE = [
+        "Madre", "Padre", "Hermano/a", "Pareja", "Ex-pareja",
+        "Hijo/a", "Abuela", "Abuelo", "Tío/a", "Primo/a",
+        "Padrastro / Madrastra", "Amigo/a cercano", "Referente / Otro"
+    ];
+
+    const TIPOS_VINCULO = [
+        { clave: "cercano", label: "🟢 Cercano / Sano", color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+        { clave: "distante", label: "🟡 Distante", color: "#d97706", bg: "rgba(245,158,11,0.14)" },
+        { clave: "conflictivo", label: "🔴 Conflictivo / Tenso", color: "#e11d48", bg: "rgba(225,29,72,0.12)" },
+        { clave: "dependiente", label: "🟣 Fusión / Dependiente", color: "#7c3aed", bg: "rgba(124,58,237,0.12)" },
+        { clave: "duelo", label: "⚫ Fallecido / Duelo", color: "#475569", bg: "rgba(71,85,105,0.16)" }
+    ];
+
+    let tabSesionVivoActiva = false;
+    let intervaloTick = null;
+    let gotaAbierta12 = false;
+    let verResumenAnterior12 = false;
+
+    const estadoVivo = {
+        pacienteId: null,
+        turnoId: null,
+        duracionMin: 45,
+        modo: "regresivo",
+        corriendo: false,
+        iniciada: false,
+        startedAtMs: null,
+        accumulatedMs: 0,
+        horaInicioStr: "",
+        sonidoFin: false,
+        avisoFinEmitido: false,
+        notas: "",
+        retomarProxima: "",
+        animo: 6,
+        ansiedad: 5,
+        etiquetas: [],
+        marcarTurnoAtendido: true,
+        tokenTurno: ""
+    };
+
+    function normTxt12(s) {
+        return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    function esc12(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function hoyISO12() {
+        return typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+    }
+
+    function toast12(msg) {
+        if (typeof mostrarToast === "function") mostrarToast(msg);
+    }
+
+    function generarCodigoPac12(pacientes) {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let b = "";
+        for (let i = 0; i < 4; i++) b += chars[Math.floor(Math.random() * chars.length)];
+        const cod = `PAC-${b}`;
+        return (pacientes || []).some(p => p.codigoAcceso === cod) ? generarCodigoPac12(pacientes) : cod;
+    }
+
+    function obtenerEspActiva12() {
+        const profs = typeof obtenerEspecialidadesHabilitadasConsultorioCDM === "function"
+            ? obtenerEspecialidadesHabilitadasConsultorioCDM()
+            : [];
+        const act = window.especialidadFiltroConsultorioCDM;
+        if (act && act !== "TODAS" && profs.some(pr => normTxt12(pr.clave) === normTxt12(act))) {
+            return profs.find(pr => normTxt12(pr.clave) === normTxt12(act)).clave;
+        }
+        return profs[0]?.clave || "Consultorio";
+    }
+
+    function esAreaPsicologia12(espOpt = null) {
+        if (typeof obtenerPerfilEspecialidadCDM !== "function") return false;
+        return obtenerPerfilEspecialidadCDM(espOpt || obtenerEspActiva12()) === "psicologia";
+    }
+
+    function estaConsultorioVisible12() {
+        const sec = document.getElementById("cdmSeccionConsultorioGlobal");
+        return Boolean(sec && !sec.classList.contains("hidden"));
+    }
+
+    function claveBorradorStorage12() {
+        const club = typeof obtenerClaveClubActivoCDM === "function" ? obtenerClaveClubActivoCDM() : "cdm_adelia_maria_principal";
+        return `cdm_psico_sesion_viva_draft_v1_${club}`;
+    }
+
+    function guardarBorradorVivo12() {
+        try { localStorage.setItem(claveBorradorStorage12(), JSON.stringify(estadoVivo)); } catch {}
+    }
+
+    function cargarBorradorVivo12() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(claveBorradorStorage12()) || "null");
+            if (raw && typeof raw === "object") {
+                Object.assign(estadoVivo, raw);
+                if (estadoVivo.corriendo) iniciarLoopReloj12();
+            }
+        } catch {}
+    }
+
+    function limpiarBorradorVivo12() {
+        try { localStorage.removeItem(claveBorradorStorage12()); } catch {}
+    }
+
+    function obtenerMsTranscurridos12() {
+        const base = Number(estadoVivo.accumulatedMs) || 0;
+        if (estadoVivo.corriendo && estadoVivo.startedAtMs) {
+            return Math.max(0, base + (Date.now() - estadoVivo.startedAtMs));
+        }
+        return Math.max(0, base);
+    }
+
+    function formatearMMSS12(totalSegs) {
+        const neg = totalSegs < 0;
+        const abs = Math.abs(Math.floor(totalSegs));
+        const h = Math.floor(abs / 3600);
+        const m = Math.floor((abs % 3600) / 60);
+        const s = abs % 60;
+        const base = h > 0
+            ? `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+            : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        return neg ? `+${base}` : base;
+    }
+
+    function calcularEstadoReloj12() {
+        const transSeg = Math.floor(obtenerMsTranscurridos12() / 1000);
+        const totalObjSeg = Math.max(60, (Number(estadoVivo.duracionMin) || 45) * 60);
+        const restantesSeg = totalObjSeg - transSeg;
+        const pct = Math.min(100, Math.round((transSeg / totalObjSeg) * 100));
+
+        const display = estadoVivo.modo === "progresivo"
+            ? formatearMMSS12(transSeg)
+            : formatearMMSS12(restantesSeg);
+
+        let fase = "idle";
+        if (estadoVivo.iniciada || transSeg > 0) {
+            if (estadoVivo.modo === "regresivo") {
+                if (restantesSeg <= 0) fase = "over";
+                else if (restantesSeg <= 300) fase = "warn";
+                else fase = "ok";
+            } else {
+                if (transSeg >= totalObjSeg) fase = "over";
+                else if (totalObjSeg - transSeg <= 300) fase = "warn";
+                else fase = "ok";
+            }
+        }
+        return { transSeg, totalObjSeg, restantesSeg, pct, display, fase };
+    }
+
+    function emitirTonoSuavePsico12() {
+        try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            const ctx = new Ctx();
+            [440, 554.37].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.08, ctx.currentTime + i * 0.25);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.25 + 0.55);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime + i * 0.25);
+                osc.stop(ctx.currentTime + i * 0.25 + 0.6);
+            });
+        } catch {}
+    }
+
+    function iniciarLoopReloj12() {
+        if (intervaloTick) clearInterval(intervaloTick);
+        intervaloTick = setInterval(() => {
+            if (!estadoVivo.corriendo) {
+                clearInterval(intervaloTick);
+                intervaloTick = null;
+                return;
+            }
+            actualizarSoloDOMReloj12();
+        }, 1000);
+    }
+
+    function construirResumenArbol12(arbol) {
+        if (!Array.isArray(arbol) || !arbol.length) return "";
+        return arbol.map(n => `${n.parentesco} ${n.nombre} (${n.rama}/${n.vinculo})`).join(" • ");
+    }
+
+    function infoVinculo12(clave) {
+        return TIPOS_VINCULO.find(v => v.clave === clave) || TIPOS_VINCULO[0];
+    }
+
+    // =====================================================================
+    // 1. ESTILOS: ANOTACIONES FULL-WIDTH + GOTA FLOTANTE + MODAL ÁRBOL
+    // =====================================================================
+    function inyectarCSSSesionVivo12() {
+        if (document.getElementById("cdmCssPsicoSesionVivo12")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssPsicoSesionVivo12";
+        st.textContent = `
+            .psv-full-wrap {
+                display: flex;
+                flex-direction: column;
+                gap: 0.85rem;
+                width: 100%;
+            }
+            .psv-topbar-slim {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.6rem;
+                flex-wrap: wrap;
+                padding-bottom: 0.75rem;
+                border-bottom: 1px solid var(--line, #e2e8f0);
+                margin-bottom: 0.75rem;
+            }
+            .psv-pac-picker-group {
+                display: flex;
+                align-items: center;
+                gap: 0.45rem;
+                flex-wrap: wrap;
+                flex: 1;
+                min-width: 240px;
+            }
+            .psv-pac-picker-group select {
+                max-width: 340px;
+                min-height: 36px;
+                font-weight: 700;
+            }
+            .psv-tools-bar {
+                display: flex;
+                align-items: center;
+                gap: 0.38rem;
+                flex-wrap: wrap;
+            }
+            .psv-prev-drawer {
+                background: rgba(124, 58, 237, 0.07);
+                border: 1px solid rgba(124, 58, 237, 0.28);
+                border-left: 4px solid #7c3aed;
+                border-radius: 13px;
+                padding: 0.72rem 0.9rem;
+                margin-bottom: 0.75rem;
+                font-size: 0.8rem;
+                line-height: 1.48;
+            }
+            .psv-tags-wrap { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+            .psv-tag-chip {
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-subtle, #f8fafc);
+                color: var(--ink-700, #334155);
+                font-size: 0.72rem; font-weight: 700;
+                padding: 0.24rem 0.62rem; border-radius: 999px;
+                cursor: pointer; transition: all 0.14s ease;
+            }
+            .psv-tag-chip.active { background: #7c3aed; border-color: #7c3aed; color: #ffffff; }
+            .psv-notes-full {
+                width: 100%;
+                min-height: 340px;
+                resize: vertical;
+                line-height: 1.65;
+                font-size: 0.93rem;
+                padding: 0.9rem 1rem;
+                border-radius: 14px;
+            }
+            .psv-bottom-controls {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1.6fr;
+                gap: 0.75rem;
+                align-items: center;
+                background: var(--surface-subtle, #f8fafc);
+                border: 1px solid var(--line-strong, #cbd5e1);
+                border-radius: 13px;
+                padding: 0.7rem 0.85rem;
+                margin-top: 0.75rem;
+                margin-bottom: 0.75rem;
+            }
+
+            /* === GOTA FLOTANTE DE TIEMPO === */
+            #cdmPsicoGotaSesion12 {
+                position: fixed; bottom: 22px; right: 22px; z-index: 1150;
+                display: flex; flex-direction: column; align-items: flex-end; gap: 0.6rem;
+            }
+            #cdmPsicoGotaSesion12.hidden { display: none !important; }
+            .psv-gota-btn {
+                min-width: 66px; height: 58px; padding: 0 1.1rem 0 0.95rem;
+                border-radius: 30px 30px 6px 30px;
+                background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
+                color: #ffffff; border: 2px solid rgba(196, 181, 253, 0.75);
+                box-shadow: 0 14px 32px rgba(76, 29, 149, 0.48);
+                cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;
+                font-weight: 900; font-size: 1.02rem; font-variant-numeric: tabular-nums;
+                transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.25s ease;
+            }
+            .psv-gota-btn:hover { transform: translateY(-3px) scale(1.03); }
+            .psv-gota-btn[data-fase="ok"] { background: linear-gradient(135deg, #047857 0%, #10b981 100%); border-color: #a7f3d0; }
+            .psv-gota-btn[data-fase="warn"] { background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%); border-color: #fde68a; }
+            .psv-gota-btn[data-fase="over"] { background: linear-gradient(135deg, #9f1239 0%, #f43f5e 100%); border-color: #fecdd3; }
+            .psv-gota-dot { width: 9px; height: 9px; border-radius: 50%; background: #ffffff; flex-shrink: 0; }
+            @keyframes psvBlink12 { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+            .psv-gota-btn.is-running .psv-gota-dot { animation: psvBlink12 1.2s infinite; }
+
+            .psv-gota-popover {
+                width: 305px; max-width: calc(100vw - 24px);
+                background: linear-gradient(155deg, #1e1b4b 0%, #312e81 60%, #4c1d95 100%);
+                color: #ffffff; border: 1.5px solid rgba(196, 181, 253, 0.45);
+                border-radius: 22px; padding: 1rem 1.05rem;
+                box-shadow: 0 24px 50px rgba(15, 23, 42, 0.65);
+                display: flex; flex-direction: column; gap: 0.65rem;
+            }
+            .psv-gota-digits { font-size: 2.45rem; font-weight: 900; text-align: center; line-height: 1.05; font-variant-numeric: tabular-nums; }
+            .psv-gota-digits[data-fase="ok"] { color: #6ee7b7; }
+            .psv-gota-digits[data-fase="warn"] { color: #fde047; }
+            .psv-gota-digits[data-fase="over"] { color: #fda4af; }
+            .psv-progress-track { height: 7px; background: rgba(255,255,255,0.16); border-radius: 999px; overflow: hidden; }
+            .psv-progress-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #34d399); border-radius: 999px; transition: width 0.35s ease; }
+            .psv-progress-fill[data-fase="warn"] { background: linear-gradient(90deg, #f59e0b, #fde047); }
+            .psv-progress-fill[data-fase="over"] { background: linear-gradient(90deg, #f43f5e, #fb7185); }
+            .psv-preset-row { display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; }
+            .psv-preset-btn {
+                border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1);
+                color: #f8fafc; font-size: 0.72rem; font-weight: 700;
+                padding: 0.26rem 0.55rem; border-radius: 8px; cursor: pointer;
+            }
+            .psv-preset-btn:hover, .psv-preset-btn.active { background: #ffffff; color: #312e81; border-color: #ffffff; }
+            .psv-custom-min {
+                width: 60px !important; min-height: 27px !important; padding: 0.12rem 0.35rem !important;
+                font-size: 0.73rem !important; font-weight: 800 !important; text-align: center;
+                background: rgba(255,255,255,0.14) !important; color: #ffffff !important;
+                border: 1px solid rgba(255,255,255,0.3) !important; border-radius: 8px !important;
+            }
+
+            /* === MODAL ÁRBOL FAMILIAR === */
+            .psv-tree-branch {
+                background: var(--surface-subtle, #f8fafc);
+                border: 1px solid var(--line, #e2e8f0);
+                border-radius: 13px; padding: 0.55rem 0.7rem; margin-bottom: 0.45rem;
+            }
+            .psv-tree-branch-title {
+                font-size: 0.69rem; font-weight: 800; text-transform: uppercase;
+                color: var(--ink-500, #64748b); letter-spacing: 0.03em; margin-bottom: 0.35rem;
+            }
+            .psv-tree-node {
+                display: flex; justify-content: space-between; align-items: center; gap: 0.45rem;
+                background: var(--surface-solid, #ffffff);
+                border: 1px solid var(--line, #e2e8f0); border-left: 4px solid #7c3aed;
+                border-radius: 10px; padding: 0.45rem 0.65rem; margin-bottom: 0.35rem; font-size: 0.78rem;
+            }
+            .psv-tree-node:last-child { margin-bottom: 0; }
+            .psv-tree-add-box {
+                background: rgba(124, 58, 237, 0.06);
+                border: 1.5px dashed rgba(124, 58, 237, 0.35);
+                border-radius: 13px; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;
+            }
+
+            @media (max-width: 900px) {
+                .psv-bottom-controls { grid-template-columns: 1fr; }
+                .psv-notes-full { min-height: 240px; }
+            }
+            @media (max-width: 860px) {
+                #cdmPsicoGotaSesion12 { bottom: 80px; right: 14px; }
+                .psv-gota-btn { height: 52px; font-size: 0.94rem; padding: 0 0.9rem; }
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    // =====================================================================
+    // 2. GOTA FLOTANTE DE TIEMPO
+    // =====================================================================
+    function debeMostrarseGotaPsico12() {
+        if (estadoVivo.corriendo) return true;
+        return estaConsultorioVisible12() && esAreaPsicologia12();
+    }
+
+    function asegurarGotaFlotantePsico12() {
+        inyectarCSSSesionVivo12();
+        let wrap = document.getElementById("cdmPsicoGotaSesion12");
+        if (!debeMostrarseGotaPsico12()) {
+            wrap?.classList.add("hidden");
+            return;
+        }
+        if (!wrap) {
+            wrap = document.createElement("div");
+            wrap.id = "cdmPsicoGotaSesion12";
+            document.body.appendChild(wrap);
+        }
+        wrap.classList.remove("hidden");
+        renderizarGotaFlotantePsico12();
+    }
+
+    function actualizarSoloDOMReloj12() {
+        const c = calcularEstadoReloj12();
+        if (estadoVivo.corriendo && c.fase === "over" && !estadoVivo.avisoFinEmitido) {
+            estadoVivo.avisoFinEmitido = true;
+            guardarBorradorVivo12();
+            if (estadoVivo.sonidoFin) emitirTonoSuavePsico12();
+            toast12("⏱️ Tiempo estipulado de sesión cumplido.");
+        }
+
+        const btnGota = document.getElementById("psvGotaBtn12");
+        if (btnGota) {
+            btnGota.dataset.fase = c.fase;
+            btnGota.classList.toggle("is-running", estadoVivo.corriendo);
+        }
+        const lblGota = document.getElementById("psvGotaTimeLbl12");
+        if (lblGota) lblGota.textContent = c.display;
+
+        const dig = document.getElementById("psicoRelojDigitos12");
+        if (dig) { dig.textContent = c.display; dig.dataset.fase = c.fase; }
+
+        const bar = document.getElementById("psicoRelojBarra12");
+        if (bar) { bar.style.width = `${c.pct}%`; bar.dataset.fase = c.fase; }
+
+        const sub = document.getElementById("psicoRelojSub12");
+        if (sub) {
+            const transMin = Math.floor(c.transSeg / 60);
+            if (!estadoVivo.iniciada && c.transSeg === 0) {
+                sub.textContent = `Configurada en ${estadoVivo.duracionMin} min • Lista`;
+            } else if (c.fase === "over") {
+                sub.textContent = `Tiempo cumplido (${transMin} min • en extra)`;
+            } else if (c.fase === "warn") {
+                sub.textContent = `Últimos 5 min • ${transMin}/${estadoVivo.duracionMin} min`;
+            } else {
+                sub.textContent = `${estadoVivo.corriendo ? "En curso" : "Pausada"} • ${transMin}/${estadoVivo.duracionMin} min`;
+            }
+        }
+    }
+
+    function renderizarGotaFlotantePsico12() {
+        const wrap = document.getElementById("cdmPsicoGotaSesion12");
+        if (!wrap) return;
+        const c = calcularEstadoReloj12();
+        const db = obtenerDatosConsultorioCDM();
+        const pac = estadoVivo.pacienteId
+            ? (db.pacientes || []).find(p => Number(p.id) === Number(estadoVivo.pacienteId))
+            : null;
+
+        const popHTML = gotaAbierta12 ? `
+            <div class="psv-gota-popover" onclick="event.stopPropagation();">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem;">
+                    <span style="font-size:0.68rem; font-weight:800; color:#c4b5fd; text-transform:uppercase; letter-spacing:0.04em;">
+                        💧⏱️ Sesión ${pac ? `• ${esc12(pac.nombre)}` : "Psicología"}
+                    </span>
+                    <div style="display:flex; gap:0.25rem; align-items:center;">
+                        <button type="button" class="psv-preset-btn" onclick="psicoVivoToggleModoReloj()">
+                            ${estadoVivo.modo === "regresivo" ? "⏳ Regresivo" : "⏱️ Progresivo"}
+                        </button>
+                        <button type="button" class="psv-preset-btn" onclick="psicoVivoToggleGota()">✕</button>
+                    </div>
+                </div>
+
+                <div id="psicoRelojDigitos12" class="psv-gota-digits" data-fase="${c.fase}">${c.display}</div>
+                <div class="psv-progress-track"><div id="psicoRelojBarra12" class="psv-progress-fill" data-fase="${c.fase}" style="width:${c.pct}%;"></div></div>
+                <small id="psicoRelojSub12" style="text-align:center; color:#e0e7ff; font-size:0.71rem; display:block;"></small>
+
+                <div class="psv-preset-row">
+                    ${DURACIONES_PRESET.map(m => `
+                        <button type="button" class="psv-preset-btn ${Number(estadoVivo.duracionMin) === m ? "active" : ""}" onclick="psicoVivoSetDuracion(${m})">${m}m</button>
+                    `).join("")}
+                    <input type="number" class="psv-custom-min" min="5" max="240" value="${estadoVivo.duracionMin}" title="Minutos personalizados" onchange="psicoVivoSetDuracion(this.value)">
+                </div>
+
+                <div style="display:flex; gap:0.4rem;">
+                    <button type="button" class="btn btn-sm" style="flex:1; background:${estadoVivo.corriendo ? "#f59e0b" : "#10b981"}; color:#ffffff; border:none; font-weight:800;" onclick="psicoVivoIniciarOPausar()">
+                        ${estadoVivo.corriendo ? "⏸ Pausar" : (estadoVivo.iniciada ? "▶ Reanudar" : "▶ Iniciar")}
+                    </button>
+                    <button type="button" class="psv-preset-btn" onclick="psicoVivoSumarMinutos(5)" title="Sumar 5 minutos">+5m</button>
+                    <button type="button" class="psv-preset-btn" onclick="psicoVivoReiniciarReloj()" title="Reiniciar reloj">↺</button>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; padding-top:0.35rem; border-top:1px solid rgba(255,255,255,0.14);">
+                    <label style="display:inline-flex; align-items:center; gap:0.35rem; font-size:0.69rem; color:#e0e7ff; cursor:pointer;">
+                        <input type="checkbox" style="width:14px; height:14px; min-height:auto; accent-color:#a78bfa;" ${estadoVivo.sonidoFin ? "checked" : ""} onchange="psicoVivoActualizarCampo('sonidoFin', this.checked)">
+                        <span>🔔 Tono al fin</span>
+                    </label>
+                    ${!tabSesionVivoActiva ? `
+                        <button type="button" class="psv-preset-btn active" onclick="abrirSesionEnVivoPsicoCDM()">✍️ Ir a Notas</button>
+                    ` : `
+                        <button type="button" class="psv-preset-btn" onclick="psicoVivoInsertarTimestamp()">⏱️ + Sello</button>
+                    `}
+                </div>
+            </div>
+        ` : "";
+
+        wrap.innerHTML = `
+            ${popHTML}
+            <button type="button" id="psvGotaBtn12" class="psv-gota-btn ${estadoVivo.corriendo ? "is-running" : ""}" data-fase="${c.fase}"
+                onclick="psicoVivoToggleGota()" title="Reloj flotante de sesión (tocá para abrir o minimizar)">
+                <span class="psv-gota-dot"></span>
+                <span>💧</span>
+                <span id="psvGotaTimeLbl12">${c.display}</span>
+            </button>
+        `;
+        actualizarSoloDOMReloj12();
+    }
+
+    window.psicoVivoToggleGota = function () {
+        gotaAbierta12 = !gotaAbierta12;
+        renderizarGotaFlotantePsico12();
+    };
+
+    // =====================================================================
+    // 3. INICIAR SESIÓN DIRECTO DESDE LA TARJETA DE PRÓXIMOS PACIENTES
+    //    (AUNQUE EL TURNO NO TENGA pacienteId VINCULADO TODAVÍA)
+    // =====================================================================
+    window.iniciarSesionDesdeTurnoPsico12 = function (turnoId) {
+        const db = obtenerDatosConsultorioCDM();
+        const t = (db.turnos || []).find(x => Number(x.id) === Number(turnoId));
+        if (!t) {
+            abrirSesionEnVivoPsicoCDM();
+            return;
+        }
+
+        const esp = t.especialidad || obtenerEspActiva12();
+        let pac = t.pacienteId
+            ? (db.pacientes || []).find(p => Number(p.id) === Number(t.pacienteId))
+            : null;
+
+        // Si el turno se agendó escribiendo solo el nombre, buscar por nombre en Psicología o crear ficha automática
+        if (!pac && t.pacienteNombre) {
+            const nomBusq = normTxt12(t.pacienteNombre);
+            pac = (db.pacientes || []).find(p =>
+                normTxt12(p.especialidad) === normTxt12(esp) &&
+                (normTxt12(`${p.nombre} ${p.apellido}`) === nomBusq || normTxt12(`${p.apellido} ${p.nombre}`) === nomBusq)
+            ) || null;
+
+            if (!pac) {
+                const partes = String(t.pacienteNombre).trim().split(/\s+/);
+                const nombre = partes[0] || "Paciente";
+                const apellido = partes.slice(1).join(" ") || "-";
+                pac = {
+                    id: Date.now(),
+                    codigoAcceso: generarCodigoPac12(db.pacientes),
+                    especialidad: esp,
+                    nombre,
+                    apellido,
+                    dni: "",
+                    fechaNacimiento: "",
+                    whatsapp: "",
+                    mutualId: t.mutualId || "",
+                    nroAfiliado: "",
+                    modalidadAtencion: "Presencial",
+                    motivoConsulta: t.motivo || "",
+                    antecedentes: t.motivo || "",
+                    arbolFamiliar: []
+                };
+                db.pacientes.push(pac);
+                toast12(`👤 Ficha rápida vinculada para ${pac.nombre} ${pac.apellido}.`);
+            }
+
+            t.pacienteId = pac.id;
+            guardarDatosConsultorioCDM(db);
+        }
+
+        abrirSesionEnVivoPsicoCDM(pac ? pac.id : null, t.id);
+    };
+
+    // =====================================================================
+    // 4. MODAL FLOTANTE COMPACTO DE "🌳 ÁRBOL FAMILIAR" (ARRIBA DE LAS NOTAS)
+    // =====================================================================
+    function asegurarModalArbolPsico12() {
+        let m = document.getElementById("modalArbolFamiliarPsico12");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalArbolFamiliarPsico12";
+            m.className = "modal-backdrop hidden";
+            m.style.zIndex = "1360";
+            m.onclick = (e) => { if (e.target === m) cerrarModalArbolPsico12(); };
+            document.body.appendChild(m);
+        }
+        return m;
+    }
+
+    window.cerrarModalArbolPsico12 = function () {
+        document.getElementById("modalArbolFamiliarPsico12")?.classList.add("hidden");
+    };
+
+    window.abrirModalArbolFamiliarEnVivo12 = function (idPacOpt = null) {
+        const pid = Number(idPacOpt || estadoVivo.pacienteId);
+        if (!pid) {
+            toast12("⚠️ Elegí primero un paciente para abrir su Árbol Familiar.");
+            return;
+        }
+        const db = obtenerDatosConsultorioCDM();
+        const pac = (db.pacientes || []).find(p => Number(p.id) === pid);
+        if (!pac) return;
+
+        const arbol = Array.isArray(pac.arbolFamiliar) ? pac.arbolFamiliar : [];
+        const modal = asegurarModalArbolPsico12();
+
+        const ramasHTML = arbol.length === 0
+            ? `<div class="empty-box" style="padding:1rem; font-size:0.8rem;">Todavía no cargaste familiares para <b>${esc12(pac.nombre)}</b>. Agregá el primero abajo.</div>`
+            : RAMAS_ARBOL_FAMILIAR.map(rama => {
+                const nodos = arbol.filter(n => (n.rama || "Nucleo") === rama.clave);
+                if (!nodos.length) return "";
+                return `
+                    <div class="psv-tree-branch">
+                        <div class="psv-tree-branch-title">${rama.icono} ${rama.label} (${nodos.length})</div>
+                        ${nodos.map(n => {
+                            const v = infoVinculo12(n.vinculo);
+                            const citarTxt = `${n.parentesco} (${n.nombre} - ${rama.label}, vínculo ${n.vinculo}${n.nota ? `, ${n.nota}` : ""}): `.replace(/'/g, "\\'");
+                            return `
+                                <div class="psv-tree-node" style="border-left-color:${v.color};">
+                                    <div style="min-width:0; flex:1;">
+                                        <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                                            <strong>${esc12(n.parentesco)}: ${esc12(n.nombre)}</strong>
+                                            <span style="font-size:0.65rem; font-weight:800; padding:1px 6px; border-radius:999px; background:${v.bg}; color:${v.color};">${v.label}</span>
+                                        </div>
+                                        ${n.nota ? `<small style="display:block; color:var(--ink-500); margin-top:2px;">${esc12(n.nota)}</small>` : ""}
+                                    </div>
+                                    <div style="display:flex; gap:0.3rem; flex-shrink:0;">
+                                        <button type="button" class="btn btn-secondary btn-sm" style="min-height:26px; font-size:0.7rem;" onclick="psicoVivoCitarFamiliarEnNota('${citarTxt}'); cerrarModalArbolPsico12();">📝 Citar</button>
+                                        <button type="button" class="btn btn-danger btn-sm" style="min-height:26px; font-size:0.7rem;" onclick="psicoEliminarNodoArbolPaciente12(${pac.id}, '${n.id}')">✕</button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                `;
+            }).join("");
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:620px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">🌳 ÁRBOL FAMILIAR (SE GUARDA EN LA FICHA)</span>
+                        <h3 style="margin-top:4px;">${esc12(pac.nombre)} ${esc12(pac.apellido)} (${arbol.length} vínculo/s)</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalArbolPsico12()">✕</button>
+                </div>
+
+                <div style="max-height:300px; overflow-y:auto; margin-bottom:0.85rem;">${ramasHTML}</div>
+
+                <div class="psv-tree-add-box">
+                    <strong style="font-size:0.75rem; color:#5b21b6;">➕ Agregar familiar / rama nueva:</strong>
+                    <div class="grid-2">
+                        <div class="field"><label>Rama</label>
+                            <select id="vivoArb_rama">${RAMAS_ARBOL_FAMILIAR.map(r => `<option value="${r.clave}">${r.icono} ${r.label}</option>`).join("")}</select>
+                        </div>
+                        <div class="field"><label>Parentesco</label>
+                            <select id="vivoArb_par">${PARENTESCOS_BASE.map(p => `<option value="${p}">${p}</option>`).join("")}</select>
+                        </div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="field"><label>Nombre *</label><input type="text" id="vivoArb_nom" placeholder="Ej: Marta / Carlos"></div>
+                        <div class="field"><label>Tipo de Vínculo</label>
+                            <select id="vivoArb_vinc">${TIPOS_VINCULO.map(v => `<option value="${v.clave}">${v.label}</option>`).join("")}</select>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:0.45rem;">
+                        <input type="text" id="vivoArb_nota" placeholder="Detalle clínico (ej: Convive, apoyo clave, conflicto...)" style="flex:1;">
+                        <button type="button" class="btn btn-primary btn-sm" style="background:#7c3aed; border-color:#7c3aed;" onclick="psicoAgregarNodoArbolPaciente12(${pac.id})">💾 Guardar Rama</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.psicoAgregarNodoArbolPaciente12 = function (idPac) {
+        const nombre = (document.getElementById("vivoArb_nom")?.value || "").trim();
+        if (!nombre) {
+            toast12("⚠️ Escribí el nombre del familiar o vínculo.");
+            document.getElementById("vivoArb_nom")?.focus();
+            return;
+        }
+        const db = obtenerDatosConsultorioCDM();
+        const pac = (db.pacientes || []).find(p => Number(p.id) === Number(idPac));
+        if (!pac) return;
+
+        if (!Array.isArray(pac.arbolFamiliar)) pac.arbolFamiliar = [];
+        const nodo = {
+            id: `arb_${Date.now()}_${Math.floor(Math.random() * 999)}`,
+            rama: document.getElementById("vivoArb_rama")?.value || "Nucleo",
+            parentesco: document.getElementById("vivoArb_par")?.value || "Madre",
+            nombre,
+            vinculo: document.getElementById("vivoArb_vinc")?.value || "cercano",
+            nota: (document.getElementById("vivoArb_nota")?.value || "").trim(),
+            fechaRegistro: hoyISO12()
+        };
+
+        pac.arbolFamiliar.push(nodo);
+        pac.genogramaResumen = construirResumenArbol12(pac.arbolFamiliar);
+        guardarDatosConsultorioCDM(db);
+
+        toast12(`🌳 ${nodo.parentesco} (${nodo.nombre}) guardado en la ficha de ${pac.nombre}.`);
+        abrirModalArbolFamiliarEnVivo12(pac.id);
+        renderizarConsultorioCompleto();
+    };
+
+    window.psicoEliminarNodoArbolPaciente12 = function (idPac, idNodo) {
+        const db = obtenerDatosConsultorioCDM();
+        const pac = (db.pacientes || []).find(p => Number(p.id) === Number(idPac));
+        if (!pac || !Array.isArray(pac.arbolFamiliar)) return;
+        pac.arbolFamiliar = pac.arbolFamiliar.filter(n => String(n.id) !== String(idNodo));
+        pac.genogramaResumen = construirResumenArbol12(pac.arbolFamiliar);
+        guardarDatosConsultorioCDM(db);
+        abrirModalArbolFamiliarEnVivo12(pac.id);
+        renderizarConsultorioCompleto();
+    };
+
+    window.psicoVivoCitarFamiliarEnNota = function (texto) {
+        const ta = document.getElementById("psicoNotaVivo12");
+        if (!ta) return;
+        const ini = ta.selectionStart ?? ta.value.length;
+        const fin = ta.selectionEnd ?? ta.value.length;
+        const pref = ini > 0 && ta.value[ini - 1] !== "\n" ? "\n" : "";
+        ta.value = ta.value.slice(0, ini) + pref + "🌳 " + texto + ta.value.slice(fin);
+        estadoVivo.notas = ta.value;
+        guardarBorradorVivo12();
+        ta.focus();
+    };
+
+    // =====================================================================
+    // 5. ACCIONES DE LA SESIÓN EN VIVO
+    // =====================================================================
+    window.abrirSesionEnVivoPsicoCDM = function (pacienteIdOpt = null, turnoIdOpt = null) {
+        if (pacienteIdOpt && Number(estadoVivo.pacienteId) !== Number(pacienteIdOpt)) {
+            const hayTrabajo = estadoVivo.corriendo || (estadoVivo.notas || "").trim().length > 10;
+            if (hayTrabajo && !confirm("⚠️ Tenés una sesión o borrador abierto con otro paciente. ¿Cambiar igualmente de paciente?")) {
+                tabSesionVivoActiva = true;
+                renderizarConsultorioCompleto();
+                return;
+            }
+            seleccionarPacienteEnSesionVivo12(pacienteIdOpt, turnoIdOpt, false);
+        } else if (turnoIdOpt) {
+            estadoVivo.turnoId = Number(turnoIdOpt);
+        }
+
+        tabSesionVivoActiva = true;
+        renderizarConsultorioCompleto();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    function seleccionarPacienteEnSesionVivo12(pacienteId, turnoIdOpt = null, reRender = true) {
+        const db = obtenerDatosConsultorioCDM();
+        const pid = pacienteId ? Number(pacienteId) : null;
+        estadoVivo.pacienteId = pid;
+
+        if (turnoIdOpt) {
+            estadoVivo.turnoId = Number(turnoIdOpt);
+            const tObj = (db.turnos || []).find(t => Number(t.id) === Number(turnoIdOpt));
+            estadoVivo.tokenTurno = tObj?.token || "";
+        } else if (pid) {
+            const hoy = hoyISO12();
+            const turnoHoy = (db.turnos || []).find(t =>
+                Number(t.pacienteId) === pid && t.fecha === hoy && t.estado !== "cancelado"
+            );
+            estadoVivo.turnoId = turnoHoy ? Number(turnoHoy.id) : null;
+            estadoVivo.tokenTurno = turnoHoy?.token || "";
+        } else {
+            estadoVivo.turnoId = null;
+            estadoVivo.tokenTurno = "";
+        }
+
+        guardarBorradorVivo12();
+        if (reRender) renderizarConsultorioCompleto();
+    }
+
+    window.psicoVivoSeleccionarPaciente = function (val, turnoIdOpt = null) {
+        const pid = val ? Number(val) : null;
+        if (pid !== estadoVivo.pacienteId && (estadoVivo.corriendo || (estadoVivo.notas || "").trim().length > 10)) {
+            if (!confirm("⚠️ Cambiar de paciente mantendrá el borrador actual. ¿Continuar?")) {
+                renderizarConsultorioCompleto();
+                return;
+            }
+        }
+        seleccionarPacienteEnSesionVivo12(pid, turnoIdOpt, true);
+    };
+
+    window.psicoVivoToggleResumenAnterior = function () {
+        verResumenAnterior12 = !verResumenAnterior12;
+        renderizarConsultorioCompleto();
+    };
+
+    window.psicoVivoSetDuracion = function (mins) {
+        const m = Math.max(5, Math.min(240, parseInt(mins, 10) || 45));
+        estadoVivo.duracionMin = m;
+        estadoVivo.avisoFinEmitido = false;
+        guardarBorradorVivo12();
+        renderizarGotaFlotantePsico12();
+        if (tabSesionVivoActiva) renderizarConsultorioCompleto();
+    };
+
+    window.psicoVivoToggleModoReloj = function () {
+        estadoVivo.modo = estadoVivo.modo === "regresivo" ? "progresivo" : "regresivo";
+        guardarBorradorVivo12();
+        renderizarGotaFlotantePsico12();
+    };
+
+    window.psicoVivoIniciarOPausar = function () {
+        if (!estadoVivo.pacienteId) {
+            toast12("⚠️ Elegí primero un paciente para iniciar la sesión.");
+            if (!tabSesionVivoActiva) abrirSesionEnVivoPsicoCDM();
+            return;
+        }
+        if (estadoVivo.corriendo) {
+            estadoVivo.accumulatedMs = obtenerMsTranscurridos12();
+            estadoVivo.startedAtMs = null;
+            estadoVivo.corriendo = false;
+            if (intervaloTick) { clearInterval(intervaloTick); intervaloTick = null; }
+            toast12("⏸️ Sesión pausada.");
+        } else {
+            if (!estadoVivo.iniciada) {
+                const ahora = new Date();
+                estadoVivo.horaInicioStr = `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
+                estadoVivo.iniciada = true;
+            }
+            estadoVivo.startedAtMs = Date.now();
+            estadoVivo.corriendo = true;
+            iniciarLoopReloj12();
+            toast12("▶️ Sesión en curso (tiempo corriendo en la gota flotante).");
+        }
+        guardarBorradorVivo12();
+        renderizarGotaFlotantePsico12();
+        if (tabSesionVivoActiva) renderizarConsultorioCompleto();
+    };
+
+    window.psicoVivoSumarMinutos = function (deltaMin) {
+        estadoVivo.duracionMin = Math.max(5, (Number(estadoVivo.duracionMin) || 45) + deltaMin);
+        estadoVivo.avisoFinEmitido = false;
+        guardarBorradorVivo12();
+        renderizarGotaFlotantePsico12();
+        toast12(`⏱️ Duración ajustada a ${estadoVivo.duracionMin} min.`);
+    };
+
+    window.psicoVivoReiniciarReloj = function () {
+        if ((estadoVivo.corriendo || obtenerMsTranscurridos12() > 5000) && !confirm("↺ ¿Reiniciar el reloj a cero? (Tus anotaciones NO se borran)")) return;
+        estadoVivo.corriendo = false;
+        estadoVivo.iniciada = false;
+        estadoVivo.startedAtMs = null;
+        estadoVivo.accumulatedMs = 0;
+        estadoVivo.horaInicioStr = "";
+        estadoVivo.avisoFinEmitido = false;
+        if (intervaloTick) { clearInterval(intervaloTick); intervaloTick = null; }
+        guardarBorradorVivo12();
+        renderizarGotaFlotantePsico12();
+        if (tabSesionVivoActiva) renderizarConsultorioCompleto();
+    };
+
+    window.psicoVivoInsertarTimestamp = function () {
+        const ta = document.getElementById("psicoNotaVivo12");
+        if (!ta) return;
+        const c = calcularEstadoReloj12();
+        const sello = `[${formatearMMSS12(c.transSeg)}] `;
+        const ini = ta.selectionStart ?? ta.value.length;
+        const fin = ta.selectionEnd ?? ta.value.length;
+        const pref = ini > 0 && ta.value[ini - 1] !== "\n" ? "\n" : "";
+        ta.value = ta.value.slice(0, ini) + pref + sello + ta.value.slice(fin);
+        estadoVivo.notas = ta.value;
+        guardarBorradorVivo12();
+        ta.focus();
+        const pos = ini + pref.length + sello.length;
+        ta.setSelectionRange(pos, pos);
+    };
+
+    window.psicoVivoToggleEtiqueta = function (etq, btnEl) {
+        if (!Array.isArray(estadoVivo.etiquetas)) estadoVivo.etiquetas = [];
+        const idx = estadoVivo.etiquetas.indexOf(etq);
+        if (idx >= 0) estadoVivo.etiquetas.splice(idx, 1);
+        else estadoVivo.etiquetas.push(etq);
+        if (btnEl) btnEl.classList.toggle("active", idx < 0);
+        guardarBorradorVivo12();
+    };
+
+    window.psicoVivoActualizarCampo = function (campo, valor) {
+        estadoVivo[campo] = valor;
+        if (campo === "animo") {
+            const el = document.getElementById("psicoLblAnimo12");
+            if (el) el.textContent = `${valor}/10`;
+        }
+        if (campo === "ansiedad") {
+            const el = document.getElementById("psicoLblAns12");
+            if (el) el.textContent = `${valor}/10`;
+        }
+        guardarBorradorVivo12();
+    };
+
+    window.psicoVivoDescartarBorrador = function () {
+        if (!confirm("🗑️ ¿Limpiar el borrador y reiniciar la sesión en vivo?")) return;
+        if (intervaloTick) { clearInterval(intervaloTick); intervaloTick = null; }
+        Object.assign(estadoVivo, {
+            corriendo: false, iniciada: false, startedAtMs: null, accumulatedMs: 0,
+            horaInicioStr: "", avisoFinEmitido: false, notas: "", retomarProxima: "",
+            animo: 6, ansiedad: 5, etiquetas: [], tokenTurno: ""
+        });
+        limpiarBorradorVivo12();
+        renderizarConsultorioCompleto();
+        renderizarGotaFlotantePsico12();
+        toast12("🧹 Borrador limpiado.");
+    };
+
+    window.psicoVivoFinalizarYGuardar = function (e) {
+        if (e && typeof e.preventDefault === "function") e.preventDefault();
+        if (!estadoVivo.pacienteId) {
+            alert("⚠️ Seleccioná primero un paciente para guardar la sesión.");
+            return;
+        }
+        const notasTexto = (document.getElementById("psicoNotaVivo12")?.value ?? estadoVivo.notas ?? "").trim();
+        const retomarTexto = (document.getElementById("psicoRetomarVivo12")?.value ?? estadoVivo.retomarProxima ?? "").trim();
+        if (!notasTexto && !retomarTexto) {
+            alert("⚠️ Escribí al menos una anotación o consigna antes de guardar la sesión.");
+            return;
+        }
+
+        const db = obtenerDatosConsultorioCDM();
+        const pac = (db.pacientes || []).find(p => Number(p.id) === Number(estadoVivo.pacienteId));
+        if (!pac) {
+            alert("⚠️ No se encontró el paciente en la base de datos.");
+            return;
+        }
+
+        const msTotales = obtenerMsTranscurridos12();
+        const durRealMin = msTotales > 0 ? Math.max(1, Math.round(msTotales / 60000)) : Number(estadoVivo.duracionMin || 45);
+        const ahora = new Date();
+        const horaFinStr = `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
+
+        const etqs = Array.isArray(estadoVivo.etiquetas) && estadoVivo.etiquetas.length
+            ? `[Temas: ${estadoVivo.etiquetas.join(", ")}]\n`
+            : "";
+        const cabeceraTiempo = `⏱️ Sesión en vivo (${durRealMin} min${estadoVivo.horaInicioStr ? ` • ${estadoVivo.horaInicioStr} a ${horaFinStr}` : ""})\n`;
+
+        const nuevaSesion = {
+            id: Date.now(),
+            pacienteId: Number(pac.id),
+            especialidad: pac.especialidad || obtenerEspActiva12(),
+            fecha: hoyISO12(),
+            horaInicio: estadoVivo.horaInicioStr || horaFinStr,
+            horaFin: horaFinStr,
+            duracionConfigMin: Number(estadoVivo.duracionMin) || 45,
+            duracionRealMin: durRealMin,
+            animo: Number(estadoVivo.animo) || 6,
+            ansiedad: Number(estadoVivo.ansiedad) || 5,
+            etiquetas: [...(estadoVivo.etiquetas || [])],
+            arbolSnapshotCount: Array.isArray(pac.arbolFamiliar) ? pac.arbolFamiliar.length : 0,
+            evolucion: `${cabeceraTiempo}${etqs}${notasTexto}`.trim(),
+            indicaciones: retomarTexto,
+            retomarProxima: retomarTexto,
+            origen: "sesion_en_vivo"
+        };
+
+        if (!Array.isArray(db.sesiones)) db.sesiones = [];
+        db.sesiones.unshift(nuevaSesion);
+
+        if (estadoVivo.turnoId) {
+            const turno = (db.turnos || []).find(t => Number(t.id) === Number(estadoVivo.turnoId));
+            if (turno) {
+                if (estadoVivo.marcarTurnoAtendido) turno.estado = "atendido";
+                const tok = (document.getElementById("psicoTokenTurno12")?.value ?? estadoVivo.tokenTurno ?? "").trim();
+                if (tok) turno.token = tok;
+            }
+        }
+
+        guardarDatosConsultorioCDM(db);
+
+        if (intervaloTick) { clearInterval(intervaloTick); intervaloTick = null; }
+        const pidGuardado = pac.id;
+        Object.assign(estadoVivo, {
+            pacienteId: pidGuardado, turnoId: null, corriendo: false, iniciada: false,
+            startedAtMs: null, accumulatedMs: 0, horaInicioStr: "", avisoFinEmitido: false,
+            notas: "", retomarProxima: "", animo: 6, ansiedad: 5, etiquetas: [], tokenTurno: ""
+        });
+        gotaAbierta12 = false;
+        limpiarBorradorVivo12();
+
+        toast12(`💾 Sesión de ${pac.nombre} ${pac.apellido} (${durRealMin} min) guardada en su expediente.`);
+        renderizarConsultorioCompleto();
+    };
+
+    // =====================================================================
+    // 6. RENDER FULL-WIDTH DE ANOTACIONES EN VIVO (CERO COLUMNAS LATERALES)
+    // =====================================================================
+    function renderizarTabSesionVivo12(cont) {
+        const db = obtenerDatosConsultorioCDM();
+        const espAct = obtenerEspActiva12();
+        const colorEsp = typeof colorEspecialidadConsultorio === "function" ? colorEspecialidadConsultorio(espAct) : "#7c3aed";
+        const pacs = (db.pacientes || [])
+            .filter(p => normTxt12(p.especialidad) === normTxt12(espAct))
+            .sort((a, b) => String(a.apellido || "").localeCompare(String(b.apellido || "")));
+
+        const pacSel = estadoVivo.pacienteId
+            ? pacs.find(p => Number(p.id) === Number(estadoVivo.pacienteId)) || null
+            : null;
+
+        const sesionesPac = pacSel
+            ? (db.sesiones || [])
+                .filter(s => Number(s.pacienteId) === Number(pacSel.id))
+                .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")) || (Number(b.id) - Number(a.id)))
+            : [];
+        const ultSes = sesionesPac[0] || null;
+        const turnoVinc = estadoVivo.turnoId ? (db.turnos || []).find(t => Number(t.id) === Number(estadoVivo.turnoId)) : null;
+        const cantArbol = Array.isArray(pacSel?.arbolFamiliar) ? pacSel.arbolFamiliar.length : 0;
+
+        cont.innerHTML = `
+            <div class="psv-full-wrap">
+                <form class="cons-card" onsubmit="psicoVivoFinalizarYGuardar(event)">
+                    <!-- BARRA SUPERIOR COMPACTA: PACIENTE + BOTONES EN 1 SOLA LÍNEA -->
+                    <div class="psv-topbar-slim">
+                        <div class="psv-pac-picker-group">
+                            <span style="font-size:1.05rem;">✍️</span>
+                            <select id="psicoSelPaciente12" onchange="psicoVivoSeleccionarPaciente(this.value)">
+                                <option value="">-- Seleccionar paciente --</option>
+                                ${pacs.map(p => `<option value="${p.id}" ${Number(pacSel?.id) === Number(p.id) ? "selected" : ""}>${esc12(p.apellido)}, ${esc12(p.nombre)}${p.dni ? ` (DNI ${esc12(p.dni)})` : ""}</option>`).join("")}
+                            </select>
+                            ${turnoVinc ? `<span class="badge badge-purple" style="font-size:0.71rem;">⏰ ${esc12(turnoVinc.hora)} hs</span>` : ""}
+                            ${pacSel ? `<button type="button" class="btn btn-ghost btn-sm" onclick="abrirHistoriaClinicaPacienteCDM(${pacSel.id})" title="Ver Historia Clínica completa">🩺 Ficha</button>` : ""}
+                        </div>
+
+                        <div class="psv-tools-bar">
+                            <button type="button" class="btn btn-sm" style="background:${estadoVivo.corriendo ? "#f59e0b" : "#10b981"}; color:#fff; border:none; font-weight:800;" onclick="psicoVivoIniciarOPausar()">
+                                ${estadoVivo.corriendo ? "⏸ Pausar" : (estadoVivo.iniciada ? "▶ Reanudar" : `▶ Iniciar (${estadoVivo.duracionMin}m)`)}
+                            </button>
+                            ${pacSel ? `
+                                <button type="button" class="btn btn-sm" style="background:${verResumenAnterior12 ? "#7c3aed" : "rgba(124,58,237,0.1)"}; color:${verResumenAnterior12 ? "#fff" : "#5b21b6"}; border:1.5px solid rgba(124,58,237,0.35); font-weight:800;"
+                                    onclick="psicoVivoToggleResumenAnterior()" title="Ver resumen de la última sesión">
+                                    🧠 Última Sesión${ultSes ? ` (${esc12(ultSes.fecha.slice(5))})` : ""}
+                                </button>
+                            ` : ""}
+                            <button type="button" class="btn btn-sm" style="background:rgba(124,58,237,0.12); color:#5b21b6; border:1.5px solid rgba(124,58,237,0.35); font-weight:800;"
+                                onclick="abrirModalArbolFamiliarEnVivo12(${pacSel ? pacSel.id : "null"})"
+                                title="Agregar o citar ramas del Árbol Familiar">
+                                🌳 Árbol Familiar${pacSel ? ` (${cantArbol})` : ""}
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="psicoVivoInsertarTimestamp()" title="Insertar minuto actual">⏱️ + Sello</button>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="psicoVivoDescartarBorrador()" title="Limpiar borrador">🧹</button>
+                        </div>
+                    </div>
+
+                    <!-- RESUMEN DE SESIÓN ANTERIOR (DESPLEGABLE SOLO SI SE TOCA EL BOTÓN) -->
+                    ${pacSel && verResumenAnterior12 ? `
+                        <div class="psv-prev-drawer">
+                            ${ultSes ? `
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:4px;">
+                                    <strong style="color:${colorEsp};">🧠 Última sesión registrada — ${esc12(ultSes.fecha)}</strong>
+                                    <div style="display:flex; gap:0.3rem;">
+                                        ${ultSes.animo != null ? `<span class="badge badge-celeste" style="font-size:0.68rem;">Ánimo ${ultSes.animo}/10</span>` : ""}
+                                        ${ultSes.ansiedad != null ? `<span class="badge badge-purple" style="font-size:0.68rem;">Ans. ${ultSes.ansiedad}/10</span>` : ""}
+                                    </div>
+                                </div>
+                                <div style="white-space:pre-line; color:var(--ink-700);">${esc12(ultSes.evolucion || "")}</div>
+                                ${(ultSes.retomarProxima || ultSes.indicaciones) ? `
+                                    <div style="margin-top:6px; padding-top:5px; border-top:1px dashed rgba(124,58,237,0.3); color:#5b21b6; font-weight:700;">
+                                        📌 Para retomar hoy: ${esc12(ultSes.retomarProxima || ultSes.indicaciones)}
+                                    </div>
+                                ` : ""}
+                            ` : `
+                                <div>Primera sesión de <b>${esc12(pacSel.nombre)}</b>.${pacSel.motivoConsulta ? ` <b>Motivo inicial:</b> ${esc12(pacSel.motivoConsulta)}` : ""}</div>
+                            `}
+                        </div>
+                    ` : ""}
+
+                    <!-- ETIQUETAS RÁPIDAS EN 1 FILA -->
+                    <div class="psv-tags-wrap">
+                        ${ETIQUETAS_PSICO_VIVO.map(etq => {
+                            const act = (estadoVivo.etiquetas || []).includes(etq);
+                            const escQ = etq.replace(/'/g, "\\'");
+                            return `<button type="button" class="psv-tag-chip ${act ? "active" : ""}" onclick="psicoVivoToggleEtiqueta('${escQ}', this)">${etq}</button>`;
+                        }).join("")}
+                    </div>
+
+                    <!-- ÁREA DE ANOTACIONES A ANCHO COMPLETO -->
+                    <textarea id="psicoNotaVivo12" class="psv-notes-full"
+                        placeholder="Escribí acá durante toda la sesión... Podés tocar '🌳 Árbol Familiar' o '⏱️ + Sello' arriba en cualquier momento, y controlar el tiempo desde la gota flotante."
+                        oninput="psicoVivoActualizarCampo('notas', this.value)">${esc12(estadoVivo.notas || "")}</textarea>
+
+                    <!-- PIE COMPACTO: ÁNIMO + ANSIEDAD + CONSIGNA PRÓXIMA SESIÓN -->
+                    <div class="psv-bottom-controls">
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-weight:800; margin-bottom:3px;">
+                                <span>🙂 Ánimo</span>
+                                <span id="psicoLblAnimo12" style="color:#0284c7;">${estadoVivo.animo}/10</span>
+                            </div>
+                            <input type="range" min="1" max="10" value="${estadoVivo.animo}" style="width:100%; min-height:auto; accent-color:#0284c7;" oninput="psicoVivoActualizarCampo('animo', Number(this.value))">
+                        </div>
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-weight:800; margin-bottom:3px;">
+                                <span>⚡ Ansiedad</span>
+                                <span id="psicoLblAns12" style="color:#7c3aed;">${estadoVivo.ansiedad}/10</span>
+                            </div>
+                            <input type="range" min="1" max="10" value="${estadoVivo.ansiedad}" style="width:100%; min-height:auto; accent-color:#7c3aed;" oninput="psicoVivoActualizarCampo('ansiedad', Number(this.value))">
+                        </div>
+                        <div class="field">
+                            <label>📌 Retomar próxima sesión / Consigna</label>
+                            <input type="text" id="psicoRetomarVivo12"
+                                value="${esc12(estadoVivo.retomarProxima || "")}"
+                                placeholder="Acuerdos, tareas o tema a retomar..."
+                                oninput="psicoVivoActualizarCampo('retomarProxima', this.value)">
+                        </div>
+                    </div>
+
+                    ${turnoVinc ? `
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.65rem; flex-wrap:wrap; background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:12px; padding:0.55rem 0.8rem; margin-bottom:0.75rem;">
+                            <label style="display:inline-flex; align-items:center; gap:0.45rem; font-size:0.78rem; font-weight:700; cursor:pointer;">
+                                <input type="checkbox" style="width:17px; height:17px; min-height:auto; accent-color:#10b981;" ${estadoVivo.marcarTurnoAtendido ? "checked" : ""} onchange="psicoVivoActualizarCampo('marcarTurnoAtendido', this.checked)">
+                                <span>✓ Marcar turno de hoy (${esc12(turnoVinc.hora)} hs) como Atendido</span>
+                            </label>
+                            <input type="text" id="psicoTokenTurno12" value="${esc12(estadoVivo.tokenTurno || turnoVinc.token || "")}"
+                                placeholder="🔑 Token / N° Orden (opc.)"
+                                style="width:190px; min-height:32px; font-size:0.76rem;"
+                                oninput="psicoVivoActualizarCampo('tokenTurno', this.value)">
+                        </div>
+                    ` : ""}
+
+                    <button type="submit" class="btn btn-primary" style="width:100%; background:${colorEsp}; border-color:${colorEsp}; font-size:0.92rem; padding:0.72rem;">
+                        💾 Finalizar y Guardar en Sesiones del Paciente
+                    </button>
+                </form>
+
+                <!-- HISTORIAL RECIENTE DESPLEGABLE (OCULTADO POR DEFECTO PARA NO OCUPAR LUGAR) -->
+                ${pacSel && sesionesPac.length > 0 ? `
+                    <details class="cons-card" style="padding:0.85rem 1.05rem;">
+                        <summary style="cursor:pointer; font-weight:800; font-size:0.86rem; color:var(--ink-800); list-style:none; display:flex; justify-content:space-between; align-items:center;">
+                            <span>📚 Sesiones guardadas de ${esc12(pacSel.nombre)} (${sesionesPac.length})</span>
+                            <span style="font-size:0.74rem; color:${colorEsp};">Tocá para desplegar ▾</span>
+                        </summary>
+                        <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.75rem; max-height:280px; overflow-y:auto;">
+                            ${sesionesPac.slice(0, 8).map(s => `
+                                <div style="background:var(--surface-subtle); border:1px solid var(--line); border-left:4px solid ${colorEsp}; border-radius:12px; padding:0.6rem 0.78rem; font-size:0.78rem;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap; margin-bottom:3px;">
+                                        <strong>📅 ${esc12(s.fecha)}${s.duracionRealMin ? ` • ⏱️ ${s.duracionRealMin} min` : ""}</strong>
+                                        <div style="display:flex; gap:0.3rem;">
+                                            ${s.animo != null ? `<span class="badge badge-celeste" style="font-size:0.66rem;">Ánimo ${s.animo}/10</span>` : ""}
+                                            ${s.ansiedad != null ? `<span class="badge badge-purple" style="font-size:0.66rem;">Ans. ${s.ansiedad}/10</span>` : ""}
+                                        </div>
+                                    </div>
+                                    <div style="color:var(--ink-700); white-space:pre-line;">${esc12(s.evolucion || "")}</div>
+                                    ${(s.retomarProxima || s.indicaciones) ? `<div style="margin-top:4px; font-size:0.74rem; color:#5b21b6;"><b>📌 Próxima / Consigna:</b> ${esc12(s.retomarProxima || s.indicaciones)}</div>` : ""}
+                                </div>
+                            `).join("")}
+                        </div>
+                    </details>
+                ` : ""}
+            </div>
+        `;
+    }
+
+    // =====================================================================
+    // 7. ENGANCHE CON CONSULTORIO.JS (BOTÓN EN PRÓXIMOS PACIENTES + TAB)
+    // =====================================================================
+    function instalarHooksSesionVivoPsico12() {
+        if (window.__cdmPsicoSesionVivoHooks12) return;
+        if (typeof window.renderizarConsultorioCompleto !== "function") return;
+        window.__cdmPsicoSesionVivoHooks12 = true;
+
+        inyectarCSSSesionVivo12();
+        cargarBorradorVivo12();
+
+        const _origCambiarTab = window.cambiarTabConsultorioCDM;
+        window.cambiarTabConsultorioCDM = function (tab) {
+            if (tab === "sesion_vivo") {
+                tabSesionVivoActiva = true;
+                window.renderizarConsultorioCompleto();
+                return;
+            }
+            tabSesionVivoActiva = false;
+            return _origCambiarTab.apply(this, arguments);
+        };
+
+        const _origCambiarEsp = window.cambiarEspecialidadFiltroConsultorioCDM;
+        window.cambiarEspecialidadFiltroConsultorioCDM = function () {
+            tabSesionVivoActiva = false;
+            const res = _origCambiarEsp.apply(this, arguments);
+            asegurarGotaFlotantePsico12();
+            return res;
+        };
+
+        if (typeof window.volverAlInicioDesdeConsultorio === "function") {
+            const _origVolver = window.volverAlInicioDesdeConsultorio;
+            window.volverAlInicioDesdeConsultorio = function () {
+                tabSesionVivoActiva = false;
+                const res = _origVolver.apply(this, arguments);
+                asegurarGotaFlotantePsico12();
+                return res;
+            };
+        }
+
+        const _origRender = window.renderizarConsultorioCompleto;
+        window.renderizarConsultorioCompleto = function () {
+            _origRender.apply(this, arguments);
+            asegurarGotaFlotantePsico12();
+
+            const sec = document.getElementById("cdmSeccionConsultorioGlobal");
+            if (!sec || sec.classList.contains("hidden")) return;
+            if (!esAreaPsicologia12()) return;
+
+            inyectarCSSSesionVivo12();
+            const colorEsp = typeof colorEspecialidadConsultorio === "function"
+                ? colorEspecialidadConsultorio(obtenerEspActiva12())
+                : "#7c3aed";
+
+            // 1. Botón directo en la cabecera de Psicología
+            const headBtns = sec.querySelector(".cons-header > div:last-child");
+            if (headBtns && !headBtns.querySelector(".btn-psico-vivo-header")) {
+                const btnHead = document.createElement("button");
+                btnHead.type = "button";
+                btnHead.className = "btn btn-sm btn-psico-vivo-header";
+                btnHead.style.cssText = "background:#ffffff; color:#4c1d95; font-weight:800; border:none;";
+                btnHead.innerHTML = estadoVivo.corriendo ? "🔴 Volver a Sesión" : "⏱️ Sesión en Vivo";
+                btnHead.onclick = () => abrirSesionEnVivoPsicoCDM();
+                headBtns.prepend(btnHead);
+            }
+
+            // 2. Pestaña dedicada "Sesión en Vivo"
+            const tabsBar = sec.querySelector(".cons-tabs");
+            if (tabsBar && !tabsBar.querySelector('[data-psico-tab="sesion_vivo"]')) {
+                const btnTab = document.createElement("button");
+                btnTab.type = "button";
+                btnTab.className = `cons-tab ${tabSesionVivoActiva ? "active" : ""}`;
+                btnTab.setAttribute("data-psico-tab", "sesion_vivo");
+                if (tabSesionVivoActiva) btnTab.style.background = colorEsp;
+                btnTab.innerHTML = `
+                    <span class="cons-tab-ico">${estadoVivo.corriendo ? "🔴" : "⏱️"}</span>
+                    <span class="cons-tab-full">Sesión en Vivo${estadoVivo.corriendo ? " (Activa)" : ""}</span>
+                    <span class="cons-tab-short">Sesión</span>
+                `;
+                btnTab.onclick = () => cambiarTabConsultorioCDM("sesion_vivo");
+                tabsBar.insertBefore(btnTab, tabsBar.children[1] || null);
+            }
+
+            // 3. Botón "▶ Iniciar Sesión" en TODAS las tarjetas de Próximos Pacientes (al lado del calendario)
+            if (!tabSesionVivoActiva) {
+                sec.querySelectorAll(".cons-next-card").forEach(card => {
+                    const acts = card.querySelector(".cons-next-actions");
+                    if (!acts || acts.querySelector(".btn-iniciar-sesion-turno12")) return;
+
+                    const selEstado = acts.querySelector('select[onchange*="cambiarEstadoTurnoCons("]');
+                    const btnEdit = acts.querySelector('button[onclick*="abrirModalTurnoConsultorio("]');
+                    const mTurno = selEstado?.getAttribute("onchange")?.match(/\((\d+)/)
+                        || btnEdit?.getAttribute("onclick")?.match(/\((\d+)/);
+                    if (!mTurno) return;
+
+                    const tid = Number(mTurno[1]);
+                    const btnPlay = document.createElement("button");
+                    btnPlay.type = "button";
+                    btnPlay.className = "btn btn-primary btn-sm btn-iniciar-sesion-turno12";
+                    btnPlay.style.cssText = `min-height:27px; font-size:0.72rem; font-weight:800; background:${colorEsp}; border-color:${colorEsp};`;
+                    btnPlay.innerHTML = "▶ Iniciar Sesión";
+                    btnPlay.title = "Ir directo a la Sesión en Vivo con este paciente";
+                    btnPlay.onclick = () => iniciarSesionDesdeTurnoPsico12(tid);
+                    acts.insertBefore(btnPlay, acts.children[1] || null);
+                });
+            }
+
+            // 4. Si está activa la pestaña Sesión en Vivo, renderizar las anotaciones a ancho completo
+            if (tabSesionVivoActiva) {
+                tabsBar?.querySelectorAll(".cons-tab").forEach(b => {
+                    const esEste = b.getAttribute("data-psico-tab") === "sesion_vivo";
+                    b.classList.toggle("active", esEste);
+                    b.style.background = esEste ? colorEsp : "";
+                });
+                const cuerpo = document.getElementById("consCuerpoTab");
+                if (cuerpo) renderizarTabSesionVivo12(cuerpo);
+            }
+        };
+    }
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") cerrarModalArbolPsico12();
+    });
+
+    instalarHooksSesionVivoPsico12();
+    document.addEventListener("DOMContentLoaded", instalarHooksSesionVivoPsico12);
+})();
+// =========================================================================
+// 13. GESTIÓN INTELIGENTE DE RECORDATORIOS 24HS (MANUAL LIMPIO vs. AUTOMÁTICO)
+//     Pegar al final de js/consultorio.js (debajo del Bloque 12)
+// =========================================================================
+
+(function () {
+    function tieneWhatsappAuto24hActivo13() {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        return Boolean(lic?.whatsappAuto24h || lic?.funciones?.general?.whatsappAuto24h);
+    }
+
+    window.solicitarActivacionWhatsappAuto13 = function () {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const nombreComercio = lic?.nombreEntidad || "Mi Consultorio";
+        const msg = `👋 Hola Gonzalo! Soy de *${nombreComercio}*.\nMe gustaría activar el *envío automático de recordatorios por WhatsApp 24hs antes* de los turnos y adaptar el costo en nuestro plan mensual.`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+    };
+
+    function aplicarControlRecordatorios24h13() {
+        const sec = document.getElementById("cdmSeccionConsultorioGlobal");
+        if (!sec || sec.classList.contains("hidden")) return;
+
+        const sideCol = sec.querySelector(".cons-side-col");
+        if (!sideCol) return;
+
+        const autoActivo = tieneWhatsappAuto24hActivo13();
+        const alarmCard = sideCol.querySelector(".cons-alarm24-card");
+
+        // MODO 1: WHATSAPP AUTOMÁTICO ACTIVADO POR SUPERADMIN
+        if (autoActivo) {
+            if (alarmCard) alarmCard.remove();
+            if (!sideCol.querySelector(".cons-auto-wa-banner13")) {
+                const banner = document.createElement("div");
+                banner.className = "cons-auto-wa-banner13";
+                banner.style.cssText = "background:rgba(16,185,129,0.1); border:1.5px solid rgba(16,185,129,0.38); border-radius:14px; padding:0.65rem 0.9rem; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; font-size:0.78rem;";
+                banner.innerHTML = `
+                    <span style="font-weight:800; color:#065f46;">🤖 Recordatorios WhatsApp 24hs: <b>Automático Activo</b></span>
+                    <span class="badge badge-ok" style="font-size:0.67rem;">Envío 100% solo</span>
+                `;
+                sideCol.prepend(banner);
+            }
+            return;
+        }
+
+        // MODO 2: MANUAL ($0) — MOSTRAR CARTEL AMARILLO SOLO PARA PENDIENTES; DESAPARECE AL ENVIAR
+        if (alarmCard) {
+            // Eliminar del cartel amarillo los ítems que ya tienen .sent (aviso enviado)
+            alarmCard.querySelectorAll(".cons-alarm24-item.sent").forEach(el => el.remove());
+
+            const pendientes = alarmCard.querySelectorAll(".cons-alarm24-item");
+            if (pendientes.length === 0) {
+                // Si no queda ningún paciente sin avisar, ocultar todo el cartel amarillo
+                alarmCard.remove();
+            } else {
+                const titulo = alarmCard.querySelector("strong");
+                if (titulo) titulo.textContent = `🔔 Pendiente avisar turno (próximas 24hs): ${pendientes.length}`;
+
+                const badge = alarmCard.querySelector(".badge");
+                if (badge) {
+                    badge.className = "badge badge-warn";
+                    badge.textContent = "Envío manual ($0)";
+                }
+
+                // Pie discreto para que el comercio pueda pedir activación automática si quiere
+                if (!alarmCard.querySelector(".cons-auto-upsell-foot13")) {
+                    const foot = document.createElement("div");
+                    foot.className = "cons-auto-upsell-foot13";
+                    foot.style.cssText = "margin-top:0.55rem; padding-top:0.5rem; border-top:1px dashed rgba(245,158,11,0.45); display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; font-size:0.72rem; color:var(--ink-700);";
+                    foot.innerHTML = `
+                        <span>¿Querés que el sistema mande estos avisos solo?</span>
+                        <button type="button" class="btn btn-ghost btn-sm" style="min-height:26px; font-size:0.71rem; font-weight:800; border-color:rgba(245,158,11,0.6);" onclick="solicitarActivacionWhatsappAuto13()">
+                            ⚡ Activar Automático
+                        </button>
+                    `;
+                    alarmCard.appendChild(foot);
+                }
+            }
+        }
+    }
+
+    function engancharRenderRecordatorios13() {
+        if (window.__cdmHookRecordatorios24h13) return;
+        if (typeof window.renderizarConsultorioCompleto !== "function") return;
+        window.__cdmHookRecordatorios24h13 = true;
+
+        const _origRender = window.renderizarConsultorioCompleto;
+        window.renderizarConsultorioCompleto = function () {
+            _origRender.apply(this, arguments);
+            aplicarControlRecordatorios24h13();
+        };
+        aplicarControlRecordatorios24h13();
+    }
+
+    engancharRenderRecordatorios13();
+    document.addEventListener("DOMContentLoaded", engancharRenderRecordatorios13);
+})();
+// =========================================================================
+// 14. MODO DISCIPLINA ÚNICA EN CONSULTORIO (SIN OBSERVER / CERO CONGELAMIENTOS)
+//     - OCULTA EL LISTADO DESPLEGABLE DEL MENÚ (SOLO QUEDA "CONSULTORIO")
+//     - ELIMINA LA TARJETA DE PORTADA Y ABRE DIRECTO EL CALENDARIO
+//     Reemplazar por completo el Bloque 14 anterior al final de js/consultorio.js
+// =========================================================================
+
+(function () {
+    function obtenerUnicaDisciplinaConsultorio14() {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const mod = lic?.modulos || {};
+        const tieneDeportesOGym = Boolean(
+            mod.futbol ||
+            mod.hockey ||
+            mod.gym ||
+            (Array.isArray(lic?.deportesExtra) && lic.deportesExtra.length > 0)
+        );
+        if (tieneDeportesOGym) return null;
+
+        const profs = typeof obtenerEspecialidadesHabilitadasConsultorioCDM === "function"
+            ? obtenerEspecialidadesHabilitadasConsultorioCDM()
+            : [];
+        return profs.length === 1 ? profs[0] : null;
+    }
+
+    function inyectarCSSDisciplinaUnica14() {
+        if (document.getElementById("cdmCssSoloUnaDisciplina14")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssSoloUnaDisciplina14";
+        st.textContent = `
+            body[data-solo-una-esp="1"] .sports-showcase-grid,
+            body[data-solo-una-esp="1"] .index-section-head,
+            body[data-solo-una-esp="1"] #cdmSeccionConsultorioGlobal button[onclick*="volverAlInicioDesdeConsultorio"],
+            body[data-solo-una-esp="1"] .app-sidebar .sidebar-nav a[data-nav="index"],
+            body[data-solo-una-esp="1"] .app-sidebar .sidebar-nav a[href="index.html"],
+            body[data-solo-una-esp="1"] .cdm-sublista-oculta-14 {
+                display: none !important;
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function simplificarSidebarUnaDisciplina14() {
+        const unica = obtenerUnicaDisciplinaConsultorio14();
+        if (!unica) {
+            document.body?.removeAttribute("data-solo-una-esp");
+            return;
+        }
+
+        inyectarCSSDisciplinaUnica14();
+        if (document.body?.getAttribute("data-solo-una-esp") !== "1") {
+            document.body?.setAttribute("data-solo-una-esp", "1");
+        }
+
+        const sidebar = document.querySelector(".app-sidebar");
+        if (!sidebar) return;
+
+        // 1. Ocultar el sub-listado interno de especialidades (ej: "🧠 Psicología")
+        sidebar.querySelectorAll('[onclick*="irAProfesionConsultorioNav"]').forEach(subItem => {
+            if (!subItem.classList.contains("cdm-sublista-oculta-14")) {
+                subItem.classList.add("cdm-sublista-oculta-14");
+            }
+            const padre = subItem.parentElement;
+            if (padre && !padre.classList.contains("sidebar-nav") && !padre.classList.contains("app-sidebar")) {
+                if (!padre.classList.contains("cdm-sublista-oculta-14")) {
+                    padre.classList.add("cdm-sublista-oculta-14");
+                }
+            }
+        });
+
+        // 2. Dejar el botón como "Consultorio" limpio y directo al Calendario (solo modifica si cambia)
+        const candidatos = Array.from(sidebar.querySelectorAll("a, button, .side-link"));
+        const btnCons = candidatos.find(el =>
+            !el.classList.contains("cdm-sublista-oculta-14") &&
+            (el.getAttribute("data-nav") === "consultorio" || /consultorio\s*(\(\d+\))?/i.test(el.textContent || ""))
+        );
+
+        if (btnCons) {
+            btnCons.classList.remove("hidden");
+
+            btnCons.querySelectorAll("span").forEach(sp => {
+                if (/consultorio/i.test(sp.textContent || "") && sp.textContent.trim() !== "Consultorio") {
+                    sp.textContent = "Consultorio";
+                }
+            });
+            btnCons.childNodes.forEach(node => {
+                if (node.nodeType === 3 && /consultorio/i.test(node.textContent || "") && node.textContent.trim() !== "Consultorio") {
+                    node.textContent = " Consultorio";
+                }
+            });
+
+            btnCons.querySelectorAll('i[class*="arrow"], i[class*="chevron"], .nav-caret, .caret').forEach(ic => {
+                if (ic.style.display !== "none") ic.style.display = "none";
+            });
+
+            if (btnCons.dataset.soloUnaEspBound14 !== "1") {
+                btnCons.dataset.soloUnaEspBound14 = "1";
+                btnCons.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    document.getElementById("cdmSeccionContabilidadGlobal")?.classList.add("hidden");
+                    document.getElementById("cdmSeccionBaseGeneral37")?.classList.add("hidden");
+                    if (typeof abrirEspecialidadDesdeInicioCDM === "function") {
+                        abrirEspecialidadDesdeInicioCDM(unica.clave);
+                    }
+                    sidebar.querySelectorAll(".side-link").forEach(l => l.classList.remove("active"));
+                    btnCons.classList.add("active");
+                }, true);
+            }
+
+            const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+            if (secCons && !secCons.classList.contains("hidden")) {
+                sidebar.querySelectorAll(".side-link").forEach(l => l.classList.remove("active"));
+                btnCons.classList.add("active");
+            }
+        }
+    }
+
+    function abrirCalendarioDirectoSiUnaDisciplina14() {
+        const unica = obtenerUnicaDisciplinaConsultorio14();
+        if (!unica) return;
+
+        simplificarSidebarUnaDisciplina14();
+
+        const enPortadaIndex = Boolean(document.querySelector(".sports-showcase-grid"));
+        const contabAbierta = document.getElementById("cdmSeccionContabilidadGlobal") &&
+            !document.getElementById("cdmSeccionContabilidadGlobal").classList.contains("hidden");
+        const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+        const yaAbierto = secCons && !secCons.classList.contains("hidden");
+
+        if (enPortadaIndex && !contabAbierta && !yaAbierto && typeof abrirEspecialidadDesdeInicioCDM === "function") {
+            abrirEspecialidadDesdeInicioCDM(unica.clave);
+            simplificarSidebarUnaDisciplina14();
+        }
+    }
+
+    function engancharHooksDisciplinaUnica14() {
+        if (window.__cdmSoloUnaDisciplinaHook14) return;
+        window.__cdmSoloUnaDisciplinaHook14 = true;
+
+        if (typeof window.volverAlInicioDesdeConsultorio === "function") {
+            const _origVolver14 = window.volverAlInicioDesdeConsultorio;
+            window.volverAlInicioDesdeConsultorio = function () {
+                const unica = obtenerUnicaDisciplinaConsultorio14();
+                if (unica && typeof abrirEspecialidadDesdeInicioCDM === "function") {
+                    abrirEspecialidadDesdeInicioCDM(unica.clave);
+                    simplificarSidebarUnaDisciplina14();
+                    return;
+                }
+                return _origVolver14.apply(this, arguments);
+            };
+        }
+
+        if (typeof window.renderizarConsultorioCompleto === "function") {
+            const _origRender14 = window.renderizarConsultorioCompleto;
+            window.renderizarConsultorioCompleto = function () {
+                _origRender14.apply(this, arguments);
+                simplificarSidebarUnaDisciplina14();
+            };
+        }
+    }
+
+    engancharHooksDisciplinaUnica14();
+    document.addEventListener("DOMContentLoaded", () => {
+        engancharHooksDisciplinaUnica14();
+        abrirCalendarioDirectoSiUnaDisciplina14();
+        setTimeout(abrirCalendarioDirectoSiUnaDisciplina14, 200);
+        setTimeout(simplificarSidebarUnaDisciplina14, 700);
+    });
+})();

@@ -1,6 +1,6 @@
 /**
  * server.js - Servidor Backend Oficial Multi-Club, Multi-Gimnasio & Consultorios (SaaS Suite)
- * Incluye control de Demos por fecha (7/10 días) y conexión aislada a MongoDB Atlas
+ * Incluye control de Demos por fecha, Sub-Administradores con permisos granulares, Auditoría y Persistencia Consultorio
  * Desarrollado por Gonzalo Adanchú
  */
 
@@ -9,6 +9,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
@@ -23,6 +24,7 @@ const PORT = process.env.PORT || 3000;
 const CDM_MONGO_URI = process.env.CDM_MONGO_URI || 'mongodb://127.0.0.1:27017/cdm_pro_suite_db';
 const ARCHIVO_RESPALDO_DISCO = path.join(__dirname, 'cdm_datos_servidor.json');
 const CLAVE_CLUB_POR_DEFECTO = 'cdm_adelia_maria_principal';
+const USUARIOS_RESERVADOS_SUPERADMIN = ['gonzalo', 'superadmin'];
 
 let mongoConectado = false;
 let CdmStateModel = null;
@@ -38,7 +40,9 @@ const cdmClubStateSchema = new mongoose.Schema({
     videoteca: { type: Array, default: [] },
     catalogoEjercicios: { type: Array, default: [] },
     consultorio: { type: Object, default: () => ({ pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] }) },
-    licenciaConfig: { type: Object, default: {} }
+    licenciaConfig: { type: Object, default: {} },
+    subAdmins: { type: Array, default: [] },
+    auditoria: { type: Array, default: [] }
 }, {
     timestamps: true,
     minimize: false,
@@ -62,8 +66,45 @@ cdmConnection.on('error', (err) => {
 });
 
 // ============================================================================
-// 2. HELPERS DE VENCIMIENTO DE DEMO Y PERSISTENCIA MULTI-CLIENTE
+// 2. HELPERS DE SEGURIDAD (HASH SCRYPT), DEMOS Y PERSISTENCIA MULTI-CLIENTE
 // ============================================================================
+
+function hashearClaveStaff(clavePlana) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.scryptSync(String(clavePlana || ''), salt, 64).toString('hex');
+    return `scrypt:${salt}:${hash}`;
+}
+
+function verificarClaveStaff(claveIngresada, staffObj) {
+    if (!staffObj) return false;
+    const guardada = String(staffObj.claveHash || staffObj.clave || '');
+    if (!guardada) return false;
+
+    if (guardada.startsWith('scrypt:')) {
+        const partes = guardada.split(':');
+        if (partes.length !== 3) return false;
+        const [, salt, hashHex] = partes;
+        const hashCalc = crypto.scryptSync(String(claveIngresada || ''), salt, 64);
+        const hashOrig = Buffer.from(hashHex, 'hex');
+        if (hashCalc.length !== hashOrig.length) return false;
+        return crypto.timingSafeEqual(hashCalc, hashOrig);
+    }
+    return guardada === String(claveIngresada || '');
+}
+
+function sanitizarStaffPublico(sa) {
+    if (!sa) return null;
+    return {
+        id: sa.id,
+        nombre: sa.nombre || '',
+        usuario: sa.usuario || '',
+        rolPlantilla: sa.rolPlantilla || 'personalizado',
+        activo: sa.activo !== false,
+        alcance: sa.alcance || { modulos: ['todos'], categorias: ['todas'] },
+        permisos: sa.permisos || {},
+        creadoISO: sa.creadoISO || new Date().toISOString()
+    };
+}
 
 function obtenerHoyAR() {
     try {
@@ -85,6 +126,16 @@ function estaDemoVencida(lic) {
     return obtenerHoyAR() > vence;
 }
 
+function tieneDatosConsultorio(cons) {
+    if (!cons || typeof cons !== 'object') return false;
+    return (
+        (Array.isArray(cons.pacientes) && cons.pacientes.length > 0) ||
+        (Array.isArray(cons.turnos) && cons.turnos.length > 0) ||
+        (Array.isArray(cons.sesiones) && cons.sesiones.length > 0) ||
+        (Array.isArray(cons.profesionales) && cons.profesionales.length > 0)
+    );
+}
+
 function crearEstadoVacioClub(claveClub = CLAVE_CLUB_POR_DEFECTO, licenciaInicial = {}) {
     return {
         claveClub,
@@ -97,6 +148,8 @@ function crearEstadoVacioClub(claveClub = CLAVE_CLUB_POR_DEFECTO, licenciaInicia
         videoteca: [],
         catalogoEjercicios: [],
         consultorio: { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] },
+        subAdmins: [],
+        auditoria: [],
         licenciaConfig: {
             claveClub,
             nombreEntidad: licenciaInicial.nombreEntidad || 'Club Deportivo Municipal',
@@ -199,7 +252,38 @@ async function obtenerEstadoMaestroClub(claveClub = CLAVE_CLUB_POR_DEFECTO) {
 async function guardarEstadoMaestroClub(nuevoEstado, claveClubParam = null) {
     const clave = String(claveClubParam || nuevoEstado.claveClub || nuevoEstado.licenciaConfig?.claveClub || CLAVE_CLUB_POR_DEFECTO).trim();
     const mapa = leerMapaClubesDesdeDisco();
-    const previo = mapa[clave] || crearEstadoVacioClub(clave);
+
+    // Leer SIEMPRE primero desde MongoDB para que un redeploy en Hostinger nunca pise datos con vacío
+    let previo = mapa[clave] || null;
+    if (mongoConectado && CdmStateModel) {
+        try {
+            const docMongo = await CdmStateModel.findOne({ claveClub: clave }).lean();
+            if (docMongo) previo = docMongo;
+        } catch (e) {
+            console.error('⚠️ Error leyendo estado previo de MongoDB:', e.message);
+        }
+    }
+    if (!previo) previo = crearEstadoVacioClub(clave);
+
+    // Conservar hashes de subAdmins si el cliente manda subAdmins sin claveHash
+    let subAdminsFinal = previo.subAdmins || [];
+    if (Array.isArray(nuevoEstado.subAdmins)) {
+        subAdminsFinal = nuevoEstado.subAdmins.map(sa => {
+            const ant = (previo.subAdmins || []).find(x => String(x.id) === String(sa.id));
+            return {
+                ...sa,
+                claveHash: sa.claveHash || ant?.claveHash || (sa.clave ? hashearClaveStaff(sa.clave) : '')
+            };
+        });
+    }
+
+    // Proteger consultorio contra envíos parciales o vacíos desde otros módulos
+    let consultorioFinal = previo.consultorio || { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] };
+    if (nuevoEstado.consultorio && typeof nuevoEstado.consultorio === 'object') {
+        if (nuevoEstado.forzarConsultorio || tieneDatosConsultorio(nuevoEstado.consultorio) || !tieneDatosConsultorio(consultorioFinal)) {
+            consultorioFinal = nuevoEstado.consultorio;
+        }
+    }
 
     const payload = {
         claveClub: clave,
@@ -211,9 +295,9 @@ async function guardarEstadoMaestroClub(nuevoEstado, claveClubParam = null) {
         microciclos: nuevoEstado.microciclos && typeof nuevoEstado.microciclos === 'object' ? nuevoEstado.microciclos : (previo.microciclos || {}),
         videoteca: Array.isArray(nuevoEstado.videoteca) ? nuevoEstado.videoteca : (previo.videoteca || []),
         catalogoEjercicios: Array.isArray(nuevoEstado.catalogoEjercicios) ? nuevoEstado.catalogoEjercicios : (previo.catalogoEjercicios || []),
-        consultorio: nuevoEstado.consultorio && typeof nuevoEstado.consultorio === 'object'
-            ? nuevoEstado.consultorio
-            : (previo.consultorio || { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] }),
+        consultorio: consultorioFinal,
+        subAdmins: subAdminsFinal,
+        auditoria: Array.isArray(nuevoEstado.auditoria) ? nuevoEstado.auditoria.slice(0, 200) : (previo.auditoria || []),
         licenciaConfig: nuevoEstado.licenciaConfig && typeof nuevoEstado.licenciaConfig === 'object' && Object.keys(nuevoEstado.licenciaConfig).length > 0
             ? { ...previo.licenciaConfig, ...nuevoEstado.licenciaConfig, claveClub: clave }
             : (previo.licenciaConfig || {})
@@ -245,16 +329,24 @@ function resumirListaClubes(mapaClubes) {
             ultimaActualizacionISO: c.ultimaActualizacionISO,
             cantidadPersonas: cantDep + cantPac,
             cantidadPacientes: cantPac,
+            cantidadStaff: Array.isArray(c.subAdmins) ? c.subAdmins.filter(s => s.activo !== false).length : 0,
             licenciaConfig: c.licenciaConfig || {}
         };
     });
+}
+
+function sanitizarEstadoParaRespuesta(estado) {
+    if (!estado) return estado;
+    return {
+        ...estado,
+        subAdmins: Array.isArray(estado.subAdmins) ? estado.subAdmins.map(sanitizarStaffPublico) : []
+    };
 }
 
 // ============================================================================
 // 3. RUTAS API REST
 // ============================================================================
 
-// Verificación rápida de estado y conexión a MongoDB Atlas
 app.get('/api/cdm/salud', (req, res) => {
     res.json({
         ok: true,
@@ -272,7 +364,7 @@ app.get('/api/cdm/estado', async (req, res) => {
         res.json({
             ok: true,
             motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
-            estado,
+            estado: sanitizarEstadoParaRespuesta(estado),
             clubes: resumirListaClubes(todos)
         });
     } catch (err) {
@@ -289,6 +381,53 @@ app.post('/api/cdm/estado', async (req, res) => {
             claveClub: guardado.claveClub,
             motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
             ultimaActualizacionISO: guardado.ultimaActualizacionISO
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.get('/api/cdm/consultorio', async (req, res) => {
+    try {
+        const clave = String(req.query.club || CLAVE_CLUB_POR_DEFECTO).trim();
+        const estado = await obtenerEstadoMaestroClub(clave);
+        res.json({
+            ok: true,
+            claveClub: clave,
+            motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
+            consultorio: estado.consultorio || { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] }
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.post('/api/cdm/consultorio', async (req, res) => {
+    try {
+        const clave = String(req.body?.claveClub || req.query.club || CLAVE_CLUB_POR_DEFECTO).trim();
+        const consultorio = req.body?.consultorio;
+        if (!consultorio || typeof consultorio !== 'object') {
+            return res.status(400).json({ ok: false, error: 'Datos de consultorio inválidos.' });
+        }
+
+        const estadoActual = await obtenerEstadoMaestroClub(clave);
+        estadoActual.consultorio = {
+            pacientes: Array.isArray(consultorio.pacientes) ? consultorio.pacientes : [],
+            turnos: Array.isArray(consultorio.turnos) ? consultorio.turnos : [],
+            mutuales: Array.isArray(consultorio.mutuales) ? consultorio.mutuales : [],
+            profesionales: Array.isArray(consultorio.profesionales) ? consultorio.profesionales : [],
+            sesiones: Array.isArray(consultorio.sesiones) ? consultorio.sesiones : []
+        };
+        estadoActual.forzarConsultorio = true;
+
+        const guardado = await guardarEstadoMaestroClub(estadoActual, clave);
+        res.json({
+            ok: true,
+            claveClub: clave,
+            motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
+            pacientes: guardado.consultorio.pacientes.length,
+            turnos: guardado.consultorio.turnos.length,
+            sesiones: guardado.consultorio.sesiones.length
         });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
@@ -315,7 +454,7 @@ app.post('/api/cdm/clubes/nuevo', async (req, res) => {
         const estadoInicial = crearEstadoVacioClub(claveNueva, { ...lic, claveClub: claveNueva });
         const guardado = await guardarEstadoMaestroClub(estadoInicial, claveNueva);
         const todos = await obtenerTodosLosClubes();
-        res.json({ ok: true, claveClub: claveNueva, estado: guardado, clubes: resumirListaClubes(todos) });
+        res.json({ ok: true, claveClub: claveNueva, estado: sanitizarEstadoParaRespuesta(guardado), clubes: resumirListaClubes(todos) });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
@@ -335,6 +474,157 @@ app.delete('/api/cdm/clubes/:claveClub', async (req, res) => {
         }
         const todos = await obtenerTodosLosClubes();
         res.json({ ok: true, clubes: resumirListaClubes(todos) });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ============================================================================
+// 3B. GESTIÓN DE SUB-ADMINISTRADORES (STAFF) Y AUDITORÍA POR COMERCIO
+// ============================================================================
+
+app.get('/api/cdm/staff', async (req, res) => {
+    try {
+        const clave = String(req.query.club || CLAVE_CLUB_POR_DEFECTO).trim();
+        const estado = await obtenerEstadoMaestroClub(clave);
+        res.json({
+            ok: true,
+            subAdmins: (estado.subAdmins || []).map(sanitizarStaffPublico),
+            auditoria: (estado.auditoria || []).slice(0, 80)
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.post('/api/cdm/staff', async (req, res) => {
+    try {
+        const { claveClub, staff, actor } = req.body || {};
+        const clave = String(claveClub || CLAVE_CLUB_POR_DEFECTO).trim();
+        if (!staff || !staff.nombre || !staff.usuario) {
+            return res.status(400).json({ ok: false, mensaje: 'Completá nombre y usuario del sub-administrador.' });
+        }
+
+        const usuarioNorm = String(staff.usuario).trim().toLowerCase();
+        if (USUARIOS_RESERVADOS_SUPERADMIN.includes(usuarioNorm)) {
+            return res.status(400).json({ ok: false, mensaje: `El usuario "${usuarioNorm}" está reservado para el SuperAdmin.` });
+        }
+
+        const todos = await obtenerTodosLosClubes();
+        const estado = todos[clave] || await obtenerEstadoMaestroClub(clave);
+        const idEdit = staff.id ? String(staff.id) : null;
+
+        // Evitar colisión de nombres de usuario entre comercios o admins principales
+        for (const c of Object.values(todos)) {
+            const uMain = String(c.licenciaConfig?.adminUsuario || '').toLowerCase();
+            if (uMain === usuarioNorm) {
+                return res.status(409).json({ ok: false, mensaje: `El usuario "${usuarioNorm}" ya pertenece a un Administrador Principal. Elegí otro.` });
+            }
+            const colisionStaff = (c.subAdmins || []).find(s =>
+                String(s.usuario || '').toLowerCase() === usuarioNorm && String(s.id) !== idEdit
+            );
+            if (colisionStaff) {
+                return res.status(409).json({ ok: false, mensaje: `El usuario "${usuarioNorm}" ya está en uso. Elegí otro.` });
+            }
+        }
+
+        if (!Array.isArray(estado.subAdmins)) estado.subAdmins = [];
+        const idx = idEdit ? estado.subAdmins.findIndex(s => String(s.id) === idEdit) : -1;
+
+        if (idx === -1 && !String(staff.clave || '').trim()) {
+            return res.status(400).json({ ok: false, mensaje: 'Ingresá una contraseña inicial para el nuevo usuario.' });
+        }
+
+        const previo = idx >= 0 ? estado.subAdmins[idx] : null;
+        const nuevoReg = {
+            id: previo ? previo.id : `staff_${Date.now()}`,
+            nombre: String(staff.nombre).trim(),
+            usuario: usuarioNorm,
+            claveHash: String(staff.clave || '').trim()
+                ? hashearClaveStaff(String(staff.clave).trim())
+                : (previo?.claveHash || ''),
+            rolPlantilla: staff.rolPlantilla || 'personalizado',
+            activo: staff.activo !== false,
+            alcance: {
+                modulos: Array.isArray(staff.alcance?.modulos) && staff.alcance.modulos.length ? staff.alcance.modulos : ['todos'],
+                categorias: Array.isArray(staff.alcance?.categorias) && staff.alcance.categorias.length ? staff.alcance.categorias : ['todas']
+            },
+            permisos: staff.permisos && typeof staff.permisos === 'object' ? staff.permisos : {},
+            creadoISO: previo?.creadoISO || new Date().toISOString()
+        };
+
+        if (idx >= 0) estado.subAdmins[idx] = nuevoReg;
+        else estado.subAdmins.unshift(nuevoReg);
+
+        if (!Array.isArray(estado.auditoria)) estado.auditoria = [];
+        estado.auditoria.unshift({
+            id: Date.now(),
+            fechaISO: new Date().toISOString(),
+            usuario: actor || 'Admin Principal',
+            accion: idx >= 0 ? 'EDITAR_STAFF' : 'CREAR_STAFF',
+            detalle: `${nuevoReg.nombre} (@${nuevoReg.usuario}) • Plantilla: ${nuevoReg.rolPlantilla}`
+        });
+
+        await guardarEstadoMaestroClub(estado, clave);
+        res.json({
+            ok: true,
+            staff: sanitizarStaffPublico(nuevoReg),
+            subAdmins: estado.subAdmins.map(sanitizarStaffPublico),
+            auditoria: estado.auditoria.slice(0, 80)
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.delete('/api/cdm/staff/:id', async (req, res) => {
+    try {
+        const clave = String(req.query.club || CLAVE_CLUB_POR_DEFECTO).trim();
+        const idStaff = String(req.params.id || '').trim();
+        const actor = String(req.query.actor || 'Admin Principal');
+        const estado = await obtenerEstadoMaestroClub(clave);
+
+        const target = (estado.subAdmins || []).find(s => String(s.id) === idStaff);
+        estado.subAdmins = (estado.subAdmins || []).filter(s => String(s.id) !== idStaff);
+
+        if (target) {
+            if (!Array.isArray(estado.auditoria)) estado.auditoria = [];
+            estado.auditoria.unshift({
+                id: Date.now(),
+                fechaISO: new Date().toISOString(),
+                usuario: actor,
+                accion: 'ELIMINAR_STAFF',
+                detalle: `${target.nombre} (@${target.usuario})`
+            });
+        }
+
+        await guardarEstadoMaestroClub(estado, clave);
+        res.json({
+            ok: true,
+            subAdmins: estado.subAdmins.map(sanitizarStaffPublico),
+            auditoria: (estado.auditoria || []).slice(0, 80)
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.post('/api/cdm/auditoria', async (req, res) => {
+    try {
+        const { claveClub, usuario, accion, detalle } = req.body || {};
+        const clave = String(claveClub || CLAVE_CLUB_POR_DEFECTO).trim();
+        const estado = await obtenerEstadoMaestroClub(clave);
+        if (!Array.isArray(estado.auditoria)) estado.auditoria = [];
+        estado.auditoria.unshift({
+            id: Date.now(),
+            fechaISO: new Date().toISOString(),
+            usuario: String(usuario || 'Admin'),
+            accion: String(accion || 'ACCION'),
+            detalle: String(detalle || '')
+        });
+        estado.auditoria = estado.auditoria.slice(0, 200);
+        await guardarEstadoMaestroClub(estado, clave);
+        res.json({ ok: true });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
@@ -402,7 +692,7 @@ app.post('/api/cdm/paciente/:id/estudio', async (req, res) => {
     }
 });
 
-// Login de Comercio / Profesional (verifica suspensión y vencimiento de demo)
+// Login unificado: Admin Principal de Comercio + Sub-Administradores (Staff)
 app.post('/api/cdm/auth-admin', async (req, res) => {
     try {
         const usuario = String(req.body?.usuario || '').trim().toLowerCase();
@@ -415,7 +705,8 @@ app.post('/api/cdm/auth-admin', async (req, res) => {
             lista.sort((a, b) => (a.claveClub === clubPreferido ? -1 : b.claveClub === clubPreferido ? 1 : 0));
         }
 
-        const match = lista.find(c => {
+        // 1. Buscar Admin Principal del Comercio
+        const matchPrincipal = lista.find(c => {
             const u = String(c.licenciaConfig?.adminUsuario || 'cdm').toLowerCase();
             const p = String(c.licenciaConfig?.adminClave || 'cdm2026');
             const esCdmPrincipal = c.claveClub === CLAVE_CLUB_POR_DEFECTO;
@@ -423,26 +714,64 @@ app.post('/api/cdm/auth-admin', async (req, res) => {
             return coincideUsuario && p === clave;
         });
 
-        if (!match) return res.status(401).json({ ok: false, mensaje: 'Usuario o contraseña incorrectos.' });
-
-        if (match.licenciaConfig?.estadoServicio === 'suspendido') {
-            return res.status(403).json({
-                ok: false,
-                suspendido: true,
-                mensaje: '⚠️ Suscripción mensual en pausa. Contactá a Gonzalo Adanchú para reactivar el servicio.'
+        if (matchPrincipal) {
+            if (matchPrincipal.licenciaConfig?.estadoServicio === 'suspendido') {
+                return res.status(403).json({
+                    ok: false,
+                    suspendido: true,
+                    mensaje: '⚠️ Suscripción mensual en pausa. Contactá a Gonzalo Adanchú para reactivar el servicio.'
+                });
+            }
+            if (estaDemoVencida(matchPrincipal.licenciaConfig)) {
+                return res.status(403).json({
+                    ok: false,
+                    suspendido: true,
+                    demoVencida: true,
+                    mensaje: `⏳ Tu prueba gratuita finalizó el ${formatearFechaAR(matchPrincipal.licenciaConfig.fechaVencimientoDemo)}. Todos tus datos siguen guardados. Contactá a Gonzalo Adanchú para activar tu plan.`
+                });
+            }
+            return res.json({
+                ok: true,
+                nivelAdmin: 'principal',
+                staffPerfil: null,
+                claveClub: matchPrincipal.claveClub,
+                estado: sanitizarEstadoParaRespuesta(matchPrincipal),
+                clubes: resumirListaClubes(todos)
             });
         }
 
-        if (estaDemoVencida(match.licenciaConfig)) {
-            return res.status(403).json({
-                ok: false,
-                suspendido: true,
-                demoVencida: true,
-                mensaje: `⏳ Tu prueba gratuita finalizó el ${formatearFechaAR(match.licenciaConfig.fechaVencimientoDemo)}. Todos tus datos siguen guardados de forma segura. Contactá a Gonzalo Adanchú para activar tu plan definitivo.`
+        // 2. Buscar Sub-Administrador (Staff) en todos los comercios
+        for (const club of lista) {
+            const hitStaff = (club.subAdmins || []).find(sa =>
+                String(sa.usuario || '').toLowerCase() === usuario && verificarClaveStaff(clave, sa)
+            );
+            if (!hitStaff) continue;
+
+            if (club.licenciaConfig?.estadoServicio === 'suspendido' || estaDemoVencida(club.licenciaConfig)) {
+                return res.status(403).json({
+                    ok: false,
+                    suspendido: true,
+                    mensaje: '⏳ El servicio de esta institución está pausado o vencido. Consultá con el administrador principal.'
+                });
+            }
+            if (hitStaff.activo === false) {
+                return res.status(403).json({
+                    ok: false,
+                    suspendido: true,
+                    mensaje: '🚫 Tu usuario de staff fue desactivado por el administrador principal.'
+                });
+            }
+
+            return res.json({
+                ok: true,
+                nivelAdmin: 'staff',
+                staffPerfil: sanitizarStaffPublico(hitStaff),
+                claveClub: club.claveClub,
+                estado: sanitizarEstadoParaRespuesta(club)
             });
         }
 
-        res.json({ ok: true, claveClub: match.claveClub, estado: match, clubes: resumirListaClubes(todos) });
+        return res.status(401).json({ ok: false, mensaje: 'Usuario o contraseña incorrectos.' });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
@@ -478,7 +807,7 @@ app.post('/api/cdm/auth-codigo', async (req, res) => {
                 if (bloqueado) {
                     return res.status(403).json({ ok: false, suspendido: true, mensaje: '⏳ El período de prueba de este consultorio finalizó. Consultá con tu profesional.' });
                 }
-                return res.json({ ok: true, esPacienteConsultorio: true, claveClub: estadoClub.claveClub, paciente: pacHit, estado: estadoClub });
+                return res.json({ ok: true, esPacienteConsultorio: true, claveClub: estadoClub.claveClub, paciente: pacHit, estado: sanitizarEstadoParaRespuesta(estadoClub) });
             }
 
             const siglaClub = String(lic.siglaCodigo || 'CDM').toUpperCase();
@@ -493,7 +822,7 @@ app.post('/api/cdm/auth-codigo', async (req, res) => {
                 if (bloqueado) {
                     return res.status(403).json({ ok: false, suspendido: true, mensaje: '⏳ El período de prueba de esta institución finalizó. Consultá con la administración.' });
                 }
-                return res.json({ ok: true, esPacienteConsultorio: false, claveClub: estadoClub.claveClub, persona: encontrado, estado: estadoClub });
+                return res.json({ ok: true, esPacienteConsultorio: false, claveClub: estadoClub.claveClub, persona: encontrado, estado: sanitizarEstadoParaRespuesta(estadoClub) });
             }
         }
 
@@ -502,6 +831,125 @@ app.post('/api/cdm/auth-codigo', async (req, res) => {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
+
+// ============================================================================
+// 3C. MOTOR AUTOMÁTICO DE RECORDATORIOS WHATSAPP 24HS (META CLOUD API)
+// ============================================================================
+
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || '';
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+const WHATSAPP_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_NAME || 'recordatorio_turno_24h';
+const WHATSAPP_TEMPLATE_LANG = process.env.WHATSAPP_TEMPLATE_LANG || 'es_AR';
+
+function normalizarTelefonoMetaAR(telRaw) {
+    let dig = String(telRaw || '').replace(/\D/g, '');
+    if (!dig) return '';
+    if (dig.startsWith('0')) dig = dig.slice(1);
+    if (!dig.startsWith('54')) dig = '549' + dig;
+    return dig;
+}
+
+async function enviarPlantillaWhatsAppMeta({ telefono, pacienteNombre, especialidad, fechaTxt, hora, institucion }) {
+    if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) return false;
+    const to = normalizarTelefonoMetaAR(telefono);
+    if (to.length < 10) return false;
+
+    const url = `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+    const body = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'template',
+        template: {
+            name: WHATSAPP_TEMPLATE_NAME,
+            language: { code: WHATSAPP_TEMPLATE_LANG },
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: String(pacienteNombre || 'Paciente') },
+                        { type: 'text', text: String(institucion || 'Consultorio') },
+                        { type: 'text', text: String(especialidad || 'Consulta') },
+                        { type: 'text', text: String(fechaTxt || '') },
+                        { type: 'text', text: String(hora || '') }
+                    ]
+                }
+            ]
+        }
+    };
+
+    const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    });
+    return resp.ok;
+}
+
+async function procesarRecordatoriosAutomaticos24h() {
+    if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) return;
+    try {
+        const todos = await obtenerTodosLosClubes();
+        const ahoraMs = Date.now();
+
+        for (const club of Object.values(todos)) {
+            const lic = club.licenciaConfig || {};
+            const autoOn = Boolean(lic.whatsappAuto24h || lic.funciones?.general?.whatsappAuto24h);
+            if (!autoOn) continue;
+            if (lic.estadoServicio === 'suspendido' || estaDemoVencida(lic)) continue;
+
+            const turnos = club.consultorio?.turnos || [];
+            const pacientes = club.consultorio?.pacientes || [];
+            let huboCambios = false;
+
+            for (const t of turnos) {
+                if (!t || t.estado === 'cancelado' || t.estado === 'atendido' || t.aviso24hEnviado) continue;
+                if (!t.fecha || !/^\d{4}-\d{2}-\d{2}$/.test(t.fecha)) continue;
+
+                const [y, m, d] = t.fecha.split('-').map(Number);
+                const [hh, mm] = String(t.hora || '09:00').split(':').map(Number);
+                // Zona horaria Argentina (-03:00)
+                const turnoMs = Date.UTC(y, m - 1, d, (isNaN(hh) ? 9 : hh) + 3, isNaN(mm) ? 0 : mm, 0);
+                const diffHoras = (turnoMs - ahoraMs) / 3600000;
+
+                // Enviar cuando faltan entre 2h y 24.5h para el turno
+                if (diffHoras >= 2 && diffHoras <= 24.5) {
+                    const pac = pacientes.find(p => Number(p.id) === Number(t.pacienteId));
+                    const tel = t.whatsapp || pac?.whatsapp || '';
+                    if (!tel) continue;
+
+                    const ok = await enviarPlantillaWhatsAppMeta({
+                        telefono: tel,
+                        pacienteNombre: t.pacienteNombre,
+                        especialidad: t.especialidad,
+                        fechaTxt: formatearFechaAR(t.fecha),
+                        hora: t.hora,
+                        institucion: lic.nombreEntidad || 'Consultorio'
+                    });
+
+                    if (ok) {
+                        t.aviso24hEnviado = true;
+                        t.aviso24hModo = 'auto';
+                        t.aviso24hFecha = new Date().toISOString();
+                        huboCambios = true;
+                    }
+                }
+            }
+
+            if (huboCambios) {
+                await guardarEstadoMaestroClub(club, club.claveClub);
+            }
+        }
+    } catch (err) {
+        console.error('⚠️ Error en cron recordatorios WA 24h:', err.message);
+    }
+}
+
+// Ejecutar revisión cada 15 minutos
+setInterval(procesarRecordatoriosAutomaticos24h, 15 * 60 * 1000);
+setTimeout(procesarRecordatoriosAutomaticos24h, 30 * 1000);
 
 // ============================================================================
 // 4. SERVIR FRONTEND Y ARRANCAR SERVIDOR

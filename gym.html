@@ -58,6 +58,12 @@
             </div>
             <div class="topbar-right">
                 <button type="button" id="btnToggleTemaCDM" class="btn btn-ghost btn-sm btn-theme-toggle" onclick="alternarTemaVisualCDM()" title="Cambiar entre Modo Día y Modo Noche"><i class="ri-moon-clear-fill"></i><span>Modo Noche</span></button>
+                <button type="button" class="btn btn-ghost btn-sm mobile-only-sys-btn" onclick="abrirModalSistemaMovilCDM()" title="Backup y Demo">
+                    <i class="ri-database-2-line"></i> Sistema
+                </button>
+                <button type="button" class="btn btn-ok btn-sm" onclick="abrirModalCrearRutinaCDM()">
+                    <i class="ri-add-circle-line"></i> + Nueva Rutina
+                </button>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalNuevoVideoEjercicio()">
                     <i class="ri-video-add-line"></i> + Subir Video
                 </button>
@@ -256,9 +262,14 @@
                     <div class="app-panel">
                         <div class="panel-head">
                             <h3><i class="ri-whatsapp-line"></i> Rutinas de Socios y Envío por WhatsApp</h3>
-                            <select id="filtroPersonaRutinasAdmin" onchange="renderizarListaRutinasAdminGym()" style="max-width:230px;">
-                                <option value="TODAS">Ver Todas las Rutinas</option>
-                            </select>
+                            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                                <select id="filtroPersonaRutinasAdmin" onchange="renderizarListaRutinasAdminGym()" style="max-width:230px;">
+                                    <option value="TODAS">Ver Todas las Rutinas</option>
+                                </select>
+                                <button type="button" id="btnAbrirModalNuevaRutinaCDM" class="btn btn-primary btn-sm" onclick="abrirModalCrearRutinaCDM()">
+                                    <i class="ri-add-circle-line"></i> + Nueva Rutina
+                                </button>
+                            </div>
                         </div>
                         <div id="contenedorTarjetasRutinasAdminGym" class="athletes-grid"></div>
                     </div>
@@ -303,6 +314,8 @@
 
 <div id="modalPersona" class="modal-backdrop hidden"></div>
 <div id="modalVideoEjercicio" class="modal-backdrop hidden"></div>
+<div id="modalCrearRutinaCDM" class="modal-backdrop hidden"></div>
+<div id="modalSistemaMovilCDM" class="modal-backdrop hidden"></div>
 
 <script src="js/app.js"></script>
 <script src="js/nav-ui.js"></script>

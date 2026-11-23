@@ -7859,3 +7859,1419 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 });
+// =========================================================================
+// 19. SISTEMA DE SUB-ADMINISTRADORES (STAFF) CON PERMISOS GRANULARES + AUDITORÍA
+//     Jerarquía: SuperAdmin (Global) -> Admin Principal del Sistema -> Staff a medida
+//     Pegar al final de js/login.js (debajo del Bloque 18)
+// =========================================================================
+
+const CATALOGO_PERMISOS_STAFF_19 = [
+    { clave: "padronEditar", icono: "👤", titulo: "Crear / Editar Socios y Jugadores", desc: "Alta de socios, edición de ficha y datos personales" },
+    { clave: "asistencia", icono: "✓", titulo: "Tomar Lista y Check-in", desc: "Marcar presentes, faltas y lista de 5 estados" },
+    { clave: "rutinasEditar", icono: "🏋️", titulo: "Crear / Editar Rutinas y Videos", desc: "Cargar planes de entrenamiento y videoteca" },
+    { clave: "evaluacionesEditar", icono: "📈", titulo: "Cargar Marcas, Scores y Lesiones", desc: "Evaluaciones 1RM, pilares 360°, anatomía y lesiones" },
+    { clave: "cajaVer", icono: "💰", titulo: "Ver Caja, Cuotas y Reportes", desc: "Visualizar recaudación, estados de cuota y contabilidad" },
+    { clave: "cajaCobrar", icono: "💳", titulo: "Cobrar Cuotas / Registrar Pagos", desc: "Cambiar estado de cuota y enviar recibos por WA" },
+    { clave: "consultorio", icono: "🩺", titulo: "Módulo Consultorio / Salud", desc: "Acceder a pacientes, turnos y evoluciones clínicas" },
+    { clave: "codigos", icono: "🔑", titulo: "Gestionar Códigos Personales", desc: "Ver, copiar y enviar códigos de acceso por WA" },
+    { clave: "eliminar", icono: "🗑️", titulo: "Permitir Eliminar Registros", desc: "Borrar socios, rutinas o evaluaciones (recomendado OFF)" },
+    { clave: "sistemaBackup", icono: "💾", titulo: "Backup, Demo y Vaciar Datos", desc: "Exportar/restaurar JSON o limpiar base (recomendado OFF)" }
+];
+
+const PLANTILLAS_STAFF_19 = {
+    recepcion: {
+        label: "🖥️ Recepción",
+        permisos: { padronEditar: true, asistencia: true, rutinasEditar: false, evaluacionesEditar: false, cajaVer: true, cajaCobrar: true, consultorio: false, codigos: true, eliminar: false, sistemaBackup: false }
+    },
+    profe: {
+        label: "🏋️ Profe / Entrenador",
+        permisos: { padronEditar: false, asistencia: true, rutinasEditar: true, evaluacionesEditar: true, cajaVer: false, cajaCobrar: false, consultorio: false, codigos: true, eliminar: false, sistemaBackup: false }
+    },
+    salud: {
+        label: "🩺 Salud / Kine",
+        permisos: { padronEditar: false, asistencia: false, rutinasEditar: true, evaluacionesEditar: true, cajaVer: false, cajaCobrar: false, consultorio: true, codigos: false, eliminar: false, sistemaBackup: false }
+    },
+    tesorero: {
+        label: "💵 Tesorero / Caja",
+        permisos: { padronEditar: false, asistencia: false, rutinasEditar: false, evaluacionesEditar: false, cajaVer: true, cajaCobrar: true, consultorio: false, codigos: false, eliminar: false, sistemaBackup: true }
+    },
+    lectura: {
+        label: "👁️ Solo Lectura",
+        permisos: { padronEditar: false, asistencia: false, rutinasEditar: false, evaluacionesEditar: false, cajaVer: false, cajaCobrar: false, consultorio: false, codigos: false, eliminar: false, sistemaBackup: false }
+    }
+};
+
+function obtenerNivelAdminCDM() {
+    const s = obtenerSesionActivaCDM();
+    if (!s) return null;
+    if (s.rol !== "admin") return "usuario";
+    if (s.esSuperAdmin) return "superadmin";
+    return s.nivelAdmin === "staff" ? "staff" : "principal";
+}
+
+function esAdminPrincipalOSuperCDM() {
+    const n = obtenerNivelAdminCDM();
+    return n === "superadmin" || n === "principal";
+}
+
+function tienePermisoAdminCDM(clavePermiso) {
+    const s = obtenerSesionActivaCDM();
+    if (!s || s.rol !== "admin") return false;
+    if (s.esSuperAdmin || s.nivelAdmin !== "staff") return true;
+    return Boolean(s.staffPerfil?.permisos?.[clavePermiso]);
+}
+
+function tieneAccesoModuloStaffCDM(modulo) {
+    const s = obtenerSesionActivaCDM();
+    if (!s || s.rol !== "admin") return false;
+    if (s.esSuperAdmin || s.nivelAdmin !== "staff") return true;
+    const mods = s.staffPerfil?.alcance?.modulos || ["todos"];
+    return mods.includes("todos") || mods.includes(modulo);
+}
+
+function obtenerClaveStorageStaff19(claveClub = null) {
+    return `cdm_subadmins_v1_${claveClub || obtenerClaveClubActivoCDM()}`;
+}
+
+function obtenerClaveStorageAudit19(claveClub = null) {
+    return `cdm_auditoria_v1_${claveClub || obtenerClaveClubActivoCDM()}`;
+}
+
+function obtenerStaffLocal19(claveClub = null) {
+    try { return JSON.parse(localStorage.getItem(obtenerClaveStorageStaff19(claveClub)) || "[]") || []; }
+    catch { return []; }
+}
+
+function guardarStaffLocal19(lista, claveClub = null) {
+    localStorage.setItem(obtenerClaveStorageStaff19(claveClub), JSON.stringify(Array.isArray(lista) ? lista : []));
+}
+
+function registrarAuditoriaCDM(accion, detalle = "") {
+    const s = obtenerSesionActivaCDM();
+    const clave = obtenerClaveClubActivoCDM();
+    const entry = {
+        id: Date.now(),
+        fechaISO: new Date().toISOString(),
+        usuario: s?.nombre || "Admin",
+        accion,
+        detalle
+    };
+    try {
+        const arr = JSON.parse(localStorage.getItem(obtenerClaveStorageAudit19(clave)) || "[]") || [];
+        arr.unshift(entry);
+        localStorage.setItem(obtenerClaveStorageAudit19(clave), JSON.stringify(arr.slice(0, 100)));
+    } catch {}
+
+    if (window.location.protocol !== "file:") {
+        fetch("/api/cdm/auditoria", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ claveClub: clave, usuario: entry.usuario, accion, detalle })
+        }).catch(() => {});
+    }
+}
+
+// 1. Sincronizar subAdmins y auditoria al cambiar de comercio
+const _origCargarEstadoClub19 = cargarEstadoClubEnLocalStorage;
+cargarEstadoClubEnLocalStorage = function (estadoClub, claveClub) {
+    _origCargarEstadoClub19.apply(this, arguments);
+    const clave = claveClub || estadoClub?.claveClub || CLAVE_CLUB_DEFECTO_CDM;
+    if (Array.isArray(estadoClub?.subAdmins)) guardarStaffLocal19(estadoClub.subAdmins, clave);
+    if (Array.isArray(estadoClub?.auditoria)) {
+        localStorage.setItem(obtenerClaveStorageAudit19(clave), JSON.stringify(estadoClub.auditoria.slice(0, 100)));
+    }
+};
+
+const _origGuardarSnapshot19 = guardarSnapshotClubActualEnMapaLocal;
+guardarSnapshotClubActualEnMapaLocal = function () {
+    const mapa = _origGuardarSnapshot19.apply(this, arguments);
+    const clave = obtenerClaveClubActivoCDM();
+    if (mapa && mapa[clave]) {
+        mapa[clave].subAdmins = obtenerStaffLocal19(clave);
+        try {
+            mapa[clave].auditoria = JSON.parse(localStorage.getItem(obtenerClaveStorageAudit19(clave)) || "[]") || [];
+        } catch {}
+        localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+    }
+    return mapa;
+};
+
+// 2. Login unificado: SuperAdmin + Admin Principal + Sub-Administradores (Staff)
+function obtenerPaginaInicialStaff19(staffPerfil, lic) {
+    const mods = staffPerfil?.alcance?.modulos || ["todos"];
+    if (!mods.includes("todos")) {
+        if (mods.includes("gym") && lic?.modulos?.gym) return "gym.html";
+        if (mods.includes("futbol") && lic?.modulos?.futbol) return "futbol.html";
+        if (mods.includes("hockey") && lic?.modulos?.hockey) return "hockey.html";
+    }
+    return obtenerPaginaInicialSegunModulos(lic);
+}
+
+const _origLoginAdmin19 = iniciarSesionComoAdmin;
+iniciarSesionComoAdmin = async function (e) {
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
+    const user = (document.getElementById("inputAdminUser")?.value || "").trim().toLowerCase();
+    const pass = (document.getElementById("inputAdminPass")?.value || "").trim();
+
+    if (CREDENCIALES_SUPERADMIN.usuarios.includes(user) && CREDENCIALES_SUPERADMIN.claves.includes(pass)) {
+        return _origLoginAdmin19.apply(this, arguments);
+    }
+
+    if (window.location.protocol !== "file:") {
+        try {
+            const resp = await fetch("/api/cdm/auth-admin", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ usuario: user, clave: pass })
+            });
+            const data = await resp.json();
+            if (resp.status === 403 && data.suspendido) {
+                mostrarErrorLogin(data.mensaje || "⚠️ Acceso suspendido.");
+                return;
+            }
+            if (resp.ok && data.ok && data.estado) {
+                cargarEstadoClubEnLocalStorage(data.estado, data.claveClub);
+                const lic = data.estado.licenciaConfig || obtenerLicenciaConfigCDM();
+                const esStaff = data.nivelAdmin === "staff" && data.staffPerfil;
+
+                localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+                    rol: "admin",
+                    esSuperAdmin: false,
+                    nivelAdmin: esStaff ? "staff" : "principal",
+                    staffPerfil: esStaff ? data.staffPerfil : null,
+                    claveClub: data.claveClub,
+                    nombre: esStaff
+                        ? `${data.staffPerfil.nombre} (${PLANTILLAS_STAFF_19[data.staffPerfil.rolPlantilla]?.label || "Staff"})`
+                        : `Admin • ${lic.nombreEntidad || "Comercio"}`,
+                    fechaIngreso: new Date().toISOString()
+                }));
+
+                window.location.href = esStaff
+                    ? obtenerPaginaInicialStaff19(data.staffPerfil, lic)
+                    : obtenerPaginaInicialSegunModulos(lic);
+                return;
+            }
+        } catch {}
+    }
+
+    // Fallback offline para sub-administradores guardados en localStorage
+    const mapaLocal = obtenerMapaLocalClubesCDM();
+    for (const club of Object.values(mapaLocal)) {
+        const staffList = Array.isArray(club.subAdmins) ? club.subAdmins : obtenerStaffLocal19(club.claveClub);
+        const hit = staffList.find(sa => String(sa.usuario || "").toLowerCase() === user && sa.claveLocal === pass);
+        if (hit) {
+            if (hit.activo === false) {
+                mostrarErrorLogin("🚫 Tu usuario de staff fue pausado por el administrador principal.");
+                return;
+            }
+            cargarEstadoClubEnLocalStorage(club, club.claveClub);
+            const lic = club.licenciaConfig || obtenerLicenciaConfigCDM();
+            localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+                rol: "admin",
+                esSuperAdmin: false,
+                nivelAdmin: "staff",
+                staffPerfil: hit,
+                claveClub: club.claveClub,
+                nombre: `${hit.nombre} (Staff)`,
+                fechaIngreso: new Date().toISOString()
+            }));
+            window.location.href = obtenerPaginaInicialStaff19(hit, lic);
+            return;
+        }
+    }
+
+    return _origLoginAdmin19.apply(this, arguments);
+};
+
+// 3. Blindaje visual (CSS) + Candado de funciones (JS) para Sub-Administradores
+function inyectarCSSYCandadoPermisosStaff19() {
+    if (!document.getElementById("cdmCssPermisosStaff19")) {
+        const st = document.createElement("style");
+        st.id = "cdmCssPermisosStaff19";
+        st.textContent = `
+            body[data-nivel-admin="staff"][data-perm-sistemaBackup="off"] .sidebar-demo-box,
+            body[data-nivel-admin="staff"][data-perm-sistemaBackup="off"] .mobile-only-sys-btn,
+            body[data-nivel-admin="staff"][data-perm-sistemaBackup="off"] button[onclick*="limpiarTodoElSistema"],
+            body[data-nivel-admin="staff"][data-perm-sistemaBackup="off"] button[onclick*="cargarDatosDemoCDM"],
+            body[data-nivel-admin="staff"][data-perm-sistemaBackup="off"] button[onclick*="exportarBackupJSON"] {
+                display: none !important;
+            }
+            body[data-nivel-admin="staff"][data-perm-eliminar="off"] button[onclick*="eliminar"]:not([onclick*="cerrarSesion"]),
+            body[data-nivel-admin="staff"][data-perm-eliminar="off"] button[onclick*="borrar"]:not([onclick*="cerrarSesion"]),
+            body[data-nivel-admin="staff"][data-perm-eliminar="off"] .routine-del-btn {
+                display: none !important;
+            }
+            body[data-nivel-admin="staff"][data-perm-padronEditar="off"] button[onclick*="abrirModalPersona"],
+            body[data-nivel-admin="staff"][data-perm-padronEditar="off"] button[onclick*="abrirModalJugador"] {
+                display: none !important;
+            }
+            body[data-nivel-admin="staff"][data-perm-rutinasEditar="off"] button[onclick*="abrirModalCrearRutinaCDM"],
+            body[data-nivel-admin="staff"][data-perm-rutinasEditar="off"] button[onclick*="abrirModalNuevoVideoEjercicio"],
+            body[data-nivel-admin="staff"][data-perm-rutinasEditar="off"] button[onclick*="abrirModalVideotecaProCDM"],
+            body[data-nivel-admin="staff"][data-perm-rutinasEditar="off"] button[onclick*="insertarEjercicioDeVideotecaEnRutina"],
+            body[data-nivel-admin="staff"][data-perm-rutinasEditar="off"] #btnAdminSwitchComplejidadTop {
+                display: none !important;
+            }
+            body[data-nivel-admin="staff"][data-perm-asistencia="off"] .check-btn,
+            body[data-nivel-admin="staff"][data-perm-asistencia="off"] button[onclick*="abrirModalTomaListaPlantel"],
+            body[data-nivel-admin="staff"][data-perm-asistencia="off"] button[onclick*="marcarTodosPresentes"] {
+                display: none !important;
+            }
+            body[data-nivel-admin="staff"][data-perm-cajaVer="off"] .side-link[data-nav="contabilidad"],
+            body[data-nivel-admin="staff"][data-perm-cajaVer="off"] #cdmSeccionContabilidadGlobal,
+            body[data-nivel-admin="staff"][data-perm-cajaVer="off"] #contenedorResumenCajaGym,
+            body[data-nivel-admin="staff"][data-perm-cajaVer="off"] .bento-kpi:has(#gymKpiRecaudacion) {
+                display: none !important;
+            }
+            body[data-nivel-admin="staff"][data-perm-cajaCobrar="off"] button[onclick*="alternarEstadoPago"],
+            body[data-nivel-admin="staff"][data-perm-cajaCobrar="off"] button[onclick*="enviarReciboPagoWhatsApp"] {
+                display: none !important;
+            }
+            body[data-nivel-admin="staff"][data-perm-codigos="off"] button[onclick*="abrirModalCodigosAccesoAdmin"],
+            body[data-nivel-admin="staff"][data-perm-codigos="off"] #adminBoxCodigoFicha {
+                display: none !important;
+            }
+            body[data-nivel-admin="staff"][data-perm-consultorio="off"] .side-link[data-nav="consultorio"],
+            body[data-nivel-admin="staff"][data-perm-consultorio="off"] #cardShowcaseConsultorioPro {
+                display: none !important;
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    const nivel = obtenerNivelAdminCDM();
+    if (!document.body || !nivel) return;
+    document.body.setAttribute("data-nivel-admin", nivel);
+
+    if (nivel === "staff") {
+        CATALOGO_PERMISOS_STAFF_19.forEach(item => {
+            document.body.setAttribute(`data-perm-${item.clave}`, tienePermisoAdminCDM(item.clave) ? "on" : "off");
+        });
+        if (!tienePermisoAdminCDM("cajaVer")) {
+            document.body.setAttribute("data-cobranza", "bloqueada");
+        }
+
+        // Ocultar módulos fuera del alcance del staff y redirigir si entra por URL directa
+        const path = window.location.pathname.toLowerCase();
+        const lic = obtenerLicenciaConfigCDM();
+        if (!tieneAccesoModuloStaffCDM("futbol")) {
+            document.querySelectorAll('.sidebar-nav a[href="futbol.html"], .sports-showcase-grid a[href="futbol.html"]').forEach(el => el.classList.add("hidden"));
+            if (path.includes("futbol.html") && !new URLSearchParams(window.location.search).get("deporte")) {
+                window.location.replace(obtenerPaginaInicialStaff19(obtenerSesionActivaCDM()?.staffPerfil, lic));
+                return;
+            }
+        }
+        if (!tieneAccesoModuloStaffCDM("hockey")) {
+            document.querySelectorAll('.sidebar-nav a[href*="hockey.html"], .sports-showcase-grid a[href*="hockey.html"]').forEach(el => el.classList.add("hidden"));
+            if (path.includes("hockey.html")) {
+                window.location.replace(obtenerPaginaInicialStaff19(obtenerSesionActivaCDM()?.staffPerfil, lic));
+                return;
+            }
+        }
+        if (!tieneAccesoModuloStaffCDM("gym")) {
+            document.querySelectorAll('.sidebar-nav a[href*="gym.html"], .sports-showcase-grid a[href*="gym.html"]').forEach(el => el.classList.add("hidden"));
+            if (path.includes("gym.html")) {
+                window.location.replace(obtenerPaginaInicialStaff19(obtenerSesionActivaCDM()?.staffPerfil, lic));
+                return;
+            }
+        }
+    }
+}
+
+function enlazarCandadosFuncionesStaff19() {
+    if (obtenerNivelAdminCDM() !== "staff" || window.__cdmStaffGuardsReady) return;
+    window.__cdmStaffGuardsReady = true;
+
+    const proteger = (fnName, permKey, label) => {
+        if (typeof window[fnName] !== "function") return;
+        const orig = window[fnName];
+        window[fnName] = function () {
+            if (!tienePermisoAdminCDM(permKey)) {
+                if (typeof mostrarToast === "function") mostrarToast(`🔒 No tenés permiso para ${label}.`);
+                else alert(`🔒 No tenés permiso para ${label}.`);
+                return;
+            }
+            return orig.apply(this, arguments);
+        };
+    };
+
+    proteger("limpiarTodoElSistema", "sistemaBackup", "vaciar datos del sistema");
+    proteger("exportarBackupJSON", "sistemaBackup", "exportar backups");
+    proteger("borrarRutinaGlobal", "eliminar", "eliminar rutinas");
+    proteger("eliminarPersonaCDM", "eliminar", "eliminar socios o jugadores");
+    proteger("abrirModalPersona", "padronEditar", "crear o editar personas");
+    proteger("abrirModalCrearRutinaCDM", "rutinasEditar", "crear rutinas");
+    proteger("alternarEstadoPago", "cajaCobrar", "modificar cobros de cuotas");
+}
+
+// 4. Botón "👥 Equipo" en Topbar (solo SuperAdmin y Admin Principal del Sistema)
+const _origInyectarBarraTopbar19 = inyectarBarraSesionTopbar;
+inyectarBarraSesionTopbar = function (sesion) {
+    _origInyectarBarraTopbar19.apply(this, arguments);
+    const barra = document.getElementById("cdmBarraSesionActiva");
+    if (!barra || !sesion || sesion.rol !== "admin") return;
+
+    if (esAdminPrincipalOSuperCDM() && !document.getElementById("btnGestionEquipoStaff19")) {
+        const btnEq = document.createElement("button");
+        btnEq.type = "button";
+        btnEq.id = "btnGestionEquipoStaff19";
+        btnEq.className = "btn btn-secondary btn-sm";
+        btnEq.onclick = () => abrirModalGestionStaffCDM();
+        btnEq.title = "Crear sub-administradores y definir qué puede modificar cada uno";
+        btnEq.innerHTML = `<i class="ri-team-line"></i> Equipo`;
+        const btnSalir = barra.querySelector('button[onclick*="cerrarSesionCDM"]');
+        if (btnSalir) barra.insertBefore(btnEq, btnSalir);
+        else barra.appendChild(btnEq);
+    } else if (sesion.nivelAdmin === "staff") {
+        const badgeAdmin = barra.querySelector(".badge-ok");
+        if (badgeAdmin) {
+            badgeAdmin.innerHTML = `<i class="ri-user-settings-line"></i> ${sesion.staffPerfil?.nombre || "Staff"}`;
+        }
+    }
+};
+
+// 5. Modal Completo de Gestión de Equipo (Sub-Administradores + Auditoría)
+function asegurarModalStaff19() {
+    let m = document.getElementById("modalGestionStaffCDM");
+    if (!m) {
+        m = document.createElement("div");
+        m.id = "modalGestionStaffCDM";
+        m.className = "modal-backdrop hidden";
+        document.body.appendChild(m);
+    }
+    return m;
+}
+
+window.aplicarPlantillaStaffModal19 = function (clavePlantilla) {
+    const pl = PLANTILLAS_STAFF_19[clavePlantilla];
+    if (!pl) return;
+    const inpRol = document.getElementById("stfRolPlantilla19");
+    if (inpRol) inpRol.value = clavePlantilla;
+    document.querySelectorAll(".stf-chk-perm-19").forEach(chk => {
+        const k = chk.dataset.perm;
+        if (pl.permisos[k] !== undefined) chk.checked = Boolean(pl.permisos[k]);
+    });
+    if (typeof mostrarToast === "function") mostrarToast(`⚡ Plantilla "${pl.label}" cargada.`);
+};
+
+window.abrirModalGestionStaffCDM = async function (idEditar = null, tabActiva = "equipo") {
+    if (!esAdminPrincipalOSuperCDM()) return;
+    const clave = obtenerClaveClubActivoCDM();
+    const lic = obtenerLicenciaConfigCDM();
+    let subAdmins = obtenerStaffLocal19(clave);
+    let auditoria = [];
+
+    if (window.location.protocol !== "file:") {
+        try {
+            const resp = await fetch(`/api/cdm/staff?club=${encodeURIComponent(clave)}`, { cache: "no-store" });
+            if (resp.ok) {
+                const d = await resp.json();
+                if (Array.isArray(d.subAdmins)) {
+                    subAdmins = d.subAdmins;
+                    guardarStaffLocal19(subAdmins, clave);
+                }
+                if (Array.isArray(d.auditoria)) auditoria = d.auditoria;
+            }
+        } catch {}
+    }
+
+    const edit = idEditar ? subAdmins.find(s => String(s.id) === String(idEditar)) : null;
+    const permsInit = edit?.permisos || PLANTILLAS_STAFF_19.profe.permisos;
+    const modsInit = edit?.alcance?.modulos || ["todos"];
+    const modal = asegurarModalStaff19();
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:840px; text-align:left;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-purple">🛡️ SUB-ADMINISTRADORES Y PERMISOS</span>
+                    <h3 style="margin-top:4px;">Equipo de ${lic.nombreEntidad || "este Sistema"}</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalGestionStaffCDM').classList.add('hidden')">✕</button>
+            </div>
+
+            <div style="display:flex; gap:0.45rem; margin-bottom:0.9rem;">
+                <button type="button" class="btn ${tabActiva === "equipo" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="abrirModalGestionStaffCDM(null, 'equipo')">👥 Usuarios Staff (${subAdmins.length})</button>
+                <button type="button" class="btn ${tabActiva === "auditoria" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="abrirModalGestionStaffCDM(null, 'auditoria')">📋 Auditoría (${auditoria.length})</button>
+            </div>
+
+            ${tabActiva === "auditoria" ? `
+                <div class="table-wrap" style="max-height:420px; overflow-y:auto;">
+                    <table class="app-table">
+                        <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead>
+                        <tbody>
+                            ${auditoria.length ? auditoria.map(a => `
+                                <tr>
+                                    <td><small>${new Date(a.fechaISO).toLocaleString("es-AR")}</small></td>
+                                    <td><b>${a.usuario}</b></td>
+                                    <td><span class="badge badge-celeste">${a.accion}</span></td>
+                                    <td><small>${a.detalle}</small></td>
+                                </tr>
+                            `).join("") : `<tr><td colspan="4"><div class="empty-box">Todavía no hay movimientos registrados.</div></td></tr>`}
+                        </tbody>
+                    </table>
+                </div>
+            ` : `
+                <form onsubmit="guardarSubAdminDesdeModal19(event, '${edit ? edit.id : ""}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:16px; padding:1rem; margin-bottom:1rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.7rem;">
+                        <strong style="font-size:0.86rem;">${edit ? `✏️ Editando a ${edit.nombre}` : "➕ Nuevo Sub-Administrador"}</strong>
+                        ${edit ? `<button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalGestionStaffCDM(null, 'equipo')">+ Crear otro</button>` : ""}
+                    </div>
+
+                    <input type="hidden" id="stfRolPlantilla19" value="${edit?.rolPlantilla || "profe"}">
+
+                    <div class="grid-3" style="margin-bottom:0.75rem;">
+                        <div class="field"><label>Nombre y Apellido *</label><input type="text" id="stfNombre19" required value="${(edit?.nombre || "").replace(/"/g, "&quot;")}" placeholder="Ej: Profe Lucas"></div>
+                        <div class="field"><label>Usuario de Ingreso *</label><input type="text" id="stfUsuario19" required value="${(edit?.usuario || "").replace(/"/g, "&quot;")}" placeholder="Ej: lucas.gym"></div>
+                        <div class="field"><label>${edit ? "Nueva Contraseña (opcional)" : "Contraseña *"}</label><input type="text" id="stfClave19" ${edit ? "" : "required"} placeholder="${edit ? "Dejar vacío para mantener" : "Ej: lucas2026"}"></div>
+                    </div>
+
+                    <label style="font-size:0.68rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.35rem;">1. Plantilla rápida de permisos:</label>
+                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+                        ${Object.entries(PLANTILLAS_STAFF_19).map(([k, pl]) => `
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="aplicarPlantillaStaffModal19('${k}')">${pl.label}</button>
+                        `).join("")}
+                    </div>
+
+                    <label style="font-size:0.68rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.35rem;">2. Áreas a las que puede entrar:</label>
+                    <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-bottom:0.8rem;">
+                        ${[
+                            { k: "todos", l: "🌐 Todas las áreas del sistema" },
+                            { k: "gym", l: "🏋️ Gimnasio" },
+                            { k: "futbol", l: "⚽ Fútbol" },
+                            { k: "hockey", l: "🏑 Hockey" },
+                            { k: "consultorio", l: "🩺 Consultorio" }
+                        ].map(m => `
+                            <label style="display:inline-flex; align-items:center; gap:0.35rem; background:var(--surface-solid); border:1px solid var(--line-strong); padding:0.35rem 0.65rem; border-radius:10px; font-size:0.76rem; font-weight:700; cursor:pointer;">
+                                <input type="checkbox" class="stf-chk-mod-19" value="${m.k}" style="width:16px; height:16px; min-height:auto;" ${modsInit.includes(m.k) ? "checked" : ""}>
+                                <span>${m.l}</span>
+                            </label>
+                        `).join("")}
+                    </div>
+
+                    <label style="font-size:0.68rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.35rem;">3. Permisos específicos de actividad:</label>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(225px, 1fr)); gap:0.45rem; margin-bottom:0.85rem;">
+                        ${CATALOGO_PERMISOS_STAFF_19.map(it => `
+                            <label style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; background:var(--surface-solid); border:1px solid var(--line-strong); border-radius:11px; padding:0.5rem 0.65rem; cursor:pointer;">
+                                <div style="min-width:0;">
+                                    <strong style="font-size:0.76rem; display:block;">${it.icono} ${it.titulo}</strong>
+                                    <small style="font-size:0.65rem; color:var(--ink-500); display:block; line-height:1.2;">${it.desc}</small>
+                                </div>
+                                <input type="checkbox" class="stf-chk-perm-19" data-perm="${it.clave}" style="width:18px; height:18px; min-height:auto; flex-shrink:0; accent-color:#0284c7;" ${permsInit[it.clave] ? "checked" : ""}>
+                            </label>
+                        `).join("")}
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        <label style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.78rem; font-weight:700; cursor:pointer;">
+                            <input type="checkbox" id="stfActivo19" style="width:17px; height:17px; min-height:auto;" ${edit?.activo !== false ? "checked" : ""}>
+                            <span>🟢 Usuario Activo</span>
+                        </label>
+                        <button type="submit" class="btn btn-primary btn-sm">💾 ${edit ? "Guardar Cambios" : "Crear Sub-Administrador"}</button>
+                    </div>
+                </form>
+
+                <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:240px; overflow-y:auto;">
+                    ${subAdmins.length === 0 ? `<div class="empty-box" style="padding:1rem;">Aún no creaste sub-administradores en este sistema.</div>` :
+                    subAdmins.map(sa => {
+                        const cantPerms = Object.values(sa.permisos || {}).filter(Boolean).length;
+                        const labelRol = PLANTILLAS_STAFF_19[sa.rolPlantilla]?.label || "Personalizado";
+                        return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; flex-wrap:wrap; background:var(--surface-solid); border:1.5px solid var(--line-strong); border-radius:13px; padding:0.65rem 0.85rem;">
+                                <div>
+                                    <strong style="font-size:0.86rem;">${sa.nombre}</strong>
+                                    <span class="badge ${sa.activo !== false ? "badge-ok" : "badge-danger"}" style="margin-left:4px;">${sa.activo !== false ? "Activo" : "Pausado"}</span>
+                                    <div style="font-size:0.73rem; color:var(--ink-500); margin-top:2px;">
+                                        👤 <b>${sa.usuario}</b> • ${labelRol} • ${cantPerms} permisos • Áreas: ${(sa.alcance?.modulos || ["todos"]).join(", ")}
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalGestionStaffCDM('${sa.id}', 'equipo')">✏️ Editar</button>
+                                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarAccesoStaffWA19('${sa.nombre.replace(/'/g, "\\'")}', '${sa.usuario.replace(/'/g, "\\'")}')" title="Enviar link y usuario por WhatsApp"><i class="ri-whatsapp-line"></i></button>
+                                    <button type="button" class="btn btn-danger btn-sm" onclick="eliminarSubAdmin19('${sa.id}')">🗑️</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            `}
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.guardarSubAdminDesdeModal19 = async function (e, idEditar = "") {
+    e.preventDefault();
+    const clave = obtenerClaveClubActivoCDM();
+    const nombre = document.getElementById("stfNombre19").value.trim();
+    const usuario = document.getElementById("stfUsuario19").value.trim().toLowerCase();
+    const claveInput = document.getElementById("stfClave19").value.trim();
+    const rolPlantilla = document.getElementById("stfRolPlantilla19")?.value || "personalizado";
+    const activo = Boolean(document.getElementById("stfActivo19")?.checked);
+
+    const permisos = {};
+    document.querySelectorAll(".stf-chk-perm-19").forEach(c => { permisos[c.dataset.perm] = Boolean(c.checked); });
+    const modulos = Array.from(document.querySelectorAll(".stf-chk-mod-19:checked")).map(c => c.value);
+    const alcance = { modulos: modulos.length ? modulos : ["todos"], categorias: ["todas"] };
+    const staffPayload = { id: idEditar || null, nombre, usuario, clave: claveInput, rolPlantilla, activo, alcance, permisos };
+
+    if (window.location.protocol !== "file:") {
+        try {
+            const resp = await fetch("/api/cdm/staff", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ claveClub: clave, staff: staffPayload, actor: obtenerSesionActivaCDM()?.nombre || "Admin" })
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                alert("⚠️ " + (data.mensaje || data.error || "No se pudo guardar el usuario."));
+                return;
+            }
+            guardarStaffLocal19(data.subAdmins || [], clave);
+            if (typeof mostrarToast === "function") mostrarToast(`✅ Sub-administrador ${nombre} guardado.`);
+            abrirModalGestionStaffCDM(null, "equipo");
+            return;
+        } catch {}
+    }
+
+    // Respaldo offline
+    const lista = obtenerStaffLocal19(clave);
+    const idx = idEditar ? lista.findIndex(s => String(s.id) === String(idEditar)) : -1;
+    const reg = { ...staffPayload, id: idEditar || `staff_${Date.now()}`, claveLocal: claveInput || lista[idx]?.claveLocal || "" };
+    if (idx >= 0) lista[idx] = reg;
+    else lista.unshift(reg);
+    guardarStaffLocal19(lista, clave);
+    abrirModalGestionStaffCDM(null, "equipo");
+};
+
+window.eliminarSubAdmin19 = async function (idStaff) {
+    if (!confirm("🗑️ ¿Eliminar definitivamente este sub-administrador?")) return;
+    const clave = obtenerClaveClubActivoCDM();
+    const actor = encodeURIComponent(obtenerSesionActivaCDM()?.nombre || "Admin");
+    if (window.location.protocol !== "file:") {
+        try {
+            const resp = await fetch(`/api/cdm/staff/${encodeURIComponent(idStaff)}?club=${encodeURIComponent(clave)}&actor=${actor}`, { method: "DELETE" });
+            const data = await resp.json();
+            if (resp.ok && data.ok) guardarStaffLocal19(data.subAdmins || [], clave);
+        } catch {}
+    } else {
+        guardarStaffLocal19(obtenerStaffLocal19(clave).filter(s => String(s.id) !== String(idStaff)), clave);
+    }
+    abrirModalGestionStaffCDM(null, "equipo");
+};
+
+window.enviarAccesoStaffWA19 = function (nombre, usuario) {
+    const lic = obtenerLicenciaConfigCDM();
+    const link = `${window.location.origin}/login.html`;
+    const msg = `🔑 *ACCESO STAFF — ${(lic.nombreEntidad || "SISTEMA").toUpperCase()}*\nHola *${nombre}*, ya tenés tu cuenta habilitada:\n\n🔗 *Link:* ${link}\n👑 *Solapa:* Admin / Comercio\n• *Usuario:* ${usuario}\n• *Contraseña:* _(la que te pasé por privado)_`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    inyectarCSSYCandadoPermisosStaff19();
+    setTimeout(() => {
+        inyectarCSSYCandadoPermisosStaff19();
+        enlazarCandadosFuncionesStaff19();
+    }, 300);
+});
+// =========================================================================
+// 19C. ACCESO SUPERADMIN A SUB-ADMINS Y AUDITORÍA DESDE EL HUB Y EL MODAL DE CADA COMERCIO
+//      Pegar al final de js/login.js (debajo del Bloque 19B)
+// =========================================================================
+
+window.__cdmClubStaffOverride19 = null;
+
+function resolverInfoComercioStaff19C(claveClub) {
+    const clave = String(claveClub || obtenerClaveClubActivoCDM()).trim();
+    const mapa = obtenerMapaLocalClubesCDM();
+    const lic = mapa[clave]?.licenciaConfig || (clave === obtenerClaveClubActivoCDM() ? obtenerLicenciaConfigCDM() : {});
+    return {
+        clave,
+        nombreEntidad: lic?.nombreEntidad || clave
+    };
+}
+
+window.cerrarModalGestionStaffCDM19C = function () {
+    window.__cdmClubStaffOverride19 = null;
+    document.getElementById("modalGestionStaffCDM")?.classList.add("hidden");
+};
+
+window.abrirStaffDeComercioDesdeHub19C = function (claveClub, tabInicial = "equipo") {
+    if (!claveClub) return;
+    window.__cdmClubStaffOverride19 = claveClub;
+    abrirModalGestionStaffCDM(null, tabInicial, claveClub);
+};
+
+// 1. Extender abrirModalGestionStaffCDM para aceptar cualquier claveClub desde el Hub o el Modal
+window.abrirModalGestionStaffCDM = async function (idEditar = null, tabActiva = "equipo", claveClubForzada = null) {
+    if (!esAdminPrincipalOSuperCDM()) return;
+
+    const clave = claveClubForzada || window.__cdmClubStaffOverride19 || obtenerClaveClubActivoCDM();
+    window.__cdmClubStaffOverride19 = clave;
+    const infoClub = resolverInfoComercioStaff19C(clave);
+
+    let subAdmins = obtenerStaffLocal19(clave);
+    let auditoria = [];
+    try {
+        auditoria = JSON.parse(localStorage.getItem(obtenerClaveStorageAudit19(clave)) || "[]") || [];
+    } catch {}
+
+    if (window.location.protocol !== "file:") {
+        try {
+            const resp = await fetch(`/api/cdm/staff?club=${encodeURIComponent(clave)}`, { cache: "no-store" });
+            if (resp.ok) {
+                const d = await resp.json();
+                if (Array.isArray(d.subAdmins)) {
+                    subAdmins = d.subAdmins;
+                    guardarStaffLocal19(subAdmins, clave);
+                }
+                if (Array.isArray(d.auditoria)) {
+                    auditoria = d.auditoria;
+                    localStorage.setItem(obtenerClaveStorageAudit19(clave), JSON.stringify(auditoria.slice(0, 100)));
+                }
+            }
+        } catch {}
+    }
+
+    const edit = idEditar ? subAdmins.find(s => String(s.id) === String(idEditar)) : null;
+    const permsInit = edit?.permisos || PLANTILLAS_STAFF_19.profe.permisos;
+    const modsInit = edit?.alcance?.modulos || ["todos"];
+    const modal = asegurarModalStaff19();
+    modal.style.zIndex = "1350"; // Por encima del modal de edición del comercio
+
+    const claveEsc = clave.replace(/'/g, "\\'");
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:840px; text-align:left;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-purple">🛡️ SUB-ADMINISTRADORES Y AUDITORÍA</span>
+                    <h3 style="margin-top:4px;">Equipo de ${infoClub.nombreEntidad}</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalGestionStaffCDM19C()">✕</button>
+            </div>
+
+            <div style="display:flex; gap:0.45rem; margin-bottom:0.9rem;">
+                <button type="button" class="btn ${tabActiva === "equipo" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="abrirModalGestionStaffCDM(null, 'equipo', '${claveEsc}')">👥 Usuarios Staff (${subAdmins.length})</button>
+                <button type="button" class="btn ${tabActiva === "auditoria" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="abrirModalGestionStaffCDM(null, 'auditoria', '${claveEsc}')">📋 Auditoría (${auditoria.length})</button>
+            </div>
+
+            ${tabActiva === "auditoria" ? `
+                <div class="table-wrap" style="max-height:420px; overflow-y:auto;">
+                    <table class="app-table">
+                        <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead>
+                        <tbody>
+                            ${auditoria.length ? auditoria.map(a => `
+                                <tr>
+                                    <td data-label="Fecha"><small>${new Date(a.fechaISO).toLocaleString("es-AR")}</small></td>
+                                    <td data-label="Usuario"><b>${a.usuario}</b></td>
+                                    <td data-label="Acción"><span class="badge badge-celeste">${a.accion}</span></td>
+                                    <td data-label="Detalle"><small>${a.detalle}</small></td>
+                                </tr>
+                            `).join("") : `<tr><td colspan="4"><div class="empty-box">Todavía no hay movimientos registrados en ${infoClub.nombreEntidad}.</div></td></tr>`}
+                        </tbody>
+                    </table>
+                </div>
+            ` : `
+                <form onsubmit="guardarSubAdminDesdeModal19(event, '${edit ? edit.id : ""}', '${claveEsc}')" style="background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:16px; padding:1rem; margin-bottom:1rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.7rem;">
+                        <strong style="font-size:0.86rem;">${edit ? `✏️ Editando a ${edit.nombre}` : `➕ Nuevo Sub-Administrador para ${infoClub.nombreEntidad}`}</strong>
+                        ${edit ? `<button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalGestionStaffCDM(null, 'equipo', '${claveEsc}')">+ Crear otro</button>` : ""}
+                    </div>
+
+                    <input type="hidden" id="stfRolPlantilla19" value="${edit?.rolPlantilla || "profe"}">
+
+                    <div class="grid-3" style="margin-bottom:0.75rem;">
+                        <div class="field"><label>Nombre y Apellido *</label><input type="text" id="stfNombre19" required value="${(edit?.nombre || "").replace(/"/g, "&quot;")}" placeholder="Ej: Profe Lucas"></div>
+                        <div class="field"><label>Usuario de Ingreso *</label><input type="text" id="stfUsuario19" required value="${(edit?.usuario || "").replace(/"/g, "&quot;")}" placeholder="Ej: lucas.gym"></div>
+                        <div class="field"><label>${edit ? "Nueva Contraseña (opcional)" : "Contraseña *"}</label><input type="text" id="stfClave19" ${edit ? "" : "required"} placeholder="${edit ? "Dejar vacío para mantener" : "Ej: lucas2026"}"></div>
+                    </div>
+
+                    <label style="font-size:0.68rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.35rem;">1. Plantilla rápida de permisos:</label>
+                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+                        ${Object.entries(PLANTILLAS_STAFF_19).map(([k, pl]) => `
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="aplicarPlantillaStaffModal19('${k}')">${pl.label}</button>
+                        `).join("")}
+                    </div>
+
+                    <label style="font-size:0.68rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.35rem;">2. Áreas a las que puede entrar:</label>
+                    <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-bottom:0.8rem;">
+                        ${[
+                            { k: "todos", l: "🌐 Todas las áreas" },
+                            { k: "gym", l: "🏋️ Gimnasio" },
+                            { k: "futbol", l: "⚽ Fútbol" },
+                            { k: "hockey", l: "🏑 Hockey" },
+                            { k: "consultorio", l: "🩺 Consultorio" }
+                        ].map(m => `
+                            <label style="display:inline-flex; align-items:center; gap:0.35rem; background:var(--surface-solid); border:1px solid var(--line-strong); padding:0.35rem 0.65rem; border-radius:10px; font-size:0.76rem; font-weight:700; cursor:pointer;">
+                                <input type="checkbox" class="stf-chk-mod-19" value="${m.k}" style="width:16px; height:16px; min-height:auto;" ${modsInit.includes(m.k) ? "checked" : ""}>
+                                <span>${m.l}</span>
+                            </label>
+                        `).join("")}
+                    </div>
+
+                    <label style="font-size:0.68rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; display:block; margin-bottom:0.35rem;">3. Permisos específicos de actividad:</label>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(225px, 1fr)); gap:0.45rem; margin-bottom:0.85rem;">
+                        ${CATALOGO_PERMISOS_STAFF_19.map(it => `
+                            <label style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; background:var(--surface-solid); border:1px solid var(--line-strong); border-radius:11px; padding:0.5rem 0.65rem; cursor:pointer;">
+                                <div style="min-width:0;">
+                                    <strong style="font-size:0.76rem; display:block;">${it.icono} ${it.titulo}</strong>
+                                    <small style="font-size:0.65rem; color:var(--ink-500); display:block; line-height:1.2;">${it.desc}</small>
+                                </div>
+                                <input type="checkbox" class="stf-chk-perm-19" data-perm="${it.clave}" style="width:18px; height:18px; min-height:auto; flex-shrink:0; accent-color:#0284c7;" ${permsInit[it.clave] ? "checked" : ""}>
+                            </label>
+                        `).join("")}
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        <label style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.78rem; font-weight:700; cursor:pointer;">
+                            <input type="checkbox" id="stfActivo19" style="width:17px; height:17px; min-height:auto;" ${edit?.activo !== false ? "checked" : ""}>
+                            <span>🟢 Usuario Activo</span>
+                        </label>
+                        <button type="submit" class="btn btn-primary btn-sm">💾 ${edit ? "Guardar Cambios" : "Crear Sub-Administrador"}</button>
+                    </div>
+                </form>
+
+                <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:240px; overflow-y:auto;">
+                    ${subAdmins.length === 0 ? `<div class="empty-box" style="padding:1rem;">Aún no hay sub-administradores en ${infoClub.nombreEntidad}.</div>` :
+                    subAdmins.map(sa => {
+                        const cantPerms = Object.values(sa.permisos || {}).filter(Boolean).length;
+                        const labelRol = PLANTILLAS_STAFF_19[sa.rolPlantilla]?.label || "Personalizado";
+                        return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.6rem; flex-wrap:wrap; background:var(--surface-solid); border:1.5px solid var(--line-strong); border-radius:13px; padding:0.65rem 0.85rem;">
+                                <div>
+                                    <strong style="font-size:0.86rem;">${sa.nombre}</strong>
+                                    <span class="badge ${sa.activo !== false ? "badge-ok" : "badge-danger"}" style="margin-left:4px;">${sa.activo !== false ? "Activo" : "Pausado"}</span>
+                                    <div style="font-size:0.73rem; color:var(--ink-500); margin-top:2px;">
+                                        👤 <b>${sa.usuario}</b> • ${labelRol} • ${cantPerms} permisos • Áreas: ${(sa.alcance?.modulos || ["todos"]).join(", ")}
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalGestionStaffCDM('${sa.id}', 'equipo', '${claveEsc}')">✏️ Editar</button>
+                                    <button type="button" class="btn btn-whatsapp btn-sm" onclick="enviarAccesoStaffWA19('${sa.nombre.replace(/'/g, "\\'")}', '${sa.usuario.replace(/'/g, "\\'")}', '${claveEsc}')" title="Enviar acceso por WhatsApp"><i class="ri-whatsapp-line"></i></button>
+                                    <button type="button" class="btn btn-danger btn-sm" onclick="eliminarSubAdmin19('${sa.id}', '${claveEsc}')">🗑️</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            `}
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.guardarSubAdminDesdeModal19 = async function (e, idEditar = "", claveClubForzada = null) {
+    e.preventDefault();
+    const clave = claveClubForzada || window.__cdmClubStaffOverride19 || obtenerClaveClubActivoCDM();
+    const nombre = document.getElementById("stfNombre19").value.trim();
+    const usuario = document.getElementById("stfUsuario19").value.trim().toLowerCase();
+    const claveInput = document.getElementById("stfClave19").value.trim();
+    const rolPlantilla = document.getElementById("stfRolPlantilla19")?.value || "personalizado";
+    const activo = Boolean(document.getElementById("stfActivo19")?.checked);
+
+    const permisos = {};
+    document.querySelectorAll(".stf-chk-perm-19").forEach(c => { permisos[c.dataset.perm] = Boolean(c.checked); });
+    const modulos = Array.from(document.querySelectorAll(".stf-chk-mod-19:checked")).map(c => c.value);
+    const alcance = { modulos: modulos.length ? modulos : ["todos"], categorias: ["todas"] };
+    const staffPayload = { id: idEditar || null, nombre, usuario, clave: claveInput, rolPlantilla, activo, alcance, permisos };
+
+    if (window.location.protocol !== "file:") {
+        try {
+            const resp = await fetch("/api/cdm/staff", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ claveClub: clave, staff: staffPayload, actor: obtenerSesionActivaCDM()?.nombre || "SuperAdmin" })
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                alert("⚠️ " + (data.mensaje || data.error || "No se pudo guardar el usuario."));
+                return;
+            }
+            guardarStaffLocal19(data.subAdmins || [], clave);
+            if (typeof mostrarToast === "function") mostrarToast(`✅ Sub-administrador ${nombre} guardado.`);
+            abrirModalGestionStaffCDM(null, "equipo", clave);
+            return;
+        } catch {}
+    }
+
+    const lista = obtenerStaffLocal19(clave);
+    const idx = idEditar ? lista.findIndex(s => String(s.id) === String(idEditar)) : -1;
+    const reg = { ...staffPayload, id: idEditar || `staff_${Date.now()}`, claveLocal: claveInput || lista[idx]?.claveLocal || "" };
+    if (idx >= 0) lista[idx] = reg;
+    else lista.unshift(reg);
+    guardarStaffLocal19(lista, clave);
+    abrirModalGestionStaffCDM(null, "equipo", clave);
+};
+
+window.eliminarSubAdmin19 = async function (idStaff, claveClubForzada = null) {
+    if (!confirm("🗑️ ¿Eliminar definitivamente este sub-administrador?")) return;
+    const clave = claveClubForzada || window.__cdmClubStaffOverride19 || obtenerClaveClubActivoCDM();
+    const actor = encodeURIComponent(obtenerSesionActivaCDM()?.nombre || "SuperAdmin");
+    if (window.location.protocol !== "file:") {
+        try {
+            const resp = await fetch(`/api/cdm/staff/${encodeURIComponent(idStaff)}?club=${encodeURIComponent(clave)}&actor=${actor}`, { method: "DELETE" });
+            const data = await resp.json();
+            if (resp.ok && data.ok) guardarStaffLocal19(data.subAdmins || [], clave);
+        } catch {}
+    } else {
+        guardarStaffLocal19(obtenerStaffLocal19(clave).filter(s => String(s.id) !== String(idStaff)), clave);
+    }
+    abrirModalGestionStaffCDM(null, "equipo", clave);
+};
+
+window.enviarAccesoStaffWA19 = function (nombre, usuario, claveClubForzada = null) {
+    const infoClub = resolverInfoComercioStaff19C(claveClubForzada || window.__cdmClubStaffOverride19);
+    const link = `${window.location.origin}/login.html`;
+    const msg = `🔑 *ACCESO STAFF — ${infoClub.nombreEntidad.toUpperCase()}*\nHola *${nombre}*, ya tenés tu cuenta habilitada:\n\n🔗 *Link:* ${link}\n👑 *Solapa:* Admin / Comercio\n• *Usuario:* ${usuario}\n• *Contraseña:* _(la que te pasé por privado)_`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+// 2. Inyectar sección "Equipo / Sub-Admins y Auditoría" DENTRO del Modal de Edición de cada Comercio
+const _origAbrirModalComercio19C = abrirModalCrearOEditarComercio;
+abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+    await _origAbrirModalComercio19C.apply(this, arguments);
+    if (!claveClubEditar) return; // Solo para comercios ya creados
+
+    const modal = document.getElementById("modalSuperAdminCDM");
+    const form = modal?.querySelector("form");
+    if (!form || document.getElementById("bloqueStaffYAuditoriaModalComercio19C")) return;
+
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const item = lista.find(x => x.claveClub === claveClubEditar);
+    const cantStaff = item?.cantidadStaff ?? obtenerStaffLocal19(claveClubEditar).filter(s => s.activo !== false).length;
+    const claveEsc = claveClubEditar.replace(/'/g, "\\'");
+
+    const box = document.createElement("div");
+    box.id = "bloqueStaffYAuditoriaModalComercio19C";
+    box.style = "background:var(--purple-bg, #eef2ff); border:1.5px solid rgba(99,102,241,0.35); border-radius:16px; padding:0.9rem 1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;";
+    box.innerHTML = `
+        <div>
+            <strong style="font-size:0.82rem; color:var(--purple-ink, #4338ca); display:block;">
+                🛡️ Sub-Administradores (Staff) y Auditoría de este Comercio
+            </strong>
+            <small style="font-size:0.73rem; color:var(--ink-600, #475569);">
+                ${cantStaff} usuario(s) de staff activo(s). Podés administrar permisos o revisar el historial sin entrar al comercio.
+            </small>
+        </div>
+        <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary btn-sm" style="background:#6366f1; border-color:#4f46e5;" onclick="abrirStaffDeComercioDesdeHub19C('${claveEsc}', 'equipo')">
+                <i class="ri-team-line"></i> Ver / Editar Staff (${cantStaff})
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="abrirStaffDeComercioDesdeHub19C('${claveEsc}', 'auditoria')">
+                <i class="ri-history-line"></i> Ver Auditoría
+            </button>
+        </div>
+    `;
+
+    const pie = form.lastElementChild;
+    if (pie) pie.insertAdjacentElement("beforebegin", box);
+    else form.appendChild(box);
+};
+
+// 3. Inyectar accesos directos "👥 Staff" y "📋 Auditoría" en cada tarjeta del Hub SuperAdmin
+const _origMostrarHub19C = mostrarHubSelectorDeComercios;
+mostrarHubSelectorDeComercios = async function () {
+    await _origMostrarHub19C.apply(this, arguments);
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const cards = document.querySelectorAll("#gridTarjetasComerciosHub .hub-comercio-card");
+
+    cards.forEach((card, idx) => {
+        const item = lista[idx];
+        if (!item || !item.claveClub || card.querySelector(".hub-staff-row-19c")) return;
+
+        const pieBotones = card.lastElementChild;
+        if (!pieBotones) return;
+
+        const cantStaff = item.cantidadStaff ?? obtenerStaffLocal19(item.claveClub).filter(s => s.activo !== false).length;
+        const claveEsc = item.claveClub.replace(/'/g, "\\'");
+
+        const filaStaff = document.createElement("div");
+        filaStaff.className = "hub-staff-row-19c";
+        filaStaff.style = "display:flex; gap:0.35rem;";
+        filaStaff.innerHTML = `
+            <button type="button" class="btn btn-ghost btn-sm" style="flex:1; font-size:0.71rem; min-height:29px; border-color:rgba(99,102,241,0.35); color:#4338ca;" onclick="abrirStaffDeComercioDesdeHub19C('${claveEsc}', 'equipo')">
+                👥 Staff (${cantStaff})
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" style="flex:1; font-size:0.71rem; min-height:29px;" onclick="abrirStaffDeComercioDesdeHub19C('${claveEsc}', 'auditoria')">
+                📋 Auditoría
+            </button>
+        `;
+        pieBotones.appendChild(filaStaff);
+    });
+};
+// =========================================================================
+// 20. INTERRUPTOR POR COMERCIO: WHATSAPP AUTOMÁTICO 24HS (CLOUD API)
+//     Pegar al final de js/login.js (debajo del Bloque 19C)
+// =========================================================================
+
+if (typeof FUNCIONES_DEFECTO_SUPERADMIN_14 !== "undefined") {
+    FUNCIONES_DEFECTO_SUPERADMIN_14.general.whatsappAuto24h = false;
+}
+
+const _origNormalizarFunc20 = typeof normalizarFuncionesLicencia14 === "function" ? normalizarFuncionesLicencia14 : null;
+normalizarFuncionesLicencia14 = function (lic = {}) {
+    const base = _origNormalizarFunc20 ? _origNormalizarFunc20(lic) : { salud: {}, deporte: {}, general: {} };
+    const raw = (lic && typeof lic.funciones === "object" && lic.funciones) ? lic.funciones : {};
+    const autoOn = raw.general?.whatsappAuto24h !== undefined
+        ? Boolean(raw.general.whatsappAuto24h)
+        : Boolean(lic?.whatsappAuto24h);
+    base.general.whatsappAuto24h = autoOn;
+    return base;
+};
+
+const _origAbrirModalComercio20 = abrirModalCrearOEditarComercio;
+abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+    await _origAbrirModalComercio20.apply(this, arguments);
+    const panel = document.getElementById("panelInterruptoresGranulares14");
+    if (!panel || panel.querySelector('[data-clave="whatsappAuto24h"]')) return;
+
+    const lista = await obtenerListaCompletaComerciosCDM();
+    const existente = claveClubEditar ? lista.find(x => x.claveClub === claveClubEditar) : null;
+    const lic = existente?.licenciaConfig || {};
+    const f = normalizarFuncionesLicencia14(lic);
+
+    const bloqueGen = Array.from(panel.children).find(el =>
+        el.tagName === "DIV" && el.querySelector('.mc-feat-switch-14[data-grupo="general"]')
+    );
+    if (!bloqueGen) return;
+
+    bloqueGen.style.gridTemplateColumns = "repeat(auto-fit, minmax(220px, 1fr))";
+    bloqueGen.insertAdjacentHTML("beforeend", `
+        <label style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.55rem; background:#ecfdf5; border:1.5px solid #10b981; border-radius:11px; padding:0.5rem 0.65rem; cursor:pointer;">
+            <div style="min-width:0;">
+                <strong style="font-size:0.77rem; color:#065f46; display:block; line-height:1.2;">🤖 WhatsApp Automático 24hs</strong>
+                <small style="font-size:0.66rem; color:#047857; display:block; margin-top:2px; line-height:1.25;">Envío automático sin intervención (costo adicional en plan). Apagado = envío manual gratis.</small>
+            </div>
+            <input type="checkbox" class="mc-feat-switch-14" data-grupo="general" data-clave="whatsappAuto24h"
+                style="width:18px; height:18px; min-height:auto; flex-shrink:0; margin-top:2px; accent-color:#10b981;"
+                ${f.general.whatsappAuto24h ? "checked" : ""}>
+        </label>
+    `);
+};
+
+const _origGuardarComercio20 = guardarComercioDesdeModal;
+guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
+    const swAuto = document.querySelector('.mc-feat-switch-14[data-grupo="general"][data-clave="whatsappAuto24h"]');
+    const autoVal = Boolean(swAuto?.checked);
+    const nombreInput = (document.getElementById("mcNombreEntidad")?.value || "").trim().toLowerCase();
+
+    await _origGuardarComercio20.apply(this, arguments);
+
+    const mapa = obtenerMapaLocalClubesCDM();
+    let claveTarget = claveClubExistente;
+    if (!claveTarget && nombreInput) {
+        const match = Object.values(mapa).find(c => (c.licenciaConfig?.nombreEntidad || "").toLowerCase() === nombreInput);
+        if (match) claveTarget = match.claveClub;
+    }
+
+    if (claveTarget && mapa[claveTarget]?.licenciaConfig) {
+        mapa[claveTarget].licenciaConfig.whatsappAuto24h = autoVal;
+        if (!mapa[claveTarget].licenciaConfig.funciones) mapa[claveTarget].licenciaConfig.funciones = {};
+        if (!mapa[claveTarget].licenciaConfig.funciones.general) mapa[claveTarget].licenciaConfig.funciones.general = {};
+        mapa[claveTarget].licenciaConfig.funciones.general.whatsappAuto24h = autoVal;
+        localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+
+        if (obtenerClaveClubActivoCDM() === claveTarget) {
+            localStorage.setItem(STORAGE_LICENCIA_KEY, JSON.stringify(mapa[claveTarget].licenciaConfig));
+        }
+    }
+};
+// =========================================================================
+// 21. OCULTAR CAJA "SISTEMA Y BACKUP / CARGAR DEMO" + BLINDAJE DE MARCA/LOGO
+//     + POP-UP DE NOTAS RÁPIDAS AL INICIO (DESACTIVABLE, SIN OBSERVERS)
+//     Reemplazar por completo el Bloque 21 anterior al final de js/login.js
+// =========================================================================
+
+(function () {
+    // ---------------------------------------------------------------------
+    // A) OCULTAR TODA LA BARRA INFERIOR DE DEMO/BACKUP POR CSS (CERO CPU)
+    // ---------------------------------------------------------------------
+    if (!document.getElementById("cdmCssHideDemoYPopupNotas21")) {
+        const st = document.createElement("style");
+        st.id = "cdmCssHideDemoYPopupNotas21";
+        st.textContent = `
+            .sidebar-demo-box,
+            .mobile-only-sys-btn,
+            button[onclick*="cargarDatosDemoCDM"],
+            button[onclick*="cargarDatosDemo"],
+            button[onclick*="abrirModalSistemaMovilCDM"] {
+                display: none !important;
+            }
+            .pn21-list {
+                display: flex;
+                flex-direction: column;
+                gap: 0.45rem;
+                max-height: 290px;
+                overflow-y: auto;
+                margin-bottom: 0.85rem;
+            }
+            .pn21-item {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 0.6rem;
+                background: var(--surface-subtle, #f8fafc);
+                border: 1.5px solid var(--line, #e2e8f0);
+                border-left: 4px solid #f59e0b;
+                border-radius: 12px;
+                padding: 0.6rem 0.75rem;
+                font-size: 0.83rem;
+            }
+            .pn21-item.done {
+                border-left-color: #10b981;
+                opacity: 0.68;
+                text-decoration: line-through;
+            }
+            .pn21-item-left {
+                display: flex;
+                align-items: flex-start;
+                gap: 0.55rem;
+                flex: 1;
+                min-width: 0;
+                cursor: pointer;
+            }
+            .pn21-item-left input[type="checkbox"] {
+                width: 18px;
+                height: 18px;
+                min-height: auto !important;
+                margin-top: 2px;
+                accent-color: #10b981;
+                flex-shrink: 0;
+                cursor: pointer;
+            }
+            .pn21-add-row {
+                display: flex;
+                gap: 0.45rem;
+                margin-bottom: 0.85rem;
+            }
+            .pn21-foot {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.65rem;
+                flex-wrap: wrap;
+                padding-top: 0.75rem;
+                border-top: 1px solid var(--line, #e2e8f0);
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    // ---------------------------------------------------------------------
+    // B) GARANTIZAR MARCA Y LOGO PROPIOS DEL COMERCIO (NUNCA "CDM" EN OTROS)
+    // ---------------------------------------------------------------------
+    function reforzarMarcaYLogoComercio21() {
+        const path = window.location.pathname.toLowerCase();
+        if (path.includes("login.html") || document.body?.classList.contains("login-page")) return;
+
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : null;
+        if (!lic) return;
+
+        const claveActiva = typeof obtenerClaveClubActivoCDM === "function"
+            ? obtenerClaveClubActivoCDM()
+            : CLAVE_CLUB_DEFECTO_CDM;
+
+        const nombre = (lic.nombreEntidad || "PLATAFORMA OFICIAL").toUpperCase();
+        const sub = lic.subtituloEntidad || "Panel Oficial";
+
+        document.querySelectorAll(".sidebar-brand-text h1").forEach(el => {
+            if (el.innerText !== nombre) el.innerText = nombre;
+        });
+        document.querySelectorAll(".sidebar-brand-text span").forEach(el => {
+            if (el.innerText !== sub) el.innerText = sub;
+        });
+
+        let logoFinal = lic.logoUrl || "";
+        if (typeof resolverLogoEfectivoComercio13 === "function") {
+            logoFinal = resolverLogoEfectivoComercio13(lic, claveActiva);
+        }
+        if (logoFinal) {
+            document.querySelectorAll(".sidebar-brand img").forEach(img => {
+                if (img.src !== logoFinal) {
+                    img.onerror = null;
+                    img.src = logoFinal;
+                }
+            });
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // C) POP-UP DE NOTAS RÁPIDAS AL ABRIR EL SISTEMA (DESACTIVABLE)
+    // ---------------------------------------------------------------------
+    const STORAGE_NOTAS_KEY = "cdm_notas_rapidas_pro_v23";
+
+    function clubKey21() {
+        return typeof obtenerClaveClubActivoCDM === "function"
+            ? obtenerClaveClubActivoCDM()
+            : "cdm_adelia_maria_principal";
+    }
+
+    function prefAutoKey21() {
+        return `cdm_popup_notas_auto_v1_${clubKey21()}`;
+    }
+
+    function sesionVistoKey21() {
+        return `cdm_popup_notas_visto_v1_${clubKey21()}`;
+    }
+
+    function estaPopupNotasActivo21() {
+        return localStorage.getItem(prefAutoKey21()) !== "off";
+    }
+
+    function leerNotasRapidas21() {
+        try {
+            const mapa = JSON.parse(localStorage.getItem(STORAGE_NOTAS_KEY) || "{}") || {};
+            const arr = mapa[clubKey21()];
+            return Array.isArray(arr) ? arr : [];
+        } catch {
+            return [];
+        }
+    }
+
+    function guardarNotasRapidas21(lista) {
+        try {
+            const mapa = JSON.parse(localStorage.getItem(STORAGE_NOTAS_KEY) || "{}") || {};
+            mapa[clubKey21()] = Array.isArray(lista) ? lista : [];
+            localStorage.setItem(STORAGE_NOTAS_KEY, JSON.stringify(mapa));
+        } catch {}
+        actualizarBadgeNotasTopbar21();
+    }
+
+    function textoNota21(n) {
+        if (typeof n === "string") return n;
+        return String(n?.texto || n?.contenido || n?.titulo || n?.nota || "").trim();
+    }
+
+    function notaHecha21(n) {
+        return Boolean(n && typeof n === "object" && (n.completada || n.hecha || n.done || n.resuelta));
+    }
+
+    function esc21(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function actualizarBadgeNotasTopbar21() {
+        const pendientes = leerNotasRapidas21().filter(n => !notaHecha21(n)).length;
+        const botones = Array.from(document.querySelectorAll(".app-topbar button"));
+        const btnNotas = botones.find(b => /notas/i.test(b.textContent || "") && b.id !== "btnToggleAutoNotas21");
+        if (btnNotas) {
+            const badge = btnNotas.querySelector("span:last-child, .badge");
+            if (badge && /^\d+$/.test((badge.textContent || "").trim())) {
+                badge.textContent = String(pendientes);
+            }
+        }
+        const btnBell = document.getElementById("btnToggleAutoNotas21");
+        if (btnBell) {
+            const on = estaPopupNotasActivo21();
+            btnBell.innerHTML = on ? "🔔" : "🔕";
+            btnBell.title = on
+                ? "Repaso de Notas al iniciar: ACTIVADO (tocá para ver o desactivar)"
+                : "Repaso de Notas al iniciar: DESACTIVADO (tocá para ver o reactivar)";
+        }
+    }
+
+    function asegurarModalPopupNotas21() {
+        let m = document.getElementById("modalPopupNotasInicioCDM21");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalPopupNotasInicioCDM21";
+            m.className = "modal-backdrop hidden";
+            m.style.zIndex = "1400";
+            m.onclick = (e) => { if (e.target === m) cerrarPopupNotasInicio21(); };
+            document.body.appendChild(m);
+        }
+        return m;
+    }
+
+    window.cerrarPopupNotasInicio21 = function () {
+        document.getElementById("modalPopupNotasInicioCDM21")?.classList.add("hidden");
+    };
+
+    window.cambiarPreferenciaPopupNotas21 = function (activo) {
+        localStorage.setItem(prefAutoKey21(), activo ? "on" : "off");
+        actualizarBadgeNotasTopbar21();
+        if (typeof mostrarToast === "function") {
+            mostrarToast(activo
+                ? "🔔 Repaso automático de Notas Rápidas ACTIVADO al abrir el sistema."
+                : "🔕 Pop-up al inicio DESACTIVADO. Podés reactivarlo desde el ícono 🔕 junto a Notas.");
+        }
+    };
+
+    window.toggleNotaDesdePopup21 = function (idx) {
+        const lista = leerNotasRapidas21();
+        const item = lista[idx];
+        if (!item) return;
+        if (typeof item === "string") {
+            lista[idx] = { id: Date.now(), texto: item, completada: true, hecha: true, fecha: new Date().toLocaleDateString("es-AR") };
+        } else {
+            const nuevo = !notaHecha21(item);
+            item.completada = nuevo;
+            item.hecha = nuevo;
+        }
+        guardarNotasRapidas21(lista);
+        abrirPopupNotasInicioCDM(true);
+    };
+
+    window.eliminarNotaDesdePopup21 = function (idx) {
+        const lista = leerNotasRapidas21();
+        lista.splice(idx, 1);
+        guardarNotasRapidas21(lista);
+        abrirPopupNotasInicioCDM(true);
+    };
+
+    window.agregarNotaDesdePopup21 = function (e) {
+        if (e && typeof e.preventDefault === "function") e.preventDefault();
+        const inp = document.getElementById("inpNuevaNotaPopup21");
+        const txt = (inp?.value || "").trim();
+        if (!txt) return;
+
+        const lista = leerNotasRapidas21();
+        lista.unshift({
+            id: Date.now(),
+            texto: txt,
+            titulo: txt,
+            completada: false,
+            hecha: false,
+            prioridad: "normal",
+            fecha: new Date().toLocaleDateString("es-AR")
+        });
+        guardarNotasRapidas21(lista);
+        abrirPopupNotasInicioCDM(true);
+    };
+
+    window.abrirPopupNotasInicioCDM = function (forzado = false) {
+        const path = window.location.pathname.toLowerCase();
+        if (path.includes("login.html") || document.body?.classList.contains("login-page")) return;
+
+        const ses = typeof obtenerSesionActivaCDM === "function" ? obtenerSesionActivaCDM() : null;
+        if (!ses || ses.rol !== "admin") return;
+
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        if (lic?.funciones?.general?.notasRapidas === false) return;
+
+        if (!forzado) {
+            if (!estaPopupNotasActivo21()) return;
+            if (sessionStorage.getItem(sesionVistoKey21()) === "1") return;
+        }
+        sessionStorage.setItem(sesionVistoKey21(), "1");
+
+        const lista = leerNotasRapidas21();
+        const pendientes = lista.filter(n => !notaHecha21(n)).length;
+        const autoOn = estaPopupNotasActivo21();
+        const modal = asegurarModalPopupNotas21();
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:540px; text-align:left;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-warn">📝 REPASO AL INICIAR • ${pendientes} PENDIENTE(S)</span>
+                        <h3 style="margin-top:4px;">Notas Rápidas — ${esc21(lic.nombreEntidad || "Mi Espacio")}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarPopupNotasInicio21()">✕</button>
+                </div>
+
+                <form class="pn21-add-row" onsubmit="agregarNotaDesdePopup21(event)">
+                    <input type="text" id="inpNuevaNotaPopup21" placeholder="Escribir nota rápida para hoy..." style="flex:1; min-height:36px;">
+                    <button type="submit" class="btn btn-primary btn-sm">+ Anotar</button>
+                </form>
+
+                <div class="pn21-list">
+                    ${lista.length === 0 ? `
+                        <div class="empty-box" style="padding:1.1rem; font-size:0.82rem;">
+                            ✨ No tenés notas rápidas pendientes para repasar hoy.
+                        </div>
+                    ` : lista.map((n, idx) => {
+                        const done = notaHecha21(n);
+                        return `
+                            <div class="pn21-item ${done ? "done" : ""}">
+                                <label class="pn21-item-left">
+                                    <input type="checkbox" ${done ? "checked" : ""} onchange="toggleNotaDesdePopup21(${idx})">
+                                    <div style="min-width:0;">
+                                        <div style="font-weight:600; color:var(--ink-900); word-break:break-word;">${esc21(textoNota21(n))}</div>
+                                        ${n?.fecha ? `<small style="font-size:0.69rem; color:var(--ink-500);">${esc21(n.fecha)}</small>` : ""}
+                                    </div>
+                                </label>
+                                <button type="button" class="btn btn-danger btn-sm" style="min-height:26px; padding:0 7px; font-size:0.72rem;" onclick="eliminarNotaDesdePopup21(${idx})" title="Borrar nota">🗑️</button>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+
+                <div class="pn21-foot">
+                    <label style="display:inline-flex; align-items:center; gap:0.45rem; font-size:0.77rem; font-weight:700; color:var(--ink-700); cursor:pointer;">
+                        <input type="checkbox" style="width:17px; height:17px; min-height:auto; accent-color:#0284c7;" ${autoOn ? "checked" : ""} onchange="cambiarPreferenciaPopupNotas21(this.checked)">
+                        <span>Mostrar este pop-up al abrir el sistema</span>
+                    </label>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="cerrarPopupNotasInicio21()">Entendido ✓</button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    function inyectarBotonBellNotasTopbar21() {
+        const path = window.location.pathname.toLowerCase();
+        if (path.includes("login.html") || document.body?.classList.contains("login-page")) return;
+        const ses = typeof obtenerSesionActivaCDM === "function" ? obtenerSesionActivaCDM() : null;
+        if (!ses || ses.rol !== "admin") return;
+
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        if (lic?.funciones?.general?.notasRapidas === false) return;
+
+        if (document.getElementById("btnToggleAutoNotas21")) {
+            actualizarBadgeNotasTopbar21();
+            return;
+        }
+
+        const botones = Array.from(document.querySelectorAll(".app-topbar button"));
+        const btnNotas = botones.find(b => /notas/i.test(b.textContent || ""));
+        if (!btnNotas || !btnNotas.parentNode) return;
+
+        const btnBell = document.createElement("button");
+        btnBell.type = "button";
+        btnBell.id = "btnToggleAutoNotas21";
+        btnBell.className = "btn btn-ghost btn-sm";
+        btnBell.style.cssText = "padding:0 0.5rem; min-height:32px; font-size:0.85rem;";
+        btnBell.onclick = () => abrirPopupNotasInicioCDM(true);
+        btnNotas.insertAdjacentElement("afterend", btnBell);
+        actualizarBadgeNotasTopbar21();
+    }
+
+    if (typeof window.iniciarSesionComoAdmin === "function") {
+        const _origLogin21 = window.iniciarSesionComoAdmin;
+        window.iniciarSesionComoAdmin = function () {
+            Object.keys(sessionStorage).forEach(k => {
+                if (k.startsWith("cdm_popup_notas_visto_v1_")) sessionStorage.removeItem(k);
+            });
+            return _origLogin21.apply(this, arguments);
+        };
+    }
+
+    if (typeof window.entrarAComercioDesdeHub === "function") {
+        const _origHub21 = window.entrarAComercioDesdeHub;
+        window.entrarAComercioDesdeHub = function (claveClub) {
+            if (claveClub) sessionStorage.removeItem(`cdm_popup_notas_visto_v1_${claveClub}`);
+            return _origHub21.apply(this, arguments);
+        };
+    }
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") cerrarPopupNotasInicio21();
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+        reforzarMarcaYLogoComercio21();
+        setTimeout(reforzarMarcaYLogoComercio21, 200);
+        setTimeout(reforzarMarcaYLogoComercio21, 750);
+        setTimeout(() => {
+            inyectarBotonBellNotasTopbar21();
+            abrirPopupNotasInicioCDM(false);
+        }, 550);
+        setTimeout(inyectarBotonBellNotasTopbar21, 1100);
+    });
+})();
