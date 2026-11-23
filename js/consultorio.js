@@ -3604,3 +3604,101 @@ window.especialidadFiltroConsultorioCDM = "TODAS";
         setTimeout(simplificarSidebarUnaDisciplina14, 700);
     });
 })();
+// =========================================================================
+// 15. PERSISTENCIA INMEDIATA EN MONGODB PARA CONSULTORIO + DIAGNÓSTICO VISIBLE
+//     Reemplazar el Bloque 15 al final de js/consultorio.js
+// =========================================================================
+
+(function () {
+    function obtenerClaveClub15() {
+        return typeof obtenerClaveClubActivoCDM === "function"
+            ? obtenerClaveClubActivoCDM()
+            : (localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal");
+    }
+
+    function storageKey15() {
+        return `cdm_consultorio_suite_v2_${obtenerClaveClub15()}`;
+    }
+
+    function tieneDatosCons15(c) {
+        if (!c || typeof c !== "object") return false;
+        return (
+            (Array.isArray(c.pacientes) && c.pacientes.length > 0) ||
+            (Array.isArray(c.turnos) && c.turnos.length > 0) ||
+            (Array.isArray(c.sesiones) && c.sesiones.length > 0) ||
+            (Array.isArray(c.profesionales) && c.profesionales.length > 0)
+        );
+    }
+
+    async function enviarConsultorioAMongo15(db, mostrarEstado = true) {
+        if (window.location.protocol === "file:") return;
+        const clave = obtenerClaveClub15();
+        try {
+            const resp = await fetch("/api/cdm/consultorio", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                keepalive: true,
+                body: JSON.stringify({ claveClub: clave, consultorio: db })
+            });
+            const data = await resp.json().catch(() => ({}));
+
+            if (!resp.ok || !data.ok) {
+                if (typeof mostrarToast === "function") {
+                    mostrarToast(`❌ Error al guardar en servidor (HTTP ${resp.status}): ${data.error || "Revisar server.js"}`);
+                }
+                return;
+            }
+
+            if (data.mongoGuardado) {
+                if (mostrarEstado && typeof mostrarToast === "function") {
+                    mostrarToast(`☁️ Guardado en MongoDB (${data.pacientes} pac. • ${data.turnos} turnos)`);
+                }
+            } else if (typeof mostrarToast === "function") {
+                mostrarToast(`⚠️ NO guardó en MongoDB: ${data.mongoError || "Base desconectada"}`);
+            }
+        } catch (err) {
+            if (typeof mostrarToast === "function") {
+                mostrarToast(`❌ Sin conexión con el servidor al guardar: ${err.message}`);
+            }
+        }
+    }
+
+    // Interceptar guardarDatosConsultorioCDM para guardar al instante sin esperar 350ms
+    if (typeof window.guardarDatosConsultorioCDM === "function" && !window.__cdmConsMongoWrapped15) {
+        window.__cdmConsMongoWrapped15 = true;
+        window.guardarDatosConsultorioCDM = function (db) {
+            try { localStorage.setItem(storageKey15(), JSON.stringify(db)); } catch {}
+            enviarConsultorioAMongo15(db, true);
+        };
+    }
+
+    async function hidratarConsultorioDesdeMongo15() {
+        if (window.location.protocol === "file:") return;
+        const path = window.location.pathname.toLowerCase();
+        if (path.includes("login.html") || document.body?.classList.contains("login-page")) return;
+
+        const clave = obtenerClaveClub15();
+        try {
+            const resp = await fetch(`/api/cdm/consultorio?club=${encodeURIComponent(clave)}`, { cache: "no-store" });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data?.ok || !data.consultorio) return;
+
+            const local = typeof obtenerDatosConsultorioCDM === "function" ? obtenerDatosConsultorioCDM() : null;
+            const remoto = data.consultorio;
+
+            if (tieneDatosCons15(remoto)) {
+                localStorage.setItem(storageKey15(), JSON.stringify(remoto));
+                if (typeof renderizarConsultorioCompleto === "function") {
+                    renderizarConsultorioCompleto();
+                }
+            } else if (tieneDatosCons15(local)) {
+                await enviarConsultorioAMongo15(local, false);
+            }
+        } catch {}
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(hidratarConsultorioDesdeMongo15, 250);
+    });
+})();
