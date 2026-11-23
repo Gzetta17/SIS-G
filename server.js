@@ -27,7 +27,6 @@ const CLAVE_CLUB_POR_DEFECTO = 'cdm_adelia_maria_principal';
 const USUARIOS_RESERVADOS_SUPERADMIN = ['gonzalo', 'superadmin'];
 
 let mongoConectado = false;
-let CdmStateModel = null;
 
 const cdmClubStateSchema = new mongoose.Schema({
     claveClub: { type: String, default: CLAVE_CLUB_POR_DEFECTO, unique: true, index: true },
@@ -53,17 +52,46 @@ const cdmConnection = mongoose.createConnection(CDM_MONGO_URI, {
     serverSelectionTimeoutMS: 8000
 });
 
+const CdmStateModel = cdmConnection.model('CdmClubState', cdmClubStateSchema);
+
 cdmConnection.on('connected', () => {
     mongoConectado = true;
-    CdmStateModel = cdmConnection.model('CdmClubState', cdmClubStateSchema);
     console.log('✅ MongoDB AISLADO conectado:', cdmConnection.name);
     inicializarEstadoEnMongoSiVacio();
+});
+
+cdmConnection.on('reconnected', () => {
+    mongoConectado = true;
+    console.log('🔄 MongoDB reconectado:', cdmConnection.name);
+});
+
+cdmConnection.on('disconnected', () => {
+    mongoConectado = false;
+    console.warn('⚠️ MongoDB desconectado.');
 });
 
 cdmConnection.on('error', (err) => {
     mongoConectado = false;
     console.error('⚠️ Error conexión MongoDB (usando respaldo local):', err.message);
 });
+
+async function asegurarConexionMongo() {
+    if (cdmConnection.readyState === 1) {
+        mongoConectado = true;
+        return true;
+    }
+    try {
+        if (cdmConnection.readyState === 2) {
+            await cdmConnection.asPromise();
+        } else {
+            await cdmConnection.openUri(CDM_MONGO_URI, { serverSelectionTimeoutMS: 8000 });
+        }
+    } catch (err) {
+        console.error('❌ No se pudo reconectar a MongoDB:', err.message);
+    }
+    mongoConectado = cdmConnection.readyState === 1;
+    return mongoConectado;
+}
 
 // ============================================================================
 // 2. HELPERS DE SEGURIDAD (HASH SCRYPT), DEMOS Y PERSISTENCIA MULTI-CLIENTE
@@ -200,7 +228,7 @@ function guardarMapaClubesEnDisco(mapaClubes) {
 }
 
 async function inicializarEstadoEnMongoSiVacio() {
-    if (!mongoConectado || !CdmStateModel) return;
+    if (!(await asegurarConexionMongo())) return;
     try {
         const mapaDisco = leerMapaClubesDesdeDisco();
         for (const [clave, datosClub] of Object.entries(mapaDisco)) {
@@ -208,7 +236,7 @@ async function inicializarEstadoEnMongoSiVacio() {
             if (!existe) {
                 await CdmStateModel.findOneAndUpdate(
                     { claveClub: clave },
-                    { ...datosClub, claveClub: clave },
+                    { $set: { ...datosClub, claveClub: clave } },
                     { upsert: true, new: true }
                 );
             }
@@ -220,7 +248,7 @@ async function inicializarEstadoEnMongoSiVacio() {
 
 async function obtenerTodosLosClubes() {
     const mapaDisco = leerMapaClubesDesdeDisco();
-    if (mongoConectado && CdmStateModel) {
+    if (await asegurarConexionMongo()) {
         try {
             const docs = await CdmStateModel.find({}).lean();
             docs.forEach(d => { if (d && d.claveClub) mapaDisco[d.claveClub] = d; });
@@ -233,7 +261,7 @@ async function obtenerTodosLosClubes() {
 
 async function obtenerEstadoMaestroClub(claveClub = CLAVE_CLUB_POR_DEFECTO) {
     const clave = String(claveClub || CLAVE_CLUB_POR_DEFECTO).trim();
-    if (mongoConectado && CdmStateModel) {
+    if (await asegurarConexionMongo()) {
         try {
             const doc = await CdmStateModel.findOne({ claveClub: clave }).lean();
             if (doc) return doc;
@@ -252,10 +280,11 @@ async function obtenerEstadoMaestroClub(claveClub = CLAVE_CLUB_POR_DEFECTO) {
 async function guardarEstadoMaestroClub(nuevoEstado, claveClubParam = null) {
     const clave = String(claveClubParam || nuevoEstado.claveClub || nuevoEstado.licenciaConfig?.claveClub || CLAVE_CLUB_POR_DEFECTO).trim();
     const mapa = leerMapaClubesDesdeDisco();
+    const conectada = await asegurarConexionMongo();
 
     // Leer SIEMPRE primero desde MongoDB para que un redeploy en Hostinger nunca pise datos con vacío
     let previo = mapa[clave] || null;
-    if (mongoConectado && CdmStateModel) {
+    if (conectada) {
         try {
             const docMongo = await CdmStateModel.findOne({ claveClub: clave }).lean();
             if (docMongo) previo = docMongo;
@@ -306,18 +335,26 @@ async function guardarEstadoMaestroClub(nuevoEstado, claveClubParam = null) {
     mapa[clave] = payload;
     guardarMapaClubesEnDisco(mapa);
 
-    if (mongoConectado && CdmStateModel) {
+    let mongoGuardado = false;
+    let mongoError = null;
+
+    if (conectada) {
         try {
             await CdmStateModel.findOneAndUpdate(
                 { claveClub: clave },
-                payload,
+                { $set: payload },
                 { upsert: true, new: true }
             );
+            mongoGuardado = true;
         } catch (e) {
-            console.error('⚠️ Error guardando en MongoDB:', e.message);
+            mongoError = e.message;
+            console.error('❌ Error guardando en MongoDB:', e.message);
         }
+    } else {
+        mongoError = 'Base desconectada (revisar CDM_MONGO_URI en Hostinger)';
     }
-    return payload;
+
+    return { ...payload, _mongoGuardado: mongoGuardado, _mongoError: mongoError };
 }
 
 function resumirListaClubes(mapaClubes) {
@@ -347,11 +384,13 @@ function sanitizarEstadoParaRespuesta(estado) {
 // 3. RUTAS API REST
 // ============================================================================
 
-app.get('/api/cdm/salud', (req, res) => {
+app.get('/api/cdm/salud', async (req, res) => {
+    const conectada = await asegurarConexionMongo();
     res.json({
         ok: true,
-        mongoConectado,
-        baseDeDatos: mongoConectado ? cdmConnection.name : 'json_disco_local',
+        mongoConectado: conectada,
+        readyState: cdmConnection.readyState,
+        baseDeDatos: conectada ? cdmConnection.name : 'json_disco_local',
         fechaAR: obtenerHoyAR()
     });
 });
@@ -379,6 +418,8 @@ app.post('/api/cdm/estado', async (req, res) => {
         res.json({
             ok: true,
             claveClub: guardado.claveClub,
+            mongoGuardado: Boolean(guardado._mongoGuardado),
+            mongoError: guardado._mongoError || null,
             motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
             ultimaActualizacionISO: guardado.ultimaActualizacionISO
         });
@@ -424,6 +465,8 @@ app.post('/api/cdm/consultorio', async (req, res) => {
         res.json({
             ok: true,
             claveClub: clave,
+            mongoGuardado: Boolean(guardado._mongoGuardado),
+            mongoError: guardado._mongoError || null,
             motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
             pacientes: guardado.consultorio.pacientes.length,
             turnos: guardado.consultorio.turnos.length,
@@ -469,7 +512,7 @@ app.delete('/api/cdm/clubes/:claveClub', async (req, res) => {
         const mapa = leerMapaClubesDesdeDisco();
         delete mapa[clave];
         guardarMapaClubesEnDisco(mapa);
-        if (mongoConectado && CdmStateModel) {
+        if (await asegurarConexionMongo()) {
             await CdmStateModel.deleteOne({ claveClub: clave });
         }
         const todos = await obtenerTodosLosClubes();
