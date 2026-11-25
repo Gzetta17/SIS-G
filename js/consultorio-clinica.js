@@ -208,37 +208,44 @@
         return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
     }
 
-    function obtenerPerfilDisciplina(especialidad) {
+  function obtenerPerfilDisciplina(especialidad) {
         const k = normStr(especialidad);
+        const customColor = typeof window.colorEspecialidadConsultorio === "function"
+            ? window.colorEspecialidadConsultorio(especialidad)
+            : null;
+        const customGrad = typeof window.gradienteEspecialidadConsultorio === "function"
+            ? window.gradienteEspecialidadConsultorio(especialidad)
+            : null;
+
         if (k.includes("psico")) {
             return {
                 tipo: "psicologia",
                 tituloBadge: "🧠 HISTORIA CLÍNICA PSICOLÓGICA",
-                gradiente: "linear-gradient(135deg, #1e1b4b 0%, #6d28d9 60%, #7c3aed 100%)",
-                accent: "#7c3aed"
+                gradiente: customGrad || "linear-gradient(135deg, #1e1b4b 0%, #6d28d9 60%, #7c3aed 100%)",
+                accent: customColor || "#7c3aed"
             };
         }
         if (k.includes("nutri")) {
             return {
                 tipo: "nutricion",
                 tituloBadge: "🥗 HISTORIA CLÍNICA NUTRICIONAL",
-                gradiente: "linear-gradient(135deg, #064e3b 0%, #15803d 60%, #0d9488 100%)",
-                accent: "#16a34a"
+                gradiente: customGrad || "linear-gradient(135deg, #064e3b 0%, #15803d 60%, #0d9488 100%)",
+                accent: customColor || "#16a34a"
             };
         }
         if (k.includes("kine") || k.includes("quiro") || k.includes("trauma") || k.includes("osteo") || k.includes("fisio")) {
             return {
                 tipo: "fisico",
                 tituloBadge: "🦴 HISTORIA CLÍNICA FÍSICA / REHABILITACIÓN",
-                gradiente: "linear-gradient(135deg, #0c192c 0%, #0369a1 62%, #0d9488 100%)",
-                accent: "#0284c7"
+                gradiente: customGrad || "linear-gradient(135deg, #0c192c 0%, #0369a1 62%, #0d9488 100%)",
+                accent: customColor || "#0284c7"
             };
         }
         return {
             tipo: "general",
             tituloBadge: "🩺 HISTORIA CLÍNICA PROFESIONAL",
-            gradiente: "linear-gradient(135deg, #0f172a 0%, #0369a1 65%, #0284c7 100%)",
-            accent: "#0284c7"
+            gradiente: customGrad || "linear-gradient(135deg, #0f172a 0%, #0369a1 65%, #0284c7 100%)",
+            accent: customColor || "#0284c7"
         };
     }
 

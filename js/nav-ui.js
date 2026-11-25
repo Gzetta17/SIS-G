@@ -1,6 +1,6 @@
 /**
- * js/nav-ui.js — Navegación Responsive, Menús Desplegables, Buscador Ctrl+K y Notas Rápidas
- * Adaptado a Clubes Deportivos, Gimnasios y Consultorios con Disciplinas Independientes
+ * js/nav-ui.js — Navegación Responsive, Menú Hamburguesa Completo, Pestañas Sin Scroll,
+ * Buscador Ctrl+K y Drawer de Notas (sin botón duplicado en Topbar)
  * CDM Pro Suite — Desarrollado por Gonzalo Adanchú
  */
 
@@ -29,9 +29,9 @@
             .modal-window { max-height: 92vh !important; overflow-y: auto !important; width: min(96vw, 720px); margin: auto !important; }
             .toast-container { z-index: 10200 !important; }
 
-            /* Ocultar Notas si SuperAdmin las desactivó */
-            body[data-feat-gen-notas="off"] #btnNotasRapidasTopbar,
-            body[data-feat-gen-notas="off"] .btn-notas-quick-nav { display: none !important; }
+            /* Ocultar siempre el botón duplicado de Notas */
+            #btnNotasRapidasTopbar,
+            .btn-notas-quick-nav { display: none !important; }
 
             /* Botón hamburguesa (solo visible <= 1024px) */
             #btnMobileSidebar33 {
@@ -40,10 +40,19 @@
                 justify-content: center;
                 width: 38px;
                 height: 38px;
+                min-width: 38px;
                 padding: 0 !important;
-                border-radius: 10px;
-                flex-shrink: 0;
-                font-size: 1.2rem;
+                border-radius: 11px;
+                flex: 0 0 38px;
+                font-size: 1.22rem;
+                background: var(--surface-subtle, #f1f5f9);
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                color: var(--ink-900, #0f172a);
+            }
+            body[data-theme="dark"] #btnMobileSidebar33 {
+                background: rgba(255, 255, 255, 0.08);
+                border-color: rgba(148, 163, 184, 0.35);
+                color: #f8fafc;
             }
             #cdmSidebarBackdrop33 {
                 display: none;
@@ -157,14 +166,14 @@
             .menu38-sublink.active { background: #0284c7; color: #ffffff; font-weight: 800; }
 
             /* Accesos rápidos del menú hamburguesa (móvil/tablet) */
-            .menu38-quick-box { display: none; margin-top: 0.35rem; }
+            .menu38-quick-box { display: none; margin-top: 0.35rem; margin-bottom: 0.75rem; }
             .menu38-quick-title {
                 font-size: 0.68rem;
                 font-weight: 800;
                 text-transform: uppercase;
                 letter-spacing: 0.06em;
                 color: rgba(148, 163, 184, 0.95);
-                margin-bottom: 0.5rem;
+                margin: 0.55rem 0 0.45rem;
                 display: block;
             }
             .menu38-quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
@@ -181,6 +190,12 @@
                 align-items: center;
                 gap: 0.4rem;
                 text-align: left;
+                min-width: 0;
+            }
+            .menu38-quick-btn span {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
             .menu38-quick-btn:hover { background: rgba(56, 189, 248, 0.22); border-color: rgba(56, 189, 248, 0.48); }
             .menu38-quick-btn.danger { border-color: rgba(244, 63, 94, 0.42); background: rgba(244, 63, 94, 0.15); color: #fda4af; }
@@ -256,7 +271,7 @@
                 padding: 0.85rem;
                 z-index: 8950;
                 box-shadow: 0 18px 42px rgba(2, 6, 23, 0.55);
-                max-height: 55vh;
+                max-height: 60vh;
                 overflow-y: auto;
             }
             #cdmBottomSheet38.open { display: block; }
@@ -268,6 +283,15 @@
                 padding-bottom: 0.45rem;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.12);
             }
+            .bsheet38-sec-lbl {
+                font-size: 0.65rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #94a3b8;
+                margin: 0.55rem 0 0.4rem;
+                display: block;
+            }
             .bsheet38-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
             .bsheet38-opt {
                 border: 1px solid rgba(255, 255, 255, 0.14);
@@ -275,8 +299,8 @@
                 color: #f1f5f9;
                 text-decoration: none;
                 border-radius: 12px;
-                padding: 0.65rem 0.7rem;
-                font-size: 0.8rem;
+                padding: 0.62rem 0.68rem;
+                font-size: 0.78rem;
                 font-weight: 700;
                 display: flex;
                 align-items: center;
@@ -381,7 +405,7 @@
                     top: 0 !important;
                     left: 0 !important;
                     bottom: 0 !important;
-                    width: min(305px, 86vw) !important;
+                    width: min(310px, 86vw) !important;
                     height: 100dvh !important;
                     display: flex !important;
                     flex-direction: column !important;
@@ -406,16 +430,114 @@
                 #cdmFloatingDropletClock { bottom: 78px !important; }
             }
 
+            /* GRILLA COMPACTA SIN SCROLL PARA LAS PESTAÑAS (.module-tabs) EN MÓVIL */
+            @media (max-width: 860px) {
+                body:not([data-rol="usuario"]) .module-tabs:not(.jf-flat-tabs) {
+                    display: grid !important;
+                    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+                    gap: 0.42rem !important;
+                    overflow: visible !important;
+                    padding: 0.45rem !important;
+                    border-radius: 16px !important;
+                }
+                body:not([data-rol="usuario"]) .module-tabs:not(.jf-flat-tabs) .mod-tab {
+                    grid-column: span 2 !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 0.2rem !important;
+                    padding: 0.5rem 0.28rem !important;
+                    min-height: 54px !important;
+                    min-width: 0 !important;
+                    font-size: 0.7rem !important;
+                    font-weight: 700 !important;
+                    line-height: 1.15 !important;
+                    text-align: center !important;
+                    white-space: normal !important;
+                    border-radius: 12px !important;
+                }
+                body:not([data-rol="usuario"]) .module-tabs:not(.jf-flat-tabs) .mod-tab i {
+                    font-size: 1.16rem !important;
+                    line-height: 1 !important;
+                    margin: 0 !important;
+                }
+                /* Si hay 4 pestañas -> 2x2 perfecto */
+                body:not([data-rol="usuario"]) .module-tabs.mob-tabs-4 .mod-tab {
+                    grid-column: span 3 !important;
+                }
+                /* Si hay 5 pestañas -> 3 arriba + 2 abajo ocupando todo el ancho sin huecos */
+                body:not([data-rol="usuario"]) .module-tabs.mob-tabs-5 .mod-tab:nth-child(4),
+                body:not([data-rol="usuario"]) .module-tabs.mob-tabs-5 .mod-tab:nth-child(5) {
+                    grid-column: span 3 !important;
+                }
+                /* Si hay 2 pestañas -> 2 columnas iguales */
+                body:not([data-rol="usuario"]) .module-tabs.mob-tabs-2 .mod-tab {
+                    grid-column: span 3 !important;
+                }
+            }
+
+            /* TOPBAR MÓVIL LIMPIA: HAMBURGUESA + TÍTULO + BOTÓN COMPACTO + CAMPANA */
             @media (max-width: 768px) {
-                .app-topbar { flex-wrap: nowrap !important; min-height: 56px !important; padding: 0.6rem 0.8rem !important; }
-                .topbar-subtitle { display: none !important; }
-                .app-topbar .topbar-left { min-width: 0 !important; flex: 1 !important; }
-                .app-topbar .topbar-title { min-width: 0 !important; }
-                .app-topbar .topbar-title h2 { font-size: 0.96rem !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-                .app-topbar .topbar-right #btnToggleTemaCDM,
-                .app-topbar .topbar-right #cdmBarraSesionActiva,
-                .app-topbar .topbar-right #topbarMenuWrap33,
-                .app-topbar .topbar-right #btnNotasRapidasTopbar { display: none !important; }
+                body:not([data-rol="usuario"]) .app-topbar {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    align-items: center !important;
+                    justify-content: space-between !important;
+                    flex-wrap: nowrap !important;
+                    gap: 0.45rem !important;
+                    min-height: 58px !important;
+                    padding: 0.55rem 0.75rem !important;
+                }
+                body:not([data-rol="usuario"]) .topbar-subtitle,
+                body:not([data-rol="usuario"]) .app-topbar .cat-active-pill {
+                    display: none !important;
+                }
+                body:not([data-rol="usuario"]) .app-topbar .topbar-left {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    align-items: center !important;
+                    gap: 0.5rem !important;
+                    min-width: 0 !important;
+                    flex: 1 1 auto !important;
+                    width: auto !important;
+                }
+                body:not([data-rol="usuario"]) .app-topbar .topbar-title {
+                    min-width: 0 !important;
+                    flex: 1 1 auto !important;
+                }
+                body:not([data-rol="usuario"]) .app-topbar .topbar-title h2 {
+                    font-size: 0.94rem !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    margin: 0 !important;
+                }
+                body:not([data-rol="usuario"]) .app-topbar .topbar-right {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    align-items: center !important;
+                    justify-content: flex-end !important;
+                    flex: 0 0 auto !important;
+                    width: auto !important;
+                    gap: 0.35rem !important;
+                    margin: 0 !important;
+                }
+                body:not([data-rol="usuario"]) .app-topbar .topbar-right #btnToggleTemaCDM,
+                body:not([data-rol="usuario"]) .app-topbar .topbar-right #cdmBarraSesionActiva,
+                body:not([data-rol="usuario"]) .app-topbar .topbar-right #topbarMenuWrap33,
+                body:not([data-rol="usuario"]) .app-topbar .topbar-right #btnNotasRapidasTopbar {
+                    display: none !important;
+                }
+                body:not([data-rol="usuario"]) .app-topbar .topbar-right > button,
+                body:not([data-rol="usuario"]) .app-topbar .topbar-right > .btn {
+                    width: auto !important;
+                    flex: 0 0 auto !important;
+                    min-width: 36px !important;
+                    padding: 0.42rem 0.65rem !important;
+                    font-size: 0.76rem !important;
+                    white-space: nowrap !important;
+                }
                 .app-content { padding: 0.8rem !important; }
                 .app-panel { padding: 0.85rem !important; }
                 .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr !important; }
@@ -426,7 +548,7 @@
     }
 
     // =====================================================================
-    // 2. HELPERS DE MENÚS, DRAWER MÓVIL Y DESPLEGABLES
+    // 2. HELPERS DE MENÚS, DRAWER MÓVIL, PESTAÑAS Y DESPLEGABLES
     // =====================================================================
     function esModoSoloConsultorioNav() {
         const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
@@ -437,9 +559,100 @@
         return (mod.consultorio !== false) && profs.length > 0 && !tieneDepOGym;
     }
 
+    function obtenerPestanasPaginaActualNav() {
+        if (document.body?.getAttribute("data-rol") === "usuario") return [];
+        const bar = document.querySelector(".module-tabs:not(.jf-flat-tabs)");
+        if (!bar) return [];
+        return Array.from(bar.querySelectorAll(".mod-tab")).filter(b => !b.classList.contains("hidden") && b.style.display !== "none");
+    }
+
+    function sincronizarGrillaPestanasMovil() {
+        const bar = document.querySelector(".module-tabs:not(.jf-flat-tabs)");
+        if (!bar) return;
+        const visibles = obtenerPestanasPaginaActualNav();
+        bar.classList.remove("mob-tabs-2", "mob-tabs-3", "mob-tabs-4", "mob-tabs-5", "mob-tabs-6");
+        if (visibles.length >= 2 && visibles.length <= 6) {
+            bar.classList.add(`mob-tabs-${visibles.length}`);
+        }
+    }
+
+    window.activarPestanaDesdeBottomSheet = function (idx) {
+        const tabs = obtenerPestanasPaginaActualNav();
+        cerrarBottomSheetNav();
+        if (tabs[idx]) {
+            tabs[idx].click();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    };
+
+    // Refleja todas las herramientas del menú "Más" (PC) adentro del menú hamburguesa (móvil)
+    function renderizarAccesosMenuHamburguesa() {
+        const quick = document.getElementById("menu38QuickBox");
+        if (!quick) return;
+
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const cobranzaBloq = Boolean(lic?.bloquearCobranza || lic?.funciones?.deporte?.cobranza === false);
+        const ses = typeof obtenerSesionActivaCDM === "function" ? obtenerSesionActivaCDM() : null;
+        const esSuper = Boolean(ses?.esSuperAdmin);
+        const esStaff = ses?.nivelAdmin === "staff";
+        const esOscuro = document.body?.getAttribute("data-theme") === "dark";
+
+        const extrasPC = [];
+        const bucket = document.getElementById("topbarDropItems33");
+        if (bucket) {
+            Array.from(bucket.querySelectorAll("button")).forEach((btn, idx) => {
+                if (btn.classList.contains("hidden") || btn.style.display === "none") return;
+                if (btn.classList.contains("mobile-only-sys-btn")) return;
+                const txt = (btn.innerText || "").replace(/\s+/g, " ").trim();
+                if (!txt) return;
+                const ic = btn.querySelector("i")?.outerHTML || `<i class="ri-tools-line"></i>`;
+                extrasPC.push({ idx, txt, ic });
+            });
+        }
+
+        quick.innerHTML = `
+            <span class="menu38-quick-title">⚡ Menú y Accesos Rápidos</span>
+            <div class="menu38-quick-grid">
+                <button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapidoNav('tema')">
+                    <i class="${esOscuro ? "ri-sun-line" : "ri-moon-clear-line"}"></i><span>${esOscuro ? "Modo Día" : "Modo Noche"}</span>
+                </button>
+                ${!cobranzaBloq ? `<button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapidoNav('caja')"><i class="ri-safe-2-line"></i><span>Caja Rápida</span></button>` : ""}
+                ${esSuper ? `<button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapidoNav('modulos')"><i class="ri-settings-3-line"></i><span>Módulos</span></button>` : ""}
+                ${esSuper ? `<button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapidoNav('comercio')"><i class="ri-store-2-line"></i><span>Comercios</span></button>` : ""}
+                ${!esStaff && typeof abrirModalColoresRapidoComercio22 === "function" ? `<button type="button" class="menu38-quick-btn" onclick="alternarSidebarMovil(true); abrirModalColoresRapidoComercio22();"><i class="ri-palette-line"></i><span>Colores</span></button>` : ""}
+                <button type="button" class="menu38-quick-btn danger" onclick="ejecutarAccesoRapidoNav('salir')"><i class="ri-logout-box-r-line"></i><span>Salir</span></button>
+            </div>
+            ${extrasPC.length ? `
+                <span class="menu38-quick-title">🛠️ Herramientas de esta pantalla</span>
+                <div class="menu38-quick-grid">
+                    ${extrasPC.map(it => `
+                        <button type="button" class="menu38-quick-btn" onclick="dispararHerramientaTopbarMovil(${it.idx})">
+                            ${it.ic}<span>${it.txt}</span>
+                        </button>
+                    `).join("")}
+                </div>
+            ` : ""}
+        `;
+    }
+
+    window.dispararHerramientaTopbarMovil = function (idx) {
+        alternarSidebarMovil(true);
+        const bucket = document.getElementById("topbarDropItems33");
+        const botones = bucket ? Array.from(bucket.querySelectorAll("button")).filter(b => !b.classList.contains("hidden") && b.style.display !== "none" && !b.classList.contains("mobile-only-sys-btn")) : [];
+        if (botones[idx]) botones[idx].click();
+    };
+
     window.alternarSidebarMovil = function (forzarCerrar = false) {
-        if (forzarCerrar) document.body.classList.remove("sidebar-mobile-open-33");
-        else document.body.classList.toggle("sidebar-mobile-open-33");
+        if (forzarCerrar) {
+            document.body.classList.remove("sidebar-mobile-open-33");
+        } else {
+            const abrira = !document.body.classList.contains("sidebar-mobile-open-33");
+            if (abrira) {
+                compactarTopbarPC();
+                renderizarAccesosMenuHamburguesa();
+            }
+            document.body.classList.toggle("sidebar-mobile-open-33");
+        }
     };
     window.alternarSidebarMovil33 = window.alternarSidebarMovil;
 
@@ -542,24 +755,46 @@
 
         const depAct = typeof deportePagina !== "undefined" ? String(deportePagina || "") : "";
         const espAct = String(window.especialidadFiltroConsultorioCDM || "").toLowerCase();
+        const tabsActuales = obtenerPestanasPaginaActualNav();
         let titulo = "", contenido = "";
 
-        if (tipo === "deportes") {
+        const htmlSeccionesActuales = tabsActuales.length ? `
+            <span class="bsheet38-sec-lbl">📌 Secciones de esta pantalla</span>
+            <div class="bsheet38-grid">
+                ${tabsActuales.map((t, idx) => {
+                    const ic = t.querySelector("i")?.outerHTML || `<i class="ri-layout-grid-line"></i>`;
+                    const txt = (t.innerText || "").trim();
+                    const act = t.classList.contains("active");
+                    return `<button type="button" class="bsheet38-opt ${act ? "active" : ""}" onclick="activarPestanaDesdeBottomSheet(${idx})">${ic}<span>${txt}</span></button>`;
+                }).join("")}
+            </div>
+        ` : "";
+
+        if (tipo === "gym_secciones") {
+            titulo = `🏋️ Secciones de Gimnasio`;
+            contenido = htmlSeccionesActuales;
+        } else if (tipo === "deportes") {
             const lista = window.__listaDeportesNav || [];
-            titulo = `🏆 Seleccionar Deporte (${lista.length})`;
-            contenido = lista.map(d => `
-                <a href="${d.href}" class="bsheet38-opt ${depAct.toLowerCase() === d.key.toLowerCase() ? "active" : ""}">
-                    <span>${d.icono}</span><span>${d.nombre}</span>
-                </a>
-            `).join("");
+            titulo = `🏆 Deportes y Secciones`;
+            contenido = `
+                ${depAct && depAct !== "Gimnasio" ? htmlSeccionesActuales : ""}
+                <span class="bsheet38-sec-lbl">🏟️ Cambiar de Deporte (${lista.length})</span>
+                <div class="bsheet38-grid">
+                    ${lista.map(d => `
+                        <a href="${d.href}" class="bsheet38-opt ${depAct.toLowerCase() === d.key.toLowerCase() ? "active" : ""}">
+                            <span>${d.icono}</span><span>${d.nombre}</span>
+                        </a>
+                    `).join("")}
+                </div>
+            `;
         } else if (tipo === "consultorio") {
             const profs = window.__listaProfesionesNav || [];
             titulo = `🩺 Especialidades (${profs.length})`;
-            contenido = profs.map(pr => `
+            contenido = `<div class="bsheet38-grid">` + profs.map(pr => `
                 <button type="button" class="bsheet38-opt ${espAct === pr.clave.toLowerCase() ? "active" : ""}" onclick="irAProfesionConsultorioNav('${pr.clave.replace(/'/g, "\\'")}')">
                     <span>${pr.icono || "🩺"}</span><span>${pr.clave}</span>
                 </button>
-            `).join("");
+            `).join("") + `</div>`;
         }
 
         sheet.dataset.tipo = tipo;
@@ -568,7 +803,7 @@
                 <strong>${titulo}</strong>
                 <button type="button" class="menu38-close-btn" style="display:inline-flex; width:28px; height:28px; font-size:0.85rem;" onclick="cerrarBottomSheetNav()">✕</button>
             </div>
-            <div class="bsheet38-grid">${contenido}</div>
+            ${contenido}
         `;
         sheet.classList.add("open");
         bg.classList.add("open");
@@ -581,6 +816,7 @@
     window.construirNavegacionCompleta = function () {
         if (document.body?.classList.contains("login-page") || document.body?.getAttribute("data-rol") === "usuario") return;
         inyectarCSSNavUI();
+        sincronizarGrillaPestanasMovil();
 
         const sidebar = document.querySelector(".app-sidebar");
         const nav = sidebar?.querySelector(".sidebar-nav");
@@ -599,7 +835,7 @@
             btn.type = "button";
             btn.id = "btnMobileSidebar33";
             btn.className = "btn btn-ghost btn-sm";
-            btn.title = "Accesos rápidos y sistema";
+            btn.title = "Abrir menú de opciones";
             btn.innerHTML = `<i class="ri-menu-2-line"></i>`;
             btn.onclick = () => alternarSidebarMovil(false);
             topLeft.prepend(btn);
@@ -721,7 +957,7 @@
             ` : ""}
         `;
 
-        // 2. Accesos Rápidos dentro del menú hamburguesa (móvil/tablet)
+        // 2. Accesos Rápidos y Herramientas dentro del menú hamburguesa (móvil/tablet)
         let quick = document.getElementById("menu38QuickBox");
         if (!quick) {
             quick = document.createElement("div");
@@ -731,17 +967,6 @@
             if (demoBox) sidebar.insertBefore(quick, demoBox);
             else sidebar.appendChild(quick);
         }
-        quick.innerHTML = `
-            <span class="menu38-quick-title">⚡ Accesos Rápidos</span>
-            <div class="menu38-quick-grid">
-                <button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapidoNav('tema')"><i class="ri-moon-clear-line"></i><span>Modo Día/Noche</span></button>
-                <button type="button" class="menu38-quick-btn btn-notas-quick-nav" onclick="ejecutarAccesoRapidoNav('notas')"><i class="ri-sticky-note-line"></i><span>Notas</span></button>
-                ${!cobranzaBloq ? `<button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapidoNav('caja')"><i class="ri-safe-2-line"></i><span>Caja Rápida</span></button>` : ""}
-                <button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapidoNav('modulos')"><i class="ri-settings-3-line"></i><span>Módulos</span></button>
-                <button type="button" class="menu38-quick-btn" onclick="ejecutarAccesoRapidoNav('comercio')"><i class="ri-store-2-line"></i><span>Comercios</span></button>
-                <button type="button" class="menu38-quick-btn danger" onclick="ejecutarAccesoRapidoNav('salir')"><i class="ri-logout-box-r-line"></i><span>Salir</span></button>
-            </div>
-        `;
 
         // 3. Barra inferior fija (móvil/tablet)
         let bnav = document.getElementById("cdmBottomNav38");
@@ -771,11 +996,11 @@
                     <i class="ri-trophy-line"></i><span>Deportes ▴</span>
                 </button>
             ` : ""}
-            ${mod.gym !== false ? `
-                <a href="gym.html" class="bnav38-item ${esEnGym ? "active" : ""}">
-                    <i class="ri-heart-pulse-line"></i><span>Gym</span>
-                </a>
-            ` : ""}
+            ${mod.gym !== false ? (
+                esEnGym
+                    ? `<button type="button" class="bnav38-item active" onclick="abrirBottomSheetNav('gym_secciones', this)"><i class="ri-heart-pulse-fill"></i><span>Gym ▴</span></button>`
+                    : `<a href="gym.html" class="bnav38-item"><i class="ri-heart-pulse-line"></i><span>Gym</span></a>`
+            ) : ""}
             ${tieneConsultorio ? `
                 <button type="button" class="bnav38-item" onclick="abrirBottomSheetNav('consultorio', this)">
                     <i class="ri-stethoscope-line"></i><span>Salud ▴</span>
@@ -793,9 +1018,10 @@
             ` : ""}
         `;
 
-        // 4. Notas Rápidas en la Topbar (PC) + Compactación de botones secundarios
+        // 4. Quitar botón Notas duplicado y compactar botones secundarios en PC
         asegurarBotonNotasTopbar();
         compactarTopbarPC();
+        renderizarAccesosMenuHamburguesa();
     };
 
     // Alias de compatibilidad con login.js
@@ -810,7 +1036,9 @@
             onclk.includes("abrirmodalpersona") ||
             onclk.includes("abrirmodalpacienteconsultorio") ||
             id === "btntoggletemacdm" || btn.classList.contains("btn-theme-toggle") ||
-            id === "btnnotasrapidastopbar" ||
+            id.includes("notif") || id.includes("campana") || id.includes("alerta") ||
+            txt.includes("🔔") || onclk.includes("notif") || onclk.includes("alerta") ||
+            Boolean(btn.querySelector(".ri-notification-3-line, .ri-notification-line, .ri-notification-3-fill, .ri-notification-fill, .ri-bell-line")) ||
             onclk.includes("login.html?hub=1") ||
             onclk.includes("abrirmodalsuperadmincdm") ||
             onclk.includes("cerrarsesioncdm") ||
@@ -845,6 +1073,7 @@
         if (!bucket) return;
 
         Array.from(topRight.querySelectorAll("button")).forEach(btn => {
+            if (btn.id === "btnNotasRapidasTopbar") return;
             if (btn.closest("#topbarMenuWrap33") || esBotonVisibleAfueraTopbar(btn)) return;
             if (btn.parentElement !== bucket) bucket.appendChild(btn);
         });
@@ -1010,16 +1239,7 @@
     }
 
     function asegurarBotonNotasTopbar() {
-        const topRight = document.querySelector(".app-topbar .topbar-right");
-        if (!topRight || document.getElementById("btnNotasRapidasTopbar")) return;
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "btnNotasRapidasTopbar";
-        btn.className = "btn btn-warn btn-sm";
-        btn.onclick = abrirNotasRapidasCDM;
-        btn.innerHTML = `<i class="ri-sticky-note-line"></i> Notas <span id="badgeCantNotasTopbar" class="badge badge-danger" style="padding:1px 6px; font-size:0.68rem;">0</span>`;
-        topRight.appendChild(btn);
-        actualizarBadgeNotas();
+        document.getElementById("btnNotasRapidasTopbar")?.remove();
     }
 
     window.abrirNotasRapidasCDM = function () {
@@ -1100,7 +1320,14 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-        setTimeout(construirNavegacionCompleta, 120);
-        setTimeout(compactarTopbarPC, 450);
+        setTimeout(() => {
+            construirNavegacionCompleta();
+            sincronizarGrillaPestanasMovil();
+        }, 120);
+        setTimeout(() => {
+            compactarTopbarPC();
+            renderizarAccesosMenuHamburguesa();
+            sincronizarGrillaPestanasMovil();
+        }, 500);
     });
 })();

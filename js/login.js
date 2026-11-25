@@ -6120,7 +6120,8 @@ function puedeMostrarseRelojDeportivoCDM() {
         return false;
     }
     const tituloTop = (document.querySelector(".topbar-title h2")?.innerText || "").toLowerCase();
-    if (tituloTop.includes("profesionales") || tituloTop.includes("salud") || tituloTop.includes("consultorio") || tituloTop.includes("paciente")) {
+    const esPantallaGym = path.includes("gym.html") || document.body?.dataset?.deporte === "Gimnasio" || tituloTop.includes("gimnasio");
+    if (!esPantallaGym && (tituloTop.includes("profesionales") || tituloTop.includes("salud") || tituloTop.includes("consultorio") || tituloTop.includes("paciente"))) {
         return false;
     }
 
@@ -9274,4 +9275,2436 @@ guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
         }, 550);
         setTimeout(inyectarBotonBellNotasTopbar21, 1100);
     });
+})();
+// =========================================================================
+// 21. HUELLA DACTILAR / FACE ID (WEBAUTHN) + MODO DEMO vs SISTEMA REAL PRIVADO
+//     Encapsulado para evitar colisiones con bloques previos de login.js
+// =========================================================================
+(function () {
+    const STORAGE_BIO_DEVICE_KEY_21 = "cdm_biometria_dispositivo_v1";
+
+    function b64UrlToUint8_21(str) {
+        let s = String(str || "").replace(/-/g, "+").replace(/_/g, "/");
+        while (s.length % 4) s += "=";
+        const bin = atob(s);
+        const out = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+        return out;
+    }
+
+    function bufToB64Url_21(buf) {
+        const bytes = new Uint8Array(buf);
+        let bin = "";
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+
+    function obtenerPerfilesBioDispositivo21() {
+        try {
+            const arr = JSON.parse(localStorage.getItem(STORAGE_BIO_DEVICE_KEY_21) || "[]");
+            return Array.isArray(arr) ? arr : [];
+        } catch {
+            return [];
+        }
+    }
+
+    function guardarPerfilBioDispositivo21(perfil) {
+        const lista = obtenerPerfilesBioDispositivo21().filter(x => x.credentialId !== perfil.credentialId);
+        lista.unshift(perfil);
+        localStorage.setItem(STORAGE_BIO_DEVICE_KEY_21, JSON.stringify(lista.slice(0, 5)));
+    }
+
+    window.quitarPerfilBioDispositivo21 = function (credentialId) {
+        const lista = obtenerPerfilesBioDispositivo21().filter(x => x.credentialId !== credentialId);
+        localStorage.setItem(STORAGE_BIO_DEVICE_KEY_21, JSON.stringify(lista));
+        renderizarBotonesBioEnLogin21();
+    };
+
+    async function soportaBiometriaDispositivo21() {
+        try {
+            if (!window.PublicKeyCredential || !navigator.credentials) return false;
+            if (typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function") {
+                return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+            }
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    function sincronizarPacienteEnRegistroUniversal21(pac, claveClub) {
+        try {
+            const mapa = JSON.parse(localStorage.getItem("cdm_registro_universal_pacientes_v19") || "{}");
+            const clave = `id_${pac.id}`;
+            mapa[clave] = {
+                clave,
+                claveClub,
+                id: pac.id,
+                codigoAcceso: pac.codigoAcceso || `PAC-${pac.id}`,
+                nombreCompleto: pac.nombreCompleto || `${pac.apellido || ""}, ${pac.nombre || ""}`.replace(/^,\s*/, "").trim(),
+                dni: pac.dni || "",
+                telefono: pac.telefono || pac.whatsapp || "",
+                especialidad: pac.especialidad || "Consultorio",
+                mutual: pac.mutual || pac.obraSocial || "Particular",
+                diagnostico: pac.diagnostico || "",
+                profesional: pac.profesional || "",
+                estudiosClinicos: Array.isArray(pac.estudios) ? pac.estudios : (Array.isArray(pac.estudiosClinicos) ? pac.estudiosClinicos : [])
+            };
+            localStorage.setItem("cdm_registro_universal_pacientes_v19", JSON.stringify(mapa));
+        } catch {}
+    }
+
+    // 21.1 Activar Huella / Face ID tras primer login
+    window.activarHuellaOFaceIDActual21 = async function () {
+        const ses = obtenerSesionActivaCDM();
+        if (!ses || !ses.bioEnrollToken) {
+            alert("⚠️ Cerrá sesión y volvé a ingresar una vez con tu clave o código para activar la Huella / Face ID.");
+            return;
+        }
+        const soporta = await soportaBiometriaDispositivo21();
+        if (!soporta) {
+            alert("⚠️ Este dispositivo o navegador no tiene lector de Huella / Face ID disponible (recordá abrir desde HTTPS o localhost).");
+            return;
+        }
+
+        try {
+            const rOpt = await fetch("/api/cdm/webauthn/register-options", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ bioEnrollToken: ses.bioEnrollToken })
+            });
+            const dOpt = await rOpt.json();
+            if (!rOpt.ok || !dOpt.ok) {
+                alert("❌ " + (dOpt.mensaje || "No se pudo iniciar el registro biométrico."));
+                return;
+            }
+
+            const opt = dOpt.options;
+            const cred = await navigator.credentials.create({
+                publicKey: {
+                    ...opt,
+                    challenge: b64UrlToUint8_21(opt.challenge),
+                    user: { ...opt.user, id: b64UrlToUint8_21(opt.user.id) }
+                }
+            });
+
+            if (!cred || !cred.response || typeof cred.response.getPublicKey !== "function") {
+                alert("⚠️ Actualizá tu navegador (Chrome / Safari) para vincular Huella o Face ID.");
+                return;
+            }
+
+            const rVer = await fetch("/api/cdm/webauthn/register-verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    bioEnrollToken: ses.bioEnrollToken,
+                    credentialId: cred.id,
+                    publicKeySpki: bufToB64Url_21(cred.response.getPublicKey()),
+                    alg: typeof cred.response.getPublicKeyAlgorithm === "function" ? cred.response.getPublicKeyAlgorithm() : -7,
+                    clientDataJSON: bufToB64Url_21(cred.response.clientDataJSON),
+                    dispositivo: navigator.userAgent.slice(0, 60)
+                })
+            });
+            const dVer = await rVer.json();
+            if (!rVer.ok || !dVer.ok) {
+                alert("❌ " + (dVer.mensaje || "No se pudo verificar la huella."));
+                return;
+            }
+
+            guardarPerfilBioDispositivo21({
+                credentialId: dVer.credentialId,
+                claveClub: dVer.claveClub,
+                nombre: ses.nombre || dVer.nombre || "Usuario",
+                rol: dVer.rol
+            });
+
+            if (typeof mostrarToast === "function") {
+                mostrarToast("✅ ¡Huella / Face ID activado! La próxima vez entrás con 1 toque.");
+            } else {
+                alert("✅ ¡Huella / Face ID activado en este dispositivo!");
+            }
+
+            const btn = document.getElementById("btnActivarBioTopbar21");
+            if (btn) btn.innerHTML = `<i class="ri-fingerprint-line"></i> Huella Activa ✓`;
+        } catch (err) {
+            if (err && err.name === "NotAllowedError") return;
+            alert("❌ Error activando biometría: " + (err?.message || err));
+        }
+    };
+
+    // 21.2 Ingresar con Huella / Face ID desde login.html
+    window.ingresarConHuellaDispositivo21 = async function (credentialId) {
+        const perfil = obtenerPerfilesBioDispositivo21().find(x => x.credentialId === credentialId);
+        if (!perfil) return;
+
+        try {
+            const rOpt = await fetch("/api/cdm/webauthn/login-options", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ credentialId: perfil.credentialId, claveClub: perfil.claveClub })
+            });
+            const dOpt = await rOpt.json();
+            if (!rOpt.ok || !dOpt.ok) {
+                mostrarErrorLogin(dOpt.mensaje || "❌ No se pudo iniciar ingreso biométrico.");
+                return;
+            }
+
+            const opt = dOpt.options;
+            const assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge: b64UrlToUint8_21(opt.challenge),
+                    rpId: opt.rpId,
+                    allowCredentials: opt.allowCredentials.map(c => ({
+                        id: b64UrlToUint8_21(c.id),
+                        type: c.type
+                    })),
+                    userVerification: "required",
+                    timeout: opt.timeout || 60000
+                }
+            });
+
+            const rVer = await fetch("/api/cdm/webauthn/login-verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    credentialId: assertion.id,
+                    claveClub: perfil.claveClub,
+                    authenticatorData: bufToB64Url_21(assertion.response.authenticatorData),
+                    clientDataJSON: bufToB64Url_21(assertion.response.clientDataJSON),
+                    signature: bufToB64Url_21(assertion.response.signature)
+                })
+            });
+            const data = await rVer.json();
+            if (!rVer.ok || !data.ok) {
+                mostrarErrorLogin(data.mensaje || "❌ Validación biométrica rechazada.");
+                return;
+            }
+
+            cargarEstadoClubEnLocalStorage(data.estado, data.claveClub);
+            const lic = data.estado?.licenciaConfig || obtenerLicenciaConfigCDM();
+
+            if (data.rol === "admin") {
+                const esStaff = data.nivelAdmin === "staff" && data.staffPerfil;
+                localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+                    rol: "admin",
+                    esSuperAdmin: false,
+                    nivelAdmin: esStaff ? "staff" : "principal",
+                    staffPerfil: esStaff ? data.staffPerfil : null,
+                    claveClub: data.claveClub,
+                    bioEnrollToken: data.bioEnrollToken || "",
+                    nombre: esStaff ? `${data.staffPerfil.nombre} (Staff)` : `Admin • ${lic.nombreEntidad || "Comercio"}`,
+                    fechaIngreso: new Date().toISOString()
+                }));
+                window.location.href = (esStaff && typeof obtenerPaginaInicialStaff19 === "function")
+                    ? obtenerPaginaInicialStaff19(data.staffPerfil, lic)
+                    : obtenerPaginaInicialSegunModulos(lic);
+                return;
+            }
+
+            if (data.esPacienteConsultorio && data.paciente) {
+                sincronizarPacienteEnRegistroUniversal21(data.paciente, data.claveClub);
+                localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+                    rol: "usuario",
+                    esPacienteConsultorio: true,
+                    clavePaciente: `id_${data.paciente.id}`,
+                    personaId: data.paciente.id,
+                    dni: data.paciente.dni || "",
+                    nombre: data.paciente.nombreCompleto || `${data.paciente.nombre || ""} ${data.paciente.apellido || ""}`.trim(),
+                    deporte: data.paciente.especialidad || "Consultorio",
+                    categoria: data.paciente.mutual || "Particular",
+                    codigo: data.paciente.codigoAcceso || `PAC-${data.paciente.id}`,
+                    bioEnrollToken: data.bioEnrollToken || "",
+                    fechaIngreso: new Date().toISOString()
+                }));
+                window.location.href = `jugador.html?id=${encodeURIComponent(data.paciente.id)}&pac=id_${encodeURIComponent(data.paciente.id)}&modo=paciente`;
+                return;
+            }
+
+            if (data.persona) {
+                localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+                    rol: "usuario",
+                    personaId: data.persona.id,
+                    dni: data.persona.dni,
+                    nombre: `${data.persona.nombre} ${data.persona.apellido}`,
+                    deporte: data.persona.deporte,
+                    categoria: data.persona.categoria,
+                    codigo: data.persona.codigoAcceso,
+                    bioEnrollToken: data.bioEnrollToken || "",
+                    fechaIngreso: new Date().toISOString()
+                }));
+                sessionStorage.setItem("cdm_socio_dni_activo", data.persona.dni || "");
+                window.location.href = `jugador.html?id=${data.persona.id}`;
+            }
+        } catch (err) {
+            if (err && err.name === "NotAllowedError") return;
+            mostrarErrorLogin("❌ No se pudo completar el ingreso con huella: " + (err?.message || err));
+        }
+    };
+
+    function renderizarBotonesBioEnLogin21() {
+        const formAdmin = document.getElementById("formLoginAdmin");
+        const formUser = document.getElementById("formLoginUsuario");
+        if (!formAdmin && !formUser) return;
+
+        const perfiles = obtenerPerfilesBioDispositivo21();
+        const bioAdmins = perfiles.filter(p => p.rol === "admin");
+        const bioUsers = perfiles.filter(p => p.rol !== "admin");
+
+        const montarEnForm = (formEl, idBox, items) => {
+            if (!formEl) return;
+            document.getElementById(idBox)?.remove();
+            if (!items.length) return;
+
+            const box = document.createElement("div");
+            box.id = idBox;
+            box.style = "margin-top:0.85rem; padding-top:0.8rem; border-top:1px dashed var(--line-strong); display:flex; flex-direction:column; gap:0.45rem;";
+            box.innerHTML = items.map(p => `
+                <div style="display:flex; gap:0.35rem; align-items:center;">
+                    <button type="button" class="btn btn-secondary" style="flex:1; font-weight:700;" onclick="ingresarConHuellaDispositivo21('${p.credentialId}')">
+                        <i class="ri-fingerprint-line" style="font-size:1.15rem;"></i> Ingresar con Huella / Face ID (${p.nombre})
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" title="Quitar huella de este dispositivo" onclick="quitarPerfilBioDispositivo21('${p.credentialId}')">✕</button>
+                </div>
+            `).join("");
+            formEl.appendChild(box);
+        };
+
+        montarEnForm(formAdmin, "boxBioLoginAdmin21", bioAdmins);
+        montarEnForm(formUser, "boxBioLoginUser21", bioUsers);
+
+        if (formAdmin && !document.getElementById("linkRecuperarClave21")) {
+            const link = document.createElement("div");
+            link.id = "linkRecuperarClave21";
+            link.style = "text-align:center; margin-top:0.7rem;";
+            link.innerHTML = `<button type="button" class="btn btn-ghost btn-sm" style="font-size:0.78rem; color:var(--cdm-600);" onclick="abrirModalRecuperarClave21()">🔑 ¿Olvidaste tu contraseña? Recuperala por mail</button>`;
+            formAdmin.appendChild(link);
+        }
+    }
+
+    // 21.3 Modal de Activación Privada (Cuenta Real con código de 6 dígitos por mail)
+    window.abrirModalActivacionPrivada21 = function (info) {
+        let modal = document.getElementById("modalPrivacidadEmail21");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "modalPrivacidadEmail21";
+            modal.className = "modal-backdrop";
+            document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:500px; text-align:left;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-ok">🔒 CUENTA REAL — PRIVACIDAD DE DATOS</span>
+                        <h3 style="color:var(--ink-900); margin-top:4px;">Configurá tu acceso privado</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalPrivacidadEmail21').classList.add('hidden')">✕</button>
+                </div>
+
+                <p style="font-size:0.83rem; color:var(--ink-600); margin-bottom:0.9rem; line-height:1.45;">
+                    Estás activando <b>${info.nombreEntidad}</b> en modo real. Para proteger tus datos sensibles, creá tu usuario y contraseña definitivos.
+                    Validaremos tu correo con un código de 6 dígitos y tu clave provisoria se eliminará automáticamente.
+                </p>
+
+                <div style="display:flex; flex-direction:column; gap:0.7rem;">
+                    <div class="field">
+                        <label>Tu correo electrónico (para recibir el código y recuperar clave) *</label>
+                        <input type="email" id="privEmail21" required value="${(info.emailSugerido || "").replace(/"/g, "&quot;")}" placeholder="Ej: tuemail@gmail.com">
+                    </div>
+                    <div class="field">
+                        <label>Nuevo Usuario definitivo *</label>
+                        <input type="text" id="privUser21" required value="${(info.usuarioActual || "").replace(/"/g, "&quot;")}" placeholder="Ej: dra.alina">
+                    </div>
+                    <div class="grid-2">
+                        <div class="field">
+                            <label>Nueva Contraseña (mín. 6) *</label>
+                            <input type="password" id="privPass1_21" required placeholder="••••••••">
+                        </div>
+                        <div class="field">
+                            <label>Repetir Contraseña *</label>
+                            <input type="password" id="privPass2_21" required placeholder="••••••••">
+                        </div>
+                    </div>
+
+                    <button type="button" id="btnEnviarCodPriv21" class="btn btn-secondary" onclick="enviarCodigoPrivacidad21('${info.tokenSetup}')">
+                        📧 1. Enviar código de 6 dígitos a mi correo
+                    </button>
+
+                    <div id="bloqueCodigoPriv21" class="hidden" style="background:var(--cdm-50); border:1.5px solid var(--line-celeste); border-radius:12px; padding:0.85rem;">
+                        <div class="field" style="margin-bottom:0.65rem;">
+                            <label>Ingresá el código de 6 dígitos que llegó a tu mail *</label>
+                            <input type="text" id="privCodigo21" maxlength="6" placeholder="123456" style="font-size:1.25rem; text-align:center; letter-spacing:6px; font-weight:800;">
+                        </div>
+                        <button type="button" id="btnConfirmarPriv21" class="btn btn-primary" style="width:100%;" onclick="confirmarActivacionPrivada21('${info.tokenSetup}')">
+                            🔒 2. Validar código y entrar a mi sistema
+                        </button>
+                    </div>
+
+                    <div id="msgPrivEstado21" style="font-size:0.8rem; font-weight:700;"></div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.enviarCodigoPrivacidad21 = async function (tokenSetup) {
+        const email = (document.getElementById("privEmail21")?.value || "").trim();
+        const nuevoUsuario = (document.getElementById("privUser21")?.value || "").trim().toLowerCase();
+        const p1 = (document.getElementById("privPass1_21")?.value || "").trim();
+        const p2 = (document.getElementById("privPass2_21")?.value || "").trim();
+        const msg = document.getElementById("msgPrivEstado21");
+        const btn = document.getElementById("btnEnviarCodPriv21");
+
+        if (p1.length < 6) { msg.style.color = "#dc2626"; msg.innerText = "⚠️ La contraseña debe tener al menos 6 caracteres."; return; }
+        if (p1 !== p2) { msg.style.color = "#dc2626"; msg.innerText = "⚠️ Las contraseñas no coinciden."; return; }
+
+        btn.disabled = true;
+        msg.style.color = "#0369a1";
+        msg.innerText = "⏳ Enviando código a tu correo...";
+
+        try {
+            const resp = await fetch("/api/cdm/auth-privacidad/enviar-codigo", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tokenSetup, email, nuevoUsuario })
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                msg.style.color = "#dc2626";
+                msg.innerText = "❌ " + (data.mensaje || "No se pudo enviar el código.");
+                return;
+            }
+            msg.style.color = "#059669";
+            msg.innerText = "✅ " + data.mensaje;
+            document.getElementById("bloqueCodigoPriv21")?.classList.remove("hidden");
+            document.getElementById("privCodigo21")?.focus();
+        } catch (err) {
+            msg.style.color = "#dc2626";
+            msg.innerText = "❌ Error de conexión: " + err.message;
+        } finally {
+            btn.disabled = false;
+        }
+    };
+
+    window.confirmarActivacionPrivada21 = async function (tokenSetup) {
+        const email = (document.getElementById("privEmail21")?.value || "").trim();
+        const nuevoUsuario = (document.getElementById("privUser21")?.value || "").trim().toLowerCase();
+        const nuevaClave = (document.getElementById("privPass1_21")?.value || "").trim();
+        const codigo = (document.getElementById("privCodigo21")?.value || "").trim();
+        const msg = document.getElementById("msgPrivEstado21");
+
+        msg.style.color = "#0369a1";
+        msg.innerText = "⏳ Verificando código y encriptando tu acceso...";
+
+        try {
+            const resp = await fetch("/api/cdm/auth-privacidad/confirmar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tokenSetup, email, codigo, nuevoUsuario, nuevaClave })
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                msg.style.color = "#dc2626";
+                msg.innerText = "❌ " + (data.mensaje || "Código inválido.");
+                return;
+            }
+
+            cargarEstadoClubEnLocalStorage(data.estado, data.claveClub);
+            const lic = data.estado?.licenciaConfig || obtenerLicenciaConfigCDM();
+            localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+                rol: "admin",
+                esSuperAdmin: false,
+                nivelAdmin: "principal",
+                staffPerfil: null,
+                claveClub: data.claveClub,
+                bioEnrollToken: data.bioEnrollToken || "",
+                nombre: `Admin • ${lic.nombreEntidad || "Comercio"}`,
+                fechaIngreso: new Date().toISOString()
+            }));
+
+            window.location.href = obtenerPaginaInicialSegunModulos(lic);
+        } catch (err) {
+            msg.style.color = "#dc2626";
+            msg.innerText = "❌ Error: " + err.message;
+        }
+    };
+
+    // 21.4 Modal de Recuperación de Contraseña por Email
+    window.abrirModalRecuperarClave21 = function () {
+        let modal = document.getElementById("modalRecuperarClave21");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "modalRecuperarClave21";
+            modal.className = "modal-backdrop";
+            document.body.appendChild(modal);
+        }
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:460px; text-align:left;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">🔑 RECUPERACIÓN AUTÓNOMA</span>
+                        <h3 style="color:var(--ink-900); margin-top:4px;">Restablecer Contraseña</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalRecuperarClave21').classList.add('hidden')">✕</button>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                    <div class="field">
+                        <label>Ingresá tu usuario o correo electrónico *</label>
+                        <input type="text" id="recIdent21" placeholder="tuemail@gmail.com o tu usuario">
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="enviarCodigoRecuperacion21()">📧 Enviar código al correo</button>
+                    <div id="bloqueConfirmRec21" class="hidden" style="display:flex; flex-direction:column; gap:0.65rem; background:var(--cdm-50); padding:0.85rem; border-radius:12px;">
+                        <input type="hidden" id="recClaveClub21">
+                        <div class="field">
+                            <label>Código de 6 dígitos *</label>
+                            <input type="text" id="recCodigo21" maxlength="6" placeholder="123456" style="text-align:center; letter-spacing:6px; font-weight:800;">
+                        </div>
+                        <div class="field">
+                            <label>Nueva Contraseña (mín. 6) *</label>
+                            <input type="password" id="recNuevaClave21" placeholder="••••••••">
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="confirmarRecuperacion21()">✅ Guardar Nueva Contraseña</button>
+                    </div>
+                    <div id="msgRecEstado21" style="font-size:0.8rem; font-weight:700;"></div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.enviarCodigoRecuperacion21 = async function () {
+        const identificador = (document.getElementById("recIdent21")?.value || "").trim();
+        const msg = document.getElementById("msgRecEstado21");
+        msg.style.color = "#0369a1";
+        msg.innerText = "⏳ Enviando código...";
+        try {
+            const resp = await fetch("/api/cdm/auth-recuperar/enviar-codigo", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ identificador })
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                msg.style.color = "#dc2626";
+                msg.innerText = "❌ " + (data.mensaje || "No se encontró la cuenta.");
+                return;
+            }
+            document.getElementById("recClaveClub21").value = data.claveClub;
+            document.getElementById("bloqueConfirmRec21")?.classList.remove("hidden");
+            msg.style.color = "#059669";
+            msg.innerText = "✅ " + data.mensaje;
+        } catch (err) {
+            msg.style.color = "#dc2626";
+            msg.innerText = "❌ Error: " + err.message;
+        }
+    };
+
+    window.confirmarRecuperacion21 = async function () {
+        const claveClub = document.getElementById("recClaveClub21")?.value;
+        const codigo = (document.getElementById("recCodigo21")?.value || "").trim();
+        const nuevaClave = (document.getElementById("recNuevaClave21")?.value || "").trim();
+        const msg = document.getElementById("msgRecEstado21");
+        try {
+            const resp = await fetch("/api/cdm/auth-recuperar/confirmar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ claveClub, codigo, nuevaClave })
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                msg.style.color = "#dc2626";
+                msg.innerText = "❌ " + (data.mensaje || "Error al actualizar.");
+                return;
+            }
+            msg.style.color = "#059669";
+            msg.innerText = "✅ " + data.mensaje;
+            setTimeout(() => document.getElementById("modalRecuperarClave21")?.classList.add("hidden"), 1500);
+        } catch (err) {
+            msg.style.color = "#dc2626";
+            msg.innerText = "❌ Error: " + err.message;
+        }
+    };
+
+    // 21.5 Hooks de Login
+    const _origLoginAdmin21 = iniciarSesionComoAdmin;
+    iniciarSesionComoAdmin = async function (e) {
+        if (e && typeof e.preventDefault === "function") e.preventDefault();
+        const user = (document.getElementById("inputAdminUser")?.value || "").trim().toLowerCase();
+        const pass = (document.getElementById("inputAdminPass")?.value || "").trim();
+
+        if (CREDENCIALES_SUPERADMIN.usuarios.includes(user) && CREDENCIALES_SUPERADMIN.claves.includes(pass)) {
+            return _origLoginAdmin21.apply(this, arguments);
+        }
+
+        if (window.location.protocol !== "file:") {
+            try {
+                const resp = await fetch("/api/cdm/auth-admin", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ usuario: user, clave: pass })
+                });
+                const data = await resp.json();
+
+                if (resp.status === 403 && data.suspendido) {
+                    mostrarErrorLogin(data.mensaje || "⚠️ Acceso suspendido.");
+                    return;
+                }
+                if (resp.ok && data.ok && data.requiereConfiguracionPrivada) {
+                    abrirModalActivacionPrivada21(data);
+                    return;
+                }
+                if (resp.ok && data.ok && data.estado) {
+                    cargarEstadoClubEnLocalStorage(data.estado, data.claveClub);
+                    const lic = data.estado.licenciaConfig || obtenerLicenciaConfigCDM();
+                    const esStaff = data.nivelAdmin === "staff" && data.staffPerfil;
+
+                    localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+                        rol: "admin",
+                        esSuperAdmin: false,
+                        nivelAdmin: esStaff ? "staff" : "principal",
+                        staffPerfil: esStaff ? data.staffPerfil : null,
+                        claveClub: data.claveClub,
+                        bioEnrollToken: data.bioEnrollToken || "",
+                        nombre: esStaff
+                            ? `${data.staffPerfil.nombre} (Staff)`
+                            : `Admin • ${lic.nombreEntidad || "Comercio"}`,
+                        fechaIngreso: new Date().toISOString()
+                    }));
+
+                    window.location.href = (esStaff && typeof obtenerPaginaInicialStaff19 === "function")
+                        ? obtenerPaginaInicialStaff19(data.staffPerfil, lic)
+                        : obtenerPaginaInicialSegunModulos(lic);
+                    return;
+                }
+                if (resp.status === 401) {
+                    mostrarErrorLogin(data.mensaje || "❌ Usuario o contraseña incorrectos.");
+                    return;
+                }
+            } catch {}
+        }
+
+        return _origLoginAdmin21.apply(this, arguments);
+    };
+
+    const _origLoginCodigo21 = iniciarSesionConCodigo;
+    iniciarSesionConCodigo = async function (e) {
+        if (e && typeof e.preventDefault === "function") e.preventDefault();
+        const rawInput = (document.getElementById("inputCodigoUsuario")?.value || "").trim().toUpperCase();
+
+        if (window.location.protocol !== "file:" && rawInput) {
+            try {
+                const resp = await fetch("/api/cdm/auth-codigo", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ codigo: rawInput })
+                });
+                const data = await resp.json();
+                if (resp.status === 403 && data.suspendido) {
+                    mostrarErrorLogin(data.mensaje || "⏳ Cuenta en pausa o vencida.");
+                    return;
+                }
+                if (resp.ok && data.ok && data.estado) {
+                    cargarEstadoClubEnLocalStorage(data.estado, data.claveClub);
+
+                    if (data.esPacienteConsultorio && data.paciente) {
+                        sincronizarPacienteEnRegistroUniversal21(data.paciente, data.claveClub);
+                        localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+                            rol: "usuario",
+                            esPacienteConsultorio: true,
+                            clavePaciente: `id_${data.paciente.id}`,
+                            personaId: data.paciente.id,
+                            dni: data.paciente.dni || "",
+                            nombre: data.paciente.nombreCompleto || `${data.paciente.nombre || ""} ${data.paciente.apellido || ""}`.trim() || "Paciente",
+                            deporte: data.paciente.especialidad || "Consultorio",
+                            categoria: data.paciente.mutual || "Particular",
+                            codigo: data.paciente.codigoAcceso || rawInput,
+                            bioEnrollToken: data.bioEnrollToken || "",
+                            fechaIngreso: new Date().toISOString()
+                        }));
+                        window.location.href = `jugador.html?id=${encodeURIComponent(data.paciente.id)}&pac=id_${encodeURIComponent(data.paciente.id)}&modo=paciente`;
+                        return;
+                    }
+
+                    if (data.persona) {
+                        localStorage.setItem(STORAGE_SESION_KEY, JSON.stringify({
+                            rol: "usuario",
+                            personaId: data.persona.id,
+                            dni: data.persona.dni,
+                            nombre: `${data.persona.nombre} ${data.persona.apellido}`,
+                            deporte: data.persona.deporte,
+                            categoria: data.persona.categoria,
+                            codigo: data.persona.codigoAcceso,
+                            bioEnrollToken: data.bioEnrollToken || "",
+                            fechaIngreso: new Date().toISOString()
+                        }));
+                        sessionStorage.setItem("cdm_socio_dni_activo", data.persona.dni || "");
+                        window.location.href = `jugador.html?id=${data.persona.id}`;
+                        return;
+                    }
+                }
+            } catch {}
+        }
+
+        return _origLoginCodigo21.apply(this, arguments);
+    };
+
+    // 21.6 Selector Demo vs Sistema Real en Modal SuperAdmin y Tarjetas Hub
+    const _origAbrirModalComercio21 = abrirModalCrearOEditarComercio;
+    abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+        await _origAbrirModalComercio21.apply(this, arguments);
+        const modal = document.getElementById("modalSuperAdminCDM");
+        const form = modal?.querySelector("form");
+        if (!form || document.getElementById("bloqueTipoCuentaPrivada21")) return;
+
+        const lista = await obtenerListaCompletaComerciosCDM();
+        const existente = claveClubEditar ? lista.find(x => x.claveClub === claveClubEditar) : null;
+        const lic = existente?.licenciaConfig || {};
+        const tipoCuenta = lic.tipoCuenta === "real" ? "real" : "demo";
+        const yaPrivada = Boolean(lic.credencialesPrivadasConfirmadas);
+
+        const box = document.createElement("div");
+        box.id = "bloqueTipoCuentaPrivada21";
+        box.style = "background:linear-gradient(135deg, rgba(99,102,241,0.08), rgba(16,185,129,0.08)); border:1.5px solid #6366f1; border-radius:16px; padding:0.9rem 1rem; margin-bottom:1rem;";
+        box.innerHTML = `
+            <label style="font-size:0.72rem; font-weight:800; color:#4338ca; text-transform:uppercase; display:block; margin-bottom:0.5rem;">
+                🛡️ MODO DE CUENTA: DEMO vs SISTEMA REAL (DATOS SENSIBLES)
+            </label>
+            <div class="grid-2">
+                <div class="field">
+                    <label>Tipo de Entorno *</label>
+                    <select id="mcTipoCuenta21" ${yaPrivada ? "disabled" : ""} style="font-weight:700;">
+                        <option value="demo" ${tipoCuenta === "demo" ? "selected" : ""}>🎁 Modo DEMO (Clave visible para pruebas/soporte)</option>
+                        <option value="real" ${tipoCuenta === "real" ? "selected" : ""}>🔒 Sistema REAL (Exige cambio de clave por mail al entrar)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Correo del Titular (Opcional)</label>
+                    <input type="email" id="mcAdminEmail21" ${yaPrivada ? "readonly" : ""} value="${(lic.adminEmail || "").replace(/"/g, "&quot;")}" placeholder="Ej: lic.alina@gmail.com">
+                </div>
+            </div>
+            <small style="display:block; margin-top:0.45rem; font-size:0.74rem; color:var(--ink-600);">
+                ${yaPrivada
+                    ? "✅ <b>Cuenta privada ya activada por el cliente.</b> Su contraseña está encriptada y protegida."
+                    : "En <b>Sistema REAL</b>, al ingresar con el usuario/clave base que le entregues, el cliente deberá validar un código en su mail y crear su acceso privado."}
+            </small>
+        `;
+
+        const bloqueDemo = document.getElementById("bloqueDemoDiasModal18");
+        if (bloqueDemo) bloqueDemo.insertAdjacentElement("beforebegin", box);
+        else form.lastElementChild?.insertAdjacentElement("beforebegin", box);
+
+        if (yaPrivada) {
+            const inpU = document.getElementById("mcAdminUsuario");
+            const inpP = document.getElementById("mcAdminClave");
+            if (inpU) inpU.readOnly = true;
+            if (inpP) {
+                inpP.value = "PRIVADA-ENCRIPTADA";
+                inpP.readOnly = true;
+            }
+        }
+    };
+
+    const _origGuardarComercio21 = guardarComercioDesdeModal;
+    guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
+        const tipoCuenta = document.getElementById("mcTipoCuenta21")?.value === "real" ? "real" : "demo";
+        const adminEmail = (document.getElementById("mcAdminEmail21")?.value || "").trim().toLowerCase();
+        const nombreInput = (document.getElementById("mcNombreEntidad")?.value || "").trim().toLowerCase();
+
+        await _origGuardarComercio21.apply(this, arguments);
+
+        const mapa = obtenerMapaLocalClubesCDM();
+        let claveTarget = claveClubExistente;
+        if (!claveTarget && nombreInput) {
+            const match = Object.values(mapa).find(c => (c.licenciaConfig?.nombreEntidad || "").toLowerCase() === nombreInput);
+            if (match) claveTarget = match.claveClub;
+        }
+
+        if (claveTarget && mapa[claveTarget]?.licenciaConfig) {
+            mapa[claveTarget].licenciaConfig.tipoCuenta = tipoCuenta;
+            if (adminEmail) mapa[claveTarget].licenciaConfig.adminEmail = adminEmail;
+            localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+
+            if (window.location.protocol !== "file:") {
+                try {
+                    const respEst = await fetch(`/api/cdm/estado?club=${encodeURIComponent(claveTarget)}`);
+                    if (respEst.ok) {
+                        const dEst = await respEst.json();
+                        const estActual = dEst.estado || {};
+                        estActual.licenciaConfig = {
+                            ...(estActual.licenciaConfig || {}),
+                            ...mapa[claveTarget].licenciaConfig,
+                            tipoCuenta,
+                            adminEmail: adminEmail || estActual.licenciaConfig?.adminEmail || ""
+                        };
+                        await fetch("/api/cdm/estado", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ ...estActual, claveClub: claveTarget })
+                        });
+                    }
+                } catch {}
+            }
+        }
+
+        const enLogin = window.location.pathname.toLowerCase().includes("login.html") || document.body?.classList.contains("login-page");
+        if (enLogin && !document.getElementById("vistaHubSuperAdmin")?.classList.contains("hidden")) {
+            await mostrarHubSelectorDeComercios();
+        }
+    };
+
+    const _origMostrarHub21 = mostrarHubSelectorDeComercios;
+    mostrarHubSelectorDeComercios = async function () {
+        await _origMostrarHub21.apply(this, arguments);
+        const lista = await obtenerListaCompletaComerciosCDM();
+        const cards = document.querySelectorAll("#gridTarjetasComerciosHub .hub-comercio-card");
+
+        cards.forEach((card, idx) => {
+            const lic = lista[idx]?.licenciaConfig || {};
+            const esReal = lic.tipoCuenta === "real";
+            const yaPrivada = Boolean(lic.credencialesPrivadasConfirmadas);
+
+            const credBox = Array.from(card.querySelectorAll("div")).find(d => (d.innerText || "").includes("Usuario comercio:"));
+            if (credBox && yaPrivada) {
+                credBox.innerHTML = `
+                    <div>👤 <b>Usuario:</b> ${lic.adminUsuario || "-"}</div>
+                    <div style="color:#059669; font-weight:700;">🔒 <b>Clave privada encriptada</b> (${lic.adminEmail || "verificada"})</div>
+                `;
+            }
+
+            if (!card.querySelector(".hub-tipo-cuenta-pill-21")) {
+                const pill = document.createElement("div");
+                pill.className = "hub-tipo-cuenta-pill-21";
+                pill.style = `font-size:0.7rem; font-weight:800; padding:0.25rem 0.55rem; border-radius:8px; text-align:center; ${
+                    esReal
+                        ? "background:rgba(16,185,129,0.12); color:#047857; border:1px solid rgba(16,185,129,0.35);"
+                        : "background:rgba(99,102,241,0.1); color:#4338ca; border:1px solid rgba(99,102,241,0.28);"
+                }`;
+                pill.innerText = esReal
+                    ? (yaPrivada ? "🔒 SISTEMA REAL • Clave Privada Activa" : "🔒 SISTEMA REAL • Pendiente activación por mail")
+                    : "🎁 MODO DEMO";
+                card.insertBefore(pill, card.lastElementChild);
+            }
+        });
+    };
+
+    // 21.7 Botón "Activar Huella / Face ID" en barra superior interna
+    const _origInyectarBarraTopbar21 = inyectarBarraSesionTopbar;
+    inyectarBarraSesionTopbar = function (sesion) {
+        _origInyectarBarraTopbar21.apply(this, arguments);
+        if (!sesion || sesion.esSuperAdmin || !sesion.bioEnrollToken) return;
+
+        const barra = document.getElementById("cdmBarraSesionActiva");
+        if (!barra || document.getElementById("btnActivarBioTopbar21")) return;
+
+        soportaBiometriaDispositivo21().then(ok => {
+            if (!ok || document.getElementById("btnActivarBioTopbar21")) return;
+            const yaActiva = obtenerPerfilesBioDispositivo21().some(p => p.claveClub === (sesion.claveClub || obtenerClaveClubActivoCDM()) && p.rol === sesion.rol);
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.id = "btnActivarBioTopbar21";
+            btn.className = "btn btn-ghost btn-sm usr-action-allow";
+            btn.title = "Vincular la Huella o Face ID de este dispositivo para entrar en 1 toque";
+            btn.onclick = activarHuellaOFaceIDActual21;
+            btn.innerHTML = yaActiva
+                ? `<i class="ri-fingerprint-line"></i> Huella Activa ✓`
+                : `<i class="ri-fingerprint-line"></i> Activar Huella / Face ID`;
+            barra.insertBefore(btn, barra.lastElementChild);
+        });
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        renderizarBotonesBioEnLogin21();
+        setTimeout(renderizarBotonesBioEnLogin21, 250);
+    });
+})();
+// =========================================================================
+// 22. PERSONALIZACIÓN DE COLORES DE MARCA POR COMERCIO (RESPETANDO MODO DÍA/NOCHE)
+//     - Paletas rápidas + selector libre (Color Principal y Secundario) + Estilo de Sidebar
+//     - Se guarda en licenciaConfig.temaMarca (persiste automático en MongoDB)
+//     - Mantiene intactos los fondos blanco/negro de Modo Día y Modo Noche
+// Pegar al final de js/login.js (debajo del Bloque 21)
+// =========================================================================
+(function () {
+    const TEMA_MARCA_DEFECTO = {
+        primario: "#0284c7",
+        secundario: "#0c192c",
+        estiloSidebar: "oscuro_neutro" // 'oscuro_neutro' | 'oscuro_tenido' | 'color_marca'
+    };
+
+    const PALETAS_PRESET_MARCA = [
+        { nombre: "Celeste Base", primario: "#0284c7", secundario: "#0c192c" },
+        { nombre: "Rojo Club", primario: "#dc2626", secundario: "#450a0a" },
+        { nombre: "Verde Salud", primario: "#059669", secundario: "#064e3b" },
+        { nombre: "Violeta Psi", primario: "#7c3aed", secundario: "#2e1065" },
+        { nombre: "Naranja Gym", primario: "#ea580c", secundario: "#431407" },
+        { nombre: "Dorado Pro", primario: "#ca8a04", secundario: "#1c1917" },
+        { nombre: "Rosa Studio", primario: "#db2777", secundario: "#500724" },
+        { nombre: "Turquesa Kine", primario: "#0d9488", secundario: "#134e4a" },
+        { nombre: "Grafito", primario: "#334155", secundario: "#0f172a" }
+    ];
+
+    window.__cdmPendingTemaMarca22 = null;
+
+    function hexValido(h, fallback) {
+        const s = String(h || "").trim();
+        return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toLowerCase() : fallback;
+    }
+
+    function hexToRgb(hex) {
+        const clean = hexValido(hex, "#0284c7").slice(1);
+        return {
+            r: parseInt(clean.slice(0, 2), 16),
+            g: parseInt(clean.slice(2, 4), 16),
+            b: parseInt(clean.slice(4, 6), 16)
+        };
+    }
+
+    function rgbToHex(r, g, b) {
+        const c = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+        return `#${c(r)}${c(g)}${c(b)}`;
+    }
+
+    function mezclarHex(hexA, hexB, pesoB) {
+        const a = hexToRgb(hexA), b = hexToRgb(hexB);
+        return rgbToHex(
+            a.r + (b.r - a.r) * pesoB,
+            a.g + (b.g - a.g) * pesoB,
+            a.b + (b.b - a.b) * pesoB
+        );
+    }
+
+    function textoContraste(hex) {
+        const { r, g, b } = hexToRgb(hex);
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        return lum > 168 ? "#0f172a" : "#ffffff";
+    }
+
+    function normalizarTemaMarca(lic) {
+        const t = (lic && typeof lic.temaMarca === "object" && lic.temaMarca) ? lic.temaMarca : {};
+        return {
+            primario: hexValido(t.primario, TEMA_MARCA_DEFECTO.primario),
+            secundario: hexValido(t.secundario, TEMA_MARCA_DEFECTO.secundario),
+            estiloSidebar: ["oscuro_neutro", "oscuro_tenido", "color_marca"].includes(t.estiloSidebar)
+                ? t.estiloSidebar
+                : TEMA_MARCA_DEFECTO.estiloSidebar
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // 22.1 MOTOR CSS DINÁMICO (RESPETA BLANCO/NEGRO EN MODO DÍA Y MODO NOCHE)
+    // -------------------------------------------------------------------------
+
+    function asegurarEstilosMarcaDinamicos() {
+        if (document.getElementById("cdmBrandThemeStyle22")) return;
+        const st = document.createElement("style");
+        st.id = "cdmBrandThemeStyle22";
+        st.textContent = `
+            body[data-brand-custom="1"] .app-topbar {
+                border-top: 3.5px solid var(--brand-p) !important;
+            }
+            body[data-brand-custom="1"] .btn-primary {
+                background: linear-gradient(135deg, var(--brand-p) 0%, var(--brand-p-dark) 100%) !important;
+                border-color: var(--brand-p) !important;
+                color: var(--brand-on-p) !important;
+                box-shadow: 0 6px 16px -4px rgba(var(--brand-rgb), 0.42) !important;
+            }
+            body[data-brand-custom="1"] .btn-primary:hover {
+                filter: brightness(1.06);
+            }
+            body[data-brand-custom="1"] .side-link.active,
+            body[data-brand-custom="1"] .menu38-sublink.active,
+            body[data-brand-custom="1"] .bnav38-item.active,
+            body[data-brand-custom="1"] .bsheet38-opt.active,
+            body[data-brand-custom="1"] .mod-tab.active,
+            body[data-brand-custom="1"] .seg-btn.active,
+            body[data-brand-custom="1"] .rutina-dest-tab.active,
+            body[data-brand-custom="1"] .gym-view-btn.active,
+            body[data-brand-custom="1"] .user-quick-dock-btn.active,
+            body[data-brand-custom="1"] .jf-chip-btn.active {
+                background: var(--brand-p) !important;
+                border-color: var(--brand-p) !important;
+                color: var(--brand-on-p) !important;
+            }
+            body[data-brand-custom="1"] .cat-active-pill,
+            body[data-brand-custom="1"] .badge-celeste,
+            body[data-brand-custom="1"] .r-pill-series {
+                background: var(--cdm-50) !important;
+                color: var(--brand-p-ink) !important;
+                border-color: var(--line-celeste) !important;
+            }
+            body[data-brand-custom="1"] .athlete-card,
+            body[data-brand-custom="1"] .jf-kpi:not(.c-purple):not(.c-green):not(.c-amber),
+            body[data-brand-custom="1"] .up-mod-card:not(.c-emerald):not(.c-purple):not(.c-amber):not(.c-rose) {
+                border-top-color: var(--brand-p) !important;
+            }
+            body[data-brand-custom="1"] .kpi-icon:not(.ok):not(.purple):not(.warn),
+            body[data-brand-custom="1"] .up-mod-icon {
+                background: var(--cdm-50) !important;
+                color: var(--brand-p-ink) !important;
+            }
+            body[data-brand-custom="1"] .ex-builder-row {
+                border-left-color: var(--brand-p) !important;
+            }
+            body[data-brand-custom="1"] .ex-builder-num,
+            body[data-brand-custom="1"] .pillar-micro-fill,
+            body[data-brand-custom="1"] .jf-bar-fill {
+                background: linear-gradient(135deg, var(--brand-p) 0%, var(--brand-p-dark) 100%) !important;
+                color: var(--brand-on-p) !important;
+            }
+            body[data-brand-custom="1"] input:focus,
+            body[data-brand-custom="1"] select:focus,
+            body[data-brand-custom="1"] textarea:focus {
+                border-color: var(--brand-p) !important;
+                box-shadow: 0 0 0 3px rgba(var(--brand-rgb), 0.18) !important;
+            }
+            body[data-brand-custom="1"] .up-hero-banner,
+            body[data-brand-custom="1"] .user-workout-banner,
+            body[data-brand-custom="1"] .routine-pro-header.routine-theme-fuerza,
+            body[data-brand-custom="1"] .eval33-score-hero {
+                background: linear-gradient(135deg, var(--brand-s) 0%, var(--brand-p-dark) 62%, var(--brand-p) 100%) !important;
+            }
+            body[data-brand-custom="1"] .cdm-droplet-btn:not(.running) {
+                background: linear-gradient(135deg, var(--brand-p) 0%, var(--brand-s) 100%) !important;
+                border-color: rgba(var(--brand-rgb), 0.6) !important;
+            }
+
+            /* Estilos opcionales de barra lateral (siempre legible) */
+            body[data-brand-custom="1"][data-brand-sidebar="oscuro_tenido"] .app-sidebar,
+            body[data-brand-custom="1"][data-brand-sidebar="oscuro_tenido"] #cdmBottomNav38 {
+                background: linear-gradient(180deg, var(--brand-sidebar-tint) 0%, #0b1220 100%) !important;
+            }
+            body[data-brand-custom="1"][data-brand-sidebar="color_marca"] .app-sidebar,
+            body[data-brand-custom="1"][data-brand-sidebar="color_marca"] #cdmBottomNav38 {
+                background: linear-gradient(180deg, var(--brand-s) 0%, var(--brand-p-deep) 100%) !important;
+                border-right: 1px solid rgba(255, 255, 255, 0.14) !important;
+            }
+            body[data-brand-custom="1"][data-brand-sidebar="color_marca"] .side-link.active {
+                background: rgba(255, 255, 255, 0.2) !important;
+                color: #ffffff !important;
+                box-shadow: inset 3px 0 0 #ffffff !important;
+            }
+
+            /* Swatches en modal */
+            .brand22-swatches {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.42rem;
+                margin-bottom: 0.75rem;
+            }
+            .brand22-swatch {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-solid, #ffffff);
+                color: var(--ink-900, #0f172a);
+                border-radius: 999px;
+                padding: 0.26rem 0.62rem 0.26rem 0.32rem;
+                font-size: 0.73rem;
+                font-weight: 700;
+                cursor: pointer;
+                transition: transform 0.14s ease, border-color 0.14s ease;
+            }
+            .brand22-swatch:hover { transform: translateY(-1px); border-color: #0284c7; }
+            .brand22-dot {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                border: 1.5px solid rgba(0, 0, 0, 0.15);
+                flex-shrink: 0;
+            }
+            .brand22-preview-bar {
+                border-radius: 12px;
+                border: 1px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-solid, #ffffff);
+                padding: 0.65rem 0.8rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 0.65rem;
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    window.aplicarColoresMarcaComercio22 = function (temaOverride = null) {
+        const path = (window.location.pathname || "").toLowerCase();
+        if (path.includes("login.html") || document.body?.classList.contains("login-page")) {
+            document.body?.removeAttribute("data-brand-custom");
+            document.body?.removeAttribute("data-brand-sidebar");
+            return;
+        }
+
+        asegurarEstilosMarcaDinamicos();
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const tema = temaOverride ? normalizarTemaMarca({ temaMarca: temaOverride }) : normalizarTemaMarca(lic);
+
+        const esDefault = tema.primario === TEMA_MARCA_DEFECTO.primario &&
+                          tema.secundario === TEMA_MARCA_DEFECTO.secundario &&
+                          tema.estiloSidebar === TEMA_MARCA_DEFECTO.estiloSidebar;
+
+        const root = document.documentElement;
+        if (esDefault && !temaOverride) {
+            document.body?.removeAttribute("data-brand-custom");
+            document.body?.removeAttribute("data-brand-sidebar");
+            ["--cdm-50", "--cdm-100", "--cdm-400", "--cdm-500", "--cdm-600", "--cdm-700", "--cdm-900", "--line-celeste"].forEach(v => root.style.removeProperty(v));
+            return;
+        }
+
+        const esOscuro = document.body?.getAttribute("data-theme") === "dark";
+        const { r, g, b } = hexToRgb(tema.primario);
+        const pLight = mezclarHex(tema.primario, "#ffffff", 0.28);
+        const pDark = mezclarHex(tema.primario, "#000000", 0.22);
+        const pDeep = mezclarHex(tema.primario, "#000000", 0.48);
+        const sidebarTint = mezclarHex(tema.primario, "#0b1220", 0.78);
+        const onPrimary = textoContraste(tema.primario);
+
+        root.style.setProperty("--brand-p", tema.primario);
+        root.style.setProperty("--brand-p-dark", pDark);
+        root.style.setProperty("--brand-p-deep", pDeep);
+        root.style.setProperty("--brand-s", tema.secundario);
+        root.style.setProperty("--brand-rgb", `${r}, ${g}, ${b}`);
+        root.style.setProperty("--brand-on-p", onPrimary);
+        root.style.setProperty("--brand-p-ink", esOscuro ? pLight : pDark);
+        root.style.setProperty("--brand-sidebar-tint", sidebarTint);
+
+        // Actualizar variables --cdm-* adaptadas al modo día o noche
+        root.style.setProperty("--cdm-50", esOscuro ? `rgba(${r}, ${g}, ${b}, 0.16)` : mezclarHex(tema.primario, "#ffffff", 0.91));
+        root.style.setProperty("--cdm-100", esOscuro ? `rgba(${r}, ${g}, ${b}, 0.24)` : mezclarHex(tema.primario, "#ffffff", 0.82));
+        root.style.setProperty("--cdm-400", pLight);
+        root.style.setProperty("--cdm-500", tema.primario);
+        root.style.setProperty("--cdm-600", pDark);
+        root.style.setProperty("--cdm-700", pDeep);
+        root.style.setProperty("--cdm-900", tema.secundario);
+        root.style.setProperty("--line-celeste", `rgba(${r}, ${g}, ${b}, ${esOscuro ? "0.38" : "0.32"})`);
+
+        document.body?.setAttribute("data-brand-custom", "1");
+        document.body?.setAttribute("data-brand-sidebar", tema.estiloSidebar);
+    };
+
+    // Reaplicar al cambiar Modo Día / Noche y al aplicar licencia
+    const _origAplicarTema22 = aplicarTemaGuardadoCDM;
+    aplicarTemaGuardadoCDM = function () {
+        _origAplicarTema22.apply(this, arguments);
+        aplicarColoresMarcaComercio22();
+    };
+
+    const _origAplicarLic22 = aplicarLicenciaYModulosCDM;
+    aplicarLicenciaYModulosCDM = function () {
+        _origAplicarLic22.apply(this, arguments);
+        aplicarColoresMarcaComercio22();
+    };
+
+    // Si usa Logo Genérico SVG (Bloque 13), teñirlo también con los colores del comercio
+    if (typeof generarLogoGenericoSVGComercio13 === "function") {
+        const _origGenLogo22 = generarLogoGenericoSVGComercio13;
+        generarLogoGenericoSVGComercio13 = function (lic = {}) {
+            if (lic?.temaMarca?.primario) {
+                const sigla = String(lic.siglaCodigo || lic.nombreEntidad || "APP")
+                    .replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 3) || "PRO";
+                const c1 = hexValido(lic.temaMarca.primario, "#0284c7");
+                const c2 = hexValido(lic.temaMarca.secundario, "#0f172a");
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+                    <defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs>
+                    <rect width="112" height="112" x="4" y="4" rx="28" fill="url(#g)" stroke="#ffffff" stroke-width="3" stroke-opacity="0.35"/>
+                    <text x="60" y="69" font-family="Poppins, Arial, sans-serif" font-size="34" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1">${sigla}</text>
+                </svg>`;
+                return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+            }
+            return _origGenLogo22.apply(this, arguments);
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // 22.2 BLOQUE DE COLORES EN MODAL SUPERADMIN (CREAR / EDITAR COMERCIO)
+    // -------------------------------------------------------------------------
+
+    function construirHtmlControlesColor(prefix, temaActual, conLiveApp = false) {
+        const onUpd = conLiveApp ? `actualizarPreviewColores22('${prefix}', true)` : `actualizarPreviewColores22('${prefix}', false)`;
+        return `
+            <div class="brand22-swatches">
+                ${PALETAS_PRESET_MARCA.map(p => `
+                    <button type="button" class="brand22-swatch" onclick="seleccionarPaletaMarca22('${prefix}', '${p.primario}', '${p.secundario}', ${conLiveApp})">
+                        <span class="brand22-dot" style="background:${p.primario};"></span>
+                        <span>${p.nombre}</span>
+                    </button>
+                `).join("")}
+            </div>
+
+            <div class="grid-3">
+                <div class="field">
+                    <label>Color Principal</label>
+                    <div style="display:flex; gap:0.4rem; align-items:center;">
+                        <input type="color" id="${prefix}Primario" value="${temaActual.primario}" oninput="${onUpd}" style="width:44px; min-height:38px; padding:2px; cursor:pointer;">
+                        <input type="text" id="${prefix}PrimarioHex" value="${temaActual.primario}" maxlength="7" oninput="sincronizarHexMarca22('${prefix}', 'Primario', ${conLiveApp})" style="font-family:monospace; font-weight:700;">
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Color Secundario (Banners)</label>
+                    <div style="display:flex; gap:0.4rem; align-items:center;">
+                        <input type="color" id="${prefix}Secundario" value="${temaActual.secundario}" oninput="${onUpd}" style="width:44px; min-height:38px; padding:2px; cursor:pointer;">
+                        <input type="text" id="${prefix}SecundarioHex" value="${temaActual.secundario}" maxlength="7" oninput="sincronizarHexMarca22('${prefix}', 'Secundario', ${conLiveApp})" style="font-family:monospace; font-weight:700;">
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Barra Lateral (Sidebar)</label>
+                    <select id="${prefix}Sidebar" onchange="${onUpd}" style="font-weight:700;">
+                        <option value="oscuro_neutro" ${temaActual.estiloSidebar === "oscuro_neutro" ? "selected" : ""}>⬛ Oscura Clásica (Solo acentos)</option>
+                        <option value="oscuro_tenido" ${temaActual.estiloSidebar === "oscuro_tenido" ? "selected" : ""}>🌑 Oscura con Toque de Marca</option>
+                        <option value="color_marca" ${temaActual.estiloSidebar === "color_marca" ? "selected" : ""}>🎨 Color de Marca Completo</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="${prefix}PreviewBar" class="brand22-preview-bar" style="border-top: 3.5px solid ${temaActual.primario};">
+                <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap;">
+                    <span id="${prefix}PrevBadge" style="font-size:0.72rem; font-weight:800; padding:0.22rem 0.65rem; border-radius:999px; background:${mezclarHex(temaActual.primario, "#ffffff", 0.9)}; color:${temaActual.primario};">Vista previa</span>
+                    <span id="${prefix}PrevBtn" style="font-size:0.74rem; font-weight:800; padding:0.32rem 0.78rem; border-radius:9px; background:${temaActual.primario}; color:${textoContraste(temaActual.primario)};">Botón Principal</span>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" style="min-height:28px; font-size:0.72rem;" onclick="seleccionarPaletaMarca22('${prefix}', '${TEMA_MARCA_DEFECTO.primario}', '${TEMA_MARCA_DEFECTO.secundario}', ${conLiveApp}, 'oscuro_neutro')">
+                    ↺ Color Base
+                </button>
+            </div>
+        `;
+    }
+
+    window.seleccionarPaletaMarca22 = function (prefix, pri, sec, liveApp = false, estiloOpt = null) {
+        const iP = document.getElementById(`${prefix}Primario`);
+        const iPH = document.getElementById(`${prefix}PrimarioHex`);
+        const iS = document.getElementById(`${prefix}Secundario`);
+        const iSH = document.getElementById(`${prefix}SecundarioHex`);
+        const selSide = document.getElementById(`${prefix}Sidebar`);
+        if (iP) iP.value = pri;
+        if (iPH) iPH.value = pri;
+        if (iS) iS.value = sec;
+        if (iSH) iSH.value = sec;
+        if (estiloOpt && selSide) selSide.value = estiloOpt;
+        actualizarPreviewColores22(prefix, liveApp);
+    };
+
+    window.sincronizarHexMarca22 = function (prefix, cual, liveApp = false) {
+        const txt = document.getElementById(`${prefix}${cual}Hex`)?.value || "";
+        if (/^#[0-9a-fA-F]{6}$/.test(txt)) {
+            const inp = document.getElementById(`${prefix}${cual}`);
+            if (inp) inp.value = txt.toLowerCase();
+            actualizarPreviewColores22(prefix, liveApp);
+        }
+    };
+
+    window.actualizarPreviewColores22 = function (prefix, liveApp = false) {
+        const pri = hexValido(document.getElementById(`${prefix}Primario`)?.value, TEMA_MARCA_DEFECTO.primario);
+        const sec = hexValido(document.getElementById(`${prefix}Secundario`)?.value, TEMA_MARCA_DEFECTO.secundario);
+        const side = document.getElementById(`${prefix}Sidebar`)?.value || "oscuro_neutro";
+
+        const iPH = document.getElementById(`${prefix}PrimarioHex`);
+        const iSH = document.getElementById(`${prefix}SecundarioHex`);
+        if (iPH && document.activeElement !== iPH) iPH.value = pri;
+        if (iSH && document.activeElement !== iSH) iSH.value = sec;
+
+        const bar = document.getElementById(`${prefix}PreviewBar`);
+        const btn = document.getElementById(`${prefix}PrevBtn`);
+        const bad = document.getElementById(`${prefix}PrevBadge`);
+        if (bar) bar.style.borderTopColor = pri;
+        if (btn) { btn.style.background = pri; btn.style.color = textoContraste(pri); }
+        if (bad) { bad.style.background = mezclarHex(pri, "#ffffff", 0.9); bad.style.color = pri; }
+
+        if (liveApp) {
+            aplicarColoresMarcaComercio22({ primario: pri, secundario: sec, estiloSidebar: side });
+        }
+    };
+
+    const _origGuardarLic22 = guardarLicenciaConfigCDM;
+    guardarLicenciaConfigCDM = function (nuevaConfig) {
+        if (nuevaConfig && typeof nuevaConfig === "object" && window.__cdmPendingTemaMarca22) {
+            nuevaConfig.temaMarca = window.__cdmPendingTemaMarca22;
+        }
+        return _origGuardarLic22.apply(this, arguments);
+    };
+
+    const _origAbrirModal22 = abrirModalCrearOEditarComercio;
+    abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+        await _origAbrirModal22.apply(this, arguments);
+        const modal = document.getElementById("modalSuperAdminCDM");
+        const form = modal?.querySelector("form");
+        if (!form || document.getElementById("bloqueColoresMarcaModal22")) return;
+
+        const lista = await obtenerListaCompletaComerciosCDM();
+        const existente = claveClubEditar ? lista.find(x => x.claveClub === claveClubEditar) : null;
+        const temaActual = normalizarTemaMarca(existente?.licenciaConfig || {});
+
+        const box = document.createElement("div");
+        box.id = "bloqueColoresMarcaModal22";
+        box.style = "background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:16px; padding:0.95rem 1rem; margin-bottom:0.95rem;";
+        box.innerHTML = `
+            <label style="font-size:0.72rem; font-weight:800; color:var(--ink-700); text-transform:uppercase; display:block; margin-bottom:0.55rem;">
+                🎨 COLORES DE MARCA DEL COMERCIO (MANTIENE MODO DÍA Y MODO NOCHE)
+            </label>
+            ${construirHtmlControlesColor("mcBrand22", temaActual, false)}
+        `;
+
+        const primerBloque = Array.from(form.children).find(el => el.tagName === "DIV");
+        if (primerBloque) primerBloque.insertAdjacentElement("afterend", box);
+        else form.prepend(box);
+    };
+
+    const _origGuardarComercio22 = guardarComercioDesdeModal;
+    guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
+        const temaCapturado = {
+            primario: hexValido(document.getElementById("mcBrand22Primario")?.value, TEMA_MARCA_DEFECTO.primario),
+            secundario: hexValido(document.getElementById("mcBrand22Secundario")?.value, TEMA_MARCA_DEFECTO.secundario),
+            estiloSidebar: document.getElementById("mcBrand22Sidebar")?.value || "oscuro_neutro"
+        };
+        const nombreInput = (document.getElementById("mcNombreEntidad")?.value || "").trim().toLowerCase();
+        window.__cdmPendingTemaMarca22 = temaCapturado;
+
+        await _origGuardarComercio22.apply(this, arguments);
+
+        const mapa = obtenerMapaLocalClubesCDM();
+        let claveTarget = claveClubExistente;
+        if (!claveTarget && nombreInput) {
+            const match = Object.values(mapa).find(c => (c.licenciaConfig?.nombreEntidad || "").toLowerCase() === nombreInput);
+            if (match) claveTarget = match.claveClub;
+        }
+
+        if (claveTarget && mapa[claveTarget]?.licenciaConfig) {
+            mapa[claveTarget].licenciaConfig.temaMarca = temaCapturado;
+            localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+            if (obtenerClaveClubActivoCDM() === claveTarget) {
+                localStorage.setItem(STORAGE_LICENCIA_KEY, JSON.stringify(mapa[claveTarget].licenciaConfig));
+            }
+            if (window.location.protocol !== "file:") {
+                try {
+                    const respEst = await fetch(`/api/cdm/estado?club=${encodeURIComponent(claveTarget)}`);
+                    if (respEst.ok) {
+                        const dEst = await respEst.json();
+                        const estActual = dEst.estado || {};
+                        estActual.licenciaConfig = { ...(estActual.licenciaConfig || {}), ...mapa[claveTarget].licenciaConfig, temaMarca: temaCapturado };
+                        await fetch("/api/cdm/estado", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ ...estActual, claveClub: claveTarget })
+                        });
+                    }
+                } catch {}
+            }
+        }
+
+        window.__cdmPendingTemaMarca22 = null;
+        aplicarColoresMarcaComercio22();
+
+        const enLogin = (window.location.pathname || "").toLowerCase().includes("login.html") || document.body?.classList.contains("login-page");
+        if (enLogin && !document.getElementById("vistaHubSuperAdmin")?.classList.contains("hidden")) {
+            await mostrarHubSelectorDeComercios();
+        }
+    };
+
+    // Mostrar franja superior con el color de marca en las tarjetas del Hub SuperAdmin
+    const _origMostrarHub22 = mostrarHubSelectorDeComercios;
+    mostrarHubSelectorDeComercios = async function () {
+        await _origMostrarHub22.apply(this, arguments);
+        const lista = await obtenerListaCompletaComerciosCDM();
+        const cards = document.querySelectorAll("#gridTarjetasComerciosHub .hub-comercio-card");
+        cards.forEach((card, idx) => {
+            const t = normalizarTemaMarca(lista[idx]?.licenciaConfig || {});
+            card.style.borderTop = `4px solid ${t.primario}`;
+        });
+    };
+
+    // -------------------------------------------------------------------------
+    // 22.3 MODAL RÁPIDO EN VIVO "🎨 COLORES" (ADENTRO DE LA APP, SIN RECARGAR)
+    // -------------------------------------------------------------------------
+
+    window.abrirModalColoresRapidoComercio22 = function () {
+        const lic = obtenerLicenciaConfigCDM();
+        const temaActual = normalizarTemaMarca(lic);
+        let modal = document.getElementById("modalColoresMarca22");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "modalColoresMarca22";
+            modal.className = "modal-backdrop";
+            document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:600px; text-align:left;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">🎨 IDENTIDAD VISUAL</span>
+                        <h3 style="margin-top:4px; color:var(--ink-900);">Colores de ${lic.nombreEntidad || "este Comercio"}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cancelarModalColores22()">✕</button>
+                </div>
+                <p style="font-size:0.81rem; color:var(--ink-500); margin-bottom:0.85rem;">
+                    Elegí una paleta rápida o un color exacto. Los cambios se previsualizan en vivo manteniendo intacto el Modo Día y Modo Noche.
+                </p>
+                ${construirHtmlControlesColor("liveBrand22", temaActual, true)}
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
+                    <button type="button" class="btn btn-ghost" onclick="cancelarModalColores22()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="guardarColoresRapidoComercio22()">💾 Guardar Colores</button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.cancelarModalColores22 = function () {
+        document.getElementById("modalColoresMarca22")?.classList.add("hidden");
+        aplicarColoresMarcaComercio22();
+    };
+
+    window.guardarColoresRapidoComercio22 = async function () {
+        const temaNuevo = {
+            primario: hexValido(document.getElementById("liveBrand22Primario")?.value, TEMA_MARCA_DEFECTO.primario),
+            secundario: hexValido(document.getElementById("liveBrand22Secundario")?.value, TEMA_MARCA_DEFECTO.secundario),
+            estiloSidebar: document.getElementById("liveBrand22Sidebar")?.value || "oscuro_neutro"
+        };
+
+        const lic = obtenerLicenciaConfigCDM();
+        lic.temaMarca = temaNuevo;
+        guardarLicenciaConfigCDM(lic);
+        aplicarColoresMarcaComercio22(temaNuevo);
+
+        const clave = obtenerClaveClubActivoCDM();
+        if (window.location.protocol !== "file:") {
+            try {
+                const respEst = await fetch(`/api/cdm/estado?club=${encodeURIComponent(clave)}`);
+                if (respEst.ok) {
+                    const dEst = await respEst.json();
+                    const estActual = dEst.estado || {};
+                    estActual.licenciaConfig = { ...(estActual.licenciaConfig || {}), ...lic, temaMarca: temaNuevo };
+                    await fetch("/api/cdm/estado", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...estActual, claveClub: clave })
+                    });
+                }
+            } catch {}
+        }
+
+        document.getElementById("modalColoresMarca22")?.classList.add("hidden");
+        if (typeof mostrarToast === "function") mostrarToast("🎨 Colores del comercio guardados.");
+    };
+
+    // Agregar botón "🎨 Colores" en la barra superior (nav-ui.js lo acomoda prolijo dentro de "Más")
+    const _origBarraTop22 = inyectarBarraSesionTopbar;
+    inyectarBarraSesionTopbar = function (sesion) {
+        _origBarraTop22.apply(this, arguments);
+        if (!sesion || sesion.rol !== "admin" || sesion.nivelAdmin === "staff") return;
+        const barra = document.getElementById("cdmBarraSesionActiva");
+        if (!barra || document.getElementById("btnColoresMarcaTopbar22")) return;
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "btnColoresMarcaTopbar22";
+        btn.className = "btn btn-ghost btn-sm";
+        btn.title = "Personalizar colores de marca de este comercio";
+        btn.onclick = abrirModalColoresRapidoComercio22;
+        btn.innerHTML = `<i class="ri-palette-line"></i> Colores`;
+        barra.insertBefore(btn, barra.lastElementChild);
+    };
+
+    // Aplicar apenas carga el script y al terminar el DOM
+    aplicarColoresMarcaComercio22();
+    document.addEventListener("DOMContentLoaded", () => {
+        aplicarColoresMarcaComercio22();
+        setTimeout(aplicarColoresMarcaComercio22, 180);
+    });
+})();
+// =========================================================================
+// 23. RELOJ PRO DE ENTRENAMIENTO (SERIES 10s/15s, AMRAP, EMOM, TABATA + TIMBRE)
+//     - Sonido Web Audio API (sin MP3): Aviso 10s, cuenta 3-2-1, timbre GO y timbre final
+//     - 3 Modos: Libre/Series | AMRAP (con contador de rondas) | Intervalos/EMOM
+//     - Corrige contraste de botones -15s/+15s y mantiene bloqueo fuera de Gym/Deportes
+// Pegar al final de js/login.js (debajo del Bloque 22)
+// =========================================================================
+(function () {
+    let audioCtxPro = null;
+
+    function obtenerAudioCtx23() {
+        try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return null;
+            if (!audioCtxPro) audioCtxPro = new Ctx();
+            if (audioCtxPro.state === "suspended") audioCtxPro.resume();
+            return audioCtxPro;
+        } catch {
+            return null;
+        }
+    }
+
+    function tocarTono23(freq, inicioSeg, durSeg, tipo = "sine", vol = 0.28) {
+        const ctx = obtenerAudioCtx23();
+        if (!ctx) return;
+        const t0 = ctx.currentTime + inicioSeg;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = tipo;
+        osc.frequency.setValueAtTime(freq, t0);
+        gain.gain.setValueAtTime(0.001, t0);
+        gain.gain.linearRampToValueAtTime(vol, t0 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + durSeg);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + durSeg + 0.03);
+    }
+
+    function sonarTimbre23(evento) {
+        if (!stReloj.sonido) return;
+        try {
+            if (evento === "pip321") {
+                tocarTono23(880, 0, 0.13, "triangle", 0.25);
+                if (navigator.vibrate) navigator.vibrate(60);
+            } else if (evento === "aviso10s") {
+                tocarTono23(740, 0, 0.14, "sine", 0.26);
+                tocarTono23(740, 0.20, 0.16, "sine", 0.26);
+                if (navigator.vibrate) navigator.vibrate([90, 70, 90]);
+            } else if (evento === "aviso1min") {
+                tocarTono23(660, 0, 0.18, "sine", 0.24);
+                tocarTono23(880, 0.22, 0.22, "sine", 0.24);
+                if (navigator.vibrate) navigator.vibrate([120, 80, 120]);
+            } else if (evento === "go") {
+                // Timbre agudo de arranque / inicio de serie
+                tocarTono23(1046.5, 0, 0.38, "triangle", 0.34);
+                tocarTono23(1568, 0.02, 0.32, "sine", 0.22);
+                if (navigator.vibrate) navigator.vibrate(220);
+            } else if (evento === "pausa") {
+                // Doble campana grave-media para descanso
+                tocarTono23(587.3, 0, 0.26, "triangle", 0.30);
+                tocarTono23(440, 0.22, 0.32, "triangle", 0.28);
+                if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+            } else if (evento === "fin") {
+                // Campana triple tipo gimnasio / boxeo al terminar
+                [0, 0.24, 0.48].forEach(off => {
+                    tocarTono23(987.7, off, 0.26, "triangle", 0.34);
+                    tocarTono23(1480, off + 0.01, 0.22, "sine", 0.20);
+                });
+                if (navigator.vibrate) navigator.vibrate([220, 90, 220, 90, 320]);
+            }
+        } catch {}
+    }
+
+    const stReloj = {
+        abierto: false,
+        modo: "libre",        // 'libre' | 'amrap' | 'intervalo'
+        corriendo: false,
+        pausado: false,
+        sonido: true,
+        avisosPrevios: true,  // Aviso 10s + cuenta regresiva 3-2-1
+        fase: "listo",        // 'listo' | 'prep' | 'trabajo' | 'descanso' | 'terminado'
+        restante: 0,
+        duracionFase: 0,
+        rondaActual: 1,
+        rondasTotal: 8,
+        // Config AMRAP
+        amrapMin: 10,
+        amrapRondasHechas: 0,
+        // Config Intervalos / EMOM
+        intTrabajo: 20,
+        intDescanso: 10,
+        intRondas: 8,
+        intEsEmom: false,
+        timerId: null
+    };
+
+    function inyectarCSSRelojPro23() {
+        if (document.getElementById("cdmCssRelojPro23")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssRelojPro23";
+        st.textContent = `
+            .cdm-droplet-popover.pro23 {
+                width: 315px !important;
+                max-width: calc(100vw - 24px) !important;
+                padding: 0.95rem 1rem !important;
+                background: #0b1628 !important;
+                border: 1.5px solid rgba(56, 189, 248, 0.42) !important;
+                color: #f8fafc !important;
+            }
+            .drp23-tabs {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.28rem;
+                background: rgba(255, 255, 255, 0.06);
+                border-radius: 11px;
+                padding: 3px;
+                margin: 0.45rem 0 0.65rem;
+            }
+            .drp23-tab {
+                border: none;
+                background: transparent;
+                color: #94a3b8;
+                font-size: 0.71rem;
+                font-weight: 800;
+                padding: 0.36rem 0.2rem;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+            .drp23-tab.active {
+                background: #0284c7;
+                color: #ffffff;
+                box-shadow: 0 3px 10px rgba(2, 132, 199, 0.4);
+            }
+            .drp23-phase-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                font-size: 0.68rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                padding: 0.18rem 0.6rem;
+                border-radius: 999px;
+                margin-bottom: 0.25rem;
+            }
+            .drp23-phase-pill.listo { background: rgba(148,163,184,0.18); color: #cbd5e1; }
+            .drp23-phase-pill.prep { background: rgba(245,158,11,0.22); color: #fcd34d; }
+            .drp23-phase-pill.trabajo { background: rgba(16,185,129,0.24); color: #34d399; }
+            .drp23-phase-pill.descanso { background: rgba(56,189,248,0.22); color: #38bdf8; }
+            .drp23-phase-pill.terminado { background: rgba(244,63,94,0.24); color: #fda4af; }
+
+            .drp23-time {
+                font-size: 2.35rem;
+                font-weight: 900;
+                line-height: 1.05;
+                font-variant-numeric: tabular-nums;
+                letter-spacing: -0.02em;
+                color: #ffffff;
+            }
+            .drp23-time.urgente { color: #fb7185 !important; }
+            .drp23-time.trabajo { color: #34d399; }
+            .drp23-time.prep { color: #fcd34d; }
+
+            .drp23-presets {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.32rem;
+                margin: 0.55rem 0;
+            }
+            .drp23-chip {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                color: #e2e8f0;
+                font-size: 0.74rem;
+                font-weight: 800;
+                padding: 0.38rem 0.25rem;
+                border-radius: 9px;
+                cursor: pointer;
+                transition: all 0.14s ease;
+            }
+            .drp23-chip:hover { background: #0284c7; border-color: #38bdf8; color: #ffffff; }
+            .drp23-chip.short { border-color: rgba(250, 204, 21, 0.35); color: #fef08a; }
+
+            .drp23-inputs-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.38rem;
+                margin: 0.5rem 0;
+            }
+            .drp23-field label {
+                display: block;
+                font-size: 0.62rem;
+                font-weight: 800;
+                color: #94a3b8;
+                text-transform: uppercase;
+                margin-bottom: 3px;
+            }
+            .drp23-field input {
+                width: 100%;
+                min-height: 32px !important;
+                padding: 0.2rem 0.45rem !important;
+                background: rgba(255, 255, 255, 0.09) !important;
+                border: 1px solid rgba(148, 163, 184, 0.32) !important;
+                color: #ffffff !important;
+                border-radius: 8px !important;
+                font-weight: 800 !important;
+                font-size: 0.82rem !important;
+                text-align: center;
+            }
+
+            .drp23-ctrl-row {
+                display: flex;
+                gap: 0.35rem;
+                align-items: center;
+                margin-top: 0.55rem;
+            }
+            .drp23-btn {
+                border: 1px solid rgba(255, 255, 255, 0.22);
+                background: rgba(255, 255, 255, 0.10);
+                color: #ffffff !important;
+                font-size: 0.75rem;
+                font-weight: 800;
+                padding: 0.4rem 0.58rem;
+                border-radius: 9px;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.3rem;
+                transition: background 0.15s ease;
+            }
+            .drp23-btn:hover { background: rgba(255, 255, 255, 0.20); }
+            .drp23-btn.primary { background: #0284c7; border-color: #38bdf8; }
+            .drp23-btn.primary:hover { background: #0369a1; }
+            .drp23-btn.ok { background: #059669; border-color: #34d399; }
+            .drp23-btn.danger { background: rgba(244, 63, 94, 0.22); border-color: rgba(251, 113, 133, 0.55); color: #fecdd3 !important; }
+            .drp23-btn.danger:hover { background: #e11d48; color: #ffffff !important; }
+            .drp23-btn.icon-sm { padding: 0.24rem 0.45rem; font-size: 0.72rem; }
+
+            .drp23-opts-bar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.35rem;
+                margin-top: 0.55rem;
+                padding-top: 0.5rem;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                font-size: 0.69rem;
+                color: #cbd5e1;
+            }
+            .drp23-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.3rem;
+                cursor: pointer;
+                font-weight: 700;
+            }
+            .drp23-toggle input { width: 14px; height: 14px; min-height: auto !important; accent-color: #38bdf8; }
+
+            .cdm-droplet-btn.phase-prep { background: linear-gradient(135deg, #d97706, #b45309) !important; border-color: #fde68a !important; }
+            .cdm-droplet-btn.phase-trabajo { background: linear-gradient(135deg, #10b981, #047857) !important; border-color: #a7f3d0 !important; }
+            .cdm-droplet-btn.phase-urgente { background: linear-gradient(135deg, #e11d48, #9f1239) !important; border-color: #fecdd3 !important; }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function fmtMMSS23(seg) {
+        const s = Math.max(0, Math.floor(Number(seg) || 0));
+        const m = Math.floor(s / 60);
+        const r = s % 60;
+        return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+    }
+
+    function limpiarIntervalo23() {
+        if (stReloj.timerId) {
+            clearInterval(stReloj.timerId);
+            stReloj.timerId = null;
+        }
+    }
+
+    function etiquetaFase23() {
+        if (stReloj.fase === "prep") return "⏳ Preparados...";
+        if (stReloj.fase === "trabajo") {
+            if (stReloj.modo === "amrap") return `🔥 AMRAP • ${stReloj.amrapRondasHechas} rondas`;
+            if (stReloj.modo === "intervalo") return `${stReloj.intEsEmom ? "⚡ EMOM" : "💪 TRABAJO"} • Ronda ${stReloj.rondaActual}/${stReloj.rondasTotal}`;
+            return "⏱️ En curso";
+        }
+        if (stReloj.fase === "descanso") return `😮‍💨 DESCANSO • Ronda ${stReloj.rondaActual}/${stReloj.rondasTotal}`;
+        if (stReloj.fase === "terminado") return "🏁 ¡Entrenamiento terminado!";
+        return stReloj.modo === "amrap" ? "🔥 Modo AMRAP" : (stReloj.modo === "intervalo" ? "⚡ Intervalos / EMOM" : "⏱️ Series y Descanso");
+    }
+
+    function actualizarDisplayEnVivo23() {
+        const tStr = fmtMMSS23(stReloj.restante);
+        const pct = stReloj.duracionFase > 0
+            ? Math.min(100, Math.max(0, Math.round(((stReloj.duracionFase - stReloj.restante) / stReloj.duracionFase) * 100)))
+            : 0;
+        const esUrgente = stReloj.corriendo && !stReloj.pausado && stReloj.restante > 0 && stReloj.restante <= 3;
+
+        const elTime = document.getElementById("drp23DisplayTime");
+        if (elTime) {
+            elTime.textContent = tStr;
+            elTime.className = `drp23-time ${esUrgente ? "urgente" : stReloj.fase}`;
+        }
+        const elPhase = document.getElementById("drp23PhasePill");
+        if (elPhase) {
+            elPhase.textContent = etiquetaFase23();
+            elPhase.className = `drp23-phase-pill ${stReloj.fase}`;
+        }
+        const elBar = document.getElementById("drp23BarFill");
+        if (elBar) {
+            elBar.style.width = `${stReloj.fase === "listo" ? 0 : pct}%`;
+            elBar.style.background = esUrgente ? "#fb7185" : (stReloj.fase === "trabajo" ? "#10b981" : (stReloj.fase === "prep" ? "#f59e0b" : "#38bdf8"));
+        }
+        const elFab = document.getElementById("drp23FabBtn");
+        if (elFab) {
+            elFab.className = `cdm-droplet-btn usr-action-allow ${esUrgente ? "phase-urgente" : (stReloj.corriendo ? `phase-${stReloj.fase} running` : "")}`;
+            const txtFab = stReloj.corriendo
+                ? (stReloj.modo === "intervalo" && stReloj.fase !== "prep" ? `${tStr} • R${stReloj.rondaActual}/${stReloj.rondasTotal}` : tStr)
+                : "Reloj";
+            const sp = elFab.querySelector("span");
+            if (sp) sp.textContent = txtFab;
+        }
+    }
+
+    function avanzarFase23() {
+        // Fin de preparación 5s -> arranca trabajo
+        if (stReloj.fase === "prep") {
+            stReloj.fase = "trabajo";
+            if (stReloj.modo === "amrap") {
+                stReloj.duracionFase = Math.max(30, stReloj.amrapMin * 60);
+                stReloj.restante = stReloj.duracionFase;
+            } else {
+                stReloj.rondaActual = 1;
+                stReloj.rondasTotal = Math.max(1, stReloj.intRondas);
+                stReloj.duracionFase = Math.max(5, stReloj.intTrabajo);
+                stReloj.restante = stReloj.duracionFase;
+            }
+            sonarTimbre23("go");
+            renderizarGotaRelojitoFlotanteCDM();
+            return;
+        }
+
+        // Modo Libre o AMRAP -> terminó
+        if (stReloj.modo === "libre" || stReloj.modo === "amrap") {
+            limpiarIntervalo23();
+            stReloj.corriendo = false;
+            stReloj.pausado = false;
+            stReloj.fase = "terminado";
+            sonarTimbre23("fin");
+            if (typeof mostrarToast === "function") {
+                mostrarToast(stReloj.modo === "amrap"
+                    ? `🏁 ¡AMRAP finalizado! Rondas completadas: ${stReloj.amrapRondasHechas}`
+                    : "🔔 ¡Tiempo cumplido!");
+            }
+            renderizarGotaRelojitoFlotanteCDM();
+            return;
+        }
+
+        // Modo Intervalos / Tabata / EMOM
+        if (stReloj.fase === "trabajo") {
+            if (stReloj.intDescanso > 0 && !stReloj.intEsEmom) {
+                if (stReloj.rondaActual >= stReloj.rondasTotal) {
+                    limpiarIntervalo23();
+                    stReloj.corriendo = false;
+                    stReloj.fase = "terminado";
+                    sonarTimbre23("fin");
+                    if (typeof mostrarToast === "function") mostrarToast("🏁 ¡Intervalos completados!");
+                } else {
+                    stReloj.fase = "descanso";
+                    stReloj.duracionFase = stReloj.intDescanso;
+                    stReloj.restante = stReloj.intDescanso;
+                    sonarTimbre23("pausa");
+                }
+            } else {
+                // EMOM o intervalos sin descanso: pasa directo a la siguiente ronda con timbre GO
+                if (stReloj.rondaActual >= stReloj.rondasTotal) {
+                    limpiarIntervalo23();
+                    stReloj.corriendo = false;
+                    stReloj.fase = "terminado";
+                    sonarTimbre23("fin");
+                    if (typeof mostrarToast === "function") mostrarToast("🏁 ¡EMOM completado!");
+                } else {
+                    stReloj.rondaActual++;
+                    stReloj.duracionFase = Math.max(5, stReloj.intTrabajo);
+                    stReloj.restante = stReloj.duracionFase;
+                    sonarTimbre23("go");
+                }
+            }
+            renderizarGotaRelojitoFlotanteCDM();
+            return;
+        }
+
+        if (stReloj.fase === "descanso") {
+            stReloj.rondaActual++;
+            stReloj.fase = "trabajo";
+            stReloj.duracionFase = Math.max(5, stReloj.intTrabajo);
+            stReloj.restante = stReloj.duracionFase;
+            sonarTimbre23("go");
+            renderizarGotaRelojitoFlotanteCDM();
+        }
+    }
+
+    function arrancarTick23() {
+        limpiarIntervalo23();
+        stReloj.timerId = setInterval(() => {
+            if (stReloj.pausado) return;
+            stReloj.restante--;
+
+            if (stReloj.restante <= 0) {
+                stReloj.restante = 0;
+                actualizarDisplayEnVivo23();
+                avanzarFase23();
+                return;
+            }
+
+            // Avisos previos sonoros antes de terminar
+            if (stReloj.avisosPrevios) {
+                if (stReloj.restante === 60 && stReloj.modo === "amrap" && stReloj.duracionFase >= 120) {
+                    sonarTimbre23("aviso1min");
+                } else if (stReloj.restante === 10 && stReloj.duracionFase >= 20 && stReloj.fase !== "prep") {
+                    sonarTimbre23("aviso10s");
+                } else if (stReloj.restante <= 3 && stReloj.restante >= 1 && stReloj.duracionFase >= 5) {
+                    sonarTimbre23("pip321");
+                }
+            }
+
+            actualizarDisplayEnVivo23();
+        }, 1000);
+    }
+
+    // --- API PÚBLICA DEL RELOJ ---
+    window.cdmRelojPro = {
+        probarTimbre() {
+            obtenerAudioCtx23();
+            const prev = stReloj.sonido;
+            stReloj.sonido = true;
+            sonarTimbre23("go");
+            stReloj.sonido = prev;
+        },
+        cambiarModo(modo) {
+            obtenerAudioCtx23();
+            limpiarIntervalo23();
+            stReloj.modo = modo;
+            stReloj.corriendo = false;
+            stReloj.pausado = false;
+            stReloj.fase = "listo";
+            stReloj.restante = modo === "amrap" ? stReloj.amrapMin * 60 : (modo === "intervalo" ? stReloj.intTrabajo : 0);
+            stReloj.duracionFase = stReloj.restante;
+            renderizarGotaRelojitoFlotanteCDM();
+        },
+        iniciarLibre(segundos) {
+            obtenerAudioCtx23();
+            const s = Math.max(5, parseInt(segundos, 10) || 15);
+            stReloj.modo = "libre";
+            stReloj.fase = "trabajo";
+            stReloj.duracionFase = s;
+            stReloj.restante = s;
+            stReloj.corriendo = true;
+            stReloj.pausado = false;
+            sonarTimbre23("go");
+            renderizarGotaRelojitoFlotanteCDM();
+            arrancarTick23();
+        },
+        setAmrapMin(min) {
+            stReloj.amrapMin = Math.max(1, Math.min(90, parseInt(min, 10) || 10));
+            if (!stReloj.corriendo) {
+                stReloj.restante = stReloj.amrapMin * 60;
+                stReloj.duracionFase = stReloj.restante;
+                actualizarDisplayEnVivo23();
+            }
+        },
+        iniciarAmrap(minOpt = null) {
+            obtenerAudioCtx23();
+            if (minOpt) stReloj.amrapMin = parseInt(minOpt, 10) || stReloj.amrapMin;
+            stReloj.modo = "amrap";
+            stReloj.amrapRondasHechas = 0;
+            stReloj.fase = "prep";
+            stReloj.duracionFase = 5;
+            stReloj.restante = 5;
+            stReloj.corriendo = true;
+            stReloj.pausado = false;
+            renderizarGotaRelojitoFlotanteCDM();
+            arrancarTick23();
+        },
+        sumarRondaAmrap(delta) {
+            stReloj.amrapRondasHechas = Math.max(0, stReloj.amrapRondasHechas + delta);
+            actualizarDisplayEnVivo23();
+            const el = document.getElementById("drp23AmrapCount");
+            if (el) el.textContent = stReloj.amrapRondasHechas;
+        },
+        aplicarPresetIntervalo(trab, desc, rondas, esEmom = false) {
+            obtenerAudioCtx23();
+            stReloj.intTrabajo = trab;
+            stReloj.intDescanso = desc;
+            stReloj.intRondas = rondas;
+            stReloj.intEsEmom = esEmom;
+            this.iniciarIntervalo();
+        },
+        actualizarInputIntervalo(campo, val) {
+            const n = Math.max(0, parseInt(val, 10) || 0);
+            stReloj[campo] = campo === "intDescanso" ? n : Math.max(1, n);
+            if (campo === "intDescanso" && n > 0) stReloj.intEsEmom = false;
+        },
+        iniciarIntervalo() {
+            obtenerAudioCtx23();
+            stReloj.modo = "intervalo";
+            stReloj.rondaActual = 1;
+            stReloj.rondasTotal = Math.max(1, stReloj.intRondas);
+            stReloj.fase = "prep";
+            stReloj.duracionFase = 5;
+            stReloj.restante = 5;
+            stReloj.corriendo = true;
+            stReloj.pausado = false;
+            renderizarGotaRelojitoFlotanteCDM();
+            arrancarTick23();
+        },
+        togglePausa() {
+            if (!stReloj.corriendo) return;
+            obtenerAudioCtx23();
+            stReloj.pausado = !stReloj.pausado;
+            renderizarGotaRelojitoFlotanteCDM();
+        },
+        toggleSonido(on) {
+            stReloj.sonido = Boolean(on);
+            if (stReloj.sonido) obtenerAudioCtx23();
+        },
+        toggleAvisos(on) {
+            stReloj.avisosPrevios = Boolean(on);
+        }
+    };
+
+    // Sobrescribir funciones globales del Bloque 9 manteniendo compatibilidad con Bloque 11
+    window.alternarAperturaGotaRelojCDM = function () {
+        obtenerAudioCtx23();
+        stReloj.abierto = !stReloj.abierto;
+        renderizarGotaRelojitoFlotanteCDM();
+    };
+
+    window.iniciarDescansoEnGotaRelojCDM = function (segundos) {
+        window.cdmRelojPro.iniciarLibre(segundos);
+    };
+
+    window.ajustarTiempoGotaRelojCDM = function (delta) {
+        stReloj.restante = Math.max(0, stReloj.restante + delta);
+        stReloj.duracionFase = Math.max(stReloj.duracionFase, stReloj.restante);
+        actualizarDisplayEnVivo23();
+    };
+
+    window.detenerGotaRelojCDM = function () {
+        limpiarIntervalo23();
+        stReloj.corriendo = false;
+        stReloj.pausado = false;
+        stReloj.fase = "listo";
+        stReloj.restante = stReloj.modo === "amrap" ? stReloj.amrapMin * 60 : (stReloj.modo === "intervalo" ? stReloj.intTrabajo : 0);
+        stReloj.duracionFase = stReloj.restante;
+        renderizarGotaRelojitoFlotanteCDM();
+    };
+
+    window.renderizarGotaRelojitoFlotanteCDM = function () {
+        inyectarCSSRelojPro23();
+        const wrap = document.getElementById("cdmFloatingDropletClock");
+        if (!wrap) return;
+
+        let cuerpoModo = "";
+
+        if (stReloj.modo === "libre") {
+            cuerpoModo = `
+                <small style="color:#94a3b8; font-size:0.68rem; font-weight:700; display:block; margin-top:0.3rem;">
+                    Series cortas (timbre) o descanso libre:
+                </small>
+                <div class="drp23-presets">
+                    <button type="button" class="drp23-chip short usr-action-allow" onclick="cdmRelojPro.iniciarLibre(10)">🔔 10s</button>
+                    <button type="button" class="drp23-chip short usr-action-allow" onclick="cdmRelojPro.iniciarLibre(15)">🔔 15s</button>
+                    <button type="button" class="drp23-chip short usr-action-allow" onclick="cdmRelojPro.iniciarLibre(20)">🔔 20s</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarLibre(30)">30s</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarLibre(45)">45s</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarLibre(60)">1 min</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarLibre(90)">1m 30s</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarLibre(120)">2 min</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarLibre(180)">3 min</button>
+                </div>
+            `;
+        } else if (stReloj.modo === "amrap") {
+            cuerpoModo = `
+                <small style="color:#94a3b8; font-size:0.68rem; font-weight:700; display:block; margin-top:0.3rem;">
+                    Duración del bloque AMRAP (incluye 5s prep + aviso final):
+                </small>
+                <div class="drp23-presets">
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarAmrap(5)">5 min</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarAmrap(8)">8 min</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarAmrap(10)">10 min</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarAmrap(12)">12 min</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarAmrap(15)">15 min</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.iniciarAmrap(20)">20 min</button>
+                </div>
+                <div class="drp23-ctrl-row" style="margin-top:0.35rem;">
+                    <div class="drp23-field" style="width:76px;">
+                        <input type="number" min="1" max="90" value="${stReloj.amrapMin}" onchange="cdmRelojPro.setAmrapMin(this.value)" title="Minutos">
+                    </div>
+                    <button type="button" class="drp23-btn primary usr-action-allow" style="flex:1;" onclick="cdmRelojPro.iniciarAmrap()">▶ Iniciar AMRAP</button>
+                </div>
+                ${stReloj.corriendo || stReloj.fase === "terminado" ? `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(16,185,129,0.14); border:1px solid rgba(52,211,153,0.35); border-radius:10px; padding:0.4rem 0.65rem; margin-top:0.5rem;">
+                        <span style="font-size:0.74rem; font-weight:800; color:#a7f3d0;">Rondas: <b id="drp23AmrapCount" style="font-size:1rem; color:#fff;">${stReloj.amrapRondasHechas}</b></span>
+                        <div style="display:flex; gap:0.3rem;">
+                            <button type="button" class="drp23-btn icon-sm usr-action-allow" onclick="cdmRelojPro.sumarRondaAmrap(-1)">-1</button>
+                            <button type="button" class="drp23-btn ok icon-sm usr-action-allow" onclick="cdmRelojPro.sumarRondaAmrap(1)">+1 Ronda</button>
+                        </div>
+                    </div>
+                ` : ""}
+            `;
+        } else {
+            cuerpoModo = `
+                <div class="drp23-presets">
+                    <button type="button" class="drp23-chip short usr-action-allow" onclick="cdmRelojPro.aplicarPresetIntervalo(10, 20, 10, false)">10/20 ×10</button>
+                    <button type="button" class="drp23-chip short usr-action-allow" onclick="cdmRelojPro.aplicarPresetIntervalo(15, 15, 8, false)">15/15 ×8</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.aplicarPresetIntervalo(20, 10, 8, false)">Tabata</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.aplicarPresetIntervalo(30, 30, 10, false)">HIIT 30/30</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.aplicarPresetIntervalo(40, 20, 8, false)">40/20 ×8</button>
+                    <button type="button" class="drp23-chip usr-action-allow" onclick="cdmRelojPro.aplicarPresetIntervalo(60, 0, 10, true)">EMOM 10'</button>
+                </div>
+                <div class="drp23-inputs-grid">
+                    <div class="drp23-field"><label>Trabajo (s)</label><input type="number" min="5" value="${stReloj.intTrabajo}" onchange="cdmRelojPro.actualizarInputIntervalo('intTrabajo', this.value)"></div>
+                    <div class="drp23-field"><label>Pausa (s)</label><input type="number" min="0" value="${stReloj.intDescanso}" onchange="cdmRelojPro.actualizarInputIntervalo('intDescanso', this.value)"></div>
+                    <div class="drp23-field"><label>Rondas</label><input type="number" min="1" value="${stReloj.intRondas}" onchange="cdmRelojPro.actualizarInputIntervalo('intRondas', this.value)"></div>
+                </div>
+                <button type="button" class="drp23-btn primary usr-action-allow" style="width:100%;" onclick="cdmRelojPro.iniciarIntervalo()">▶ Iniciar Intervalos (5s prep)</button>
+            `;
+        }
+
+        const popoverHTML = stReloj.abierto ? `
+            <div class="cdm-droplet-popover pro23" onclick="event.stopPropagation();">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem;">
+                    <span style="font-size:0.71rem; font-weight:800; color:#38bdf8; text-transform:uppercase; letter-spacing:0.04em;">
+                        ⏱️ Reloj Pro de Entrenamiento
+                    </span>
+                    <div style="display:flex; gap:0.25rem; align-items:center;">
+                        <button type="button" class="drp23-btn icon-sm usr-action-allow" title="Probar sonido del timbre" onclick="cdmRelojPro.probarTimbre()">🔔</button>
+                        <button type="button" class="drp23-btn icon-sm usr-action-allow" onclick="alternarAperturaGotaRelojCDM()">✕</button>
+                    </div>
+                </div>
+
+                <div class="drp23-tabs">
+                    <button type="button" class="drp23-tab usr-action-allow ${stReloj.modo === "libre" ? "active" : ""}" onclick="cdmRelojPro.cambiarModo('libre')">⏱️ Series</button>
+                    <button type="button" class="drp23-tab usr-action-allow ${stReloj.modo === "amrap" ? "active" : ""}" onclick="cdmRelojPro.cambiarModo('amrap')">🔥 AMRAP</button>
+                    <button type="button" class="drp23-tab usr-action-allow ${stReloj.modo === "intervalo" ? "active" : ""}" onclick="cdmRelojPro.cambiarModo('intervalo')">⚡ Intervalos</button>
+                </div>
+
+                <div style="text-align:center; padding:0.2rem 0 0.35rem;">
+                    <span id="drp23PhasePill" class="drp23-phase-pill ${stReloj.fase}">${etiquetaFase23()}</span>
+                    <div id="drp23DisplayTime" class="drp23-time ${stReloj.fase}">${fmtMMSS23(stReloj.restante)}</div>
+                    <div style="height:6px; background:rgba(255,255,255,0.12); border-radius:99px; overflow:hidden; margin-top:0.45rem;">
+                        <div id="drp23BarFill" style="height:100%; width:0%; background:#38bdf8; transition:width 0.25s ease;"></div>
+                    </div>
+                </div>
+
+                ${cuerpoModo}
+
+                <div class="drp23-ctrl-row">
+                    ${stReloj.corriendo ? `
+                        <button type="button" class="drp23-btn ok usr-action-allow" onclick="cdmRelojPro.togglePausa()">${stReloj.pausado ? "▶ Seguir" : "⏸ Pausa"}</button>
+                    ` : ""}
+                    <button type="button" class="drp23-btn usr-action-allow" onclick="ajustarTiempoGotaRelojCDM(-15)">-15s</button>
+                    <button type="button" class="drp23-btn usr-action-allow" onclick="ajustarTiempoGotaRelojCDM(15)">+15s</button>
+                    <button type="button" class="drp23-btn danger usr-action-allow" style="flex:1;" onclick="detenerGotaRelojCDM()">Reiniciar</button>
+                </div>
+
+                <div class="drp23-opts-bar">
+                    <label class="drp23-toggle">
+                        <input type="checkbox" ${stReloj.sonido ? "checked" : ""} onchange="cdmRelojPro.toggleSonido(this.checked)">
+                        <span>🔊 Timbre</span>
+                    </label>
+                    <label class="drp23-toggle">
+                        <input type="checkbox" ${stReloj.avisosPrevios ? "checked" : ""} onchange="cdmRelojPro.toggleAvisos(this.checked)">
+                        <span>⏰ Aviso 10s + 3-2-1</span>
+                    </label>
+                </div>
+            </div>
+        ` : "";
+
+        wrap.innerHTML = `
+            ${popoverHTML}
+            <button type="button" id="drp23FabBtn" class="cdm-droplet-btn usr-action-allow" onclick="alternarAperturaGotaRelojCDM()" title="Reloj Pro de Entrenamiento">
+                <i class="ri-timer-flash-fill"></i>
+                <span>Reloj</span>
+            </button>
+        `;
+        actualizarDisplayEnVivo23();
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(() => {
+            if (typeof asegurarGotaRelojitoFlotanteCDM === "function") asegurarGotaRelojitoFlotanteCDM();
+        }, 280);
+    });
+})();
+// =========================================================================
+// 24. IDENTIDAD DE MARCA GLOBAL: G-SIS
+//     - Cabecera horizontal integrada en login.html
+//     - Sello en Hub SuperAdmin
+//     - Pie de página centrado, elevado y destacado en todo el sistema
+//     - Favicon SVG centrado + compatibilidad total Modo Día y Modo Noche
+// Pegar al final de js/login.js (reemplazando el Bloque 24 anterior)
+// =========================================================================
+(function () {
+    const USAR_IMAGEN_EN_LOGIN = false;
+    const RUTA_IMAGEN_LOGIN = "img/gsis-logo.jpg";
+
+    function svgIsotipoGSIS(size = 40, conFondo = false) {
+        const bg = conFondo
+            ? `<rect width="100" height="100" rx="22" fill="#0c192c"/>`
+            : "";
+        return `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}" style="display:block; flex-shrink:0;" aria-label="G-SIS">
+                <defs>
+                    <linearGradient id="gsisGrad24" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#0284c7"/>
+                        <stop offset="52%" stop-color="#0ea5e9"/>
+                        <stop offset="100%" stop-color="#38bdf8"/>
+                    </linearGradient>
+                </defs>
+                ${bg}
+                <g transform="translate(50 50) skewX(-7) translate(-50 -50)" fill="url(#gsisGrad24)">
+                    <path d="M58 17 H38 C24 17 17 25 17 39 V57 L28 49 V39 C28 31 32 27 40 27 H53 Z"/>
+                    <path d="M64 17 H79 L73 29 H58 Z"/>
+                    <path d="M18 64 L29 56 V61 C29 69 33 73 41 73 H59 C64 73 67 70 69 65 L72 56 H48 V46 H83 L78 67 C75 78 68 83 56 83 H38 C25 83 18 76 18 64 Z"/>
+                </g>
+            </svg>
+        `.trim();
+    }
+
+    function inyectarCSSMarcaGSIS() {
+        document.getElementById("cdmCssMarcaGSIS24")?.remove();
+        const st = document.createElement("style");
+        st.id = "cdmCssMarcaGSIS24";
+        st.textContent = `
+            /* === CABECERA HORIZONTAL INTEGRADA EN LOGIN === */
+            .gsis-login-banner {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.9rem;
+                padding: 1.05rem 1.25rem;
+                margin-bottom: 1.25rem;
+                border-radius: 18px;
+                background:
+                    radial-gradient(circle at 85% 15%, rgba(56, 189, 248, 0.22) 0%, transparent 55%),
+                    linear-gradient(135deg, #091424 0%, #0f213a 58%, #0c192c 100%);
+                border: 1px solid rgba(56, 189, 248, 0.24);
+                box-shadow: 0 12px 26px -12px rgba(2, 132, 199, 0.45);
+                text-align: left;
+            }
+            .gsis-login-emblem {
+                width: 52px;
+                height: 52px;
+                border-radius: 14px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(56, 189, 248, 0.28);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                overflow: hidden;
+            }
+            .gsis-login-emblem img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+            .gsis-login-copy {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                gap: 2px;
+            }
+            .gsis-wordmark {
+                font-family: 'Poppins', system-ui, sans-serif;
+                font-size: 1.68rem;
+                font-weight: 900;
+                letter-spacing: 0.09em;
+                line-height: 1;
+                color: #ffffff;
+                margin: 0;
+            }
+            .gsis-wordmark .gsis-dash {
+                color: #38bdf8;
+            }
+            .gsis-login-sub {
+                font-size: 0.67rem;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: #94a3b8;
+                margin: 3px 0 0 0;
+            }
+
+            /* === SELLO EN HUB SUPERADMIN === */
+            .gsis-hub-bar {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                background: linear-gradient(135deg, #091424 0%, #10243f 100%);
+                color: #ffffff;
+                border: 1px solid rgba(56, 189, 248, 0.32);
+                border-radius: 12px;
+                padding: 0.36rem 0.85rem 0.36rem 0.5rem;
+                font-size: 0.76rem;
+                font-weight: 800;
+                letter-spacing: 0.06em;
+                margin-bottom: 0.75rem;
+            }
+            .gsis-hub-bar .gsis-dash { color: #38bdf8; }
+
+            /* === PIE DE PÁGINA CENTRADO Y DESTACADO (G-SIS) === */
+            @media (min-width: 1025px) {
+                .app-main > .app-content {
+                    padding-bottom: 0.75rem !important;
+                }
+            }
+            .creator-footer-right {
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                width: 100% !important;
+                margin-top: 0 !important;
+                padding: 0.35rem 1rem 1.35rem !important;
+                border-top: none !important;
+            }
+            .creator-badge-pill.gsis-split-pill {
+                padding: 5px 20px 5px 5px !important;
+                gap: 0.75rem !important;
+                border-radius: 999px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                flex-wrap: wrap !important;
+                background: var(--surface-solid, #ffffff) !important;
+                border: 1.5px solid rgba(2, 132, 199, 0.3) !important;
+                box-shadow: 0 10px 24px -10px rgba(2, 132, 199, 0.28), 0 4px 10px -4px rgba(15, 23, 42, 0.1) !important;
+                transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+            }
+            .creator-badge-pill.gsis-split-pill:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 14px 28px -10px rgba(2, 132, 199, 0.38) !important;
+            }
+            .gsis-footer-chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.42rem;
+                background: linear-gradient(135deg, #091424 0%, #122845 100%);
+                color: #ffffff;
+                padding: 0.42rem 0.9rem 0.42rem 0.6rem;
+                border-radius: 999px;
+                border: 1px solid rgba(56, 189, 248, 0.38);
+                font-size: 0.88rem;
+                font-weight: 900;
+                letter-spacing: 0.08em;
+                line-height: 1;
+                box-shadow: 0 4px 14px -4px rgba(2, 132, 199, 0.5);
+            }
+            .gsis-footer-chip .gsis-dash { color: #38bdf8; }
+            .gsis-footer-author {
+                font-size: 0.84rem;
+                color: var(--ink-600, #475569);
+                line-height: 1.2;
+            }
+            .gsis-footer-author b {
+                color: var(--ink-900, #0f172a);
+                font-weight: 800;
+            }
+            body[data-theme="dark"] .creator-badge-pill.gsis-split-pill {
+                background: #0f172a !important;
+                border-color: rgba(56, 189, 248, 0.34) !important;
+                box-shadow: 0 10px 26px -10px rgba(2, 6, 23, 0.7) !important;
+            }
+            body[data-theme="dark"] .gsis-footer-author { color: #94a3b8; }
+            body[data-theme="dark"] .gsis-footer-author b { color: #f8fafc; }
+
+            @media (max-width: 640px) {
+                .creator-footer-right {
+                    margin-top: 0.25rem !important;
+                    padding: 0.4rem 0.75rem 1rem !important;
+                }
+                .creator-badge-pill.gsis-split-pill {
+                    padding: 5px 15px 5px 5px !important;
+                    gap: 0.55rem !important;
+                }
+                .gsis-footer-chip {
+                    font-size: 0.8rem;
+                    padding: 0.36rem 0.72rem 0.36rem 0.5rem;
+                }
+                .gsis-footer-author {
+                    font-size: 0.78rem;
+                }
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function aplicarFaviconYTituloGSIS() {
+        const svgFav = svgIsotipoGSIS(64, true).replace(/\s+/g, " ");
+        const dataUri = "data:image/svg+xml;utf8," + encodeURIComponent(svgFav);
+
+        let linkIcon = document.querySelector('link[rel="icon"]');
+        if (!linkIcon) {
+            linkIcon = document.createElement("link");
+            linkIcon.rel = "icon";
+            document.head.appendChild(linkIcon);
+        }
+        linkIcon.type = "image/svg+xml";
+        linkIcon.href = dataUri;
+
+        const path = (window.location.pathname || "").toLowerCase();
+        if (path.includes("login.html") || document.body?.classList.contains("login-page")) {
+            document.title = "G-SIS | Plataforma de Gestión";
+        } else if (document.title) {
+            document.title = document.title.replace(/CDM\s*Pro\s*Suite/gi, "G-SIS");
+        }
+    }
+
+    function aplicarMarcaEnLoginYHubGSIS() {
+        const vistaLogin = document.getElementById("vistaLoginGenerico");
+        if (vistaLogin && !document.getElementById("gsisLoginBrand24")) {
+            const tabs = document.getElementById("btnTabUsuario")?.parentElement;
+            if (tabs) {
+                let prev = tabs.previousElementSibling;
+                while (prev) {
+                    if (prev.id !== "gsisLoginBrand24" && prev.id !== "cajaErrorLogin") {
+                        prev.style.display = "none";
+                    }
+                    prev = prev.previousElementSibling;
+                }
+            }
+
+            const banner = document.createElement("div");
+            banner.id = "gsisLoginBrand24";
+            banner.className = "gsis-login-banner";
+            banner.innerHTML = `
+                <div class="gsis-login-emblem">
+                    ${USAR_IMAGEN_EN_LOGIN
+                        ? `<img src="${RUTA_IMAGEN_LOGIN}" alt="G-SIS" onerror="this.parentElement.innerHTML=\`${svgIsotipoGSIS(38, false).replace(/"/g, "&quot;")}\`">`
+                        : svgIsotipoGSIS(38, false)}
+                </div>
+                <div class="gsis-login-copy">
+                    <h1 class="gsis-wordmark">G<span class="gsis-dash">-</span>SIS</h1>
+                    <p class="gsis-login-sub">Sistema Integral de Gestión</p>
+                </div>
+            `;
+            vistaLogin.prepend(banner);
+        }
+
+        const vistaHub = document.getElementById("vistaHubSuperAdmin");
+        if (vistaHub && !document.getElementById("gsisHubBadge24")) {
+            const bar = document.createElement("div");
+            bar.id = "gsisHubBadge24";
+            bar.className = "gsis-hub-bar";
+            bar.innerHTML = `${svgIsotipoGSIS(22, false)}<span>G<span class="gsis-dash">-</span>SIS • PANEL CENTRAL</span>`;
+            vistaHub.prepend(bar);
+        }
+    }
+
+    function aplicarMarcaEnFooterGSIS() {
+        document.querySelectorAll(".creator-badge-pill").forEach(pill => {
+            if (pill.dataset.gsisReady === "3") return;
+            pill.dataset.gsisReady = "3";
+            pill.classList.add("gsis-split-pill");
+            pill.innerHTML = `
+                <span class="gsis-footer-chip">
+                    ${svgIsotipoGSIS(20, false)}
+                    <span>G<span class="gsis-dash">-</span>SIS</span>
+                </span>
+                <span class="gsis-footer-author">Desarrollado por <b>Gonzalo Adanchú</b></span>
+            `;
+        });
+    }
+
+    function inicializarMarcaGSIS() {
+        inyectarCSSMarcaGSIS();
+        aplicarFaviconYTituloGSIS();
+        aplicarMarcaEnLoginYHubGSIS();
+        aplicarMarcaEnFooterGSIS();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => {
+            inicializarMarcaGSIS();
+            setTimeout(inicializarMarcaGSIS, 200);
+        });
+    } else {
+        inicializarMarcaGSIS();
+        setTimeout(inicializarMarcaGSIS, 200);
+    }
 })();

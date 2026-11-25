@@ -980,17 +980,105 @@ function inicializarIndex() {
     setTimeout(sincronizarIdentidadComercioUI, 350);
 }
 
-function construirTarjetaHeroIndex({ href, onclick, idCount, tag, titulo, sub, bgImageCss, overlay, cantidad, sufijo, lesionados }) {
+function puedeEditarFotosPortadaIndexCDM() {
+    try {
+        const ses = JSON.parse(localStorage.getItem("cdm_sesion_activa_v1") || "null");
+        if (!ses) return false;
+        return ses.rol === "admin" && ses.nivelAdmin !== "staff";
+    } catch {
+        return false;
+    }
+}
+
+function obtenerFotoPersonalizadaAreaCDM(areaKey) {
+    const lic = obtenerLicenciaConfigCDM();
+    const val = lic?.fotosPortadaAreas?.[areaKey];
+    return typeof val === "string" && val.trim() ? val.trim() : "";
+}
+
+function escAttrIndexCDM(str) {
+    return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function inyectarCSSEditarFotoPortadaIndex() {
+    if (document.getElementById("cdmCssEditFotoPortadaIndex")) return;
+    const st = document.createElement("style");
+    st.id = "cdmCssEditFotoPortadaIndex";
+    st.textContent = `
+        .idx-hero-top-left {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
+            min-width: 0;
+        }
+        .idx-edit-photo-btn {
+            background: rgba(15, 23, 42, 0.58);
+            backdrop-filter: blur(8px);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            border-radius: 9px;
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.86rem;
+            flex-shrink: 0;
+            transition: background 0.16s ease, transform 0.16s ease;
+        }
+        .idx-edit-photo-btn:hover {
+            background: #0284c7;
+            border-color: #38bdf8;
+            transform: scale(1.06);
+        }
+        @media (max-width: 640px) {
+            .idx-edit-photo-btn {
+                width: 26px;
+                height: 26px;
+                font-size: 0.76rem;
+                border-radius: 8px;
+            }
+            .idx-hero-top {
+                align-items: flex-start;
+            }
+        }
+    `;
+    document.head.appendChild(st);
+}
+
+function construirTarjetaHeroIndex({ areaKey, href, onclick, idCount, tag, titulo, sub, bgImageCss, defaultPreview, overlay, cantidad, sufijo, lesionados }) {
     const attrNav = onclick
         ? `href="#consultorio" onclick="event.preventDefault(); ${onclick}"`
         : `href="${href}"`;
+
+    const fotoCustom = areaKey ? obtenerFotoPersonalizadaAreaCDM(areaKey) : "";
+    const bgFinal = fotoCustom
+        ? `url("${fotoCustom.replace(/"/g, '\\"')}"), ${bgImageCss}`
+        : bgImageCss;
+
+    const btnEditarFoto = (areaKey && puedeEditarFotosPortadaIndexCDM()) ? `
+        <button type="button" class="idx-edit-photo-btn" title="Cambiar foto de portada de ${escAttrIndexCDM(titulo)}"
+            onclick="event.preventDefault(); event.stopPropagation(); abrirModalFotoPortadaAreaCDM('${escAttrIndexCDM(areaKey)}', '${escAttrIndexCDM(titulo)}', '${escAttrIndexCDM(defaultPreview || "")}')">
+            <i class="ri-pencil-line"></i>
+        </button>
+    ` : "";
+
     return `
         <a ${attrNav} class="idx-hero-card">
-            <div class="idx-hero-bg" style="background-image:${bgImageCss};"></div>
+            <div class="idx-hero-bg" style="background-image:${bgFinal};"></div>
             <div class="idx-hero-overlay" style="background:${overlay};"></div>
 
             <div class="idx-hero-top">
-                <span class="idx-hero-tag">${tag}</span>
+                <div class="idx-hero-top-left">
+                    ${btnEditarFoto}
+                    <span class="idx-hero-tag">${tag}</span>
+                </div>
                 <div class="idx-hero-badges">
                     ${lesionados > 0 ? `<span class="idx-hero-alert" title="En seguimiento">🩹 ${lesionados}</span>` : ""}
                     <span class="idx-hero-count" id="${idCount || ""}"><span class="idx-hero-dot"></span>${cantidad} ${sufijo}</span>
@@ -1008,9 +1096,141 @@ function construirTarjetaHeroIndex({ href, onclick, idCount, tag, titulo, sub, b
     `;
 }
 
+function comprimirFotoPortadaIndexCDM(file, cb) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+            const maxW = 900;
+            const scale = Math.min(1, maxW / img.width);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+            cb(canvas.toDataURL("image/jpeg", 0.80));
+        };
+        img.onerror = () => alert("⚠️ No se pudo procesar la imagen seleccionada.");
+        img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+window.abrirModalFotoPortadaAreaCDM = function (areaKey, tituloArea, defaultPreview = "") {
+    if (!areaKey) return;
+    let modal = document.getElementById("modalFotoPortadaAreaCDM");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalFotoPortadaAreaCDM";
+        modal.className = "modal-backdrop hidden";
+        modal.onclick = (e) => { if (e.target === modal) cerrarModalFotoPortadaAreaCDM(); };
+        document.body.appendChild(modal);
+    }
+
+    const fotoActual = obtenerFotoPersonalizadaAreaCDM(areaKey);
+    const previewIni = fotoActual || defaultPreview || "https://images.unsplash.com/photo-1517649763962-0c62326601db?auto=format&fit=crop&w=900&q=80";
+
+    modal.innerHTML = `
+        <div class="modal-window" style="max-width:520px; text-align:left;">
+            <div class="modal-top">
+                <div>
+                    <span class="badge badge-celeste">🖼️ PORTADA DE DISCIPLINA</span>
+                    <h3 style="margin-top:4px; color:var(--ink-900);">Foto de ${escAttrIndexCDM(tituloArea)}</h3>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalFotoPortadaAreaCDM()">✕</button>
+            </div>
+
+            <form onsubmit="guardarFotoPortadaAreaCDM(event, '${escAttrIndexCDM(areaKey)}', '${escAttrIndexCDM(tituloArea)}')">
+                <div class="field" style="margin-bottom:0.85rem;">
+                    <label>Foto de Portada (subí desde PC/Celular o pegá una URL) *</label>
+                    <div style="display:flex; gap:0.45rem; align-items:center;">
+                        <input type="text" id="idxAreaFotoInput" required style="flex:1;"
+                            placeholder="https://... o tocá Subir"
+                            value="${escAttrIndexCDM(fotoActual)}"
+                            oninput="if(this.value.trim()) document.getElementById('idxAreaFotoPrev').src = this.value.trim();">
+                        <label class="btn btn-secondary btn-sm" style="cursor:pointer; margin:0; flex-shrink:0;">
+                            📷 Subir
+                            <input type="file" accept="image/*" style="display:none;" onchange="subirFotoPortadaAreaIndexCDM(event)">
+                        </label>
+                    </div>
+                    <img id="idxAreaFotoPrev" src="${escAttrIndexCDM(previewIni)}"
+                        style="width:100%; height:180px; object-fit:cover; border-radius:14px; margin-top:0.65rem; border:1px solid var(--line-strong); background:#0f172a;"
+                        onerror="this.src='https://images.unsplash.com/photo-1517649763962-0c62326601db?auto=format&fit=crop&w=900&q=80'">
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                    ${fotoActual ? `
+                        <button type="button" class="btn btn-danger btn-sm" onclick="restaurarFotoPortadaAreaCDM('${escAttrIndexCDM(areaKey)}', '${escAttrIndexCDM(tituloArea)}')">
+                            ↺ Restaurar original
+                        </button>
+                    ` : `<span></span>`}
+                    <div style="display:flex; gap:0.45rem;">
+                        <button type="button" class="btn btn-ghost" onclick="cerrarModalFotoPortadaAreaCDM()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">💾 Guardar Foto</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    `;
+    modal.classList.remove("hidden");
+};
+
+window.cerrarModalFotoPortadaAreaCDM = function () {
+    document.getElementById("modalFotoPortadaAreaCDM")?.classList.add("hidden");
+};
+
+window.subirFotoPortadaAreaIndexCDM = function (event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    comprimirFotoPortadaIndexCDM(file, (dataUrl) => {
+        const inp = document.getElementById("idxAreaFotoInput");
+        const prev = document.getElementById("idxAreaFotoPrev");
+        if (inp) inp.value = dataUrl;
+        if (prev) prev.src = dataUrl;
+    });
+};
+
+function persistirFotosPortadaEnLicenciaCDM(lic) {
+    if (typeof guardarLicenciaConfigCDM === "function") {
+        guardarLicenciaConfigCDM(lic);
+    } else {
+        localStorage.setItem("cdm_licencia_config_v1", JSON.stringify(lic));
+        guardarDatosCDM();
+    }
+}
+
+window.guardarFotoPortadaAreaCDM = function (e, areaKey, tituloArea) {
+    e.preventDefault();
+    const url = (document.getElementById("idxAreaFotoInput")?.value || "").trim();
+    if (!url) return;
+
+    const lic = obtenerLicenciaConfigCDM();
+    if (!lic.fotosPortadaAreas || typeof lic.fotosPortadaAreas !== "object") {
+        lic.fotosPortadaAreas = {};
+    }
+    lic.fotosPortadaAreas[areaKey] = url;
+    persistirFotosPortadaEnLicenciaCDM(lic);
+
+    cerrarModalFotoPortadaAreaCDM();
+    renderizarTarjetasModernasIndex(basePersonas.filter(p => p && p.activo));
+    mostrarToast(`🖼️ Foto de "${tituloArea}" guardada.`);
+};
+
+window.restaurarFotoPortadaAreaCDM = function (areaKey, tituloArea) {
+    const lic = obtenerLicenciaConfigCDM();
+    if (lic.fotosPortadaAreas && lic.fotosPortadaAreas[areaKey]) {
+        delete lic.fotosPortadaAreas[areaKey];
+        persistirFotosPortadaEnLicenciaCDM(lic);
+    }
+    cerrarModalFotoPortadaAreaCDM();
+    renderizarTarjetasModernasIndex(basePersonas.filter(p => p && p.activo));
+    mostrarToast(`↺ Foto original de "${tituloArea}" restaurada.`);
+};
+
 function renderizarTarjetasModernasIndex(activos) {
     const grid = document.querySelector(".sports-showcase-grid");
     if (!grid) return;
+
+    inyectarCSSEditarFotoPortadaIndex();
 
     const lic = obtenerLicenciaConfigCDM();
     const mod = lic.modulos || { futbol: true, hockey: true, gym: true, consultorio: false };
@@ -1030,10 +1250,13 @@ function renderizarTarjetasModernasIndex(activos) {
 
     if (mod.futbol !== false) {
         const s = statsDe("Futbol");
+        const fbFutbol = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=900&q=80";
         cards.push(construirTarjetaHeroIndex({
+            areaKey: "futbol",
             href: "futbol.html", idCount: "countFutbol", tag: "⚽ Fútbol", titulo: "Fútbol",
             sub: `${txtPres(s.pres)} • Planteles y Cancha`,
-            bgImageCss: `url('img/futbol.jpg'), url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=900&q=80')`,
+            bgImageCss: `url('img/futbol.jpg'), url('${fbFutbol}')`,
+            defaultPreview: fbFutbol,
             overlay: "linear-gradient(160deg, rgba(6, 78, 59, 0.55) 0%, rgba(15, 23, 42, 0.88) 100%)",
             cantidad: s.cant, sufijo: s.cant === 1 ? "activo" : "activos", lesionados: s.les
         }));
@@ -1041,21 +1264,27 @@ function renderizarTarjetasModernasIndex(activos) {
 
     if (mod.hockey !== false) {
         const s = statsDe("Hockey");
+        const fbHockey = "https://images.unsplash.com/photo-1580748141549-71748dbe0bdc?auto=format&fit=crop&w=900&q=80";
         cards.push(construirTarjetaHeroIndex({
+            areaKey: "hockey",
             href: "hockey.html", idCount: "countHockey", tag: "🏑 Hockey", titulo: "Hockey",
             sub: `${txtPres(s.pres)} • Planteles y Cancha`,
-            bgImageCss: `url('img/hockey.jpg')`,
-            overlay: "linear-gradient(160deg, rgba(3, 105, 161, 0.35) 0%, rgba(12, 25, 44, 0.86) 100%)",
+            bgImageCss: `url('img/hockey.jpg'), url('${fbHockey}')`,
+            defaultPreview: fbHockey,
+            overlay: "linear-gradient(160deg, rgba(3, 105, 161, 0.42) 0%, rgba(12, 25, 44, 0.88) 100%)",
             cantidad: s.cant, sufijo: s.cant === 1 ? "activo" : "activos", lesionados: s.les
         }));
     }
 
     if (mod.gym !== false) {
         const s = statsDe("Gimnasio");
+        const fbGym = "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=900&q=80";
         cards.push(construirTarjetaHeroIndex({
+            areaKey: "gimnasio",
             href: "gym.html", idCount: "countGym", tag: "🏋️ Gimnasio", titulo: "Gimnasio",
             sub: `${txtPres(s.pres)} • Rutinas y Videoteca`,
-            bgImageCss: `url('img/gym.jpg'), url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=900&q=80')`,
+            bgImageCss: `url('img/gym.jpg'), url('${fbGym}')`,
+            defaultPreview: fbGym,
             overlay: "linear-gradient(160deg, rgba(49, 46, 129, 0.58) 0%, rgba(15, 23, 42, 0.92) 100%)",
             cantidad: s.cant, sufijo: s.cant === 1 ? "socio" : "socios", lesionados: s.les
         }));
@@ -1075,14 +1304,16 @@ function renderizarTarjetasModernasIndex(activos) {
         else if (k.includes("boxeo")) { img = "https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?auto=format&fit=crop&w=900&q=80"; overlay = "linear-gradient(160deg, rgba(190, 18, 60, 0.64) 0%, rgba(15, 23, 42, 0.92) 100%)"; }
 
         cards.push(construirTarjetaHeroIndex({
+            areaKey: `dep_${k}`,
             href: `futbol.html?deporte=${encodeURIComponent(nom)}`, tag: depRaw, titulo: nom,
             sub: `${txtPres(s.pres)} • Planteles y Cancha`,
-            bgImageCss: `url('${img}')`, overlay,
+            bgImageCss: `url('${img}')`,
+            defaultPreview: img,
+            overlay,
             cantidad: s.cant, sufijo: s.cant === 1 ? "activo" : "activos", lesionados: s.les
         }));
     });
 
-    // Tarjetas GRANDES de Especialidades de Consultorio (leyendo datos reales de consultorio.js)
     if (mod.consultorio !== false && profesiones.length > 0) {
         const dbCons = typeof obtenerDatosConsultorioCDM === "function" ? obtenerDatosConsultorioCDM() : { pacientes: [], turnos: [] };
         const ESTILOS_PROF = {
@@ -1101,11 +1332,13 @@ function renderizarTarjetasModernasIndex(activos) {
                 const claveEsc = pr.clave.replace(/'/g, "\\'");
 
                 cards.push(construirTarjetaHeroIndex({
+                    areaKey: `prof_${k}`,
                     onclick: `if(typeof abrirEspecialidadDesdeInicioCDM==='function') abrirEspecialidadDesdeInicioCDM('${claveEsc}');`,
                     tag: `${pr.icono || "🩺"} Especialidad`,
                     titulo: pr.clave,
                     sub: `${cantPac} ${cantPac === 1 ? "paciente" : "pacientes"} • Agenda e Historia Clínica`,
                     bgImageCss: `url('${est.img}')`,
+                    defaultPreview: est.img,
                     overlay: est.ov,
                     cantidad: tHoy,
                     sufijo: tHoy === 1 ? "turno hoy" : "turnos hoy",
@@ -1113,11 +1346,14 @@ function renderizarTarjetasModernasIndex(activos) {
                 }));
             });
         } else {
+            const fbCons = "https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=900&q=80";
             cards.push(construirTarjetaHeroIndex({
+                areaKey: "consultorio",
                 onclick: `if(typeof abrirEspecialidadDesdeInicioCDM==='function') abrirEspecialidadDesdeInicioCDM('TODAS');`,
                 tag: "🩺 Consultorio", titulo: "Consultorio",
                 sub: `${profesiones.map(p => p.clave).slice(0, 3).join(" • ")}`,
-                bgImageCss: `url('https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=900&q=80')`,
+                bgImageCss: `url('${fbCons}')`,
+                defaultPreview: fbCons,
                 overlay: "linear-gradient(160deg, rgba(13, 148, 136, 0.62) 0%, rgba(15, 23, 42, 0.92) 100%)",
                 cantidad: profesiones.length, sufijo: "áreas", lesionados: 0
             }));
@@ -1127,6 +1363,7 @@ function renderizarTarjetasModernasIndex(activos) {
     grid.classList.toggle("cols-even-mobile", cards.length === 2 || cards.length === 4);
     grid.innerHTML = cards.join("");
 }
+
 
 function renderizarWidgetsLimpiosIndex(activos) {
     const grid = document.querySelector(".sports-showcase-grid");

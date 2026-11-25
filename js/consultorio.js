@@ -3702,3 +3702,415 @@ window.especialidadFiltroConsultorioCDM = "TODAS";
         setTimeout(hidratarConsultorioDesdeMongo15, 250);
     });
 })();
+// =========================================================================
+// 16. COLORES PERSONALIZABLES PARA CONSULTORIO Y ESPECIALIDADES
+//     - Conecta Consultorio, Calendario, Gota 45:00, Sesión en Vivo y Clínica con 🎨 Colores
+//     - Permite elegir un color distinto por especialidad o aplicar el color general del comercio
+//     - Respeta Modo Día / Modo Noche y guarda automáticamente en MongoDB (licenciaConfig)
+// Pegar al final de js/consultorio.js (debajo del Bloque 15)
+// =========================================================================
+(function () {
+    const PALETAS_CLINICA_16 = [
+        { nombre: "Violeta Psi", hex: "#7c3aed" },
+        { nombre: "Turquesa Kine", hex: "#0d9488" },
+        { nombre: "Celeste Base", hex: "#0284c7" },
+        { nombre: "Verde Salud", hex: "#16a34a" },
+        { nombre: "Rosa Studio", hex: "#db2777" },
+        { nombre: "Índigo", hex: "#4f46e5" },
+        { nombre: "Terracota", hex: "#c2410c" },
+        { nombre: "Bordo", hex: "#be123c" },
+        { nombre: "Dorado", hex: "#b45309" },
+        { nombre: "Grafito", hex: "#334155" }
+    ];
+
+    window.__cdmLiveColorCons16 = null;
+    window.__cdmLiveBrand16 = null;
+
+    function norm16(s) {
+        return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    function hexValido16(h, fb = "#0284c7") {
+        const s = String(h || "").trim();
+        return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toLowerCase() : fb;
+    }
+
+    function hexToRgb16(hex) {
+        const c = hexValido16(hex, "#0284c7").slice(1);
+        return { r: parseInt(c.slice(0, 2), 16), g: parseInt(c.slice(2, 4), 16), b: parseInt(c.slice(4, 6), 16) };
+    }
+
+    function mezclarHex16(hexA, hexB, pesoB) {
+        const a = hexToRgb16(hexA), b = hexToRgb16(hexB);
+        const f = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+        return `#${f(a.r + (b.r - a.r) * pesoB)}${f(a.g + (b.g - a.g) * pesoB)}${f(a.b + (b.b - a.b) * pesoB)}`;
+    }
+
+    function textoContraste16(hex) {
+        const { r, g, b } = hexToRgb16(hex);
+        return (0.299 * r + 0.587 * g + 0.114 * b) > 172 ? "#0f172a" : "#ffffff";
+    }
+
+    function obtenerEspActiva16() {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const lista = Array.isArray(lic?.profesionesHabilitadas)
+            ? lic.profesionesHabilitadas.map(c => String(c || "").trim()).filter(Boolean)
+            : [];
+        const act = window.especialidadFiltroConsultorioCDM;
+        if (act && act !== "TODAS") {
+            const hit = lista.find(c => norm16(c) === norm16(act));
+            if (hit) return hit;
+        }
+        return lista[0] || "Consultorio";
+    }
+
+    const _origColorEsp16 = window.colorEspecialidadConsultorio;
+
+    window.colorEspecialidadConsultorio = function (esp) {
+        const claveEsp = norm16(esp || obtenerEspActiva16());
+        const espAct = norm16(obtenerEspActiva16());
+
+        // 1. Vista previa en vivo desde el modal de color del consultorio
+        if (window.__cdmLiveColorCons16 && claveEsp === espAct) {
+            return hexValido16(window.__cdmLiveColorCons16);
+        }
+
+        // 2. Vista previa en vivo desde Más -> 🎨 Colores
+        if (window.__cdmLiveBrand16?.primario) {
+            return hexValido16(window.__cdmLiveBrand16.primario);
+        }
+
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+
+        // 3. Color personalizado guardado específicamente para esta especialidad
+        const mapaEsp = lic?.coloresEspecialidades;
+        if (mapaEsp && typeof mapaEsp === "object" && mapaEsp[claveEsp]) {
+            return hexValido16(mapaEsp[claveEsp]);
+        }
+
+        // 4. Color de marca global del comercio (si fue personalizado en 🎨 Colores)
+        const tm = lic?.temaMarca;
+        if (tm && tm.primario && (tm.primario.toLowerCase() !== "#0284c7" || (tm.secundario && tm.secundario.toLowerCase() !== "#0c192c") || tm.aplicarAConsultorio)) {
+            return hexValido16(tm.primario);
+        }
+
+        // 5. Color predeterminado por especialidad
+        return typeof _origColorEsp16 === "function" ? _origColorEsp16(esp) : "#0369a1";
+    };
+
+    window.gradienteEspecialidadConsultorio = function (esp) {
+        const pri = window.colorEspecialidadConsultorio(esp);
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const secBase = window.__cdmLiveBrand16?.secundario || lic?.temaMarca?.secundario;
+        const deep = (secBase && /^#[0-9a-fA-F]{6}$/.test(secBase) && secBase.toLowerCase() !== "#0c192c")
+            ? secBase
+            : mezclarHex16(pri, "#0b1220", 0.68);
+        const priHeader = textoContraste16(pri) === "#0f172a" ? mezclarHex16(pri, "#000000", 0.22) : pri;
+        return `linear-gradient(135deg, ${deep} 0%, ${priHeader} 100%)`;
+    };
+
+    function inyectarCSSColorDinamicoConsultorio16() {
+        if (document.getElementById("cdmCssColorConsultorio16")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssColorConsultorio16";
+        st.textContent = `
+            /* Banner, pestañas activas y calendario del Consultorio */
+            #cdmSeccionConsultorioGlobal .cons-header {
+                background: linear-gradient(135deg, var(--cons-p-deep) 0%, var(--cons-p-hdr) 100%) !important;
+            }
+            #cdmSeccionConsultorioGlobal .cons-tab.active {
+                background: var(--cons-p) !important;
+                color: var(--cons-on-p) !important;
+                box-shadow: 0 4px 12px rgba(var(--cons-p-rgb), 0.34) !important;
+            }
+            #cdmSeccionConsultorioGlobal .cons-cal-chip {
+                background: var(--cons-p) !important;
+                color: var(--cons-on-p) !important;
+            }
+            #cdmSeccionConsultorioGlobal .cons-cal-day:hover {
+                border-color: var(--cons-p) !important;
+                background: rgba(var(--cons-p-rgb), 0.09) !important;
+            }
+            #cdmSeccionConsultorioGlobal .cons-cal-day.is-today {
+                border-color: var(--cons-p) !important;
+                box-shadow: inset 0 0 0 1px var(--cons-p) !important;
+            }
+            #cdmSeccionConsultorioGlobal .cons-cal-day.is-today .cons-cal-day-num span:first-child {
+                background: var(--cons-p) !important;
+                color: var(--cons-on-p) !important;
+            }
+            #cdmSeccionConsultorioGlobal .cons-cal-day.is-sel {
+                background: rgba(var(--cons-p-rgb), 0.13) !important;
+                border-color: var(--cons-p) !important;
+                box-shadow: 0 0 0 2px rgba(var(--cons-p-rgb), 0.25) !important;
+            }
+
+            /* Gota flotante de sesión (45:00) y su desplegable */
+            #cdmPsicoGotaSesion12 .psv-gota-btn:not([data-fase="ok"]):not([data-fase="warn"]):not([data-fase="over"]) {
+                background: linear-gradient(135deg, var(--cons-p-deep) 0%, var(--cons-p) 100%) !important;
+                border-color: rgba(var(--cons-p-rgb), 0.72) !important;
+                box-shadow: 0 14px 30px rgba(var(--cons-p-rgb), 0.42) !important;
+                color: var(--cons-on-p) !important;
+            }
+            #cdmPsicoGotaSesion12 .psv-gota-popover {
+                background: linear-gradient(155deg, #0f172a 0%, var(--cons-p-deep) 60%, var(--cons-p-dark) 100%) !important;
+                border-color: rgba(var(--cons-p-rgb), 0.48) !important;
+            }
+            #cdmSeccionConsultorioGlobal .btn-psico-vivo-header {
+                color: var(--cons-p-deep) !important;
+            }
+            #cdmSeccionConsultorioGlobal .psv-tag-chip.active {
+                background: var(--cons-p) !important;
+                border-color: var(--cons-p) !important;
+                color: var(--cons-on-p) !important;
+            }
+            #cdmSeccionConsultorioGlobal .psv-prev-drawer,
+            #modalArbolFamiliarPsico12 .psv-tree-add-box {
+                background: rgba(var(--cons-p-rgb), 0.08) !important;
+                border-color: rgba(var(--cons-p-rgb), 0.34) !important;
+                border-left-color: var(--cons-p) !important;
+            }
+
+            /* Historia Clínica, Genograma y botones principales del modal clínico */
+            #modalSuiteClinicaProCDM .clin-hero {
+                background: linear-gradient(135deg, var(--cons-p-deep) 0%, var(--cons-p-hdr) 100%) !important;
+            }
+            #modalSuiteClinicaProCDM .clin-tab.active,
+            #modalSuiteClinicaProCDM .btn-primary {
+                background: var(--cons-p) !important;
+                border-color: var(--cons-p) !important;
+                color: var(--cons-on-p) !important;
+            }
+            #modalSuiteClinicaProCDM .clin-geno-node.is-pac {
+                background: linear-gradient(135deg, var(--cons-p) 0%, var(--cons-p-deep) 100%) !important;
+                border-color: var(--cons-p) !important;
+                color: var(--cons-on-p) !important;
+            }
+
+            .cons16-swatches { display: flex; flex-wrap: wrap; gap: 0.42rem; margin-bottom: 0.8rem; }
+            .cons16-swatch {
+                display: inline-flex; align-items: center; gap: 0.35rem;
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-solid, #ffffff);
+                color: var(--ink-900, #0f172a);
+                border-radius: 999px; padding: 0.28rem 0.65rem 0.28rem 0.34rem;
+                font-size: 0.74rem; font-weight: 700; cursor: pointer;
+            }
+            .cons16-swatch:hover { border-color: var(--cons-p, #0284c7); transform: translateY(-1px); }
+            .cons16-dot { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.16); flex-shrink: 0; }
+        `;
+        document.head.appendChild(st);
+    }
+
+    window.aplicarVariablesColorConsultorio16 = function (espOpt = null) {
+        inyectarCSSColorDinamicoConsultorio16();
+        const esp = espOpt || obtenerEspActiva16();
+        const pri = hexValido16(window.colorEspecialidadConsultorio(esp), "#0284c7");
+        const { r, g, b } = hexToRgb16(pri);
+        const onP = textoContraste16(pri);
+        const pDark = mezclarHex16(pri, "#000000", 0.24);
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const secMarca = window.__cdmLiveBrand16?.secundario || lic?.temaMarca?.secundario;
+        const pDeep = (secMarca && /^#[0-9a-fA-F]{6}$/.test(secMarca) && secMarca.toLowerCase() !== "#0c192c")
+            ? secMarca
+            : mezclarHex16(pri, "#0b1220", 0.68);
+        const pHdr = onP === "#0f172a" ? mezclarHex16(pri, "#000000", 0.22) : pri;
+
+        const root = document.documentElement;
+        root.style.setProperty("--cons-p", pri);
+        root.style.setProperty("--cons-p-hdr", pHdr);
+        root.style.setProperty("--cons-p-dark", pDark);
+        root.style.setProperty("--cons-p-deep", pDeep);
+        root.style.setProperty("--cons-p-rgb", `${r}, ${g}, ${b}`);
+        root.style.setProperty("--cons-on-p", onP);
+    };
+
+    // --- MODAL RÁPIDO PARA ELEGIR COLOR DEL CONSULTORIO / ESPECIALIDAD ---
+    window.abrirModalColorConsultorio16 = function () {
+        const esp = obtenerEspActiva16();
+        const colorAct = window.colorEspecialidadConsultorio(esp);
+
+        let modal = document.getElementById("modalColorConsultorio16");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "modalColorConsultorio16";
+            modal.className = "modal-backdrop";
+            modal.onclick = (e) => { if (e.target === modal) cancelarColorConsultorio16(); };
+            document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:540px; text-align:left;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">🎨 PERSONALIZAR COLOR</span>
+                        <h3 style="margin-top:4px; color:var(--ink-900);">Color de ${esp}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cancelarColorConsultorio16()">✕</button>
+                </div>
+
+                <p style="font-size:0.8rem; color:var(--ink-500); margin-bottom:0.8rem;">
+                    Elegí una paleta o cualquier color libre. Se previsualiza en vivo en la cabecera, pestañas, calendario, reloj e historia clínica (respetando Modo Día y Noche).
+                </p>
+
+                <div class="cons16-swatches">
+                    ${PALETAS_CLINICA_16.map(p => `
+                        <button type="button" class="cons16-swatch" onclick="previewColorConsultorio16('${p.hex}')">
+                            <span class="cons16-dot" style="background:${p.hex};"></span>
+                            <span>${p.nombre}</span>
+                        </button>
+                    `).join("")}
+                </div>
+
+                <div style="display:flex; gap:0.65rem; align-items:center; margin-bottom:1rem; background:var(--surface-subtle); padding:0.7rem 0.85rem; border-radius:12px; border:1px solid var(--line-strong);">
+                    <input type="color" id="cons16ColorPicker" value="${colorAct}" oninput="previewColorConsultorio16(this.value)" style="width:48px; height:40px; padding:2px; cursor:pointer;">
+                    <div class="field" style="flex:1;">
+                        <label>Código HEX</label>
+                        <input type="text" id="cons16ColorHex" value="${colorAct}" maxlength="7" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value)) previewColorConsultorio16(this.value)" style="font-family:monospace; font-weight:800;">
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="restaurarColorConsultorio16()">↺ Original</button>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="guardarColorConsultorio16(true)">
+                        🎨 Aplicar a todo el Comercio
+                    </button>
+                    <div style="display:flex; gap:0.45rem;">
+                        <button type="button" class="btn btn-ghost" onclick="cancelarColorConsultorio16()">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="guardarColorConsultorio16(false)">
+                            💾 Guardar para ${esp}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.previewColorConsultorio16 = function (hex) {
+        const val = hexValido16(hex, "#0284c7");
+        window.__cdmLiveColorCons16 = val;
+        const pk = document.getElementById("cons16ColorPicker");
+        const tx = document.getElementById("cons16ColorHex");
+        if (pk) pk.value = val;
+        if (tx && document.activeElement !== tx) tx.value = val;
+        aplicarVariablesColorConsultorio16();
+    };
+
+    window.cancelarColorConsultorio16 = function () {
+        window.__cdmLiveColorCons16 = null;
+        document.getElementById("modalColorConsultorio16")?.classList.add("hidden");
+        aplicarVariablesColorConsultorio16();
+    };
+
+    async function persistirLicenciaColoresEnServidor16(lic) {
+        if (typeof guardarLicenciaConfigCDM === "function") guardarLicenciaConfigCDM(lic);
+        const clave = typeof obtenerClaveClubActivoCDM === "function" ? obtenerClaveClubActivoCDM() : "cdm_adelia_maria_principal";
+        if (window.location.protocol !== "file:") {
+            try {
+                const resp = await fetch(`/api/cdm/estado?club=${encodeURIComponent(clave)}`);
+                if (resp.ok) {
+                    const d = await resp.json();
+                    const est = d.estado || {};
+                    est.licenciaConfig = { ...(est.licenciaConfig || {}), ...lic };
+                    await fetch("/api/cdm/estado", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...est, claveClub: clave })
+                    });
+                }
+            } catch {}
+        }
+    }
+
+    window.guardarColorConsultorio16 = async function (aplicarATodoComercio = false) {
+        const hex = hexValido16(document.getElementById("cons16ColorPicker")?.value, "#0284c7");
+        const esp = obtenerEspActiva16();
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+
+        if (!lic.coloresEspecialidades || typeof lic.coloresEspecialidades !== "object") {
+            lic.coloresEspecialidades = {};
+        }
+        lic.coloresEspecialidades[norm16(esp)] = hex;
+
+        if (aplicarATodoComercio) {
+            lic.temaMarca = {
+                ...(lic.temaMarca || { estiloSidebar: "oscuro_neutro" }),
+                primario: hex,
+                secundario: mezclarHex16(hex, "#0b1220", 0.68),
+                aplicarAConsultorio: true
+            };
+        }
+
+        window.__cdmLiveColorCons16 = null;
+        await persistirLicenciaColoresEnServidor16(lic);
+
+        document.getElementById("modalColorConsultorio16")?.classList.add("hidden");
+        if (typeof aplicarColoresMarcaComercio22 === "function") aplicarColoresMarcaComercio22();
+        aplicarVariablesColorConsultorio16();
+        if (typeof renderizarConsultorioCompleto === "function") renderizarConsultorioCompleto();
+        if (typeof mostrarToast === "function") {
+            mostrarToast(aplicarATodoComercio ? "🎨 Color aplicado a todo el comercio y consultorio." : `🎨 Color de ${esp} guardado.`);
+        }
+    };
+
+    window.restaurarColorConsultorio16 = async function () {
+        const esp = obtenerEspActiva16();
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        if (lic.coloresEspecialidades) delete lic.coloresEspecialidades[norm16(esp)];
+        window.__cdmLiveColorCons16 = null;
+        await persistirLicenciaColoresEnServidor16(lic);
+        document.getElementById("modalColorConsultorio16")?.classList.add("hidden");
+        aplicarVariablesColorConsultorio16();
+        if (typeof renderizarConsultorioCompleto === "function") renderizarConsultorioCompleto();
+        if (typeof mostrarToast === "function") mostrarToast(`↺ Color original de ${esp} restaurado.`);
+    };
+
+    // --- ENGANCHES EN VIVO CON CONSULTORIO Y CON LOGIN.JS BLOQUE 22 ---
+    function instalarHooksColoresConsultorio16() {
+        if (window.__cdmColorConsHook16) return;
+        window.__cdmColorConsHook16 = true;
+
+        if (typeof window.renderizarConsultorioCompleto === "function") {
+            const _origRend16 = window.renderizarConsultorioCompleto;
+            window.renderizarConsultorioCompleto = function () {
+                aplicarVariablesColorConsultorio16();
+                _origRend16.apply(this, arguments);
+                aplicarVariablesColorConsultorio16();
+
+                // Botón discreto "🎨 Color" en la cabecera del Consultorio (solo Admin Principal / SuperAdmin)
+                const ses = typeof obtenerSesionActivaCDM === "function" ? obtenerSesionActivaCDM() : null;
+                if (ses && ses.nivelAdmin === "staff") return;
+                const headBtns = document.querySelector("#cdmSeccionConsultorioGlobal .cons-header > div:last-child");
+                if (headBtns && !headBtns.querySelector(".btn-color-cons16")) {
+                    const b = document.createElement("button");
+                    b.type = "button";
+                    b.className = "btn btn-sm btn-color-cons16";
+                    b.style.cssText = "background:rgba(255,255,255,0.2); color:#ffffff; border:1px solid rgba(255,255,255,0.42); font-weight:800;";
+                    b.innerHTML = "🎨 Color";
+                    b.title = "Personalizar color de esta especialidad o de todo el consultorio";
+                    b.onclick = abrirModalColorConsultorio16;
+                    headBtns.appendChild(b);
+                }
+            };
+        }
+
+        if (typeof window.aplicarColoresMarcaComercio22 === "function") {
+            const _origBrand22 = window.aplicarColoresMarcaComercio22;
+            window.aplicarColoresMarcaComercio22 = function (temaOverride = null) {
+                window.__cdmLiveBrand16 = temaOverride || null;
+                const res = _origBrand22.apply(this, arguments);
+                aplicarVariablesColorConsultorio16();
+                return res;
+            };
+        }
+
+        aplicarVariablesColorConsultorio16();
+    }
+
+    instalarHooksColoresConsultorio16();
+    document.addEventListener("DOMContentLoaded", () => {
+        instalarHooksColoresConsultorio16();
+        setTimeout(aplicarVariablesColorConsultorio16, 250);
+    });
+})();
