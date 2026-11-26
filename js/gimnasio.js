@@ -2882,3 +2882,540 @@ document.addEventListener("DOMContentLoaded", () => {
         if (cont && cont.children.length === 0) agregarFilaRutinaAdminGym();
     }
 });
+// =========================================================================
+// 7. BASE DE DATOS DE RUTINAS + SELECTOR VISUAL DESDE BASE DE EJERCICIOS
+//    - Elegir ejercicios directo desde baseCatalogoEjercicios + baseVideoteca
+//    - Elegir y asignar rutinas guardadas en la Base de Rutinas desde afuera
+//      (funciona tanto en gym.html / deportes como en la ficha jugador.html)
+// Pegar al final de js/gimnasio.js
+// =========================================================================
+(function () {
+    if (window.__cdmBaseRutinasYEjercicios7) return;
+    window.__cdmBaseRutinasYEjercicios7 = true;
+
+    let pickerEjModoDestino = "modal_rutina"; // "modal_rutina" | "ficha_individual"
+    let pickerEjGrupoFiltro = "TODOS";
+    let pickerEjBusqueda = "";
+    const pickerEjSeleccionados = new Set();
+
+    let pickerRutModo = "cargar_en_modal"; // "cargar_en_modal" | "ficha_persona"
+    let pickerRutPersonaId = null;
+    let pickerRutSoloBiblio = true;
+    let pickerRutBusqueda = "";
+
+    function escB7(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function inyectarCSSPickersBase7() {
+        if (document.getElementById("cdmCssPickersBase7")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssPickersBase7";
+        st.textContent = `
+            #modalPickerBaseCDM7 { z-index: 99999 !important; }
+            .pk7-chips { display: flex; gap: 0.32rem; flex-wrap: wrap; margin-bottom: 0.65rem; }
+            .pk7-chip {
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-subtle, #f8fafc);
+                color: var(--ink-700, #334155);
+                font-size: 0.72rem; font-weight: 800; padding: 0.28rem 0.65rem;
+                border-radius: 999px; cursor: pointer;
+            }
+            .pk7-chip.active { background: #0284c7; border-color: #0284c7; color: #ffffff; }
+            .pk7-ej-list {
+                display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+                gap: 0.48rem; max-height: 44vh; overflow-y: auto; padding: 2px;
+            }
+            .pk7-ej-item {
+                display: flex; align-items: flex-start; gap: 0.55rem;
+                padding: 0.58rem 0.72rem; border-radius: 12px;
+                border: 1.5px solid var(--line, #e2e8f0);
+                background: var(--surface-subtle, #f8fafc);
+                cursor: pointer; transition: all 0.14s ease;
+            }
+            .pk7-ej-item:hover { border-color: #0284c7; }
+            .pk7-ej-item.checked { background: rgba(2, 132, 199, 0.1); border-color: #0284c7; }
+            .pk7-ej-item input { width: 17px; height: 17px; min-height: auto !important; margin-top: 2px; accent-color: #0284c7; flex-shrink: 0; }
+            .pk7-rut-list {
+                display: flex; flex-direction: column; gap: 0.55rem;
+                max-height: 52vh; overflow-y: auto;
+            }
+            .pk7-rut-card {
+                background: var(--surface-subtle, #f8fafc);
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                border-left: 4px solid #0284c7;
+                border-radius: 14px; padding: 0.75rem 0.9rem;
+                display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function asegurarModalPicker7() {
+        inyectarCSSPickersBase7();
+        let m = document.getElementById("modalPickerBaseCDM7");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalPickerBaseCDM7";
+            m.className = "modal-backdrop hidden";
+            m.onclick = (e) => { if (e.target === m) cerrarModalPickerBase7(); };
+            document.body.appendChild(m);
+        }
+        return m;
+    }
+
+    window.cerrarModalPickerBase7 = function () {
+        document.getElementById("modalPickerBaseCDM7")?.classList.add("hidden");
+    };
+
+    // --- 1. UNIFICAR BASE DE EJERCICIOS (CATALOGO + VIDEOTECA) ---
+    function obtenerBaseEjerciciosUnificada7() {
+        if (typeof asegurarVideotecaCargada === "function") asegurarVideotecaCargada();
+        const mapa = new Map();
+
+        (typeof baseVideoteca !== "undefined" ? baseVideoteca : []).forEach(v => {
+            if (!v?.nombre) return;
+            const k = normalizarTextoEjercicioCDM(v.nombre);
+            if (!k || mapa.has(k)) return;
+            mapa.set(k, {
+                clave: k,
+                nombre: v.nombre.trim(),
+                grupo: v.grupo || "General",
+                equipo: v.equipo || "A ajustar",
+                series: v.seriesSugeridas || 4,
+                reps: v.repsSugeridas || "8-10",
+                pausa: v.pausaSugerida || "90s",
+                forma: v.clavesTecnicas || "",
+                tieneVideo: Boolean(v.videoUrl && v.videoUrl !== "biomech://simulador")
+            });
+        });
+
+        (typeof baseCatalogoEjercicios !== "undefined" ? baseCatalogoEjercicios : []).forEach(e => {
+            if (!e?.nombre) return;
+            const k = normalizarTextoEjercicioCDM(e.nombre);
+            if (!k || mapa.has(k)) return;
+            mapa.set(k, {
+                clave: k,
+                nombre: e.nombre.trim(),
+                grupo: e.grupo || "General",
+                equipo: "A ajustar",
+                series: 4,
+                reps: "8-10",
+                pausa: "90s",
+                forma: "",
+                tieneVideo: Boolean(e.video)
+            });
+        });
+
+        return Array.from(mapa.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }
+
+    // --- 2. SELECTOR VISUAL DESDE LA BASE DE EJERCICIOS ---
+    window.abrirModalSelectorBaseEjerciciosCDM = function (modoDestino = "modal_rutina") {
+        pickerEjModoDestino = modoDestino;
+        pickerEjGrupoFiltro = "TODOS";
+        pickerEjBusqueda = "";
+        pickerEjSeleccionados.clear();
+        renderModalSelectorEjercicios7();
+    };
+
+    function renderModalSelectorEjercicios7() {
+        const modal = asegurarModalPicker7();
+        const todos = obtenerBaseEjerciciosUnificada7();
+        const grupos = ["TODOS", ...new Set(todos.map(e => e.grupo).filter(Boolean))];
+        const q = normalizarTextoEjercicioCDM(pickerEjBusqueda);
+
+        const filtrados = todos.filter(e => {
+            if (pickerEjGrupoFiltro !== "TODOS" && e.grupo !== pickerEjGrupoFiltro) return false;
+            if (q && !normalizarTextoEjercicioCDM(`${e.nombre} ${e.grupo} ${e.equipo}`).includes(q)) return false;
+            return true;
+        });
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:740px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">🏋️ BASE DE DATOS DE EJERCICIOS (${todos.length})</span>
+                        <h3 style="margin-top:4px;">Elegir Ejercicios para la Rutina</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPickerBase7()">✕</button>
+                </div>
+
+                <div style="display:flex; gap:0.5rem; margin-bottom:0.65rem; flex-wrap:wrap;">
+                    <input type="text" id="pk7BusqEj" value="${escB7(pickerEjBusqueda)}" placeholder="🔍 Buscar ejercicio o equipo..." style="flex:1; min-width:200px;"
+                        oninput="pk7SetFiltroEj('busq', this.value)">
+                </div>
+
+                <div class="pk7-chips">
+                    ${grupos.map(g => `
+                        <button type="button" class="pk7-chip ${pickerEjGrupoFiltro === g ? "active" : ""}" onclick="pk7SetFiltroEj('grupo', '${escB7(g)}')">${escB7(g === "TODOS" ? "Todos" : g)}</button>
+                    `).join("")}
+                </div>
+
+                <div class="pk7-ej-list">
+                    ${filtrados.length === 0 ? `<div class="empty-box" style="grid-column:1/-1; padding:1rem;">Sin ejercicios con ese filtro. Podés crear uno abajo.</div>` :
+                    filtrados.map(ex => {
+                        const sel = pickerEjSeleccionados.has(ex.clave);
+                        return `
+                            <label class="pk7-ej-item ${sel ? "checked" : ""}">
+                                <input type="checkbox" ${sel ? "checked" : ""} onchange="pk7ToggleEj('${escB7(ex.clave)}', this)">
+                                <div style="min-width:0;">
+                                    <strong style="display:block; font-size:0.83rem; color:var(--ink-900);">${escB7(ex.nombre)}</strong>
+                                    <small style="display:block; font-size:0.71rem; color:var(--ink-500);">
+                                        ${escB7(ex.grupo)} • ${ex.series}×${escB7(ex.reps)} ${ex.tieneVideo ? "• 🎥 Video" : ""}
+                                    </small>
+                                </div>
+                            </label>
+                        `;
+                    }).join("")}
+                </div>
+
+                <form onsubmit="pk7CrearEjercicioRapido(event)" style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.75rem; padding-top:0.7rem; border-top:1px dashed var(--line);">
+                    <input type="text" id="pk7NuevoNom" placeholder="+ Crear ejercicio nuevo en la Base..." style="flex:1; min-width:180px; min-height:34px; font-size:0.78rem;">
+                    <select id="pk7NuevoGrp" style="width:auto; min-height:34px; font-size:0.76rem;">
+                        <option>Tren Inferior</option><option>Empuje / Torso</option><option>Tracción / Espalda</option><option>Core y Funcional</option><option>Potencia y Pliometría</option><option>Movilidad y Rehab</option>
+                    </select>
+                    <button type="submit" class="btn btn-secondary btn-sm">+ Crear y tildar</button>
+                </form>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-top:0.85rem; flex-wrap:wrap;">
+                    <small id="pk7ContSel" style="font-weight:800; color:var(--ink-600);">${pickerEjSeleccionados.size} ejercicio(s) seleccionado(s)</small>
+                    <div style="display:flex; gap:0.45rem;">
+                        <button type="button" class="btn btn-ghost" onclick="cerrarModalPickerBase7()">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="pk7ConfirmarEjercicios()">✅ Agregar a la Rutina</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    }
+
+    window.pk7SetFiltroEj = function (tipo, val) {
+        if (tipo === "grupo") pickerEjGrupoFiltro = val;
+        else pickerEjBusqueda = val;
+        renderModalSelectorEjercicios7();
+        if (tipo === "busq") {
+            const inp = document.getElementById("pk7BusqEj");
+            if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+        }
+    };
+
+    window.pk7ToggleEj = function (clave, chkEl) {
+        if (chkEl.checked) pickerEjSeleccionados.add(clave);
+        else pickerEjSeleccionados.delete(clave);
+        chkEl.closest(".pk7-ej-item")?.classList.toggle("checked", chkEl.checked);
+        const lbl = document.getElementById("pk7ContSel");
+        if (lbl) lbl.textContent = `${pickerEjSeleccionados.size} ejercicio(s) seleccionado(s)`;
+    };
+
+    window.pk7CrearEjercicioRapido = function (e) {
+        e.preventDefault();
+        const nom = (document.getElementById("pk7NuevoNom")?.value || "").trim();
+        const grp = document.getElementById("pk7NuevoGrp")?.value || "General";
+        if (!nom) return;
+        if (typeof agregarEjercicioInventadoAlCatalogoCDM === "function") {
+            agregarEjercicioInventadoAlCatalogoCDM(nom, "fuerza_kg", false, { grupo: grp });
+            if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+        }
+        pickerEjSeleccionados.add(normalizarTextoEjercicioCDM(nom));
+        pickerEjBusqueda = "";
+        renderModalSelectorEjercicios7();
+    };
+
+    window.pk7ConfirmarEjercicios = function () {
+        if (pickerEjSeleccionados.size === 0) {
+            if (typeof mostrarToast === "function") mostrarToast("⚠️ Tildá al menos un ejercicio de la lista.");
+            return;
+        }
+        const todos = obtenerBaseEjerciciosUnificada7();
+        const elegidos = todos.filter(e => pickerEjSeleccionados.has(e.clave));
+
+        if (pickerEjModoDestino === "ficha_individual") {
+            const cont = document.getElementById("contenedorFilasRutinaIndividual");
+            if (cont) {
+                const filas = cont.querySelectorAll(".ex-builder-row");
+                if (filas.length === 1 && !(filas[0].querySelector(".ri-ej")?.value || "").trim()) {
+                    filas[0].remove();
+                }
+                elegidos.forEach(ex => {
+                    if (typeof agregarFilaEjercicioIndividual === "function") {
+                        agregarFilaEjercicioIndividual({ nombre: ex.nombre, series: String(ex.series), reps: ex.reps, peso: ex.equipo });
+                    }
+                });
+            }
+        } else {
+            const cont = document.getElementById("modalFilasRutinaCDM");
+            if (cont) {
+                const filas = cont.querySelectorAll(".ex-builder-row");
+                if (filas.length === 1 && !(filas[0].querySelector(".mr-nombre")?.value || "").trim()) {
+                    filas[0].remove();
+                }
+                elegidos.forEach(ex => {
+                    if (typeof agregarFilaRutinaModalCDM === "function") {
+                        agregarFilaRutinaModalCDM({ nombre: ex.nombre, series: ex.series, reps: ex.reps, peso: ex.equipo, pausa: ex.pausa, forma: ex.forma });
+                    }
+                });
+            }
+        }
+
+        cerrarModalPickerBase7();
+        if (typeof mostrarToast === "function") mostrarToast(`✅ ${elegidos.length} ejercicio(s) sumado(s) desde la Base.`);
+    };
+
+    // --- 3. SELECTOR DE RUTINAS GUARDADAS EN LA BASE DE DATOS (DESDE AFUERA) ---
+    window.abrirModalSelectorBaseRutinasCDM = function (modo = "cargar_en_modal", personaId = null) {
+        pickerRutModo = modo;
+        pickerRutPersonaId = personaId ? Number(personaId) : null;
+        pickerRutSoloBiblio = true;
+        pickerRutBusqueda = "";
+        renderModalSelectorRutinas7();
+    };
+
+    function renderModalSelectorRutinas7() {
+        const modal = asegurarModalPicker7();
+        const todas = [...(typeof baseRutinas !== "undefined" ? baseRutinas : [])].filter(Boolean);
+        const biblio = todas.filter(r => r.esPlantillaBiblioteca);
+        const fuente = (pickerRutSoloBiblio && biblio.length > 0) ? biblio : todas;
+        const q = normalizarTextoEjercicioCDM(pickerRutBusqueda);
+
+        const filtradas = fuente.filter(r => {
+            if (!q) return true;
+            const txt = `${r.nombre || ""} ${r.objetivo || ""} ${r.dias || ""} ${(r.ejercicios || []).map(e => e.nombre).join(" ")}`;
+            return normalizarTextoEjercicioCDM(txt).includes(q);
+        });
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:740px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">📚 BASE DE DATOS DE RUTINAS</span>
+                        <h3 style="margin-top:4px;">Elegir Rutina Guardada (${filtradas.length})</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPickerBase7()">✕</button>
+                </div>
+
+                <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap; align-items:center;">
+                    <input type="text" id="pk7BusqRut" value="${escB7(pickerRutBusqueda)}" placeholder="🔍 Buscar por nombre, objetivo o ejercicio..." style="flex:1; min-width:200px;"
+                        oninput="pk7SetFiltroRut('busq', this.value)">
+                    <button type="button" class="pk7-chip ${pickerRutSoloBiblio ? "active" : ""}" onclick="pk7SetFiltroRut('soloBib', true)">📚 Base (${biblio.length})</button>
+                    <button type="button" class="pk7-chip ${!pickerRutSoloBiblio ? "active" : ""}" onclick="pk7SetFiltroRut('soloBib', false)">Todas (${todas.length})</button>
+                </div>
+
+                <div class="pk7-rut-list">
+                    ${filtradas.length === 0 ? `
+                        <div class="empty-box" style="padding:1.3rem;">
+                            Todavía no hay rutinas guardadas en la Base.
+                            ${typeof cargarBibliotecaBaseRutinasCDM === "function" ? `<br><button type="button" class="btn btn-primary btn-sm" style="margin-top:0.65rem;" onclick="cargarBibliotecaBaseRutinasCDM(); renderModalSelectorRutinas7Public();">✨ Cargar 7 Rutinas Base</button>` : ""}
+                        </div>
+                    ` : filtradas.map(r => {
+                        const ejs = (r.ejercicios || []).slice(0, 4).map(e => e.nombre).join(" • ");
+                        const mas = (r.ejercicios || []).length > 4 ? ` (+${r.ejercicios.length - 4})` : "";
+                        return `
+                            <div class="pk7-rut-card">
+                                <div style="flex:1; min-width:220px;">
+                                    <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:3px;">
+                                        <span class="badge ${r.esPlantillaBiblioteca ? "badge-purple" : "badge-celeste"}" style="font-size:0.65rem;">${r.esPlantillaBiblioteca ? "📚 Base" : "👤 Asignada"}</span>
+                                        <span class="badge badge-ok" style="font-size:0.65rem;">${escB7(r.objetivo || "General")}</span>
+                                        <span class="badge" style="font-size:0.65rem;">${(r.ejercicios || []).length} ej.</span>
+                                    </div>
+                                    <strong style="font-size:0.93rem;">${escB7(r.nombre)}</strong>
+                                    <small style="display:block; color:var(--ink-500); margin-top:2px;">${escB7(ejs + mas)}</small>
+                                </div>
+                                <div style="display:flex; gap:0.35rem; flex-shrink:0; flex-wrap:wrap;">
+                                    ${pickerRutModo === "ficha_persona" ? `
+                                        <button type="button" class="btn btn-ok btn-sm" onclick="pk7AsignarRutinaDirectaPersona(${r.id})">✅ Asignar directa</button>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="pk7CargarRutinaEnFormulario(${r.id}, 'ficha')">✏️ Ajustar</button>
+                                    ` : `
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="pk7CargarRutinaEnFormulario(${r.id}, 'modal')">📥 Usar esta Rutina</button>
+                                    `}
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    }
+
+    window.renderModalSelectorRutinas7Public = renderModalSelectorRutinas7;
+
+    window.pk7SetFiltroRut = function (tipo, val) {
+        if (tipo === "soloBib") pickerRutSoloBiblio = Boolean(val);
+        else pickerRutBusqueda = val;
+        renderModalSelectorRutinas7();
+        if (tipo === "busq") {
+            const inp = document.getElementById("pk7BusqRut");
+            if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+        }
+    };
+
+    window.pk7AsignarRutinaDirectaPersona = function (idRut) {
+        const origen = (baseRutinas || []).find(x => Number(x.id) === Number(idRut));
+        const p = (basePersonas || []).find(x => Number(x.id) === Number(pickerRutPersonaId));
+        if (!origen || !p) return;
+
+        baseRutinas.unshift({
+            ...JSON.parse(JSON.stringify(origen)),
+            id: Date.now(),
+            esPlantillaBiblioteca: false,
+            origenPlantillaId: origen.id,
+            esGrupal: false,
+            personaId: p.id,
+            deporteDestino: p.deporte || "Gimnasio",
+            categoriaDestino: p.categoria || "General",
+            etiquetaDestino: `👤 ${p.nombre} ${p.apellido}`,
+            fecha: new Date().toLocaleDateString("es-AR")
+        });
+
+        guardarDatosCDM();
+        cerrarModalPickerBase7();
+        if (typeof renderizarRutinasJugador === "function") renderizarRutinasJugador(p);
+        if (typeof mostrarToast === "function") mostrarToast(`✅ Rutina "${origen.nombre}" asignada a ${p.nombre}.`);
+    };
+
+    window.pk7CargarRutinaEnFormulario = function (idRut, destino) {
+        const r = (baseRutinas || []).find(x => Number(x.id) === Number(idRut));
+        if (!r) return;
+
+        if (destino === "ficha") {
+            if (document.getElementById("rutNombre")) document.getElementById("rutNombre").value = r.nombre || "";
+            if (document.getElementById("rutObjetivo") && r.objetivo) document.getElementById("rutObjetivo").value = r.objetivo;
+            if (document.getElementById("rutDias")) document.getElementById("rutDias").value = r.dias || "";
+            if (document.getElementById("rutNotas")) document.getElementById("rutNotas").value = r.notas || "";
+            const cont = document.getElementById("contenedorFilasRutinaIndividual");
+            if (cont) {
+                cont.innerHTML = "";
+                (r.ejercicios || []).forEach(ex => {
+                    if (typeof agregarFilaEjercicioIndividual === "function") agregarFilaEjercicioIndividual(ex);
+                });
+            }
+        } else {
+            if (document.getElementById("modalRutinaNombre")) document.getElementById("modalRutinaNombre").value = r.nombre || "";
+            if (document.getElementById("modalRutinaObjetivo") && r.objetivo) document.getElementById("modalRutinaObjetivo").value = r.objetivo;
+            if (document.getElementById("modalRutinaDias")) document.getElementById("modalRutinaDias").value = r.dias || "";
+            if (document.getElementById("modalRutinaNotas")) document.getElementById("modalRutinaNotas").value = r.notas || "";
+            const cont = document.getElementById("modalFilasRutinaCDM");
+            if (cont) {
+                cont.innerHTML = "";
+                (r.ejercicios || []).forEach(ex => {
+                    if (typeof agregarFilaRutinaModalCDM === "function") agregarFilaRutinaModalCDM(ex);
+                });
+            }
+        }
+
+        cerrarModalPickerBase7();
+        if (typeof mostrarToast === "function") mostrarToast(`📥 "${r.nombre}" cargada. Podés ajustar pesos o guardarla directo.`);
+    };
+
+    // --- 4. ENGANCHES EN EL MODAL DE RUTINAS Y EN LA FICHA JUGADOR.HTML ---
+    if (typeof window.abrirModalCrearRutinaCDM === "function") {
+        const _origModalRut7 = window.abrirModalCrearRutinaCDM;
+        window.abrirModalCrearRutinaCDM = function () {
+            const res = _origModalRut7.apply(this, arguments);
+            const form = document.getElementById("formModalRutinaCDM");
+            if (!form) return res;
+
+            // Botón "Elegir desde Base de Rutinas" arriba
+            if (!document.getElementById("btnElegirBaseRutModal7")) {
+                const topRow = form.previousElementSibling;
+                if (topRow) {
+                    const bRut = document.createElement("button");
+                    bRut.type = "button";
+                    bRut.id = "btnElegirBaseRutModal7";
+                    bRut.className = "btn btn-secondary btn-sm";
+                    bRut.innerHTML = "📚 Elegir de Base de Rutinas";
+                    bRut.onclick = () => abrirModalSelectorBaseRutinasCDM("cargar_en_modal");
+                    topRow.prepend(bRut);
+                }
+            }
+
+            // Botón "Elegir desde Base de Ejercicios" junto a "+ Añadir Ejercicio"
+            const btnAdd = form.querySelector('button[onclick*="agregarFilaRutinaModalCDM"]');
+            if (btnAdd && !document.getElementById("btnElegirBaseEjModal7")) {
+                const wrap = document.createElement("div");
+                wrap.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:0.45rem; margin-bottom:0.75rem;";
+                btnAdd.style.marginBottom = "0";
+                btnAdd.parentNode.insertBefore(wrap, btnAdd);
+
+                const bEj = document.createElement("button");
+                bEj.type = "button";
+                bEj.id = "btnElegirBaseEjModal7";
+                bEj.className = "btn btn-primary btn-sm";
+                bEj.innerHTML = "🏋️ Elegir de Base de Ejercicios";
+                bEj.onclick = () => abrirModalSelectorBaseEjerciciosCDM("modal_rutina");
+
+                wrap.appendChild(bEj);
+                wrap.appendChild(btnAdd);
+            }
+
+            // Casilla para guardar copia reutilizable en la Base de Rutinas
+            const notasField = document.getElementById("modalRutinaNotas")?.closest(".field");
+            if (notasField && !document.getElementById("chkGuardarCopiaBaseRut7")) {
+                const lbl = document.createElement("label");
+                lbl.style.cssText = "display:flex; align-items:center; gap:0.45rem; font-size:0.79rem; font-weight:700; margin-bottom:0.85rem; cursor:pointer;";
+                lbl.innerHTML = `<input type="checkbox" id="chkGuardarCopiaBaseRut7" style="width:16px; height:16px; min-height:auto;"> 📚 Guardar también una copia reutilizable en la Base de Rutinas`;
+                notasField.insertAdjacentElement("afterend", lbl);
+            }
+            return res;
+        };
+    }
+
+    if (typeof window.guardarRutinaDesdeModalCDM === "function") {
+        const _origGuardarRut7 = window.guardarRutinaDesdeModalCDM;
+        window.guardarRutinaDesdeModalCDM = function (e, idEditar) {
+            const guardarCopia = Boolean(document.getElementById("chkGuardarCopiaBaseRut7")?.checked);
+            const tipoDest = document.getElementById("modalRutinaTipoDest")?.value || "biblioteca";
+            const res = _origGuardarRut7.apply(this, arguments);
+
+            if (guardarCopia && tipoDest !== "biblioteca" && Array.isArray(baseRutinas) && baseRutinas.length > 0) {
+                const recien = baseRutinas[0];
+                if (recien && !recien.esPlantillaBiblioteca) {
+                    const nomNorm = normalizarTextoEjercicioCDM(recien.nombre);
+                    const yaExiste = baseRutinas.some(r => r.esPlantillaBiblioteca && normalizarTextoEjercicioCDM(r.nombre) === nomNorm);
+                    if (!yaExiste) {
+                        baseRutinas.push({
+                            ...JSON.parse(JSON.stringify(recien)),
+                            id: Date.now() + 7,
+                            esPlantillaBiblioteca: true,
+                            esGrupal: false,
+                            personaId: null,
+                            deporteDestino: "",
+                            categoriaDestino: "",
+                            etiquetaDestino: "📚 Biblioteca"
+                        });
+                        guardarDatosCDM();
+                    }
+                }
+            }
+            return res;
+        };
+    }
+
+    function inyectarBotonesBaseEnFichaJugador7() {
+        if (document.body?.dataset?.page !== "perfil-individual") return;
+        const form = document.getElementById("formRutinaIndividual");
+        if (!form) return;
+
+        // 1. Botón "Elegir de Base de Rutinas" arriba del formulario en jugador.html
+        if (!document.getElementById("btnBaseRutFicha7")) {
+            const bar = document.createElement("div");
+            bar.style.cssText = "display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.75rem;";
+            bar.innerHTML = `
+                <button type="button" id="btnBaseRutFicha7" class="btn btn-primary btn-sm" style="flex:1;" onclick="abrirModalSelectorBaseRutinasCDM('ficha_persona', obtenerJugadorActualPorURL()?.id)">📚 Elegir de Base de Rutinas</button>
+                <button type="button" id="btnBaseEjFicha7" class="btn btn-secondary btn-sm" style="flex:1;" onclick="abrirModalSelectorBaseEjerciciosCDM('ficha_individual')">🏋️ Elegir de Base de Ejercicios</button>
+            `;
+            form.prepend(bar);
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        inyectarBotonesBaseEnFichaJugador7();
+        setTimeout(inyectarBotonesBaseEnFichaJugador7, 400);
+    });
+})();

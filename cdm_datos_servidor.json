@@ -1,6 +1,6 @@
 {
   "claveClub": "cdm_adelia_maria_principal",
-  "ultimaActualizacionISO": "2026-11-24T23:13:26.953Z",
+  "ultimaActualizacionISO": "2026-11-25T01:40:49.610Z",
   "personas": [
     {
       "id": 101,
@@ -1410,7 +1410,7 @@
   "clubes": {
     "cdm_adelia_maria_principal": {
       "claveClub": "cdm_adelia_maria_principal",
-      "ultimaActualizacionISO": "2026-11-24T23:13:26.953Z",
+      "ultimaActualizacionISO": "2026-11-25T01:40:49.610Z",
       "personas": [
         {
           "id": 101,
@@ -2820,7 +2820,7 @@
     },
     "gimasio_426": {
       "claveClub": "gimasio_426",
-      "ultimaActualizacionISO": "2026-11-22T04:13:27.760Z",
+      "ultimaActualizacionISO": "2026-11-26T00:31:27.282Z",
       "personas": [
         {
           "id": 101,
@@ -3243,6 +3243,279 @@
               "forma": "Espalda neutra"
             }
           ]
+        },
+        {
+          "id": 1795653087270,
+          "esPlantillaBiblioteca": true,
+          "esGrupal": false,
+          "personaId": null,
+          "categoriaVisualId": "hipertrofia",
+          "objetivo": "Hipertrofia Estructural",
+          "nombre": "Tren Superior — Hipertrofia",
+          "nivel": "Principiante",
+          "dias": "Lun, Mié y Vie",
+          "notas": "Controlar la técnica y respetar las pausas.",
+          "fecha": "25/11/2026",
+          "ejercicios": [
+            {
+              "nombre": "Press de Banca Plano",
+              "series": 4,
+              "reps": "8-10",
+              "peso": "Moderado-Alto",
+              "pausa": "90s",
+              "forma": "Escápulas retraídas y bajada controlada"
+            },
+            {
+              "nombre": "Dominadas / Jalón al Pecho en Polea",
+              "series": 4,
+              "reps": "8-12",
+              "peso": "Moderado",
+              "pausa": "90s",
+              "forma": "Pecho arriba sin balanceo"
+            },
+            {
+              "nombre": "Remo Unilateral con Mancuerna",
+              "series": 3,
+              "reps": "10 c/lado",
+              "peso": "Moderado",
+              "pausa": "75s",
+              "forma": "Tirar hacia la cadera"
+            }
+          ]
+        },
+        {
+          "id": 1795653087271,
+          "esPlantillaBiblioteca": true,
+          "esGrupal": false,
+          "personaId": null,
+          "categoriaVisualId": "fuerza",
+          "objetivo": "Fuerza Máxima",
+          "nombre": "Fuerza Base 5×5",
+          "nivel": "Intermedio",
+          "dias": "Lun, Mié y Vie",
+          "notas": "Controlar la técnica y respetar las pausas.",
+          "fecha": "25/11/2026",
+          "ejercicios": [
+            {
+              "nombre": "Sentadilla Trasera con Barra",
+              "series": 5,
+              "reps": "5",
+              "peso": "80% 1RM",
+              "pausa": "180s",
+              "forma": "Core firme y profundidad controlada"
+            },
+            {
+              "nombre": "Press de Banca Plano",
+              "series": 5,
+              "reps": "5",
+              "peso": "80% 1RM",
+              "pausa": "180s",
+              "forma": "Pausa breve en el pecho"
+            },
+            {
+              "nombre": "Peso Muerto Rumano (Isquios y Glúteos)",
+              "series": 4,
+              "reps": "5",
+              "peso": "80% 1RM",
+              "pausa": "150s",
+              "forma": "Espalda neutra"
+            }
+          ]
+        },
+        {
+          "id": 1795653087272,
+          "esPlantillaBiblioteca": true,
+          "esGrupal": false,
+          "personaId": null,
+          "categoriaVisualId": "fuerza",
+          "objetivo": "Fuerza Máxima",
+          "nombre": "Fuerza Tren Inferior y Glúteos",
+          "nivel": "Avanzado",
+          "dias": "Mar y Jue",
+          "notas": "Controlar la técnica y respetar las pausas.",
+          "fecha": "25/11/2026",
+          "ejercicios": [
+            {
+              "nombre": "Hip Thrust con Barra (Empuje de Cadera)",
+              "series": 4,
+              "reps": "8-10",
+              "peso": "Pesado",
+              "pausa": "90s",
+              "forma": "Sostener 1s arriba"
+            },
+            {
+              "nombre": "Sentadilla Búlgara Unilateral",
+              "series": 3,
+              "reps": "8 c/pierna",
+              "peso": "Mancuernas",
+              "pausa": "75s",
+              "forma": "Rodilla alineada con el pie"
+            },
+            {
+              "nombre": "Peso Muerto Rumano (Isquios y Glúteos)",
+              "series": 4,
+              "reps": "8",
+              "peso": "Controlado",
+              "pausa": "90s",
+              "forma": "Bisagra de cadera"
+            }
+          ]
+        },
+        {
+          "id": 1795653087273,
+          "esPlantillaBiblioteca": true,
+          "esGrupal": false,
+          "personaId": null,
+          "categoriaVisualId": "levantamiento",
+          "objetivo": "Levantamiento y Potencia",
+          "nombre": "Levantamiento y Potencia Explosiva",
+          "nivel": "Principiante",
+          "dias": "Mar y Jue",
+          "notas": "Controlar la técnica y respetar las pausas.",
+          "fecha": "25/11/2026",
+          "ejercicios": [
+            {
+              "nombre": "Cargada Colgante (Hang Clean)",
+              "series": 5,
+              "reps": "3",
+              "peso": "70% 1RM",
+              "pausa": "120s",
+              "forma": "Extensión explosiva de cadera"
+            },
+            {
+              "nombre": "Press Militar de Hombros",
+              "series": 4,
+              "reps": "5",
+              "peso": "75% 1RM",
+              "pausa": "120s",
+              "forma": "Bloqueo firme arriba"
+            },
+            {
+              "nombre": "Salto al Cajón Explosivo (Box Jump)",
+              "series": 4,
+              "reps": "5",
+              "peso": "Corporal",
+              "pausa": "90s",
+              "forma": "Aterrizaje suave"
+            }
+          ]
+        },
+        {
+          "id": 1795653087274,
+          "esPlantillaBiblioteca": true,
+          "esGrupal": false,
+          "personaId": null,
+          "categoriaVisualId": "aerobico",
+          "objetivo": "Aeróbico y Resistencia",
+          "nombre": "Aeróbico / HIIT Metabólico",
+          "nivel": "Intermedio",
+          "dias": "Mar, Jue y Sáb",
+          "notas": "Controlar la técnica y respetar las pausas.",
+          "fecha": "25/11/2026",
+          "ejercicios": [
+            {
+              "nombre": "Bloque Intermitente 30/30 (Cinta / Bici)",
+              "series": 10,
+              "reps": "30 seg",
+              "peso": "RPE 8",
+              "pausa": "30s",
+              "forma": "Ritmo parejo en todas las rondas"
+            },
+            {
+              "nombre": "Zancadas Alternas Dinámicas",
+              "series": 4,
+              "reps": "16 totales",
+              "peso": "Corporal",
+              "pausa": "45s",
+              "forma": "Torso erguido"
+            },
+            {
+              "nombre": "Burpees Técnicos",
+              "series": 4,
+              "reps": "12",
+              "peso": "Corporal",
+              "pausa": "60s",
+              "forma": "Respiración continua"
+            }
+          ]
+        },
+        {
+          "id": 1795653087275,
+          "esPlantillaBiblioteca": true,
+          "esGrupal": false,
+          "personaId": null,
+          "categoriaVisualId": "funcional",
+          "objetivo": "Funcional y Core",
+          "nombre": "Funcional, Core y Estabilidad",
+          "nivel": "Avanzado",
+          "dias": "Lun, Mié y Vie",
+          "notas": "Controlar la técnica y respetar las pausas.",
+          "fecha": "25/11/2026",
+          "ejercicios": [
+            {
+              "nombre": "Plancha Abdominal RKC y Core",
+              "series": 4,
+              "reps": "35s",
+              "peso": "Corporal",
+              "pausa": "45s",
+              "forma": "Glúteos y abdomen firmes"
+            },
+            {
+              "nombre": "Sentadilla Búlgara Unilateral",
+              "series": 3,
+              "reps": "10 c/pierna",
+              "peso": "Moderado",
+              "pausa": "60s",
+              "forma": "Control de estabilidad"
+            },
+            {
+              "nombre": "Press Pallof Antirrotación",
+              "series": 3,
+              "reps": "12 c/lado",
+              "peso": "Banda / Polea",
+              "pausa": "45s",
+              "forma": "Evitar rotar el torso"
+            }
+          ]
+        },
+        {
+          "id": 1795653087276,
+          "esPlantillaBiblioteca": true,
+          "esGrupal": false,
+          "personaId": null,
+          "categoriaVisualId": "rehabilitacion",
+          "objetivo": "Rehabilitación / Lesión",
+          "nombre": "Readaptación y Estabilidad Articular",
+          "nivel": "Principiante",
+          "dias": "3 días / sem",
+          "notas": "Controlar la técnica y respetar las pausas.",
+          "fecha": "25/11/2026",
+          "ejercicios": [
+            {
+              "nombre": "Hip Thrust con Barra (Empuje de Cadera)",
+              "series": 3,
+              "reps": "12",
+              "peso": "Suave / Sin dolor",
+              "pausa": "60s",
+              "forma": "Escala de dolor menor a 3"
+            },
+            {
+              "nombre": "Sentadilla Isométrica en Pared",
+              "series": 3,
+              "reps": "30s",
+              "peso": "Corporal",
+              "pausa": "60s",
+              "forma": "Rodillas a 90° alineadas"
+            },
+            {
+              "nombre": "Plancha Abdominal RKC y Core",
+              "series": 3,
+              "reps": "30s",
+              "peso": "Corporal",
+              "pausa": "45s",
+              "forma": "Sin tensión lumbar"
+            }
+          ]
         }
       ],
       "partidos": [
@@ -3503,6 +3776,9 @@
         "profesionales": [],
         "sesiones": []
       },
+      "subAdmins": [],
+      "auditoria": [],
+      "credencialesBiometricas": [],
       "licenciaConfig": {
         "claveClub": "gimasio_426",
         "nombreEntidad": "GIMASIO",
@@ -3549,14 +3825,15 @@
           },
           "general": {
             "notasRapidas": true,
-            "cierreCaja": true
+            "cierreCaja": true,
+            "whatsappAuto24h": false
           }
         }
       }
     },
     "lic_alina_caudana_425": {
       "claveClub": "lic_alina_caudana_425",
-      "ultimaActualizacionISO": "2026-11-24T23:36:24.610Z",
+      "ultimaActualizacionISO": "2026-11-26T00:04:28.675Z",
       "personas": [],
       "rutinas": [],
       "partidos": [],
@@ -3892,8 +4169,8 @@
         "aliasTransferencia": "",
         "titularTransferencia": "",
         "temaMarca": {
-          "primario": "#0284c7",
-          "secundario": "#0b66ef",
+          "primario": "#db2777",
+          "secundario": "#500724",
           "estiloSidebar": "oscuro_tenido"
         }
       }

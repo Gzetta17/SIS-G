@@ -1617,3 +1617,601 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (typeof verificarAccesoYRolEnApp === "function") verificarAccesoYRolEnApp();
 });
+
+// =========================================================================
+// 11. NOVEDADES Y CAMBIOS DE HORARIO (BOTÓN EN INDEX + POP-UP CON IMAGEN)
+//     - Exclusivo para Clubes y Gimnasios (oculto en comercios solo Consultorio)
+//     - Permite subir flyers/imágenes (PC/Celular o URL), editar, pausar y eliminar
+//     - Persiste en licenciaConfig.anunciosPortal (sincronizado con MongoDB)
+//     - Pop-up automático en mi-ficha.html (portal-socio) y jugador.html (rol usuario)
+// Reemplaza el Bloque 11 al final de js/app.js
+// =========================================================================
+(function () {
+    if (window.__cdmNovedadesPortal11) return;
+    window.__cdmNovedadesPortal11 = true;
+
+    const TIPOS_NOVEDAD = {
+        horario: { label: "🕒 Cambio de Horario", color: "#0284c7", bg: "rgba(2, 132, 199, 0.14)" },
+        feriado: { label: "📅 Feriado / Cierre", color: "#d97706", bg: "rgba(245, 158, 11, 0.16)" },
+        aviso:   { label: "📣 Aviso General", color: "#10b981", bg: "rgba(16, 185, 129, 0.14)" },
+        urgente: { label: "🔥 Urgente", color: "#dc2626", bg: "rgba(220, 38, 38, 0.14)" }
+    };
+
+    function escNov(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function esAdminNovedades() {
+        try {
+            const ses = JSON.parse(localStorage.getItem("cdm_sesion_activa_v1") || "null");
+            if (!ses) return false;
+            return ses.rol === "admin" && ses.nivelAdmin !== "staff";
+        } catch { return false; }
+    }
+
+    function esComercioClubOGym() {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        if (typeof esComercioSoloConsultorio === "function" && esComercioSoloConsultorio(lic)) return false;
+        const mod = lic?.modulos || { futbol: true, hockey: true, gym: true };
+        return mod.futbol !== false || mod.hockey !== false || mod.gym !== false || ((lic?.deportesExtra || []).length > 0);
+    }
+
+    function obtenerAnunciosPortal() {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        return Array.isArray(lic?.anunciosPortal) ? lic.anunciosPortal : [];
+    }
+
+    function guardarAnunciosPortal(lista) {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        lic.anunciosPortal = lista;
+        if (typeof guardarLicenciaConfigCDM === "function") {
+            guardarLicenciaConfigCDM(lic);
+        } else {
+            localStorage.setItem("cdm_licencia_config_v1", JSON.stringify(lic));
+            if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+        }
+        inyectarBotonNovedadesIndex();
+    }
+
+    function obtenerAnunciosVigentes(persona = null) {
+        const hoy = typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+        return obtenerAnunciosPortal().filter(a => {
+            if (!a || a.activo === false) return false;
+            if (a.vence && String(a.vence) < hoy) return false;
+            if (persona) {
+                const dest = a.destinatario || "TODOS";
+                if (dest === "Gimnasio" && persona.deporte !== "Gimnasio") return false;
+                if (dest === "DEPORTES" && persona.deporte === "Gimnasio") return false;
+            }
+            return true;
+        });
+    }
+
+    function claveLeidosStorage(personaId) {
+        const club = typeof obtenerClaveClubActivoCDM === "function" ? obtenerClaveClubActivoCDM() : "cdm_adelia_maria_principal";
+        return `cdm_novedades_leidas_v1_${club}_${personaId || "anon"}`;
+    }
+
+    function obtenerMapaLeidos(personaId) {
+        try { return JSON.parse(localStorage.getItem(claveLeidosStorage(personaId)) || "{}") || {}; } catch { return {}; }
+    }
+
+    function marcarLeidos(personaId, anuncios) {
+        const mapa = obtenerMapaLeidos(personaId);
+        (anuncios || []).forEach(a => { mapa[String(a.id)] = Number(a.updatedAt || a.id); });
+        try { localStorage.setItem(claveLeidosStorage(personaId), JSON.stringify(mapa)); } catch {}
+    }
+
+    function comprimirImagenNovedadCDM(file, cb) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                const maxSide = 920;
+                const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.max(1, Math.round(img.width * scale));
+                canvas.height = Math.max(1, Math.round(img.height * scale));
+                canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                cb(canvas.toDataURL("image/jpeg", 0.78));
+            };
+            img.onerror = () => alert("⚠️ No se pudo procesar la imagen seleccionada.");
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function inyectarCSSNovedades() {
+        if (document.getElementById("cdmCssNovedades11")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssNovedades11";
+        st.textContent = `
+            #modalNovedadesPortalCDM { z-index: 99999 !important; }
+            .nov-card-item {
+                background: var(--surface-subtle, #f8fafc);
+                border: 1.5px solid var(--line, #e2e8f0);
+                border-left: 4px solid #0284c7;
+                border-radius: 14px;
+                padding: 0.78rem 0.92rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.42rem;
+            }
+            .nov-popup-hero {
+                background: linear-gradient(135deg, #0c192c 0%, #0284c7 100%);
+                color: #ffffff;
+                border-radius: 16px;
+                padding: 0.95rem 1.15rem;
+                margin-bottom: 0.9rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.6rem;
+            }
+            .nov-popup-hero h3 { margin: 2px 0 0 0; color: #ffffff; font-size: 1.12rem; font-weight: 900; }
+            .nov-badge-count {
+                display: inline-flex; align-items: center; justify-content: center;
+                min-width: 19px; height: 19px; padding: 0 5px;
+                border-radius: 999px; background: #ef4444; color: #ffffff;
+                font-size: 0.68rem; font-weight: 900; margin-left: 4px;
+            }
+            .nov-img-preview-box {
+                position: relative;
+                margin-top: 0.5rem;
+                border-radius: 12px;
+                overflow: hidden;
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: rgba(15, 23, 42, 0.08);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            .nov-img-preview-box img {
+                max-width: 100%;
+                max-height: 190px;
+                object-fit: contain;
+                display: block;
+            }
+            .nov-img-remove-btn {
+                position: absolute;
+                top: 6px;
+                right: 6px;
+            }
+            .nov-popup-img {
+                width: 100%;
+                max-height: 360px;
+                object-fit: contain;
+                border-radius: 11px;
+                background: rgba(15, 23, 42, 0.14);
+                border: 1px solid var(--line, #e2e8f0);
+                display: block;
+                cursor: zoom-in;
+            }
+            .nov-list-thumb {
+                width: 78px;
+                height: 78px;
+                border-radius: 10px;
+                object-fit: cover;
+                border: 1px solid var(--line-strong, #cbd5e1);
+                flex-shrink: 0;
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function asegurarModalNovedades() {
+        inyectarCSSNovedades();
+        let m = document.getElementById("modalNovedadesPortalCDM");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalNovedadesPortalCDM";
+            m.className = "modal-backdrop hidden";
+        }
+        m.style.zIndex = "99999";
+        document.body.appendChild(m);
+        return m;
+    }
+
+    window.cerrarModalNovedadesPortalCDM = function () {
+        document.getElementById("modalNovedadesPortalCDM")?.classList.add("hidden");
+    };
+
+    // --- 1. BOTÓN EN TOPBAR DE INDEX.HTML (SOLO CLUBES Y GIMNASIOS) ---
+    function inyectarBotonNovedadesIndex() {
+        if (!document.querySelector(".sports-showcase-grid")) return;
+        const existente = document.getElementById("btnNovedadesIndexCDM");
+        if (!esAdminNovedades() || !esComercioClubOGym()) {
+            existente?.remove();
+            return;
+        }
+        const topRight = document.querySelector(".app-topbar .topbar-right");
+        if (!topRight) return;
+
+        inyectarCSSNovedades();
+        const vigentes = obtenerAnunciosVigentes().length;
+        let btn = existente;
+        if (!btn) {
+            btn = document.createElement("button");
+            btn.type = "button";
+            btn.id = "btnNovedadesIndexCDM";
+            btn.className = "btn btn-secondary btn-sm";
+            btn.title = "Publicar cambios de horario, flyers o anuncios pop-up para socios y deportistas";
+            btn.onclick = () => abrirModalGestionNovedadesCDM();
+            const ref = topRight.querySelector('#btnAltaTopbarCDM, button[onclick*="abrirModalPersona"]');
+            if (ref) topRight.insertBefore(btn, ref);
+            else topRight.prepend(btn);
+        }
+        btn.innerHTML = `<i class="ri-megaphone-line"></i><span>Novedades</span>${vigentes > 0 ? `<span class="nov-badge-count">${vigentes}</span>` : ""}`;
+    }
+
+    // --- 2. CONTROLES DE IMAGEN DEL FORMULARIO ---
+    window.subirImagenNovedadCDM = function (event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        comprimirImagenNovedadCDM(file, (dataUrl) => {
+            const inp = document.getElementById("novImagen");
+            const prevWrap = document.getElementById("novImgPreviewWrap");
+            const prevImg = document.getElementById("novImgPreview");
+            if (inp) inp.value = dataUrl;
+            if (prevImg) prevImg.src = dataUrl;
+            if (prevWrap) prevWrap.classList.remove("hidden");
+        });
+    };
+
+    window.actualizarPreviewImagenNovedadCDM = function (url) {
+        const limpio = String(url || "").trim();
+        const prevWrap = document.getElementById("novImgPreviewWrap");
+        const prevImg = document.getElementById("novImgPreview");
+        if (!prevWrap || !prevImg) return;
+        if (limpio) {
+            prevImg.src = limpio;
+            prevWrap.classList.remove("hidden");
+        } else {
+            prevImg.src = "";
+            prevWrap.classList.add("hidden");
+        }
+    };
+
+    window.quitarImagenNovedadCDM = function () {
+        const inp = document.getElementById("novImagen");
+        const fileInp = document.getElementById("novImagenFile");
+        const prevWrap = document.getElementById("novImgPreviewWrap");
+        const prevImg = document.getElementById("novImgPreview");
+        if (inp) inp.value = "";
+        if (fileInp) fileInp.value = "";
+        if (prevImg) prevImg.src = "";
+        if (prevWrap) prevWrap.classList.add("hidden");
+    };
+
+    // --- 3. GESTOR DE NOVEDADES (CREAR, EDITAR, PAUSAR, ELIMINAR + IMAGEN) ---
+    window.abrirModalGestionNovedadesCDM = function (idEditar = null) {
+        const lista = obtenerAnunciosPortal();
+        const edit = idEditar ? lista.find(x => Number(x.id) === Number(idEditar)) : null;
+        const imgIni = edit?.imagen || "";
+        const modal = asegurarModalNovedades();
+
+        modal.onclick = (e) => { if (e.target === modal) cerrarModalNovedadesPortalCDM(); };
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:700px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">📢 COMUNICADOS Y HORARIOS</span>
+                        <h3 style="margin-top:4px;">${edit ? "✏️ Editar Novedad" : "Novedades Pop-up para Usuarios"}</h3>
+                    </div>
+                    <div style="display:flex; gap:0.4rem; align-items:center;">
+                        ${obtenerAnunciosVigentes().length > 0 ? `<button type="button" class="btn btn-secondary btn-sm" onclick="previsualizarPopupNovedadesAdminCDM()">👁️ Vista previa</button>` : ""}
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalNovedadesPortalCDM()">✕</button>
+                    </div>
+                </div>
+
+                <form onsubmit="guardarNovedadPortalCDM(event, ${edit ? edit.id : "null"})" style="background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:15px; padding:0.9rem; margin-bottom:1rem;">
+                    <div class="grid-2" style="margin-bottom:0.6rem;">
+                        <div class="field">
+                            <label>Título del Anuncio *</label>
+                            <input type="text" id="novTitulo" required placeholder="Ej: Cambio de horario feriado / Grilla de clases" value="${escNov(edit?.titulo || "")}">
+                        </div>
+                        <div class="field">
+                            <label>Tipo de Aviso</label>
+                            <select id="novTipo">
+                                ${Object.entries(TIPOS_NOVEDAD).map(([k, v]) => `<option value="${k}" ${(edit?.tipo || "horario") === k ? "selected" : ""}>${v.label}</option>`).join("")}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.6rem;">
+                        <label>Mensaje para los socios / deportistas (opcional si subís imagen)</label>
+                        <textarea id="novMensaje" rows="3" placeholder="Ej: El lunes feriado el gimnasio abrirá de 9:00 a 13:00 hs. Por la tarde permanecerá cerrado.">${escNov(edit?.mensaje || "")}</textarea>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.65rem;">
+                        <label>🖼️ Imagen / Flyer / Placa de Horarios (opcional)</label>
+                        <div style="display:flex; gap:0.45rem; align-items:center; flex-wrap:wrap;">
+                            <label class="btn btn-secondary btn-sm" style="cursor:pointer; margin:0; flex-shrink:0;">
+                                📷 Subir Imagen
+                                <input type="file" id="novImagenFile" accept="image/*" style="display:none;" onchange="subirImagenNovedadCDM(event)">
+                            </label>
+                            <input type="text" id="novImagen" value="${escNov(imgIni)}" placeholder="O pegá un link de imagen (https://...)" style="flex:1; min-width:190px; font-size:0.78rem;"
+                                oninput="actualizarPreviewImagenNovedadCDM(this.value)">
+                        </div>
+                        <div id="novImgPreviewWrap" class="nov-img-preview-box ${imgIni ? "" : "hidden"}">
+                            <img id="novImgPreview" src="${escNov(imgIni)}" alt="Vista previa">
+                            <button type="button" class="btn btn-danger btn-sm nov-img-remove-btn" onclick="quitarImagenNovedadCDM()" title="Quitar imagen">✕ Quitar</button>
+                        </div>
+                    </div>
+
+                    <div class="grid-3" style="margin-bottom:0.75rem;">
+                        <div class="field">
+                            <label>¿Quién lo ve?</label>
+                            <select id="novDest">
+                                <option value="TODOS" ${(edit?.destinatario || "TODOS") === "TODOS" ? "selected" : ""}>🌐 Todos (Club + Gimnasio)</option>
+                                <option value="Gimnasio" ${edit?.destinatario === "Gimnasio" ? "selected" : ""}>🏋️ Solo Gimnasio</option>
+                                <option value="DEPORTES" ${edit?.destinatario === "DEPORTES" ? "selected" : ""}>⚽ Solo Deportes</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Mostrar hasta (opcional)</label>
+                            <input type="date" id="novVence" value="${escNov(edit?.vence || "")}">
+                        </div>
+                        <div class="field" style="justify-content:flex-end;">
+                            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; margin-top:20px;">
+                                <input type="checkbox" id="novActivo" ${!edit || edit.activo !== false ? "checked" : ""} style="width:17px; height:17px; min-height:auto;">
+                                Activo ahora
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:0.45rem; justify-content:flex-end;">
+                        ${edit ? `<button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalGestionNovedadesCDM(null)">Cancelar edición</button>` : ""}
+                        <button type="submit" class="btn btn-primary btn-sm">💾 ${edit ? "Guardar Cambios" : "Publicar Novedad"}</button>
+                    </div>
+                </form>
+
+                <strong style="display:block; font-size:0.84rem; margin-bottom:0.55rem;">📋 Novedades cargadas (${lista.length})</strong>
+                <div style="display:flex; flex-direction:column; gap:0.55rem; max-height:290px; overflow-y:auto;">
+                    ${lista.length === 0 ? `<div class="empty-box" style="padding:1rem; font-size:0.8rem;">Sin novedades cargadas. Publicá una arriba y les saltará como pop-up al ingresar.</div>` :
+                    lista.map(a => {
+                        const meta = TIPOS_NOVEDAD[a.tipo] || TIPOS_NOVEDAD.aviso;
+                        const hoy = typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+                        const vencida = Boolean(a.vence && a.vence < hoy);
+                        const destTxt = a.destinatario === "Gimnasio" ? "🏋️ Solo Gym" : (a.destinatario === "DEPORTES" ? "⚽ Solo Deportes" : "🌐 Todos");
+                        return `
+                            <div class="nov-card-item" style="border-left-color:${meta.color}; opacity:${a.activo === false || vencida ? "0.65" : "1"};">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.65rem; flex-wrap:wrap;">
+                                    <div style="display:flex; gap:0.65rem; align-items:flex-start; flex:1; min-width:210px;">
+                                        ${a.imagen ? `<img class="nov-list-thumb" src="${escNov(a.imagen)}" alt="Flyer">` : ""}
+                                        <div style="min-width:0;">
+                                            <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:3px;">
+                                                <span class="badge" style="background:${meta.bg}; color:${meta.color}; font-size:0.66rem;">${meta.label}</span>
+                                                <span class="badge badge-celeste" style="font-size:0.65rem;">${destTxt}</span>
+                                                ${vencida ? `<span class="badge badge-warn" style="font-size:0.65rem;">Vencida</span>` : (a.activo === false ? `<span class="badge badge-danger" style="font-size:0.65rem;">Pausada</span>` : `<span class="badge badge-ok" style="font-size:0.65rem;">Visible</span>`)}
+                                            </div>
+                                            <strong style="display:block; font-size:0.9rem;">${escNov(a.titulo)}</strong>
+                                            ${a.mensaje ? `<div style="font-size:0.79rem; color:var(--ink-700); white-space:pre-line; margin-top:2px;">${escNov(a.mensaje)}</div>` : ""}
+                                            <small style="display:block; color:var(--ink-500); font-size:0.7rem; margin-top:3px;">Publicada: ${escNov(a.creadoFecha || "-")}${a.vence ? ` • Visible hasta: <b>${escNov(a.vence)}</b>` : " • Sin vencimiento"}</small>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex; gap:0.32rem; flex-shrink:0; flex-wrap:wrap;">
+                                        <button type="button" class="btn btn-ghost btn-sm" style="min-height:28px; font-size:0.73rem;" onclick="toggleActivoNovedadCDM(${a.id})">${a.activo === false ? "▶ Activar" : "⏸ Pausar"}</button>
+                                        <button type="button" class="btn btn-secondary btn-sm" style="min-height:28px; font-size:0.73rem;" onclick="abrirModalGestionNovedadesCDM(${a.id})">✏️ Editar</button>
+                                        <button type="button" class="btn btn-danger btn-sm" style="min-height:28px; font-size:0.73rem;" onclick="eliminarNovedadPortalCDM(${a.id})">🗑️ Eliminar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+        if (edit) modal.querySelector(".modal-window")?.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    window.guardarNovedadPortalCDM = function (e, idEditar = null) {
+        e.preventDefault();
+        const titulo = (document.getElementById("novTitulo")?.value || "").trim();
+        const mensaje = (document.getElementById("novMensaje")?.value || "").trim();
+        const imagen = (document.getElementById("novImagen")?.value || "").trim();
+
+        if (!titulo) return;
+        if (!mensaje && !imagen) {
+            alert("⚠️ Escribí un mensaje o subí una imagen/flyer para publicar la novedad.");
+            return;
+        }
+
+        const lista = [...obtenerAnunciosPortal()];
+        const ahora = Date.now();
+        const item = {
+            id: idEditar ? Number(idEditar) : ahora,
+            updatedAt: ahora,
+            titulo,
+            mensaje,
+            imagen,
+            tipo: document.getElementById("novTipo")?.value || "horario",
+            destinatario: document.getElementById("novDest")?.value || "TODOS",
+            vence: document.getElementById("novVence")?.value || "",
+            activo: Boolean(document.getElementById("novActivo")?.checked),
+            creadoFecha: typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0]
+        };
+
+        if (idEditar) {
+            const idx = lista.findIndex(x => Number(x.id) === Number(idEditar));
+            if (idx >= 0) {
+                item.creadoFecha = lista[idx].creadoFecha || item.creadoFecha;
+                lista[idx] = item;
+            } else lista.unshift(item);
+        } else {
+            lista.unshift(item);
+        }
+
+        guardarAnunciosPortal(lista);
+        if (typeof mostrarToast === "function") mostrarToast(idEditar ? "📢 Novedad actualizada." : "📢 Novedad publicada para los usuarios.");
+        abrirModalGestionNovedadesCDM(null);
+    };
+
+    window.toggleActivoNovedadCDM = function (idNov) {
+        const lista = obtenerAnunciosPortal().map(a =>
+            Number(a.id) === Number(idNov) ? { ...a, activo: a.activo === false ? true : false, updatedAt: Date.now() } : a
+        );
+        guardarAnunciosPortal(lista);
+        abrirModalGestionNovedadesCDM(null);
+    };
+
+    window.eliminarNovedadPortalCDM = function (idNov) {
+        if (!confirm("🗑️ ¿Eliminar esta novedad definitivamente?")) return;
+        guardarAnunciosPortal(obtenerAnunciosPortal().filter(a => Number(a.id) !== Number(idNov)));
+        if (typeof mostrarToast === "function") mostrarToast("🗑️ Novedad eliminada.");
+        abrirModalGestionNovedadesCDM(null);
+    };
+
+    window.previsualizarPopupNovedadesAdminCDM = function () {
+        const vigentes = obtenerAnunciosVigentes();
+        if (!vigentes.length) return;
+        mostrarPopupNovedadesModal(vigentes, null, true);
+    };
+
+    // --- 4. POP-UP AUTOMÁTICO PARA SOCIOS / DEPORTISTAS (MI-FICHA Y JUGADOR) ---
+    function mostrarPopupNovedadesModal(anuncios, persona = null, esPreview = false) {
+        if (!anuncios || !anuncios.length) return;
+        const modal = asegurarModalNovedades();
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : { nombreEntidad: "Club / Gimnasio" };
+
+        const cerrarYMarcar = () => {
+            if (!esPreview && persona) marcarLeidos(persona.id, anuncios);
+            cerrarModalNovedadesPortalCDM();
+            if (esPreview) abrirModalGestionNovedadesCDM(null);
+        };
+
+        modal.onclick = (e) => { if (e.target === modal) cerrarYMarcar(); };
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:560px;">
+                <div class="nov-popup-hero">
+                    <div>
+                        <span class="badge" style="background:rgba(255,255,255,0.2); color:#ffffff; font-size:0.66rem;">
+                            ${esPreview ? "👁️ VISTA PREVIA DE USUARIO" : `📢 NOVEDADES • ${escNov(lic.nombreEntidad || "")}`}
+                        </span>
+                        <h3>${anuncios.length === 1 ? escNov(anuncios[0].titulo) : `Tenés ${anuncios.length} novedades importantes`}</h3>
+                    </div>
+                    <button type="button" id="btnCerrarXNovPop" class="btn btn-sm" style="background:rgba(255,255,255,0.18); color:#fff; border:1px solid rgba(255,255,255,0.35);">✕</button>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:0.7rem; max-height:60vh; overflow-y:auto; margin-bottom:1rem;">
+                    ${anuncios.map(a => {
+                        const meta = TIPOS_NOVEDAD[a.tipo] || TIPOS_NOVEDAD.aviso;
+                        return `
+                            <div class="nov-card-item" style="border-left-color:${meta.color};">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                                    <span class="badge" style="background:${meta.bg}; color:${meta.color}; font-size:0.68rem;">${meta.label}</span>
+                                    <small style="color:var(--ink-500); font-size:0.7rem;">${escNov(a.creadoFecha || "")}</small>
+                                </div>
+                                <strong style="font-size:0.96rem; color:var(--ink-900);">${escNov(a.titulo)}</strong>
+                                ${a.imagen ? `<img class="nov-popup-img" src="${escNov(a.imagen)}" alt="${escNov(a.titulo)}" onclick="window.open(this.src, '_blank')" title="Tocá para ver en tamaño completo">` : ""}
+                                ${a.mensaje ? `<div style="font-size:0.84rem; color:var(--ink-700); line-height:1.5; white-space:pre-line;">${escNov(a.mensaje)}</div>` : ""}
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+
+                <button type="button" id="btnEntendidoNovPop" class="btn btn-primary" style="width:100%;">
+                    ${esPreview ? "← Volver al Gestor de Novedades" : "✓ Entendido"}
+                </button>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+        document.getElementById("btnEntendidoNovPop")?.addEventListener("click", cerrarYMarcar);
+        document.getElementById("btnCerrarXNovPop")?.addEventListener("click", cerrarYMarcar);
+    }
+
+    window.verNovedadesVigentesUsuarioCDM = function (personaId) {
+        const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(personaId));
+        if (!p) return;
+        const vigentes = obtenerAnunciosVigentes(p);
+        if (!vigentes.length) {
+            if (typeof mostrarToast === "function") mostrarToast("📢 No hay novedades vigentes en este momento.");
+            return;
+        }
+        mostrarPopupNovedadesModal(vigentes, p, false);
+    };
+
+    window.verificarYMostrarNovedadesUsuarioCDM = function (persona) {
+        if (!persona || !esComercioClubOGym()) return;
+        const vigentes = obtenerAnunciosVigentes(persona);
+        if (!vigentes.length) return;
+
+        const contAcciones = document.querySelector("#socioCabeceraInfo > div > div:last-child, #fichaCabeceraJugador .cab33-actions");
+        if (contAcciones && !document.getElementById("btnVerNovedadesUsuarioCDM")) {
+            inyectarCSSNovedades();
+            const b = document.createElement("button");
+            b.type = "button";
+            b.id = "btnVerNovedadesUsuarioCDM";
+            b.className = "btn btn-secondary btn-sm";
+            b.innerHTML = `📢 Novedades <span class="nov-badge-count">${vigentes.length}</span>`;
+            b.onclick = () => verNovedadesVigentesUsuarioCDM(persona.id);
+            contAcciones.prepend(b);
+        }
+
+        const leidos = obtenerMapaLeidos(persona.id);
+        const noLeidos = vigentes.filter(a => Number(leidos[String(a.id)]) !== Number(a.updatedAt || a.id));
+        if (noLeidos.length > 0) {
+            const modalAbierto = document.getElementById("modalNovedadesPortalCDM") &&
+                !document.getElementById("modalNovedadesPortalCDM").classList.contains("hidden");
+            if (!modalAbierto) mostrarPopupNovedadesModal(noLeidos, persona, false);
+        }
+    };
+
+    function conectarHooksNovedades() {
+        inyectarBotonNovedadesIndex();
+
+        if (typeof window.inicializarPanelSocio === "function" && !window.__cdmNovWrapSocio) {
+            window.__cdmNovWrapSocio = true;
+            const _origSocio = window.inicializarPanelSocio;
+            window.inicializarPanelSocio = function () {
+                const r = _origSocio.apply(this, arguments);
+                const p = typeof obtenerSocioLogueadoURLoSession === "function" ? obtenerSocioLogueadoURLoSession() : null;
+                if (p) setTimeout(() => verificarYMostrarNovedadesUsuarioCDM(p), 120);
+                return r;
+            };
+        }
+
+        if (typeof window.inicializarPaginaJugadorIndividual === "function" && !window.__cdmNovWrapJug) {
+            window.__cdmNovWrapJug = true;
+            const _origJug = window.inicializarPaginaJugadorIndividual;
+            window.inicializarPaginaJugadorIndividual = function () {
+                const r = _origJug.apply(this, arguments);
+                try {
+                    const ses = JSON.parse(localStorage.getItem("cdm_sesion_activa_v1") || "null");
+                    const esUsr = ses?.rol === "usuario" || document.body?.getAttribute("data-rol") === "usuario";
+                    if (esUsr && typeof obtenerJugadorActualPorURL === "function") {
+                        const p = obtenerJugadorActualPorURL();
+                        if (p) setTimeout(() => verificarYMostrarNovedadesUsuarioCDM(p), 150);
+                    }
+                } catch {}
+                return r;
+            };
+        }
+
+        if (document.body?.dataset?.page === "mi-ficha" && typeof obtenerSocioLogueadoURLoSession === "function") {
+            const p = obtenerSocioLogueadoURLoSession();
+            if (p) setTimeout(() => verificarYMostrarNovedadesUsuarioCDM(p), 300);
+        }
+        if (document.body?.dataset?.page === "perfil-individual" && typeof obtenerJugadorActualPorURL === "function") {
+            try {
+                const ses = JSON.parse(localStorage.getItem("cdm_sesion_activa_v1") || "null");
+                if (ses?.rol === "usuario") {
+                    const p = obtenerJugadorActualPorURL();
+                    if (p) setTimeout(() => verificarYMostrarNovedadesUsuarioCDM(p), 300);
+                }
+            } catch {}
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        conectarHooksNovedades();
+        setTimeout(conectarHooksNovedades, 450);
+        setTimeout(inyectarBotonNovedadesIndex, 1000);
+    });
+})();

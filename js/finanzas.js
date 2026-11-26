@@ -1,7 +1,8 @@
 /**
  * js/finanzas.js — Motor Financiero y Contabilidad Unificada (4 Cajas, Libro Mayor,
- * Cuentas Corrientes, Aumento Masivo de Cuotas + Alias WA, Cierre de Caja y CSV)
- * CDM Pro Suite — Desarrollado por Gonzalo Adanchú
+ * Cuentas Corrientes Club/Gym, Cobranzas de Obras Sociales/Tokens solo para Profesionales,
+ * Reconstrucción Automática desde MongoDB, Aumento Masivo de Cuotas + Alias WA, Cierre de Caja y CSV)
+ * G-SIS — Desarrollado por Gonzalo Adanchú
  */
 
 (function () {
@@ -13,7 +14,9 @@
     ];
 
     const RUBROS_INGRESO = ["Cuota Gimnasio", "Cuota Deportes", "Sesión Consultorio", "Coseguro / Mutual", "Indumentaria / Buffets", "Otros Ingresos"];
+    const RUBROS_INGRESO_CONS = ["Sesión Consultorio", "Coseguro / Mutual", "Liquidación Obra Social", "Informes / Certificados", "Otros Ingresos"];
     const RUBROS_EGRESO = ["Alquiler / Servicios", "Honorarios Profesores", "Equipamiento / Mantenimiento", "Insumos / Limpieza", "Impuestos / Varios", "Retiro / Otros"];
+    const RUBROS_EGRESO_CONS = ["Alquiler / Servicios", "Colegio / Matrícula", "Insumos / Consultorio", "Honorarios Equipo", "Impuestos / Varios", "Retiro / Otros"];
 
     window._finState = {
         tab: "resumen",
@@ -33,6 +36,15 @@
         return `cdm_finanzas_unif_v35_${clubKeyFin()}`;
     }
 
+    function estadoModulosFin() {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const mod = lic?.modulos || { futbol: true, hockey: true, gym: true, consultorio: false };
+        const profs = Array.isArray(lic?.profesionesHabilitadas) ? lic.profesionesHabilitadas.filter(Boolean) : [];
+        const tieneCons = (mod.consultorio !== false) && profs.length > 0;
+        const tieneClubGym = (mod.futbol !== false) || (mod.hockey !== false) || (mod.gym !== false) || ((lic?.deportesExtra || []).length > 0);
+        return { tieneCons, tieneClubGym, soloCons: tieneCons && !tieneClubGym };
+    }
+
     function normalizarMedioPago(raw = "") {
         const t = String(raw || "").toLowerCase();
         if (t.includes("efec")) return "Efectivo";
@@ -48,7 +60,6 @@
 
         if (!Array.isArray(lista)) {
             lista = [];
-            // Migración única y sin pérdidas desde claves viejas
             const club = clubKeyFin();
             const fuentes = [];
             if (club === "cdm_adelia_maria_principal") {
@@ -81,7 +92,7 @@
         localStorage.setItem(storageKeyFin(), JSON.stringify(lista));
     }
 
-    // Hook público llamado desde js/deportes-cancha.js al cobrar una cuota
+    // Hook público para clubes y gimnasios (intacto)
     window.registrarAsientoCuotaEnLibroMayor = function (persona, monto, medio = "Transferencia", fecha = null) {
         if (!persona || !monto) return;
         const lista = obtenerMovimientosFinanzas();
@@ -96,6 +107,64 @@
             personaId: persona.id
         });
         guardarMovimientosFinanzas(lista);
+    };
+
+    // Hooks públicos exclusivos para Consultorio (idempotentes por refKey: cero duplicados)
+    window.sincronizarAsientoConsultorioFinanzas = function (asiento) {
+        if (!asiento || !asiento.refKey || !asiento.monto) return;
+        const lista = obtenerMovimientosFinanzas();
+        const idx = lista.findIndex(m => m.refKey === asiento.refKey);
+        const nuevo = {
+            id: idx >= 0 ? lista[idx].id : (Date.now() + Math.floor(Math.random() * 999)),
+            refKey: asiento.refKey,
+            fecha: asiento.fecha || obtenerHoyISO(),
+            tipo: asiento.tipo || "ingreso",
+            rubro: asiento.rubro || "Coseguro / Mutual",
+            concepto: asiento.concepto || "Cobro Consultorio",
+            monto: Math.abs(parseFloat(asiento.monto) || 0),
+            medio: normalizarMedioPago(asiento.medio || "Transferencia"),
+            origenConsultorio: true,
+            turnoId: asiento.turnoId || null,
+            mesTrabajo: asiento.mesTrabajo || ""
+        };
+        if (idx >= 0) lista[idx] = nuevo;
+        else lista.unshift(nuevo);
+        guardarMovimientosFinanzas(lista);
+    };
+
+    window.eliminarAsientoConsultorioFinanzas = function (refKey) {
+        if (!refKey) return;
+        const lista = obtenerMovimientosFinanzas();
+        const filtrada = lista.filter(m => m.refKey !== refKey);
+        if (filtrada.length !== lista.length) guardarMovimientosFinanzas(filtrada);
+    };
+
+    // Reconstrucción atómica de asientos de Consultorio (sin tocar movimientos manuales ni Club/Gym)
+    window.reemplazarAsientosConsultorioFinanzas = function (asientosConsultorio = []) {
+        const lista = obtenerMovimientosFinanzas();
+        const manualesYClub = lista.filter(m => !m.origenConsultorio && !String(m.refKey || "").startsWith("cons_"));
+        const baseId = Date.now();
+        const nuevos = (asientosConsultorio || []).map((a, idx) => ({
+            id: baseId + idx,
+            refKey: a.refKey,
+            fecha: a.fecha || obtenerHoyISO(),
+            tipo: a.tipo || "ingreso",
+            rubro: a.rubro || "Coseguro / Mutual",
+            concepto: a.concepto || "Cobro Consultorio",
+            monto: Math.abs(parseFloat(a.monto) || 0),
+            medio: normalizarMedioPago(a.medio || "Transferencia"),
+            origenConsultorio: true,
+            turnoId: a.turnoId || null,
+            mesTrabajo: a.mesTrabajo || ""
+        }));
+        guardarMovimientosFinanzas([...nuevos, ...manualesYClub]);
+    };
+
+    window.refrescarFinanzasSiVisible = function () {
+        const sec = document.getElementById("cdmSeccionContabilidadGlobal");
+        if (sec && !sec.classList.contains("hidden")) {
+            renderizarSeccionFinanzas();
+        }
     };
 
     function fmtPesos(n) {
@@ -121,17 +190,31 @@
             }
         });
 
+        const { soloCons, tieneCons } = estadoModulosFin();
         const activos = (basePersonas || []).filter(p => p && p.activo);
         const deudores = activos.filter(p => (p.pagoEstado || "Al Día") !== "Al Día");
-        const pendienteCobrar = deudores.reduce((a, p) => a + (Number(p.montoCuota) || 25000), 0);
+        const pendienteClubGym = deudores.reduce((a, p) => a + (Number(p.montoCuota) || 25000), 0);
 
-        return { delMes, ingresos, egresos, neto: ingresos - egresos, cajas, deudores, pendienteCobrar, activos };
+        const pendCons = tieneCons && typeof window.calcularResumenPendienteConsultorio17 === "function"
+            ? window.calcularResumenPendienteConsultorio17()
+            : { pendTotal: 0, pendCoseg: 0, pendOS: 0, sesionesPend: 0, faltanTokens: 0 };
+
+        return {
+            delMes, ingresos, egresos, neto: ingresos - egresos, cajas,
+            deudores, activos,
+            pendienteCobrar: soloCons ? pendCons.pendTotal : pendienteClubGym,
+            pendienteCant: soloCons ? pendCons.sesionesPend : deudores.length,
+            pendCons
+        };
     }
 
     // =====================================================================
     // 1. SECCIÓN PRINCIPAL "💰 CONTABILIDAD Y CAJA"
     // =====================================================================
     window.abrirModuloContabilidadIndependienteCDM = function (tabOpt = null) {
+        if (typeof window.reconstruirAsientosConsultorioEnCaja17 === "function") {
+            window.reconstruirAsientosConsultorioEnCaja17();
+        }
         if (tabOpt) window._finState.tab = tabOpt;
         if (typeof alternarSidebarMovil === "function") alternarSidebarMovil(true);
 
@@ -150,8 +233,13 @@
         }
         sec.classList.remove("hidden");
 
+        const { soloCons } = estadoModulosFin();
         const h2 = document.querySelector(".topbar-title h2");
-        if (h2) h2.innerHTML = `💰 Contabilidad y Caja <span class="cat-active-pill">4 Cajas Unificadas</span>`;
+        if (h2) {
+            h2.innerHTML = soloCons
+                ? `💰 Contabilidad y Caja <span class="cat-active-pill">Consultorio y Mutuales</span>`
+                : `💰 Contabilidad y Caja <span class="cat-active-pill">4 Cajas Unificadas</span>`;
+        }
 
         renderizarSeccionFinanzas();
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -227,35 +315,68 @@
     function renderizarSeccionFinanzas() {
         const sec = document.getElementById("cdmSeccionContabilidadGlobal");
         if (!sec) return;
+
+        const { soloCons, tieneCons, tieneClubGym } = estadoModulosFin();
         const st = window._finState;
+        if (soloCons && st.tab === "cuotas") st.tab = "cobranzas_cons";
+        if (!tieneCons && st.tab === "cobranzas_cons") st.tab = "cuotas";
+
         const res = calcularResumenMes(st.mes);
+        const rubIng = soloCons ? RUBROS_INGRESO_CONS : RUBROS_INGRESO;
+        const rubEgr = soloCons ? RUBROS_EGRESO_CONS : RUBROS_EGRESO;
+
+        const tabsHTML = soloCons ? `
+            <div class="module-tabs tabs-3" style="margin-bottom:1rem;">
+                <button type="button" class="mod-tab ${st.tab === "resumen" ? "active" : ""}" onclick="cambiarTabFinanzas('resumen')"><i class="ri-safe-2-line"></i><span>4 Cajas y P&L</span></button>
+                <button type="button" class="mod-tab ${st.tab === "libro" ? "active" : ""}" onclick="cambiarTabFinanzas('libro')"><i class="ri-book-2-line"></i><span>Libro Mayor (${res.delMes.length})</span></button>
+                <button type="button" class="mod-tab ${st.tab === "cobranzas_cons" ? "active" : ""}" onclick="cambiarTabFinanzas('cobranzas_cons')"><i class="ri-hospital-line"></i><span>Cobranzas, Tokens y Mutuales (${res.pendCons.sesionesPend} pend.)</span></button>
+            </div>
+        ` : (tieneCons && tieneClubGym) ? `
+            <div class="module-tabs" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:0.35rem; margin-bottom:1rem;">
+                <button type="button" class="mod-tab ${st.tab === "resumen" ? "active" : ""}" onclick="cambiarTabFinanzas('resumen')"><i class="ri-safe-2-line"></i><span>4 Cajas y P&L</span></button>
+                <button type="button" class="mod-tab ${st.tab === "libro" ? "active" : ""}" onclick="cambiarTabFinanzas('libro')"><i class="ri-book-2-line"></i><span>Libro Mayor (${res.delMes.length})</span></button>
+                <button type="button" class="mod-tab ${st.tab === "cuotas" ? "active" : ""}" onclick="cambiarTabFinanzas('cuotas')"><i class="ri-group-line"></i><span>Cuotas Club/Gym (${res.deudores.length})</span></button>
+                <button type="button" class="mod-tab ${st.tab === "cobranzas_cons" ? "active" : ""}" onclick="cambiarTabFinanzas('cobranzas_cons')"><i class="ri-hospital-line"></i><span>Mutuales y Tokens (${res.pendCons.sesionesPend})</span></button>
+            </div>
+        ` : `
+            <div class="module-tabs tabs-3" style="margin-bottom:1rem;">
+                <button type="button" class="mod-tab ${st.tab === "resumen" ? "active" : ""}" onclick="cambiarTabFinanzas('resumen')"><i class="ri-safe-2-line"></i><span>4 Cajas y P&L</span></button>
+                <button type="button" class="mod-tab ${st.tab === "libro" ? "active" : ""}" onclick="cambiarTabFinanzas('libro')"><i class="ri-book-2-line"></i><span>Libro Mayor (${res.delMes.length})</span></button>
+                <button type="button" class="mod-tab ${st.tab === "cuotas" ? "active" : ""}" onclick="cambiarTabFinanzas('cuotas')"><i class="ri-group-line"></i><span>Cuotas y Cobranza (${res.deudores.length} pend.)</span></button>
+            </div>
+        `;
 
         sec.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; gap:0.65rem; flex-wrap:wrap; margin-bottom:0.9rem;">
                 <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-                    <label style="font-size:0.78rem; font-weight:800;">📅 Período:</label>
+                    <label style="font-size:0.78rem; font-weight:800;">📅 Período (Fecha de Cobro):</label>
                     <input type="month" value="${st.mes === "TODOS" ? new Date().toISOString().slice(0, 7) : st.mes}" style="width:auto;" onchange="window._finState.mes=this.value; renderizarSeccionFinanzas();">
                     <button type="button" class="btn ${st.mes === "TODOS" ? "btn-primary" : "btn-ghost"} btn-sm" onclick="window._finState.mes='TODOS'; renderizarSeccionFinanzas();">Histórico Total</button>
                 </div>
                 <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalAumentoMasivoCuotas()">📈 Aumento Cuotas & Alias WA</button>
+                    ${soloCons
+                        ? `<button type="button" class="btn btn-ok btn-sm" onclick="if(typeof abrirModalLiquidacionMasiva17==='function') abrirModalLiquidacionMasiva17('TODAS');">💰 Liquidar Mutual</button>
+                           <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalAumentoMasivoCuotas()">🏦 Alias WA</button>`
+                        : `<button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalAumentoMasivoCuotas()">📈 Aumento Cuotas & Alias WA</button>`}
                     <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalCierreCaja25()">💵 Cierre de Caja</button>
                     <button type="button" class="btn btn-ghost btn-sm" onclick="exportarLibroMayorCSV()">📊 Excel CSV</button>
                 </div>
             </div>
 
             <section class="bento-kpis" style="margin-bottom:1rem;">
-                <div class="bento-kpi"><div class="kpi-icon ok"><i class="ri-arrow-down-circle-fill"></i></div><div class="kpi-data"><span>Ingresos</span><strong>${fmtPesos(res.ingresos)}</strong></div></div>
+                <div class="bento-kpi"><div class="kpi-icon ok"><i class="ri-arrow-down-circle-fill"></i></div><div class="kpi-data"><span>Ingresos Cobrados</span><strong>${fmtPesos(res.ingresos)}</strong></div></div>
                 <div class="bento-kpi"><div class="kpi-icon warn"><i class="ri-arrow-up-circle-fill"></i></div><div class="kpi-data"><span>Egresos</span><strong>${fmtPesos(res.egresos)}</strong></div></div>
                 <div class="bento-kpi"><div class="kpi-icon purple"><i class="ri-scales-3-fill"></i></div><div class="kpi-data"><span>Balance Neto</span><strong style="color:${res.neto >= 0 ? "var(--ok)" : "var(--err)"};">${fmtPesos(res.neto)}</strong></div></div>
-                <div class="bento-kpi"><div class="kpi-icon"><i class="ri-error-warning-fill"></i></div><div class="kpi-data"><span>Por Cobrar (${res.deudores.length})</span><strong>${fmtPesos(res.pendienteCobrar)}</strong></div></div>
+                <div class="bento-kpi" style="${soloCons ? "cursor:pointer;" : ""}" ${soloCons ? `onclick="cambiarTabFinanzas('cobranzas_cons')"` : ""}>
+                    <div class="kpi-icon"><i class="ri-error-warning-fill"></i></div>
+                    <div class="kpi-data">
+                        <span>${soloCons ? `Por Cobrar (${res.pendienteCant} ses.)` : `Por Cobrar (${res.deudores.length})`}</span>
+                        <strong>${fmtPesos(res.pendienteCobrar)}</strong>
+                    </div>
+                </div>
             </section>
 
-            <div class="module-tabs tabs-3" style="margin-bottom:1rem;">
-                <button type="button" class="mod-tab ${st.tab === "resumen" ? "active" : ""}" onclick="cambiarTabFinanzas('resumen')"><i class="ri-safe-2-line"></i><span>4 Cajas y P&L</span></button>
-                <button type="button" class="mod-tab ${st.tab === "libro" ? "active" : ""}" onclick="cambiarTabFinanzas('libro')"><i class="ri-book-2-line"></i><span>Libro Mayor (${res.delMes.length})</span></button>
-                <button type="button" class="mod-tab ${st.tab === "cuotas" ? "active" : ""}" onclick="cambiarTabFinanzas('cuotas')"><i class="ri-group-line"></i><span>Cuotas y Cobranza (${res.deudores.length} pend.)</span></button>
-            </div>
+            ${tabsHTML}
             <div id="finBodyContent"></div>
         `;
 
@@ -275,6 +396,12 @@
                                 </div>
                             `).join("")}
                         </div>
+                        ${soloCons ? `
+                            <div style="margin-top:0.85rem; padding:0.7rem 0.85rem; background:var(--surface-subtle); border:1px solid var(--line); border-radius:12px; font-size:0.79rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                                <span>🏥 Pendiente Obras Sociales (Neto): <b>${fmtPesos(res.pendCons.pendOS)}</b> • Coseguros/Part.: <b>${fmtPesos(res.pendCons.pendCoseg)}</b></span>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="cambiarTabFinanzas('cobranzas_cons')">Abrir Cobranzas →</button>
+                            </div>
+                        ` : ""}
                     </div>
 
                     <div class="app-panel">
@@ -283,7 +410,7 @@
                             <div class="grid-3" style="margin-bottom:0.65rem;">
                                 <div class="field"><label>Fecha</label><input type="date" id="finFecha" value="${obtenerHoyISO()}" required></div>
                                 <div class="field"><label>Tipo</label>
-                                    <select id="finTipo" onchange="const s=document.getElementById('finRubro'); const arr=this.value==='egreso'?${JSON.stringify(RUBROS_EGRESO).replace(/"/g, "'")}:${JSON.stringify(RUBROS_INGRESO).replace(/"/g, "'")}; s.innerHTML=arr.map(x=>'<option>'+x+'</option>').join('');">
+                                    <select id="finTipo" onchange="const s=document.getElementById('finRubro'); const arr=this.value==='egreso'?${JSON.stringify(rubEgr).replace(/"/g, "'")}:${JSON.stringify(rubIng).replace(/"/g, "'")}; s.innerHTML=arr.map(x=>'<option>'+x+'</option>').join('');">
                                         <option value="ingreso">🟢 Ingreso (+)</option>
                                         <option value="egreso">🔴 Egreso (-)</option>
                                     </select>
@@ -293,10 +420,10 @@
                                 </div>
                             </div>
                             <div class="grid-2" style="margin-bottom:0.65rem;">
-                                <div class="field"><label>Rubro</label><select id="finRubro">${RUBROS_INGRESO.map(r => `<option>${r}</option>`).join("")}</select></div>
+                                <div class="field"><label>Rubro</label><select id="finRubro">${rubIng.map(r => `<option>${r}</option>`).join("")}</select></div>
                                 <div class="field"><label>Monto ($) *</label><input type="number" id="finMonto" min="1" step="1" required placeholder="25000"></div>
                             </div>
-                            <div class="field" style="margin-bottom:0.8rem;"><label>Concepto / Detalle *</label><input type="text" id="finConcepto" required placeholder="Ej: Pago luz / Cuota socio / Compra pelotas"></div>
+                            <div class="field" style="margin-bottom:0.8rem;"><label>Concepto / Detalle *</label><input type="text" id="finConcepto" required placeholder="${soloCons ? "Ej: Alquiler consultorio / Matrícula Colegio / Sesión" : "Ej: Pago luz / Cuota socio / Compra pelotas"}"></div>
                             <button type="submit" class="btn btn-primary" style="width:100%;">💾 Registrar en Caja</button>
                         </form>
                     </div>
@@ -326,7 +453,7 @@
                     </div>
                     <div class="table-wrap">
                         <table class="app-table" style="font-size:0.82rem;">
-                            <thead><tr><th>Fecha</th><th>Tipo / Rubro</th><th>Concepto</th><th>Medio</th><th>Monto</th><th></th></tr></thead>
+                            <thead><tr><th>Fecha Pago</th><th>Tipo / Rubro</th><th>Concepto</th><th>Medio</th><th>Monto</th><th></th></tr></thead>
                             <tbody>
                                 ${filtrados.length === 0 ? `<tr><td colspan="6"><div class="empty-box" style="padding:1rem;">Sin movimientos en este filtro.</div></td></tr>` :
                                 filtrados.map(m => `
@@ -344,6 +471,12 @@
                     </div>
                 </div>
             `;
+        } else if (st.tab === "cobranzas_cons") {
+            if (typeof window.renderizarPanelCobranzaConsultorio17 === "function") {
+                window.renderizarPanelCobranzaConsultorio17(body, { espFiltro: "TODAS", desdeCaja: true });
+            } else {
+                body.innerHTML = `<div class="empty-box">Cargá el Bloque 17 en js/consultorio.js para habilitar Cobranzas, Tokens y Mutuales.</div>`;
+            }
         } else {
             const ord = [...res.activos].sort((a, b) => ((a.pagoEstado === "Pendiente" ? 0 : 1) - (b.pagoEstado === "Pendiente" ? 0 : 1)) || a.apellido.localeCompare(b.apellido));
             body.innerHTML = `
@@ -382,7 +515,7 @@
     }
 
     // =====================================================================
-    // 2. MODAL DE CIERRE DE CAJA RÁPIDO (ACCESIBLE DESDE MENÚ Y FINANZAS)
+    // 2. MODAL DE CIERRE DE CAJA RÁPIDO
     // =====================================================================
     function asegurarModalFinanzas() {
         let m = document.getElementById("modalFinanzasCDM");
@@ -396,6 +529,9 @@
     }
 
     window.abrirModalCierreCaja25 = function (fechaOpt = null) {
+        if (typeof window.reconstruirAsientosConsultorioEnCaja17 === "function") {
+            window.reconstruirAsientosConsultorioEnCaja17();
+        }
         const fecha = fechaOpt || obtenerHoyISO();
         const movsDia = obtenerMovimientosFinanzas().filter(m => m.fecha === fecha);
         const porMedio = { "Efectivo": 0, "Transferencia": 0, "MercadoPago": 0, "Tarjeta / Mutual": 0 };
@@ -446,7 +582,7 @@
     };
 
     // =====================================================================
-    // 3. AUMENTO MASIVO DE CUOTAS + ALIAS / CBU PARA WHATSAPP
+    // 3. AUMENTO MASIVO DE CUOTAS (SOLO CLUB/GYM) + ALIAS / CBU PARA WHATSAPP
     // =====================================================================
     window.enviarCobroConAliasWA = function (idPersona) {
         const p = (basePersonas || []).find(x => Number(x.id) === Number(idPersona));
@@ -468,35 +604,38 @@
 
     window.abrirModalAumentoMasivoCuotas = function () {
         const lic = obtenerLicenciaConfigCDM();
+        const { soloCons } = estadoModulosFin();
         const modal = asegurarModalFinanzas();
         modal.innerHTML = `
             <div class="modal-window" style="max-width:560px;">
                 <div class="modal-top">
                     <div>
-                        <span class="badge badge-purple">📈 ACTUALIZACIÓN DE CUOTAS Y ALIAS</span>
-                        <h3 style="margin-top:4px;">Aumento Masivo y Datos de Transferencia</h3>
+                        <span class="badge badge-purple">${soloCons ? "🏦 DATOS DE TRANSFERENCIA" : "📈 ACTUALIZACIÓN DE CUOTAS Y ALIAS"}</span>
+                        <h3 style="margin-top:4px;">${soloCons ? "Alias / CBU del Consultorio" : "Aumento Masivo y Datos de Transferencia"}</h3>
                     </div>
                     <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalFinanzasCDM').classList.add('hidden')">✕</button>
                 </div>
 
-                <form onsubmit="aplicarAumentoMasivoCuotas(event)" style="margin-bottom:1rem; padding-bottom:0.9rem; border-bottom:1px solid var(--line);">
-                    <div class="grid-3" style="margin-bottom:0.65rem;">
-                        <div class="field"><label>Aplicar a</label>
-                            <select id="aumArea"><option value="TODOS">Todos los Activos</option><option value="Gimnasio">Solo Gimnasio</option><option value="Futbol">Solo Fútbol</option><option value="Hockey">Solo Hockey</option></select>
+                ${!soloCons ? `
+                    <form onsubmit="aplicarAumentoMasivoCuotas(event)" style="margin-bottom:1rem; padding-bottom:0.9rem; border-bottom:1px solid var(--line);">
+                        <div class="grid-3" style="margin-bottom:0.65rem;">
+                            <div class="field"><label>Aplicar a</label>
+                                <select id="aumArea"><option value="TODOS">Todos los Activos</option><option value="Gimnasio">Solo Gimnasio</option><option value="Futbol">Solo Fútbol</option><option value="Hockey">Solo Hockey</option></select>
+                            </div>
+                            <div class="field"><label>Modo</label>
+                                <select id="aumModo"><option value="pct">Porcentaje (%)</option><option value="fijo">Fijar Nuevo Monto ($)</option></select>
+                            </div>
+                            <div class="field"><label>Valor *</label><input type="number" id="aumValor" required placeholder="Ej: 15 o 30000"></div>
                         </div>
-                        <div class="field"><label>Modo</label>
-                            <select id="aumModo"><option value="pct">Porcentaje (%)</option><option value="fijo">Fijar Nuevo Monto ($)</option></select>
-                        </div>
-                        <div class="field"><label>Valor *</label><input type="number" id="aumValor" required placeholder="Ej: 15 o 30000"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">📈 Aplicar Nuevo Valor de Cuota</button>
-                </form>
+                        <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">📈 Aplicar Nuevo Valor de Cuota</button>
+                    </form>
+                ` : ""}
 
                 <form onsubmit="guardarAliasTransferenciaFinanzas(event)">
-                    <strong style="font-size:0.8rem; display:block; margin-bottom:0.45rem;">🏦 Alias / CBU para mensajes de WhatsApp:</strong>
+                    <strong style="font-size:0.8rem; display:block; margin-bottom:0.45rem;">🏦 Alias / CBU para envíos por WhatsApp:</strong>
                     <div class="grid-2" style="margin-bottom:0.65rem;">
-                        <div class="field"><label>Alias o CBU</label><input type="text" id="finAliasWA" value="${(lic.aliasTransferencia || "").replace(/"/g, "&quot;")}" placeholder="Ej: club.cdm.mp"></div>
-                        <div class="field"><label>Titular</label><input type="text" id="finTitularWA" value="${(lic.titularTransferencia || "").replace(/"/g, "&quot;")}" placeholder="Ej: Club Deportivo Municipal"></div>
+                        <div class="field"><label>Alias o CBU</label><input type="text" id="finAliasWA" value="${(lic.aliasTransferencia || "").replace(/"/g, "&quot;")}" placeholder="Ej: consultorio.mp"></div>
+                        <div class="field"><label>Titular</label><input type="text" id="finTitularWA" value="${(lic.titularTransferencia || "").replace(/"/g, "&quot;")}" placeholder="Ej: Lic. Alina Caudana"></div>
                     </div>
                     <button type="submit" class="btn btn-secondary btn-sm" style="width:100%;">💾 Guardar Datos de Transferencia</button>
                 </form>
@@ -531,6 +670,6 @@
         lic.titularTransferencia = (document.getElementById("finTitularWA")?.value || "").trim();
         if (typeof guardarLicenciaConfigCDM === "function") guardarLicenciaConfigCDM(lic);
         else localStorage.setItem("cdm_licencia_config_v1", JSON.stringify(lic));
-        mostrarToast("🏦 Alias/CBU guardado para envíos por WhatsApp.");
+        mostrarToast("🏦 Alias/CBU guardado.");
     };
 })();

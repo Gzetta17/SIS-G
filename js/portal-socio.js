@@ -1,5 +1,7 @@
 /**
  * js/portal-socio.js — Portal del Socio / Deportista por Código o DNI (mi-ficha.html)
+ * - Registro rápido de marcas y cargas en la rutina para Gimnasio (con última marca visible)
+ * - Respeto de permisos en Deportes (solo habilitado si el profesor lo permite)
  * CDM Pro Suite — Desarrollado por Gonzalo Adanchú
  */
 
@@ -52,6 +54,25 @@ function cambiarTabSocio(seccion, btnEl) {
     if (sec) { sec.classList.remove("hidden"); sec.classList.add("animate-in"); }
     document.querySelectorAll(".module-tabs .mod-tab").forEach(b => b.classList.remove("active"));
     if (btnEl) btnEl.classList.add("active");
+    if (seccion === "progreso") renderizarGraficoSocio();
+}
+
+function puedeVerYUsarProgresoSocio(socio) {
+    if (!socio) return false;
+    if (socio.deporte === "Gimnasio") return true;
+    if (typeof window.obtenerPermisosEfectivosPortal === "function") {
+        const perms = window.obtenerPermisosEfectivosPortal(socio);
+        return Boolean(perms && perms.progreso);
+    }
+    return false;
+}
+
+function obtenerUltimaMarcaEjercicioSocio(socio, nombreEjercicio) {
+    const clave = normalizarTextoEjercicioCDM(nombreEjercicio);
+    const matches = (socio?.evaluaciones || []).filter(ev => normalizarTextoEjercicioCDM(ev.ejercicio) === clave);
+    if (!matches.length) return null;
+    matches.sort((a, b) => new Date(a.fecha || 0) - new Date(b.fecha || 0) || (Number(a.id) - Number(b.id)));
+    return matches[matches.length - 1];
 }
 
 function inicializarPanelSocio() {
@@ -70,6 +91,18 @@ function inicializarPanelSocio() {
     panelDash?.classList.remove("hidden");
     asegurarPilaresPersona(socio);
     if (typeof asegurarVideotecaCargada === "function") asegurarVideotecaCargada();
+
+    const permiteProgreso = puedeVerYUsarProgresoSocio(socio);
+    const btnTabProgreso = document.querySelector('.module-tabs .mod-tab[onclick*="progreso"]');
+    if (btnTabProgreso) {
+        btnTabProgreso.classList.toggle("hidden", !permiteProgreso);
+        if (!permiteProgreso && !document.getElementById("socio-sec-rutinas")?.classList.contains("hidden")) {
+            // Mantener pestaña activa válida
+        } else if (!permiteProgreso && !document.getElementById("socio-sec-progreso")?.classList.contains("hidden")) {
+            const tabRut = document.querySelector('.module-tabs .mod-tab[onclick*="rutinas"]');
+            cambiarTabSocio("rutinas", tabRut);
+        }
+    }
 
     const cab = document.getElementById("socioCabeceraInfo");
     if (cab) {
@@ -101,38 +134,110 @@ function inicializarPanelSocio() {
 
     renderizarRutinasSocio(socio);
 
-    const selEx = document.getElementById("socioSelectEjercicio");
-    if (selEx) {
-        const unicos = [...new Set((socio.evaluaciones || []).map(e => e.ejercicio))];
-        selEx.innerHTML = unicos.length ? unicos.map(nom => `<option value="${nom}">${nom}</option>`).join("") : `<option value="">-- Sin marcas aún --</option>`;
+    if (permiteProgreso) {
+        poblarSelectEjerciciosSocio(socio);
+        renderizarGraficoSocio(socio);
     }
-    renderizarGraficoSocio(socio);
     renderizarRankingSocio(socio);
+}
+
+function poblarSelectEjerciciosSocio(socio) {
+    const selEx = document.getElementById("socioSelectEjercicio");
+    if (!selEx) return;
+    const prev = selEx.value;
+    const unicos = [...new Set((socio.evaluaciones || []).map(e => e.ejercicio).filter(Boolean))];
+    selEx.innerHTML = unicos.length
+        ? unicos.map(nom => `<option value="${nom.replace(/"/g, "&quot;")}">${nom}</option>`).join("")
+        : `<option value="">-- Sin marcas aún --</option>`;
+    if (prev && unicos.includes(prev)) selEx.value = prev;
+}
+
+function registrarMarcaRapidaSocioGym(e, idxForm) {
+    e.preventDefault();
+    const socio = obtenerSocioLogueadoURLoSession();
+    if (!socio || !puedeVerYUsarProgresoSocio(socio)) return;
+
+    const form = e.target;
+    const ejercicio = (form.dataset.ejercicio || "").trim();
+    const pesoKg = parseFloat(form.querySelector(".js-gym-kg")?.value);
+    const reps = parseInt(form.querySelector(".js-gym-reps")?.value, 10) || 1;
+    const nota = (form.querySelector(".js-gym-nota")?.value || "").trim();
+
+    if (!ejercicio || isNaN(pesoKg) || pesoKg <= 0) {
+        alert("⚠️ Ingresá un peso válido en kg para anotar tu marca.");
+        return;
+    }
+
+    const fecha = typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+    const rmEstimado = Math.round((reps === 1 ? pesoKg : pesoKg * (1 + reps / 30)) * 10) / 10;
+    const detalle = reps > 1 ? `${pesoKg} kg × ${reps} reps (1RM est. ${rmEstimado} kg)` : `${pesoKg} kg × 1 rep`;
+
+    if (!Array.isArray(socio.evaluaciones)) socio.evaluaciones = [];
+    socio.evaluaciones.push({
+        id: Date.now() + (idxForm || 0),
+        fecha,
+        ejercicio,
+        tipo: "fuerza_kg",
+        valor: rmEstimado,
+        unidad: "kg (1RM)",
+        detalle,
+        nota: nota || "Anotado por socio en rutina"
+    });
+    socio.evaluaciones.sort((a, b) => new Date(a.fecha || 0) - new Date(b.fecha || 0) || (Number(a.id) - Number(b.id)));
+
+    if (typeof registrarSnapshotPersona === "function") {
+        registrarSnapshotPersona(socio, `Marca ${ejercicio}`);
+    }
+    if (typeof guardarDatosCDM === "function") {
+        guardarDatosCDM();
+    }
+
+    mostrarToast(`💪 Anotado: ${ejercicio} (${detalle})`);
+    inicializarPanelSocio();
 }
 
 function renderizarRutinasSocio(socio) {
     const cont = document.getElementById("socioListaRutinas");
     if (!cont) return;
+    const permiteAnotar = puedeVerYUsarProgresoSocio(socio);
+
     const rutinas = (baseRutinas || []).filter(r =>
         Number(r.personaId) === Number(socio.id) || (r.esGrupal && r.deporteDestino === socio.deporte && (r.categoriaDestino === socio.categoria || r.categoriaDestino === "General"))
     );
-    if (!rutinas.length) { cont.innerHTML = `<div class="empty-box" style="grid-column:1/-1;">Todavía no tenés rutinas asignadas.</div>`; return; }
+    if (!rutinas.length) {
+        cont.innerHTML = `<div class="empty-box" style="grid-column:1/-1;">Todavía no tenés rutinas asignadas.</div>`;
+        return;
+    }
 
+    let formSeq = 0;
     cont.innerHTML = rutinas.map(r => `
         <div class="athlete-card" style="cursor:default;">
             <span class="badge ${r.esGrupal ? "badge-purple" : "badge-celeste"}">${r.esGrupal ? "🏟️ Grupal" : "👤 Personal"}</span>
             <h4 style="font-size:1.05rem; margin-top:4px;">${r.nombre}</h4>
             <small style="color:var(--ink-500);">${r.objetivo} • ${r.dias}</small>
-            <div style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.4rem;">
+            <div style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.5rem;">
                 ${(r.ejercicios || []).map((ex, i) => {
+                    formSeq++;
                     const vid = (baseVideoteca || []).find(v => normalizarTextoEjercicioCDM(v.nombre).includes(normalizarTextoEjercicioCDM(ex.nombre)));
+                    const ult = permiteAnotar ? obtenerUltimaMarcaEjercicioSocio(socio, ex.nombre) : null;
+                    const ejEsc = String(ex.nombre || "").replace(/"/g, "&quot;");
+
                     return `
-                        <div style="padding:0.55rem 0.7rem; background:var(--surface-subtle); border:1px solid var(--line); border-radius:10px; font-size:0.82rem;">
+                        <div style="padding:0.6rem 0.75rem; background:var(--surface-subtle); border:1px solid var(--line); border-radius:11px; font-size:0.82rem;">
                             <strong>${i + 1}. ${ex.nombre}</strong>
-                            <div style="display:flex; gap:0.75rem; font-size:0.74rem; color:var(--ink-500); margin-top:2px;">
+                            <div style="display:flex; gap:0.75rem; flex-wrap:wrap; font-size:0.74rem; color:var(--ink-500); margin-top:2px;">
                                 <span>📊 ${ex.series}×${ex.reps}</span><span>🏋️ ${ex.peso}</span><span>⏱️ ${ex.pausa}</span>
                             </div>
-                            ${vid ? `<button class="btn btn-primary btn-sm" style="margin-top:0.35rem; min-height:26px; font-size:0.7rem;" onclick="abrirModalReproductorEjercicio(${vid.id})">▶ Ver Video</button>` : ""}
+                            ${ult ? `<div style="margin-top:4px; font-size:0.73rem; color:var(--cdm-600); font-weight:700;">📌 Última vez (${ult.fecha}): ${ult.detalle}</div>` : ""}
+                            ${vid ? `<button type="button" class="btn btn-primary btn-sm" style="margin-top:0.4rem; min-height:26px; font-size:0.7rem;" onclick="abrirModalReproductorEjercicio(${vid.id})">▶ Ver Video</button>` : ""}
+                            ${permiteAnotar ? `
+                                <form data-ejercicio="${ejEsc}" onsubmit="registrarMarcaRapidaSocioGym(event, ${formSeq})" style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.5rem; padding-top:0.45rem; border-top:1px dashed var(--line);">
+                                    <input type="number" step="0.5" min="0.5" class="js-gym-kg" placeholder="Kg" required style="width:74px; min-height:30px; font-size:0.76rem; padding:0.2rem 0.45rem;">
+                                    <input type="number" min="1" class="js-gym-reps" placeholder="Reps" value="8" style="width:66px; min-height:30px; font-size:0.76rem; padding:0.2rem 0.45rem;">
+                                    <input type="text" class="js-gym-nota" placeholder="Nota (opcional)" style="flex:1; min-width:95px; min-height:30px; font-size:0.75rem; padding:0.2rem 0.5rem;">
+                                    <button type="submit" class="btn btn-ok btn-sm" style="min-height:30px; font-size:0.72rem;">+ Anotar</button>
+                                </form>
+                            ` : ""}
                         </div>
                     `;
                 }).join("")}
@@ -145,8 +250,10 @@ function renderizarGraficoSocio(socioOpt = null) {
     const socio = socioOpt || obtenerSocioLogueadoURLoSession();
     const cv = document.getElementById("canvasSocioProgreso");
     if (!cv || !socio || typeof Chart === "undefined") return;
+    if (!puedeVerYUsarProgresoSocio(socio)) return;
+
     const nom = document.getElementById("socioSelectEjercicio")?.value;
-    const datos = (socio.evaluaciones || []).filter(e => e.ejercicio === nom).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    const datos = (socio.evaluaciones || []).filter(e => e.ejercicio === nom).sort((a, b) => new Date(a.fecha || 0) - new Date(b.fecha || 0) || (Number(a.id) - Number(b.id)));
     if (window.chartSocioInstancia) { window.chartSocioInstancia.destroy(); window.chartSocioInstancia = null; }
     if (!datos.length) return;
     window.chartSocioInstancia = new Chart(cv.getContext("2d"), {

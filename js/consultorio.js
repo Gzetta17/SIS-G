@@ -4114,3 +4114,2174 @@ window.especialidadFiltroConsultorioCDM = "TODAS";
         setTimeout(aplicarVariablesColorConsultorio16, 250);
     });
 })();
+// =========================================================================
+// 17. SUITE PROFESIONAL DE OBRAS SOCIALES, CUPOS, TOKENS, COBRANZAS Y LIQUIDACIONES
+//     - Exclusivo para Profesionales / Consultorio (no afecta Clubes ni Gimnasios)
+//     - Obra Social (solo Valor OS + Coseguro) vs Particular (solo Valor Total)
+//     - Descuento automático de sesiones por paciente (cupo mes/año atado al año calendario)
+//     - Reglas de token por mutual y por paciente + filtro Mes Trabajado / Mes Cobrado
+//     - Checklist (Token / Presentado / Coseguro / OS / Completo) + Liquidaciones (Mensual / BIS)
+//     - Reconstrucción automática de asientos en Caja (sincronizado con MongoDB)
+// Pegar al final de js/consultorio.js (debajo del Bloque 16)
+// =========================================================================
+(function () {
+    if (window.__cdmConsObrasSociales17) return;
+    window.__cdmConsObrasSociales17 = true;
+
+    const MODOS_TOKEN = [
+        { clave: "sin_token", label: "Sin token / Libre", corto: "Sin token" },
+        { clave: "semanal", label: "Token semanal (día de sesión)", corto: "Token semanal" },
+        { clave: "fin_mes", label: "Autorización a fin de mes", corto: "Fin de mes" },
+        { clave: "previa", label: "Autorización previa / Orden RP", corto: "Auth. previa" },
+        { clave: "por_dia", label: "Validación online por día", corto: "Por día" }
+    ];
+
+    const FREC_PRESENTACION = [
+        { clave: "mensual", label: "Mensual (ej. del 28 al 8)" },
+        { clave: "semanal", label: "Semanal" },
+        { clave: "por_dia", label: "Por día / On-line directo" }
+    ];
+
+    const LIQ_POR_MES = [
+        { clave: "1", label: "1 por mes (Mensual — 1er día hábil)" },
+        { clave: "2", label: "2 por mes (Mensual + BIS mediados de mes)" },
+        { clave: "variable", label: "Directa / Variable según mutual" }
+    ];
+
+    const TIPOS_LIQ_PAGO = [
+        "1ª Liquidación Mensual",
+        "2ª Liquidación (BIS)",
+        "Liquidación Extraordinaria",
+        "Pago Directo Mutual"
+    ];
+
+    const MEDIOS_CAJA_17 = ["Efectivo", "Transferencia", "MercadoPago", "Tarjeta / Mutual"];
+
+    const ui17 = {
+        fechaSel: typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0],
+        cobSubTab: "sesiones", // "sesiones" | "pacientes" | "mutuales" | "liquidaciones"
+        cobModoMes: "trabajo", // "trabajo" | "cobro"
+        cobMesTrabajo: new Date().toISOString().slice(0, 7), // "YYYY-MM" | "TODOS"
+        cobMutId: "TODAS",
+        cobPacId: "TODOS",
+        cobEstado: "TODOS",
+        cobEsp: "ACTIVA",
+        cobBusq: ""
+    };
+
+    function norm17(s) {
+        return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    function mismaEsp17(a, b) {
+        return norm17(a) === norm17(b);
+    }
+
+    function esc17(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function escJs17(s) {
+        return esc17(String(s ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+    }
+
+    function hoy17() {
+        return typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+    }
+
+    function fmt17(n) {
+        return "$" + Math.round(Number(n) || 0).toLocaleString("es-AR");
+    }
+
+    function toast17(msg) {
+        if (typeof mostrarToast === "function") mostrarToast(msg);
+    }
+
+    function tieneConsultorioActivo17() {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const mod = lic?.modulos || {};
+        const profs = Array.isArray(lic?.profesionesHabilitadas) ? lic.profesionesHabilitadas.filter(Boolean) : [];
+        return mod.consultorio !== false && profs.length > 0;
+    }
+
+    function obtenerEspActiva17() {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const lista = Array.isArray(lic?.profesionesHabilitadas)
+            ? lic.profesionesHabilitadas.map(c => String(c || "").trim()).filter(Boolean)
+            : [];
+        const act = window.especialidadFiltroConsultorioCDM;
+        if (act && act !== "TODAS") {
+            const hit = lista.find(c => mismaEsp17(c, act));
+            if (hit) return hit;
+        }
+        return lista[0] || "Consultorio";
+    }
+
+    function formatearMesYM17(ym) {
+        if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return ym || "-";
+        const [y, m] = ym.split("-").map(Number);
+        const dt = new Date(y, m - 1, 1);
+        const txt = dt.toLocaleDateString("es-AR", { month: "short", year: "numeric" });
+        return txt.charAt(0).toUpperCase() + txt.slice(1);
+    }
+
+    function labelModoToken17(clave, corto = false) {
+        const hit = MODOS_TOKEN.find(x => x.clave === clave);
+        if (!hit) return corto ? "Sin token" : "Sin token / Libre";
+        return corto ? hit.corto : hit.label;
+    }
+
+    function labelFrecPres17(clave) {
+        return (FREC_PRESENTACION.find(x => x.clave === clave) || FREC_PRESENTACION[0]).label;
+    }
+
+    function labelLiqMes17(clave) {
+        return (LIQ_POR_MES.find(x => x.clave === String(clave)) || LIQ_POR_MES[1]).label;
+    }
+
+    function obtenerDescColegioDefecto17(db, esp) {
+        const k = norm17(esp || obtenerEspActiva17());
+        const mapa = db?.configCobranza?.descuentoColegioPorEsp || {};
+        if (mapa[k] !== undefined && mapa[k] !== null && mapa[k] !== "") return Number(mapa[k]) || 0;
+        if (db?.configCobranza?.descuentoColegioGeneral !== undefined) return Number(db.configCobranza.descuentoColegioGeneral) || 0;
+        return 0;
+    }
+
+    function esMutualParticular17(m) {
+        if (!m) return true;
+        if (m.esParticular === true) return true;
+        if (m.esParticular === false) return false;
+        const n = norm17(m.nombre);
+        return n.includes("particular") || (Number(m.valorMutual || 0) === 0 && Number(m.valorParticular || 0) > 0);
+    }
+
+    function normalizarMutual17(m, db, espFallback = "") {
+        if (!m) return null;
+        const esPart = esMutualParticular17(m);
+        const defCol = obtenerDescColegioDefecto17(db, m.especialidad || espFallback);
+        const modoToken = esPart
+            ? "sin_token"
+            : (m.modoToken || (m.requiereToken ? "semanal" : "sin_token"));
+        return {
+            ...m,
+            esParticular: esPart,
+            valorMutual: esPart ? 0 : (Number(m.valorMutual) || 0),
+            coseguro: esPart ? 0 : (Number(m.coseguro) || 0),
+            valorParticular: esPart ? (Number(m.valorParticular) || 0) : 0,
+            requiereToken: !esPart && modoToken !== "sin_token",
+            modoToken,
+            topeMensual: esPart ? 0 : (Number(m.topeMensual) || 0),
+            topeAnual: esPart ? 0 : (Number(m.topeAnual) || 0),
+            frecuenciaPresentacion: esPart ? "por_dia" : (m.frecuenciaPresentacion || "mensual"),
+            liquidacionesMes: esPart ? "variable" : String(m.liquidacionesMes || "2"),
+            descuentoColegioPct: esPart ? 0 : (m.descuentoColegioPct !== undefined && m.descuentoColegioPct !== "" ? Number(m.descuentoColegioPct) : defCol),
+            estadoConvenio: esPart ? "activo" : (m.estadoConvenio || "activo"),
+            demoraEstimada: esPart ? "" : (m.demoraEstimada || "")
+        };
+    }
+
+    function resolverMutual17(db, mutId, espFallback = "") {
+        const raw = typeof window.buscarMutualConsultorioCDM === "function"
+            ? window.buscarMutualConsultorioCDM(db, mutId, espFallback)
+            : (db.mutuales || []).find(x => x.id === mutId);
+        return raw ? normalizarMutual17(raw, db, espFallback) : null;
+    }
+
+    function obtenerReglaTokenPaciente17(db, pac, mutNorm = null) {
+        const m = mutNorm || (pac ? resolverMutual17(db, pac.mutualId, pac.especialidad) : null);
+        if (m && m.esParticular) return { clave: "sin_token", origen: "Particular", nota: "" };
+        if (pac?.modoTokenPaciente && pac.modoTokenPaciente !== "heredar") {
+            return { clave: pac.modoTokenPaciente, origen: "Regla del paciente", nota: pac.notaTokenPaciente || "" };
+        }
+        return { clave: m?.modoToken || "sin_token", origen: "De la mutual", nota: pac?.notaTokenPaciente || "" };
+    }
+
+    // =====================================================================
+    // 1. CÁLCULO DE CUPO DE SESIONES (ATADO AL AÑO CALENDARIO)
+    // =====================================================================
+    window.calcularCupoPacienteCons17 = function (db, pac, fechaRefISO = null) {
+        if (!db || !pac) return null;
+        const mut = resolverMutual17(db, pac.mutualId, pac.especialidad);
+        const ref = fechaRefISO || hoy17();
+        const mesRef = ref.slice(0, 7);
+        const anioRef = ref.slice(0, 4);
+
+        const turnosPac = (db.turnos || []).filter(t => Number(t.pacienteId) === Number(pac.id) && t.estado !== "cancelado");
+        const atendidosMes = turnosPac.filter(t => t.estado === "atendido" && String(t.fecha || "").startsWith(mesRef)).length;
+        const atendidosAnioSistema = turnosPac.filter(t => t.estado === "atendido" && String(t.fecha || "").startsWith(anioRef)).length;
+        const agendadosMes = turnosPac.filter(t => t.estado !== "atendido" && String(t.fecha || "").startsWith(mesRef)).length;
+
+        const anioPrev = pac.anioSesionesPrevias ? String(pac.anioSesionesPrevias) : String(new Date().getFullYear());
+        const previasAnio = anioPrev === anioRef ? (Number(pac.sesionesPreviasAnio) || 0) : 0;
+        const usadasAnio = atendidosAnioSistema + previasAnio;
+
+        const topeMes = pac.topeMensualCustom !== undefined && pac.topeMensualCustom !== "" && pac.topeMensualCustom !== null
+            ? Number(pac.topeMensualCustom)
+            : (mut?.topeMensual || 0);
+        const topeAnio = pac.topeAnualCustom !== undefined && pac.topeAnualCustom !== "" && pac.topeAnualCustom !== null
+            ? Number(pac.topeAnualCustom)
+            : (mut?.topeAnual || 0);
+
+        const restanMes = topeMes > 0 ? Math.max(0, topeMes - atendidosMes) : null;
+        const restanAnio = topeAnio > 0 ? Math.max(0, topeAnio - usadasAnio) : null;
+        const excedidoMes = topeMes > 0 && atendidosMes >= topeMes;
+        const excedidoAnio = topeAnio > 0 && usadasAnio >= topeAnio;
+        const alertaBaja = (!excedidoMes && restanMes === 1) || (!excedidoAnio && restanAnio !== null && restanAnio <= 2);
+
+        return {
+            esParticular: !mut || mut.esParticular,
+            mutual: mut,
+            mesRef, anioRef,
+            atendidosMes, agendadosMes,
+            usadasAnio, previasAnio,
+            topeMes, topeAnio,
+            restanMes, restanAnio,
+            excedidoMes, excedidoAnio, alertaBaja
+        };
+    };
+
+    // =====================================================================
+    // 2. MOTOR FINANCIERO POR SESIÓN + RECONSTRUCCIÓN ATÓMICA DE CAJA
+    // =====================================================================
+    function analizarFinanzasTurno17(db, t) {
+        const mut = resolverMutual17(db, t.mutualId, t.especialidad);
+        const pac = t.pacienteId ? (db.pacientes || []).find(p => Number(p.id) === Number(t.pacienteId)) : null;
+        const esPart = Boolean(mut?.esParticular) || (Number(t.valorParticular || 0) > 0 && Number(t.valorMutual || 0) === 0);
+
+        const valPart = esPart ? (Number(t.valorParticular) || 0) : 0;
+        const valCoseg = esPart ? 0 : (Number(t.coseguro) || 0);
+        const valOSBruto = esPart ? 0 : (Number(t.valorMutual) || 0);
+
+        const descPct = esPart
+            ? 0
+            : (t.descuentoColegioPct !== undefined && t.descuentoColegioPct !== "" && t.descuentoColegioPct !== null
+                ? Number(t.descuentoColegioPct)
+                : (mut ? Number(mut.descuentoColegioPct) || 0 : obtenerDescColegioDefecto17(db, t.especialidad)));
+
+        const descMonto = Math.round(valOSBruto * (descPct / 100));
+        const valOSNeto = Math.max(0, valOSBruto - descMonto);
+
+        const montoConsultorio = esPart ? valPart : valCoseg;
+        const cosegCobrado = Boolean(t.coseguroCobrado);
+        const osCobrada = Boolean(t.mutualCobrada);
+        const tokenEntregado = Boolean(t.tokenEntregado || (t.token && String(t.token).trim()));
+
+        // Prioriza la regla individual del paciente por sobre la mutual
+        const reglaToken = obtenerReglaTokenPaciente17(db, pac, mut);
+        const requiereToken = !esPart && reglaToken.clave !== "sin_token";
+
+        const cobradoConsultorio = cosegCobrado ? montoConsultorio : 0;
+        const pendConsultorio = (montoConsultorio > 0 && !cosegCobrado) ? montoConsultorio : 0;
+        const cobradoOSNeto = osCobrada ? valOSNeto : 0;
+        const pendOSNeto = (valOSBruto > 0 && !osCobrada) ? valOSNeto : 0;
+
+        const faltaCoseg = montoConsultorio > 0 && !cosegCobrado;
+        const faltaOS = valOSBruto > 0 && !osCobrada;
+        const completo = !faltaCoseg && !faltaOS;
+        const mesTrabajo = String(t.fecha || "").slice(0, 7);
+
+        return {
+            mut, pac, esPart, mesTrabajo, reglaToken,
+            montoConsultorio, valOSBruto, descPct, descMonto, valOSNeto,
+            cosegCobrado, osCobrada, tokenEntregado, requiereToken,
+            faltaToken: requiereToken && !tokenEntregado,
+            faltaCoseg, faltaOS, completo,
+            cobradoConsultorio, pendConsultorio,
+            cobradoOSNeto, pendOSNeto,
+            totalCobradoReal: cobradoConsultorio + cobradoOSNeto,
+            totalPendienteReal: pendConsultorio + pendOSNeto
+        };
+    }
+
+    function construirAsientosDeTurno17(db, t) {
+        const res = [];
+        if (!t || t.estado === "cancelado") return res;
+        const fin = analizarFinanzasTurno17(db, t);
+
+        if (fin.cosegCobrado && fin.montoConsultorio > 0) {
+            res.push({
+                refKey: `cons_coseg_${t.id}`,
+                fecha: t.fechaPagoCoseguro || t.fecha || hoy17(),
+                tipo: "ingreso",
+                rubro: fin.esPart ? "Sesión Consultorio" : "Coseguro / Mutual",
+                concepto: `${fin.esPart ? "Sesión Particular" : `Coseguro (${fin.mut?.nombre || t.mutualNombre})`} — ${t.pacienteNombre} [Trab: ${fin.mesTrabajo}]`,
+                monto: fin.montoConsultorio,
+                medio: t.medioPagoCoseguro || "Efectivo",
+                origenConsultorio: true,
+                turnoId: t.id,
+                mesTrabajo: fin.mesTrabajo
+            });
+        }
+
+        if (!fin.esPart && fin.osCobrada && fin.valOSNeto > 0) {
+            const liqTxt = t.liquidacionRef ? ` • ${t.liquidacionRef}` : "";
+            const colTxt = fin.descPct > 0 ? ` (Bruto ${fmt17(fin.valOSBruto)} - ${fin.descPct}% Col.)` : "";
+            res.push({
+                refKey: `cons_mut_${t.id}`,
+                fecha: t.fechaPagoMutual || hoy17(),
+                tipo: "ingreso",
+                rubro: "Coseguro / Mutual",
+                concepto: `Obra Social ${fin.mut?.nombre || t.mutualNombre} — ${t.pacienteNombre} [Trab: ${fin.mesTrabajo}${liqTxt}]${colTxt}`,
+                monto: fin.valOSNeto,
+                medio: t.medioPagoMutual || "Transferencia",
+                origenConsultorio: true,
+                turnoId: t.id,
+                mesTrabajo: fin.mesTrabajo
+            });
+        }
+        return res;
+    }
+
+    window.reconstruirAsientosConsultorioEnCaja17 = function () {
+        if (!tieneConsultorioActivo17()) return;
+        const db = obtenerDatosConsultorioCDM();
+        const asientos = [];
+        (db.turnos || []).forEach(t => {
+            asientos.push(...construirAsientosDeTurno17(db, t));
+        });
+
+        if (typeof window.reemplazarAsientosConsultorioFinanzas === "function") {
+            window.reemplazarAsientosConsultorioFinanzas(asientos);
+        } else if (typeof window.sincronizarAsientoConsultorioFinanzas === "function") {
+            asientos.forEach(a => window.sincronizarAsientoConsultorioFinanzas(a));
+        }
+    };
+
+    function sincronizarCajaDesdeTurno17(db, t) {
+        if (typeof window.reemplazarAsientosConsultorioFinanzas === "function") {
+            window.reconstruirAsientosConsultorioEnCaja17();
+            return;
+        }
+        if (typeof window.sincronizarAsientoConsultorioFinanzas !== "function") return;
+        const asientos = construirAsientosDeTurno17(db, t);
+        const refs = new Set(asientos.map(a => a.refKey));
+        asientos.forEach(a => window.sincronizarAsientoConsultorioFinanzas(a));
+        if (typeof window.eliminarAsientoConsultorioFinanzas === "function") {
+            if (!refs.has(`cons_coseg_${t.id}`)) window.eliminarAsientoConsultorioFinanzas(`cons_coseg_${t.id}`);
+            if (!refs.has(`cons_mut_${t.id}`)) window.eliminarAsientoConsultorioFinanzas(`cons_mut_${t.id}`);
+        }
+    }
+
+    window.calcularResumenPendienteConsultorio17 = function () {
+        const db = obtenerDatosConsultorioCDM();
+        let pendTotal = 0, pendCoseg = 0, pendOS = 0, sesionesPend = 0, faltanTokens = 0;
+        (db.turnos || []).forEach(t => {
+            if (!t || t.estado === "cancelado") return;
+            const f = analizarFinanzasTurno17(db, t);
+            if (f.totalPendienteReal > 0) {
+                pendTotal += f.totalPendienteReal;
+                pendCoseg += f.pendConsultorio;
+                pendOS += f.pendOSNeto;
+                sesionesPend++;
+            }
+            if (f.faltaToken) faltanTokens++;
+        });
+        return { pendTotal, pendCoseg, pendOS, sesionesPend, faltanTokens };
+    };
+
+    // =====================================================================
+    // 3. ESTILOS COMPACTOS PARA OBRAS SOCIALES, CUPOS Y COBRANZAS
+    // =====================================================================
+    function inyectarCSS17() {
+        if (document.getElementById("cdmCssConsObras17")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssConsObras17";
+        st.textContent = `
+            .c17-subtabs {
+                display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.85rem;
+                background: var(--surface-subtle, #f1f5f9); padding: 0.32rem;
+                border: 1px solid var(--line, #e2e8f0); border-radius: 13px;
+            }
+            .c17-subtab {
+                flex: 1 0 auto; border: none; background: transparent;
+                color: var(--ink-600, #475569); font-size: 0.77rem; font-weight: 800;
+                padding: 0.45rem 0.7rem; border-radius: 9px; cursor: pointer;
+                transition: all 0.14s ease;
+            }
+            .c17-subtab.active {
+                background: var(--cons-p, #0284c7); color: var(--cons-on-p, #ffffff);
+                box-shadow: 0 3px 10px rgba(2, 132, 199, 0.25);
+            }
+            .c17-filter-bar {
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 0.45rem; margin-bottom: 0.85rem;
+                background: var(--surface-subtle, #f8fafc); border: 1px solid var(--line, #e2e8f0);
+                padding: 0.65rem 0.75rem; border-radius: 14px;
+            }
+            .c17-filter-bar select, .c17-filter-bar input { min-height: 35px; font-size: 0.77rem; }
+            .c17-kpi-5 {
+                display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 0.65rem; margin-bottom: 0.9rem;
+            }
+            .c17-check-pill {
+                display: inline-flex; align-items: center; gap: 0.32rem;
+                padding: 0.22rem 0.5rem; border-radius: 8px;
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-solid, #ffffff);
+                font-size: 0.72rem; font-weight: 800; cursor: pointer; user-select: none;
+                white-space: nowrap; transition: all 0.12s ease;
+            }
+            .c17-check-pill input { width: 15px; height: 15px; min-height: auto !important; margin: 0; cursor: pointer; accent-color: #10b981; }
+            .c17-check-pill.is-ok { background: rgba(16, 185, 129, 0.12); border-color: #10b981; color: #047857; }
+            .c17-check-pill.is-warn { background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.45); color: #b91c1c; }
+            .c17-check-pill.is-done { background: #10b981; border-color: #059669; color: #ffffff; }
+            body[data-theme="dark"] .c17-check-pill.is-ok { color: #34d399; }
+            body[data-theme="dark"] .c17-check-pill.is-warn { color: #fca5a5; }
+            .c17-cupo-bar {
+                display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;
+                font-size: 0.7rem; font-weight: 800;
+            }
+            .c17-mut-meta {
+                display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;
+                background: var(--surface-solid, #ffffff); border: 1px solid var(--line, #e2e8f0);
+                border-radius: 11px; padding: 0.55rem 0.65rem; font-size: 0.76rem;
+            }
+            .c17-mut-meta small { display: block; font-size: 0.63rem; color: var(--ink-500, #64748b); text-transform: uppercase; font-weight: 800; }
+            .c17-neto-preview {
+                background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.35);
+                border-radius: 11px; padding: 0.52rem 0.75rem; font-size: 0.77rem; margin-bottom: 0.7rem;
+            }
+            .c17-tipo-switch {
+                display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; margin-bottom: 0.75rem;
+            }
+            .c17-tipo-opt {
+                border: 1.5px solid var(--line-strong, #cbd5e1); background: var(--surface-subtle, #f8fafc);
+                border-radius: 12px; padding: 0.55rem 0.7rem; cursor: pointer;
+                font-size: 0.8rem; font-weight: 800; text-align: center; transition: all 0.14s ease;
+            }
+            .c17-tipo-opt.active {
+                background: var(--cons-p, #0284c7); border-color: var(--cons-p, #0284c7); color: #ffffff;
+            }
+            .c17-mob-cards { display: none; }
+            @media (max-width: 1120px) { .c17-kpi-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+            @media (max-width: 820px) {
+                .c17-desk-table { display: none !important; }
+                .c17-mob-cards { display: flex; flex-direction: column; gap: 0.55rem; }
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function asegurarModal17() {
+        let m = document.getElementById("modalConsultorioProCDM");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalConsultorioProCDM";
+            m.className = "modal-backdrop hidden";
+            m.onclick = (e) => { if (e.target === m && typeof cerrarModalConsultorioCDM === "function") cerrarModalConsultorioCDM(); };
+            document.body.appendChild(m);
+        }
+        return m;
+    }
+
+    // =====================================================================
+    // 4. MODAL Y TAB DE OBRAS SOCIALES vs PARTICULAR (ESTRICTAMENTE SEPARADOS)
+    // =====================================================================
+    function renderTabMutualesPro17(cont, db, espAct) {
+        const mutualesEsp = (db.mutuales || [])
+            .filter(m => mismaEsp17(m.especialidad, espAct))
+            .map(m => normalizarMutual17(m, db, espAct));
+        const descDef = obtenerDescColegioDefecto17(db, espAct);
+
+        cont.innerHTML = `
+            <div class="cons-card">
+                <div class="cons-card-head">
+                    <div>
+                        <h3>🏥 Obras Sociales, Convenios y Particular — ${esc17(espAct)}</h3>
+                        <small style="color:var(--ink-500); font-size:0.74rem;">
+                            Aranceles, cupos mensuales/anuales, reglas de token, liquidaciones y retención del Colegio (Defecto: <b>${descDef}%</b>)
+                        </small>
+                    </div>
+                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalConfigColegio17('${escJs17(espAct)}')">⚙️ % Colegio (${descDef}%)</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalMutualConsultorio()">+ Nuevo Convenio / Particular</button>
+                    </div>
+                </div>
+
+                <div class="cons-mut-grid">
+                    ${mutualesEsp.map(m => {
+                        const estMap = {
+                            activo: { cls: "badge-ok", txt: "🟢 Activo" },
+                            alerta: { cls: "badge-warn", txt: "🟡 En Alerta" },
+                            suspendido: { cls: "badge-danger", txt: "🔴 Suspendido" }
+                        }[m.estadoConvenio || "activo"] || { cls: "badge-ok", txt: "🟢 Activo" };
+
+                        const descM = Math.round(m.valorMutual * (m.descuentoColegioPct / 100));
+                        const netoOS = Math.max(0, m.valorMutual - descM);
+                        const totalProf = netoOS + m.coseguro;
+
+                        return `
+                            <div class="cons-mut-card" style="border-top:4px solid ${m.esParticular ? "#10b981" : (m.estadoConvenio === "suspendido" ? "#ef4444" : m.estadoConvenio === "alerta" ? "#f59e0b" : "var(--cons-p, #0284c7)")};">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.4rem;">
+                                    <div>
+                                        <strong style="font-size:0.95rem;">${esc17(m.nombre)}</strong>
+                                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:3px;">
+                                            <span class="badge ${m.esParticular ? "badge-ok" : "badge-celeste"}" style="font-size:0.65rem;">${m.esParticular ? "💵 Solo Particular" : "🏥 Obra Social"}</span>
+                                            ${!m.esParticular ? `<span class="badge ${estMap.cls}" style="font-size:0.65rem;">${estMap.txt}</span>` : ""}
+                                        </div>
+                                    </div>
+                                    ${!m.esParticular ? `<span class="badge ${m.requiereToken ? "badge-purple" : "badge-ok"}" style="font-size:0.65rem;">🔑 ${esc17(labelModoToken17(m.modoToken, true))}</span>` : ""}
+                                </div>
+
+                                ${m.esParticular ? `
+                                    <div class="c17-mut-meta" style="grid-template-columns:1fr;">
+                                        <div>
+                                            <small>VALOR TOTAL SESIÓN PARTICULAR</small>
+                                            <strong style="font-size:1.25rem; color:#059669;">${fmt17(m.valorParticular)}</strong>
+                                            <span style="display:block; font-size:0.71rem; color:var(--ink-500); margin-top:2px;">Sin obra social ni coseguro • Pago directo</span>
+                                        </div>
+                                    </div>
+                                ` : `
+                                    <div class="c17-mut-meta">
+                                        <div><small>Valor Obra Social</small><b>${fmt17(m.valorMutual)}</b></div>
+                                        <div><small>Coseguro Paciente</small><b>${fmt17(m.coseguro)}</b></div>
+                                        <div><small>Desc. Colegio (${m.descuentoColegioPct}%)</small><b style="color:#b91c1c;">-${fmt17(descM)}</b></div>
+                                        <div><small>Neto Profesional</small><b style="color:#059669;">${fmt17(totalProf)}</b></div>
+                                        <div style="grid-column:1/-1; border-top:1px dashed var(--line); padding-top:4px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.3rem;">
+                                            <span>🎯 Cupo: <b>${m.topeMensual > 0 ? `${m.topeMensual}/mes` : "Libre/mes"}</b> • <b>${m.topeAnual > 0 ? `${m.topeAnual}/año` : "Libre/año"}</b></span>
+                                        </div>
+                                        <div style="grid-column:1/-1; font-size:0.72rem; color:var(--ink-600);">
+                                            📤 Presentación: <b>${esc17(labelFrecPres17(m.frecuenciaPresentacion))}</b><br>
+                                            💰 Liquidaciones: <b>${esc17(labelLiqMes17(m.liquidacionesMes))}</b>${m.demoraEstimada ? ` • ⏱️ ${esc17(m.demoraEstimada)}` : ""}
+                                        </div>
+                                    </div>
+                                `}
+
+                                ${m.notas ? `<small style="color:var(--ink-500); font-size:0.72rem;">💡 ${esc17(m.notas)}</small>` : ""}
+                                <div style="display:flex; gap:0.4rem; margin-top:auto;">
+                                    <button type="button" class="btn btn-secondary btn-sm" style="flex:1;" onclick="abrirModalMutualConsultorio('${escJs17(m.id)}')">✏️ Editar</button>
+                                    ${!m.esParticular ? `<button type="button" class="btn btn-danger btn-sm" onclick="eliminarMutualConsultorio('${escJs17(m.id)}')">🗑️</button>` : ""}
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            </div>
+        `;
+    }
+
+    window.abrirModalConfigColegio17 = function (espOpt = null) {
+        const db = obtenerDatosConsultorioCDM();
+        const esp = espOpt || obtenerEspActiva17();
+        const actual = obtenerDescColegioDefecto17(db, esp);
+        const modal = asegurarModal17();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:460px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">⚙️ RETENCIÓN DEL COLEGIO</span>
+                        <h3 style="margin-top:4px;">% Descuento — ${esc17(esp)}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalConsultorioCDM()">✕</button>
+                </div>
+                <form onsubmit="guardarConfigColegio17(event, '${escJs17(esp)}')">
+                    <p style="font-size:0.79rem; color:var(--ink-600); margin-bottom:0.75rem;">
+                        Definí el porcentaje de gastos administrativos / retención que descuenta el Colegio profesional (Psicólogos, Kinesiólogos, etc.) sobre los honorarios de Obras Sociales. Se precarga automático y podés ajustarlo por mutual o liquidación.
+                    </p>
+                    <div class="field" style="margin-bottom:0.65rem;">
+                        <label>Porcentaje de Retención del Colegio (%) *</label>
+                        <input type="number" id="c17DescColDef" min="0" max="50" step="0.1" value="${actual}" required>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:0.45rem; font-size:0.8rem; font-weight:700; margin-bottom:0.85rem; cursor:pointer;">
+                        <input type="checkbox" id="c17AplicarTodasMut" style="width:16px; height:16px; min-height:auto;">
+                        Aplicar este % también a todas las obras sociales ya creadas en ${esc17(esp)}
+                    </label>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">💾 Guardar % Colegio</button>
+                </form>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.guardarConfigColegio17 = function (e, esp) {
+        e.preventDefault();
+        const db = obtenerDatosConsultorioCDM();
+        const pct = Math.max(0, Math.min(50, parseFloat(document.getElementById("c17DescColDef")?.value) || 0));
+        const aplicarTodas = Boolean(document.getElementById("c17AplicarTodasMut")?.checked);
+
+        if (!db.configCobranza || typeof db.configCobranza !== "object") db.configCobranza = {};
+        if (!db.configCobranza.descuentoColegioPorEsp) db.configCobranza.descuentoColegioPorEsp = {};
+        db.configCobranza.descuentoColegioPorEsp[norm17(esp)] = pct;
+
+        if (aplicarTodas) {
+            (db.mutuales || []).forEach(m => {
+                if (mismaEsp17(m.especialidad, esp) && !esMutualParticular17(m)) {
+                    m.descuentoColegioPct = pct;
+                }
+            });
+        }
+        guardarDatosConsultorioCDM(db);
+        cerrarModalConsultorioCDM();
+        toast17(`⚙️ Retención del Colegio fijada en ${pct}% para ${esp}.`);
+        renderizarConsultorioCompleto();
+        if (typeof window.refrescarFinanzasSiVisible === "function") window.refrescarFinanzasSiVisible();
+    };
+
+    window.abrirModalMutualConsultorio = function (mutId = null) {
+        const db = obtenerDatosConsultorioCDM();
+        const espAct = obtenerEspActiva17();
+        const raw = mutId ? (db.mutuales || []).find(x => x.id === mutId) : null;
+        const m = raw ? normalizarMutual17(raw, db, espAct) : null;
+        const esPartIni = m ? m.esParticular : false;
+        const descDef = obtenerDescColegioDefecto17(db, espAct);
+
+        const modal = asegurarModal17();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:640px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">🏥 CONVENIO / TARIFA • ${esc17(espAct.toUpperCase())}</span>
+                        <h3 style="margin-top:4px;">${m ? `Editar: ${esc17(m.nombre)}` : `Nueva Obra Social o Particular`}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalConsultorioCDM()">✕</button>
+                </div>
+
+                <form onsubmit="guardarMutualConsultorio(event, ${m ? `'${escJs17(m.id)}'` : "null"}, '${escJs17(espAct)}')">
+                    <input type="hidden" id="cmEsParticular17" value="${esPartIni ? "1" : "0"}">
+
+                    <div class="c17-tipo-switch">
+                        <button type="button" id="cmBtnTipoOS" class="c17-tipo-opt ${!esPartIni ? "active" : ""}" onclick="cambiarTipoModalMutual17(false)">
+                            🏥 Obra Social / Prepaga
+                        </button>
+                        <button type="button" id="cmBtnTipoPart" class="c17-tipo-opt ${esPartIni ? "active" : ""}" onclick="cambiarTipoModalMutual17(true)">
+                            💵 Particular (Sin Obra Social)
+                        </button>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.65rem;">
+                        <label id="cmLblNombre17">${esPartIni ? "Nombre de Tarifa Particular *" : "Nombre de la Obra Social / Prepaga *"}</label>
+                        <input type="text" id="cmNom" value="${esc17(m?.nombre || "")}" required placeholder="${esPartIni ? "Ej: Particular (Sin Obra Social)" : "Ej: OSDE, APROSS, Swiss Medical, Federada..."}">
+                    </div>
+
+                    <!-- BLOQUE SOLO PARTICULAR -->
+                    <div id="cmBloqueParticular17" class="${esPartIni ? "" : "hidden"}" style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:14px; padding:0.8rem; margin-bottom:0.75rem;">
+                        <div class="field">
+                            <label>Valor Total de la Sesión Particular ($) *</label>
+                            <input type="number" id="cmValPart" min="0" step="100" value="${m?.valorParticular ?? 25000}" placeholder="Ej: 25000">
+                        </div>
+                        <small style="display:block; color:var(--ink-500); font-size:0.73rem; margin-top:4px;">
+                            Al ser particular no lleva valor de obra social, coseguro, token ni descuento de colegio.
+                        </small>
+                    </div>
+
+                    <!-- BLOQUE SOLO OBRA SOCIAL -->
+                    <div id="cmBloqueObraSocial17" class="${esPartIni ? "hidden" : ""}">
+                        <div class="grid-3" style="margin-bottom:0.6rem;">
+                            <div class="field"><label>Valor Obra Social ($) *</label><input type="number" id="cmValMut" min="0" step="100" value="${m?.valorMutual ?? 18000}" oninput="recalcPreviewMutual17()"></div>
+                            <div class="field"><label>Coseguro Paciente ($)</label><input type="number" id="cmCoseg" min="0" step="100" value="${m?.coseguro ?? 0}" oninput="recalcPreviewMutual17()"></div>
+                            <div class="field"><label>% Descuento Colegio</label><input type="number" id="cmDescCol" min="0" max="50" step="0.1" value="${m ? m.descuentoColegioPct : descDef}" oninput="recalcPreviewMutual17()"></div>
+                        </div>
+
+                        <div id="cmNetoPreview17" class="c17-neto-preview"></div>
+
+                        <div class="grid-3" style="margin-bottom:0.6rem;">
+                            <div class="field"><label>Sesiones cubiertas / Mes</label><input type="number" id="cmTopeMes" min="0" max="60" value="${m?.topeMensual ?? 4}" placeholder="0 = sin tope"></div>
+                            <div class="field"><label>Sesiones cubiertas / Año</label><input type="number" id="cmTopeAnio" min="0" max="365" value="${m?.topeAnual ?? 30}" placeholder="0 = sin tope"></div>
+                            <div class="field"><label>Estado del Convenio</label>
+                                <select id="cmEstadoConv">
+                                    <option value="activo" ${(m?.estadoConvenio || "activo") === "activo" ? "selected" : ""}>🟢 Activo</option>
+                                    <option value="alerta" ${m?.estadoConvenio === "alerta" ? "selected" : ""}>🟡 En Alerta</option>
+                                    <option value="suspendido" ${m?.estadoConvenio === "suspendido" ? "selected" : ""}>🔴 Suspendido</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid-2" style="margin-bottom:0.6rem;">
+                            <div class="field"><label>🔑 Modalidad de Token / Autorización</label>
+                                <select id="cmModoToken">
+                                    ${MODOS_TOKEN.map(mt => `<option value="${mt.clave}" ${(m?.modoToken || "semanal") === mt.clave ? "selected" : ""}>${mt.label}</option>`).join("")}
+                                </select>
+                            </div>
+                            <div class="field"><label>📤 Frecuencia de Presentación</label>
+                                <select id="cmFrecPres">
+                                    ${FREC_PRESENTACION.map(fp => `<option value="${fp.clave}" ${(m?.frecuenciaPresentacion || "mensual") === fp.clave ? "selected" : ""}>${fp.label}</option>`).join("")}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid-2" style="margin-bottom:0.65rem;">
+                            <div class="field"><label>💰 Liquidaciones que hace por mes</label>
+                                <select id="cmLiqMes">
+                                    ${LIQ_POR_MES.map(lq => `<option value="${lq.clave}" ${String(m?.liquidacionesMes || "2") === lq.clave ? "selected" : ""}>${lq.label}</option>`).join("")}
+                                </select>
+                            </div>
+                            <div class="field"><label>⏱️ Demora estimada de pago (opc.)</label>
+                                <input type="text" id="cmDemora" value="${esc17(m?.demoraEstimada || "")}" placeholder="Ej: 60 días / 2 meses">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.8rem;">
+                        <label>Notas / Reglas de Facturación (ej. presentación del 28 al 8, planillas, etc.)</label>
+                        <input type="text" id="cmNotas" value="${esc17(m?.notas || "")}" placeholder="Opcional...">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width:100%;">💾 Guardar en ${esc17(espAct)}</button>
+                </form>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+        recalcPreviewMutual17();
+    };
+
+    window.cambiarTipoModalMutual17 = function (esPart) {
+        const hid = document.getElementById("cmEsParticular17");
+        if (hid) hid.value = esPart ? "1" : "0";
+        document.getElementById("cmBtnTipoOS")?.classList.toggle("active", !esPart);
+        document.getElementById("cmBtnTipoPart")?.classList.toggle("active", esPart);
+        document.getElementById("cmBloqueParticular17")?.classList.toggle("hidden", !esPart);
+        document.getElementById("cmBloqueObraSocial17")?.classList.toggle("hidden", esPart);
+        const lbl = document.getElementById("cmLblNombre17");
+        if (lbl) lbl.textContent = esPart ? "Nombre de Tarifa Particular *" : "Nombre de la Obra Social / Prepaga *";
+        recalcPreviewMutual17();
+    };
+
+    window.recalcPreviewMutual17 = function () {
+        const box = document.getElementById("cmNetoPreview17");
+        if (!box) return;
+        const valOS = Number(document.getElementById("cmValMut")?.value) || 0;
+        const cos = Number(document.getElementById("cmCoseg")?.value) || 0;
+        const pct = Math.max(0, Math.min(50, parseFloat(document.getElementById("cmDescCol")?.value) || 0));
+        const desc = Math.round(valOS * (pct / 100));
+        const netoOS = Math.max(0, valOS - desc);
+        box.innerHTML = `
+            💡 <b>Cálculo neto por sesión:</b> Obra Social <b>${fmt17(valOS)}</b> − Colegio (${pct}%: <b>-${fmt17(desc)}</b>) = <b>${fmt17(netoOS)}</b> neto mutual
+            ${cos > 0 ? ` + Coseguro <b>${fmt17(cos)}</b> = <b style="color:#047857;">${fmt17(netoOS + cos)} total real</b>` : ` = <b style="color:#047857;">${fmt17(netoOS)} total real</b>`}
+        `;
+    };
+
+    window.guardarMutualConsultorio = function (e, idEdit, espFija) {
+        e.preventDefault();
+        const db = obtenerDatosConsultorioCDM();
+        const existente = idEdit ? (db.mutuales || []).find(x => x.id === idEdit) : null;
+        const esPart = document.getElementById("cmEsParticular17")?.value === "1";
+        const modoToken = esPart ? "sin_token" : (document.getElementById("cmModoToken")?.value || "semanal");
+
+        const obj = {
+            ...(existente || {}),
+            id: idEdit || (`mut_${Date.now()}_${norm17(espFija)}`),
+            especialidad: espFija,
+            esParticular: esPart,
+            nombre: (document.getElementById("cmNom")?.value || "").trim(),
+            valorMutual: esPart ? 0 : (Number(document.getElementById("cmValMut")?.value) || 0),
+            coseguro: esPart ? 0 : (Number(document.getElementById("cmCoseg")?.value) || 0),
+            valorParticular: esPart ? (Number(document.getElementById("cmValPart")?.value) || 0) : 0,
+            requiereToken: !esPart && modoToken !== "sin_token",
+            modoToken,
+            topeMensual: esPart ? 0 : (Number(document.getElementById("cmTopeMes")?.value) || 0),
+            topeAnual: esPart ? 0 : (Number(document.getElementById("cmTopeAnio")?.value) || 0),
+            frecuenciaPresentacion: esPart ? "por_dia" : (document.getElementById("cmFrecPres")?.value || "mensual"),
+            liquidacionesMes: esPart ? "variable" : (document.getElementById("cmLiqMes")?.value || "2"),
+            descuentoColegioPct: esPart ? 0 : (parseFloat(document.getElementById("cmDescCol")?.value) || 0),
+            estadoConvenio: esPart ? "activo" : (document.getElementById("cmEstadoConv")?.value || "activo"),
+            demoraEstimada: esPart ? "" : (document.getElementById("cmDemora")?.value || "").trim(),
+            notas: (document.getElementById("cmNotas")?.value || "").trim()
+        };
+
+        if (idEdit) {
+            const i = db.mutuales.findIndex(x => x.id === idEdit);
+            if (i >= 0) db.mutuales[i] = obj;
+        } else {
+            db.mutuales.push(obj);
+        }
+
+        guardarDatosConsultorioCDM(db);
+        cerrarModalConsultorioCDM();
+        toast17(`🏥 ${esPart ? "Tarifa particular" : "Convenio"} guardado en ${espFija}: ${obj.nombre}`);
+        renderizarConsultorioCompleto();
+    };
+
+    // =====================================================================
+    // 5. PACIENTES CON REGLA DE TOKEN INDIVIDUAL + DESCUENTO DE SESIONES
+    // =====================================================================
+    const _origAbrirPac17 = window.abrirModalPacienteConsultorio;
+    const _origGuardarPac17 = window.guardarPacienteConsultorio;
+
+    window.abrirModalPacienteConsultorio = function (idPac = null, espForzada = null) {
+        if (typeof _origAbrirPac17 === "function") {
+            _origAbrirPac17.apply(this, arguments);
+        }
+        const modal = document.getElementById("modalConsultorioProCDM");
+        const form = modal?.querySelector("form");
+        if (!form || form.querySelector("#cpBloqueObra17")) return;
+
+        const db = obtenerDatosConsultorioCDM();
+        const p = idPac ? (db.pacientes || []).find(x => Number(x.id) === Number(idPac)) : null;
+        const cupo = p ? calcularCupoPacienteCons17(db, p) : null;
+        const anioAct = new Date().getFullYear();
+        const prevAnioVal = (p && (!p.anioSesionesPrevias || Number(p.anioSesionesPrevias) === anioAct))
+            ? (p.sesionesPreviasAnio ?? 0)
+            : 0;
+
+        const bloque = document.createElement("div");
+        bloque.id = "cpBloqueObra17";
+        bloque.style.cssText = "background:rgba(2,132,199,0.06); border:1px solid rgba(2,132,199,0.25); border-radius:13px; padding:0.7rem 0.8rem; margin-bottom:0.75rem;";
+        bloque.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+                <strong style="font-size:0.78rem; color:var(--ink-800);">🔑 Regla de Token y Cupo de Sesiones (${anioAct})</strong>
+                ${cupo && !cupo.esParticular ? `
+                    <span class="badge ${cupo.excedidoMes || cupo.excedidoAnio ? "badge-danger" : "badge-ok"}" style="font-size:0.66rem;">
+                        Mes: ${cupo.atendidosMes}${cupo.topeMes ? `/${cupo.topeMes}` : ""} • Año ${anioAct}: ${cupo.usadasAnio}${cupo.topeAnio ? `/${cupo.topeAnio}` : ""}
+                    </span>
+                ` : ""}
+            </div>
+            <div class="grid-2" style="margin-bottom:0.5rem;">
+                <div class="field">
+                    <label>¿Cómo se autoriza / pide token a este paciente?</label>
+                    <select id="cpModoTokenPac17">
+                        <option value="heredar" ${(!p?.modoTokenPaciente || p.modoTokenPaciente === "heredar") ? "selected" : ""}>🔗 Heredar regla de la Obra Social</option>
+                        ${MODOS_TOKEN.map(mt => `<option value="${mt.clave}" ${p?.modoTokenPaciente === mt.clave ? "selected" : ""}>${mt.label}</option>`).join("")}
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Sesiones ya usadas en ${anioAct} (antes del sistema)</label>
+                    <input type="number" id="cpSesPrevAnio17" min="0" max="365" value="${prevAnioVal}">
+                    <input type="hidden" id="cpAnioPrev17" value="${anioAct}">
+                </div>
+            </div>
+            <div class="grid-3">
+                <div class="field"><label>Cupo Mes propio (vacío = mutual)</label><input type="number" id="cpTopeMes17" min="0" max="60" value="${p?.topeMensualCustom ?? ""}" placeholder="Heredar"></div>
+                <div class="field"><label>Cupo Año propio (vacío = mutual)</label><input type="number" id="cpTopeAnio17" min="0" max="365" value="${p?.topeAnualCustom ?? ""}" placeholder="Heredar"></div>
+                <div class="field"><label>Nota de autorización (opc.)</label><input type="text" id="cpNotaTok17" value="${esc17(p?.notaTokenPaciente || "")}" placeholder="Ej: Pide token los lunes"></div>
+            </div>
+        `;
+
+        const btnSubmit = form.querySelector('button[type="submit"]');
+        if (btnSubmit) form.insertBefore(bloque, btnSubmit);
+        else form.appendChild(bloque);
+    };
+
+    window.guardarPacienteConsultorio = function (e, idEdit, espFija) {
+        const modoTokenPaciente = document.getElementById("cpModoTokenPac17")?.value || "heredar";
+        const sesionesPreviasAnio = Number(document.getElementById("cpSesPrevAnio17")?.value) || 0;
+        const anioSesionesPrevias = Number(document.getElementById("cpAnioPrev17")?.value) || new Date().getFullYear();
+        const topeMesRaw = document.getElementById("cpTopeMes17")?.value;
+        const topeAnioRaw = document.getElementById("cpTopeAnio17")?.value;
+        const notaTokenPaciente = (document.getElementById("cpNotaTok17")?.value || "").trim();
+        const dniVal = (document.getElementById("cpDni")?.value || "").trim();
+        const nomVal = (document.getElementById("cpNom")?.value || "").trim();
+
+        if (typeof _origGuardarPac17 === "function") {
+            _origGuardarPac17.apply(this, arguments);
+        }
+
+        const db = obtenerDatosConsultorioCDM();
+        let pac = idEdit ? (db.pacientes || []).find(x => Number(x.id) === Number(idEdit)) : null;
+        if (!pac && db.pacientes.length) {
+            pac = [...db.pacientes].reverse().find(x => x.dni === dniVal && x.nombre === nomVal) || db.pacientes[db.pacientes.length - 1];
+        }
+        if (pac) {
+            pac.modoTokenPaciente = modoTokenPaciente;
+            pac.sesionesPreviasAnio = sesionesPreviasAnio;
+            pac.anioSesionesPrevias = anioSesionesPrevias;
+            pac.topeMensualCustom = topeMesRaw !== "" && topeMesRaw !== undefined ? Number(topeMesRaw) : "";
+            pac.topeAnualCustom = topeAnioRaw !== "" && topeAnioRaw !== undefined ? Number(topeAnioRaw) : "";
+            pac.notaTokenPaciente = notaTokenPaciente;
+            guardarDatosConsultorioCDM(db);
+            renderizarConsultorioCompleto();
+        }
+    };
+
+    function enriquecerTablaPacientesConCupo17(sec, db, espAct) {
+        const pacsEsp = (db.pacientes || []).filter(p => mismaEsp17(p.especialidad, espAct));
+        const mapaPac = new Map(pacsEsp.map(p => [Number(p.id), p]));
+
+        sec.querySelectorAll(".cons-pac-desktop-table tbody tr").forEach(tr => {
+            if (tr.dataset.c17Enriched === "1") return;
+            const btnHist = tr.querySelector('button[onclick*="abrirHistoriaClinicaPacienteCDM("]');
+            const mId = btnHist?.getAttribute("onclick")?.match(/\((\d+)/);
+            if (!mId) return;
+            const pac = mapaPac.get(Number(mId[1]));
+            if (!pac) return;
+            tr.dataset.c17Enriched = "1";
+
+            const tdMut = tr.children[2];
+            if (!tdMut) return;
+            const cupo = calcularCupoPacienteCons17(db, pac);
+            const regla = obtenerReglaTokenPaciente17(db, pac, cupo?.mutual);
+            if (cupo && !cupo.esParticular) {
+                const badgeCls = (cupo.excedidoMes || cupo.excedidoAnio) ? "badge-danger" : (cupo.alertaBaja ? "badge-warn" : "badge-ok");
+                const txtMes = cupo.topeMes > 0 ? `${cupo.atendidosMes}/${cupo.topeMes} mes` : `${cupo.atendidosMes} mes`;
+                const txtAnio = cupo.topeAnio > 0 ? `${cupo.usadasAnio}/${cupo.topeAnio} año` : `${cupo.usadasAnio} año`;
+                const txtResta = cupo.restanAnio !== null ? ` (restan ${cupo.restanAnio})` : (cupo.restanMes !== null ? ` (restan ${cupo.restanMes}/mes)` : "");
+                tdMut.insertAdjacentHTML("beforeend", `
+                    <div class="c17-cupo-bar" style="margin-top:4px;">
+                        <span class="badge ${badgeCls}" style="font-size:0.64rem;">🎯 ${txtMes} • ${txtAnio}${txtResta}</span>
+                        <span class="badge badge-purple" style="font-size:0.63rem;" title="${esc17(regla.nota || regla.origen)}">🔑 ${esc17(labelModoToken17(regla.clave, true))}</span>
+                    </div>
+                `);
+            }
+        });
+
+        sec.querySelectorAll(".cons-pac-row-mob").forEach(row => {
+            if (row.dataset.c17Enriched === "1") return;
+            const info = row.querySelector(".cons-pac-row-info");
+            const mId = info?.getAttribute("onclick")?.match(/\((\d+)/);
+            if (!mId) return;
+            const pac = mapaPac.get(Number(mId[1]));
+            if (!pac) return;
+            row.dataset.c17Enriched = "1";
+            const cupo = calcularCupoPacienteCons17(db, pac);
+            if (cupo && !cupo.esParticular && (cupo.topeMes > 0 || cupo.topeAnio > 0)) {
+                const badgeCls = (cupo.excedidoMes || cupo.excedidoAnio) ? "badge-danger" : "badge-ok";
+                info.insertAdjacentHTML("beforeend", `
+                    <span class="badge ${badgeCls}" style="font-size:0.61rem; margin-top:3px;">
+                        🎯 ${cupo.atendidosMes}${cupo.topeMes ? `/${cupo.topeMes}` : ""} mes • ${cupo.usadasAnio}${cupo.topeAnio ? `/${cupo.topeAnio}` : ""} año
+                    </span>
+                `);
+            }
+        });
+    }
+
+    // =====================================================================
+    // 6. MODAL DE TURNO INTELIGENTE (SEPARACIÓN OS vs PARTICULAR + ALERTA CUPO)
+    // =====================================================================
+    const _origSelDia17 = window.seleccionarDiaCalendarioCons;
+    if (typeof _origSelDia17 === "function") {
+        window.seleccionarDiaCalendarioCons = function (fechaISO) {
+            ui17.fechaSel = fechaISO;
+            return _origSelDia17.apply(this, arguments);
+        };
+    }
+
+    const _origAbrirTurno17 = window.abrirModalTurnoConsultorio;
+    const _origGuardarTurno17 = window.guardarTurnoConsultorio;
+    const _origCambiarEstTurno17 = window.cambiarEstadoTurnoCons;
+    const _origElimTurno17 = window.eliminarTurnoCons;
+
+    function refrescarCamposPrecioYCupoEnModalTurno17(espDef) {
+        const db = obtenerDatosConsultorioCDM();
+        const mutId = document.getElementById("ctMutId")?.value;
+        const pacId = document.getElementById("ctPacId")?.value;
+        const fecha = document.getElementById("ctFecha")?.value || hoy17();
+        const mut = resolverMutual17(db, mutId, espDef);
+        const esPart = !mut || mut.esParticular;
+
+        const fValMut = document.getElementById("ctValMut")?.closest(".field");
+        const fCoseg = document.getElementById("ctCoseg")?.closest(".field");
+        const fValPart = document.getElementById("ctValPart")?.closest(".field");
+        const fToken = document.getElementById("ctToken")?.closest(".field");
+        const gridPrecios = fValMut?.parentElement;
+
+        if (fValMut) fValMut.style.display = esPart ? "none" : "";
+        if (fCoseg) fCoseg.style.display = esPart ? "none" : "";
+        if (fValPart) fValPart.style.display = esPart ? "" : "none";
+        if (fToken) fToken.style.opacity = esPart ? "0.45" : "1";
+        if (gridPrecios) gridPrecios.style.gridTemplateColumns = esPart ? "1fr" : "1fr 1fr";
+
+        let infoBox = document.getElementById("ctInfoCupoYRegla17");
+        if (!infoBox && gridPrecios) {
+            infoBox = document.createElement("div");
+            infoBox.id = "ctInfoCupoYRegla17";
+            infoBox.style.cssText = "border-radius:11px; padding:0.52rem 0.72rem; margin-bottom:0.65rem; font-size:0.75rem;";
+            gridPrecios.insertAdjacentElement("beforebegin", infoBox);
+        }
+        if (!infoBox) return;
+
+        if (esPart) {
+            infoBox.style.display = "block";
+            infoBox.style.background = "rgba(16, 185, 129, 0.09)";
+            infoBox.style.border = "1px solid rgba(16, 185, 129, 0.35)";
+            infoBox.innerHTML = `💵 <b>Sesión Particular:</b> se cobra únicamente el valor total directo (sin obra social, coseguro ni token).`;
+            return;
+        }
+
+        const pac = pacId ? (db.pacientes || []).find(p => Number(p.id) === Number(pacId)) : null;
+        const cupo = pac ? calcularCupoPacienteCons17(db, pac, fecha) : null;
+        const regla = obtenerReglaTokenPaciente17(db, pac, mut);
+        const descCol = Number(mut.descuentoColegioPct) || 0;
+        const alerta = cupo && (cupo.excedidoMes || cupo.excedidoAnio);
+
+        infoBox.style.display = "block";
+        infoBox.style.background = alerta ? "rgba(239, 68, 68, 0.1)" : "rgba(2, 132, 199, 0.08)";
+        infoBox.style.border = alerta ? "1.5px solid #ef4444" : "1px solid rgba(2, 132, 199, 0.28)";
+
+        let html = `<div>🏥 <b>${esc17(mut.nombre)}</b> • 🔑 <b>${esc17(labelModoToken17(regla.clave))}</b>`;
+        if (descCol > 0) html += ` • 🏛️ Desc. Colegio: <b>${descCol}%</b>`;
+        html += `</div>`;
+
+        if (cupo) {
+            const mTxt = cupo.topeMes > 0 ? `${cupo.atendidosMes}/${cupo.topeMes} este mes` : `${cupo.atendidosMes} este mes`;
+            const aTxt = cupo.topeAnio > 0 ? `${cupo.usadasAnio}/${cupo.topeAnio} en ${cupo.anioRef}` : `${cupo.usadasAnio} en ${cupo.anioRef}`;
+            html += `<div style="margin-top:3px;">🎯 <b>Sesiones atendidas de ${esc17(pac.nombre)}:</b> ${mTxt} • ${aTxt}`;
+            if (cupo.restanAnio !== null) html += ` — <b>Quedan ${cupo.restanAnio} en el año</b>`;
+            else if (cupo.restanMes !== null) html += ` — <b>Quedan ${cupo.restanMes} en el mes</b>`;
+            html += `</div>`;
+            if (alerta) {
+                html += `<div style="margin-top:3px; color:#b91c1c; font-weight:800;">⚠️ Cupo cubierto alcanzado: verificá si corresponde coseguro excedente o cambiar a Particular.</div>`;
+            }
+        }
+        if (regla.nota) html += `<div style="margin-top:2px; color:var(--ink-600);">📝 ${esc17(regla.nota)}</div>`;
+        infoBox.innerHTML = html;
+    }
+
+    window.abrirModalTurnoConsultorio = function (idTurno = null, fechaPre = null, idPacPre = null) {
+        if (typeof _origAbrirTurno17 === "function") _origAbrirTurno17.apply(this, arguments);
+        const espDef = obtenerEspActiva17();
+        refrescarCamposPrecioYCupoEnModalTurno17(espDef);
+        document.getElementById("ctFecha")?.addEventListener("change", () => refrescarCamposPrecioYCupoEnModalTurno17(espDef));
+    };
+
+    const _origAutoPacTurno17 = window.autocompletarPacienteEnTurno;
+    window.autocompletarPacienteEnTurno = function (idPac, espDef) {
+        if (typeof _origAutoPacTurno17 === "function") _origAutoPacTurno17.apply(this, arguments);
+        refrescarCamposPrecioYCupoEnModalTurno17(espDef || obtenerEspActiva17());
+    };
+
+    const _origActPrecios17 = window.actualizarPreciosModalTurno;
+    window.actualizarPreciosModalTurno = function (mutId) {
+        if (typeof _origActPrecios17 === "function") _origActPrecios17.apply(this, arguments);
+        refrescarCamposPrecioYCupoEnModalTurno17(obtenerEspActiva17());
+    };
+
+    window.guardarTurnoConsultorio = function (e, idEdit, espFija) {
+        const dbPre = obtenerDatosConsultorioCDM();
+        const mutId = document.getElementById("ctMutId")?.value;
+        const mut = resolverMutual17(dbPre, mutId, espFija);
+        const esPart = !mut || mut.esParticular;
+
+        if (esPart) {
+            if (document.getElementById("ctValMut")) document.getElementById("ctValMut").value = 0;
+            if (document.getElementById("ctCoseg")) document.getElementById("ctCoseg").value = 0;
+        } else {
+            if (document.getElementById("ctValPart")) document.getElementById("ctValPart").value = 0;
+        }
+
+        if (typeof _origGuardarTurno17 === "function") _origGuardarTurno17.apply(this, arguments);
+
+        const db = obtenerDatosConsultorioCDM();
+        const t = idEdit
+            ? (db.turnos || []).find(x => Number(x.id) === Number(idEdit))
+            : db.turnos[db.turnos.length - 1];
+        if (t) {
+            if (!esPart && (t.descuentoColegioPct === undefined || t.descuentoColegioPct === "")) {
+                t.descuentoColegioPct = Number(mut?.descuentoColegioPct) || 0;
+            }
+            if (t.token && String(t.token).trim()) t.tokenEntregado = true;
+            guardarDatosConsultorioCDM(db);
+            sincronizarCajaDesdeTurno17(db, t);
+            renderizarConsultorioCompleto();
+        }
+    };
+
+    window.cambiarEstadoTurnoCons = function (idTurno, nuevoEstado) {
+        if (typeof _origCambiarEstTurno17 === "function") _origCambiarEstTurno17.apply(this, arguments);
+        const db = obtenerDatosConsultorioCDM();
+        const t = (db.turnos || []).find(x => Number(x.id) === Number(idTurno));
+        if (t) {
+            sincronizarCajaDesdeTurno17(db, t);
+            if (nuevoEstado === "atendido" && t.pacienteId) {
+                const pac = db.pacientes.find(p => Number(p.id) === Number(t.pacienteId));
+                const cupo = pac ? calcularCupoPacienteCons17(db, pac, t.fecha) : null;
+                if (cupo && !cupo.esParticular && (cupo.topeMes > 0 || cupo.topeAnio > 0)) {
+                    const txtM = cupo.topeMes > 0 ? `${cupo.atendidosMes}/${cupo.topeMes} mes` : `${cupo.atendidosMes} mes`;
+                    const txtA = cupo.topeAnio > 0 ? `${cupo.usadasAnio}/${cupo.topeAnio} año` : `${cupo.usadasAnio} año`;
+                    toast17(`🎯 Cupo actualizado de ${pac.nombre}: ${txtM} • ${txtA}`);
+                }
+            }
+        }
+        if (typeof window.refrescarFinanzasSiVisible === "function") window.refrescarFinanzasSiVisible();
+    };
+
+    window.eliminarTurnoCons = function (idTurno) {
+        if (typeof _origElimTurno17 === "function") _origElimTurno17.apply(this, arguments);
+        window.reconstruirAsientosConsultorioEnCaja17();
+        if (typeof window.refrescarFinanzasSiVisible === "function") window.refrescarFinanzasSiVisible();
+    };
+
+    // =====================================================================
+    // 7. TABLERO MAESTRO DE COBRANZAS, TOKENS Y LIQUIDACIONES ATRASADAS
+    // =====================================================================
+    function obtenerTurnosFiltradosCobranza17(db, espFija = null) {
+        const espFiltro = espFija && espFija !== "TODAS"
+            ? espFija
+            : (ui17.cobEsp && ui17.cobEsp !== "ACTIVA" && ui17.cobEsp !== "TODAS" ? ui17.cobEsp : null);
+        const q = norm17(ui17.cobBusq);
+
+        return (db.turnos || [])
+            .filter(t => {
+                if (!t || t.estado === "cancelado") return false;
+                if (espFiltro && !mismaEsp17(t.especialidad, espFiltro)) return false;
+
+                if (ui17.cobMesTrabajo !== "TODOS") {
+                    if (ui17.cobModoMes === "cobro") {
+                        const cobCosEnMes = Boolean(t.coseguroCobrado) && String(t.fechaPagoCoseguro || t.fecha || "").startsWith(ui17.cobMesTrabajo);
+                        const cobOsEnMes = Boolean(t.mutualCobrada) && String(t.fechaPagoMutual || "").startsWith(ui17.cobMesTrabajo);
+                        if (!cobCosEnMes && !cobOsEnMes) return false;
+                    } else {
+                        if (!String(t.fecha || "").startsWith(ui17.cobMesTrabajo)) return false;
+                    }
+                }
+
+                if (ui17.cobMutId !== "TODAS") {
+                    const m = resolverMutual17(db, t.mutualId, t.especialidad);
+                    if (!m || m.id !== ui17.cobMutId) return false;
+                }
+                if (ui17.cobPacId !== "TODOS" && Number(t.pacienteId) !== Number(ui17.cobPacId)) return false;
+
+                const f = analizarFinanzasTurno17(db, t);
+                if (ui17.cobEstado === "pendiente_cobro" && f.completo) return false;
+                if (ui17.cobEstado === "falta_token" && !f.faltaToken) return false;
+                if (ui17.cobEstado === "falta_coseg" && !f.faltaCoseg) return false;
+                if (ui17.cobEstado === "falta_os" && !f.faltaOS) return false;
+                if (ui17.cobEstado === "completos" && !f.completo) return false;
+
+                if (q) {
+                    const hay = norm17(`${t.pacienteNombre} ${f.pac?.dni || ""} ${f.pac?.nroAfiliado || ""} ${t.mutualNombre} ${t.token || ""} ${t.liquidacionRef || ""} ${t.fecha}`);
+                    if (!hay.includes(q)) return false;
+                }
+                return true;
+            })
+            .sort((a, b) => `${b.fecha || ""} ${b.hora || ""}`.localeCompare(`${a.fecha || ""} ${a.hora || ""}`));
+    }
+
+    function refrescarVistasCobranza17() {
+        const secCons = document.getElementById("cdmSeccionConsultorioGlobal");
+        if (secCons && !secCons.classList.contains("hidden")) {
+            renderizarConsultorioCompleto();
+        }
+        if (typeof window.refrescarFinanzasSiVisible === "function") {
+            window.refrescarFinanzasSiVisible();
+        }
+    }
+
+    window.renderizarPanelCobranzaConsultorio17 = function (cont, opts = {}) {
+        if (!cont) return;
+        inyectarCSS17();
+
+        const db = obtenerDatosConsultorioCDM();
+        const desdeCaja = Boolean(opts.desdeCaja);
+        const espContexto = opts.espFiltro || (desdeCaja ? "TODAS" : obtenerEspActiva17());
+        const profs = typeof obtenerEspecialidadesHabilitadasConsultorioCDM === "function"
+            ? obtenerEspecialidadesHabilitadasConsultorioCDM()
+            : [];
+        const espEfectiva = espContexto !== "TODAS"
+            ? espContexto
+            : (ui17.cobEsp && ui17.cobEsp !== "ACTIVA" ? ui17.cobEsp : "TODAS");
+
+        const mutualesVisibles = (db.mutuales || [])
+            .filter(m => espEfectiva === "TODAS" || mismaEsp17(m.especialidad, espEfectiva))
+            .map(m => normalizarMutual17(m, db, m.especialidad));
+        const pacsVisibles = (db.pacientes || [])
+            .filter(p => espEfectiva === "TODAS" || mismaEsp17(p.especialidad, espEfectiva))
+            .sort((a, b) => String(a.apellido || "").localeCompare(String(b.apellido || "")));
+
+        const regs = obtenerTurnosFiltradosCobranza17(db, espEfectiva);
+
+        let totCobradoReal = 0, totFaltaCobrar = 0, totDescColegio = 0, faltanTokens = 0, cantCompletos = 0;
+        regs.forEach(t => {
+            const f = analizarFinanzasTurno17(db, t);
+            totCobradoReal += f.totalCobradoReal;
+            totFaltaCobrar += f.totalPendienteReal;
+            totDescColegio += f.descMonto;
+            if (f.faltaToken) faltanTokens++;
+            if (f.completo) cantCompletos++;
+        });
+
+        const descDef = obtenerDescColegioDefecto17(db, espEfectiva === "TODAS" ? obtenerEspActiva17() : espEfectiva);
+
+        cont.innerHTML = `
+            <div class="cons-card" id="c17CobranzaRoot" data-desde-caja="${desdeCaja ? "1" : "0"}" data-esp-ctx="${esc17(espContexto)}">
+                <div class="cons-card-head">
+                    <div>
+                        <h3>💳 Cobranzas, Tokens y Liquidaciones de Mutuales${espEfectiva !== "TODAS" ? ` — ${esc17(espEfectiva)}` : ""}</h3>
+                        <small style="color:var(--ink-500); font-size:0.74rem;">
+                            Tildá tokens, coseguros y liquidaciones (incluso meses anteriores). Todo cobro impacta en Caja con su <b>fecha real de pago</b>.
+                        </small>
+                    </div>
+                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-ok btn-sm" onclick="abrirModalLiquidacionMasiva17('${escJs17(espEfectiva)}')">💰 Liquidar Mutual</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalConfigColegio17('${escJs17(espEfectiva === "TODAS" ? obtenerEspActiva17() : espEfectiva)}')">⚙️ % Colegio (${descDef}%)</button>
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="exportarCobranzasCSV17('${escJs17(espEfectiva)}')">📊 CSV</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="imprimirCobranzasPDF17('${escJs17(espEfectiva)}')">🖨️ PDF A4</button>
+                    </div>
+                </div>
+
+                <!-- KPIs REALES DE COBRANZA -->
+                <div class="c17-kpi-5">
+                    <div class="cons-kpi" style="border-top-color:#10b981;">
+                        <small>Cobrado Real (Neto)</small>
+                        <strong style="color:#059669;">${fmt17(totCobradoReal)}</strong>
+                    </div>
+                    <div class="cons-kpi" style="border-top-color:${totFaltaCobrar > 0 ? "#ef4444" : "#10b981"};">
+                        <small>Falta Cobrar (Neto)</small>
+                        <strong style="color:${totFaltaCobrar > 0 ? "#dc2626" : "#059669"};">${fmt17(totFaltaCobrar)}</strong>
+                    </div>
+                    <div class="cons-kpi" style="border-top-color:#6366f1;">
+                        <small>Desc. Colegio</small>
+                        <strong>-${fmt17(totDescColegio)}</strong>
+                    </div>
+                    <div class="cons-kpi" style="border-top-color:#0284c7;">
+                        <small>Completos / Total</small>
+                        <strong>${cantCompletos} / ${regs.length}</strong>
+                    </div>
+                    <div class="cons-kpi" style="border-top-color:${faltanTokens > 0 ? "#f59e0b" : "#10b981"};">
+                        <small>Faltan Tokens</small>
+                        <strong>${faltanTokens}</strong>
+                    </div>
+                </div>
+
+                <!-- SUB-VISTAS (4 VISTAS CLAVE) -->
+                <div class="c17-subtabs">
+                    <button type="button" class="c17-subtab ${ui17.cobSubTab === "sesiones" ? "active" : ""}" onclick="setCobFiltro17('cobSubTab','sesiones')">📋 Sesiones y Checklist (${regs.length})</button>
+                    <button type="button" class="c17-subtab ${ui17.cobSubTab === "pacientes" ? "active" : ""}" onclick="setCobFiltro17('cobSubTab','pacientes')">👤 Por Paciente</button>
+                    <button type="button" class="c17-subtab ${ui17.cobSubTab === "mutuales" ? "active" : ""}" onclick="setCobFiltro17('cobSubTab','mutuales')">🏥 Por Mutual y Mes</button>
+                    <button type="button" class="c17-subtab ${ui17.cobSubTab === "liquidaciones" ? "active" : ""}" onclick="setCobFiltro17('cobSubTab','liquidaciones')">🧾 Liquidaciones Cobradas</button>
+                </div>
+
+                <!-- FILTROS (CON ALTERNADOR MES TRABAJADO / MES COBRADO) -->
+                <div class="c17-filter-bar">
+                    <select onchange="setCobFiltro17('cobModoMes', this.value)" title="Elegir si el mes filtra por cuándo trabajaste o cuándo cobraste">
+                        <option value="trabajo" ${ui17.cobModoMes === "trabajo" ? "selected" : ""}>📅 Filtrar: Mes Trabajado</option>
+                        <option value="cobro" ${ui17.cobModoMes === "cobro" ? "selected" : ""}>💰 Filtrar: Mes Cobrado</option>
+                    </select>
+
+                    <div style="display:flex; gap:0.3rem; align-items:center;">
+                        <input type="month" value="${ui17.cobMesTrabajo === "TODOS" ? new Date().toISOString().slice(0, 7) : ui17.cobMesTrabajo}"
+                            style="flex:1; min-width:0;"
+                            onchange="setCobFiltro17('cobMesTrabajo', this.value)">
+                        <button type="button" class="btn ${ui17.cobMesTrabajo === "TODOS" ? "btn-primary" : "btn-ghost"} btn-sm"
+                            style="min-height:35px; font-size:0.71rem; padding:0 8px; flex-shrink:0;"
+                            onclick="setCobFiltro17('cobMesTrabajo', ui17_toggleTodosMeses())" title="Ver todos los meses acumulados">
+                            ${ui17.cobMesTrabajo === "TODOS" ? "✓ Todos" : "Todos"}
+                        </button>
+                    </div>
+
+                    ${desdeCaja && profs.length > 1 ? `
+                        <select onchange="setCobFiltro17('cobEsp', this.value)">
+                            <option value="TODAS" ${espEfectiva === "TODAS" ? "selected" : ""}>Todas las Especialidades</option>
+                            ${profs.map(pr => `<option value="${esc17(pr.clave)}" ${mismaEsp17(espEfectiva, pr.clave) ? "selected" : ""}>${pr.icono} ${esc17(pr.clave)}</option>`).join("")}
+                        </select>
+                    ` : ""}
+
+                    <select onchange="setCobFiltro17('cobMutId', this.value)">
+                        <option value="TODAS">Todas las Obras Sociales</option>
+                        ${mutualesVisibles.map(m => `<option value="${esc17(m.id)}" ${ui17.cobMutId === m.id ? "selected" : ""}>${esc17(m.nombre)}</option>`).join("")}
+                    </select>
+
+                    <select onchange="setCobFiltro17('cobPacId', this.value)">
+                        <option value="TODOS">Todos los Pacientes</option>
+                        ${pacsVisibles.map(p => `<option value="${p.id}" ${String(ui17.cobPacId) === String(p.id) ? "selected" : ""}>${esc17(p.apellido)}, ${esc17(p.nombre)}</option>`).join("")}
+                    </select>
+
+                    <select onchange="setCobFiltro17('cobEstado', this.value)">
+                        <option value="TODOS" ${ui17.cobEstado === "TODOS" ? "selected" : ""}>Todos los estados</option>
+                        <option value="pendiente_cobro" ${ui17.cobEstado === "pendiente_cobro" ? "selected" : ""}>🔴 Falta cobrar algo</option>
+                        <option value="falta_token" ${ui17.cobEstado === "falta_token" ? "selected" : ""}>🔑 Falta Token</option>
+                        <option value="falta_coseg" ${ui17.cobEstado === "falta_coseg" ? "selected" : ""}>💵 Falta Coseg./Part.</option>
+                        <option value="falta_os" ${ui17.cobEstado === "falta_os" ? "selected" : ""}>🏥 Falta Obra Social</option>
+                        <option value="completos" ${ui17.cobEstado === "completos" ? "selected" : ""}>✅ Completos</option>
+                    </select>
+
+                    <input type="text" id="c17CobBusqInp" value="${esc17(ui17.cobBusq)}" placeholder="🔍 Buscar paciente, token..."
+                        onchange="setCobFiltro17('cobBusq', this.value)">
+                </div>
+
+                <div id="c17CobSubBody"></div>
+            </div>
+        `;
+
+        const body = document.getElementById("c17CobSubBody");
+        if (!body) return;
+
+        if (ui17.cobSubTab === "sesiones") renderCobSubSesiones17(body, db, regs);
+        else if (ui17.cobSubTab === "pacientes") renderCobSubPacientes17(body, db, regs);
+        else if (ui17.cobSubTab === "mutuales") renderCobSubMutuales17(body, db, regs);
+        else renderCobSubLiquidaciones17(body, db, regs);
+    };
+
+    window.ui17_toggleTodosMeses = function () {
+        return ui17.cobMesTrabajo === "TODOS" ? new Date().toISOString().slice(0, 7) : "TODOS";
+    };
+
+    window.setCobFiltro17 = function (clave, valor) {
+        ui17[clave] = valor;
+        refrescarVistasCobranza17();
+    };
+
+    window.verSesionesDePacienteEnCob17 = function (pacId) {
+        ui17.cobPacId = String(pacId);
+        ui17.cobSubTab = "sesiones";
+        refrescarVistasCobranza17();
+    };
+
+    function renderCobSubSesiones17(cont, db, regs) {
+        if (!regs.length) {
+            cont.innerHTML = `<div class="empty-box" style="padding:1.25rem;">Sin sesiones en este filtro. Probá tocar <b>Todos</b> en el mes o alternar entre <b>Mes Trabajado</b> y <b>Mes Cobrado</b>.</div>`;
+            return;
+        }
+
+        const filasPC = regs.map(t => {
+            const f = analizarFinanzasTurno17(db, t);
+            const mutCorta = (f.mut?.nombre || t.mutualNombre || "Particular").replace(/\s*\(Sin Obra Social\)/i, "");
+
+            const celdaToken = f.esPart
+                ? `<span style="color:var(--ink-400); font-size:0.74rem;">Particular</span>`
+                : `
+                    <div style="display:flex; flex-direction:column; gap:3px;">
+                        <div style="display:flex; gap:4px; align-items:center;">
+                            <label class="c17-check-pill ${f.tokenEntregado ? "is-ok" : (f.faltaToken ? "is-warn" : "")}" title="${esc17(labelModoToken17(f.reglaToken.clave))} (${esc17(f.reglaToken.origen)})">
+                                <input type="checkbox" ${f.tokenEntregado ? "checked" : ""} onchange="toggleCheckCobranza17(${t.id}, 'tokenEntregado', this.checked)">
+                                <span>🔑</span>
+                            </label>
+                            <input type="text" value="${esc17(t.token || "")}" placeholder="${esc17(labelModoToken17(f.reglaToken.clave, true))}"
+                                style="width:100px; min-height:26px; font-size:0.73rem; padding:1px 6px; ${f.faltaToken ? "border-color:#ef4444;" : ""}"
+                                onchange="actualizarTokenCob17(${t.id}, this.value)">
+                        </div>
+                        <label style="font-size:0.68rem; color:var(--ink-500); display:inline-flex; align-items:center; gap:3px; cursor:pointer;">
+                            <input type="checkbox" ${t.presentado ? "checked" : ""} style="width:13px; height:13px; min-height:auto;" onchange="toggleCheckCobranza17(${t.id}, 'presentado', this.checked)">
+                            <span>${t.presentado ? `📤 Presentado${t.mesPresentacion ? ` (${t.mesPresentacion})` : ""}` : "Marcar presentado"}</span>
+                        </label>
+                    </div>
+                `;
+
+            const celdaConsultorio = f.montoConsultorio <= 0
+                ? `<span style="color:var(--ink-400); font-size:0.74rem;">$0</span>`
+                : `
+                    <label class="c17-check-pill ${f.cosegCobrado ? "is-ok" : "is-warn"}">
+                        <input type="checkbox" ${f.cosegCobrado ? "checked" : ""} onchange="toggleCheckCobranza17(${t.id}, 'coseguroCobrado', this.checked)">
+                        <span>${fmt17(f.montoConsultorio)}</span>
+                    </label>
+                    ${f.cosegCobrado ? `<small style="display:block; font-size:0.66rem; color:var(--ink-500); margin-top:2px;">📅 ${esc17(t.fechaPagoCoseguro || t.fecha)} • ${esc17(t.medioPagoCoseguro || "Efectivo")}</small>` : ""}
+                `;
+
+            const celdaOS = f.esPart || f.valOSBruto <= 0
+                ? `<span style="color:var(--ink-400); font-size:0.74rem;">—</span>`
+                : `
+                    <label class="c17-check-pill ${f.osCobrada ? "is-ok" : "is-warn"}" title="Bruto ${fmt17(f.valOSBruto)} - ${f.descPct}% Colegio (${fmt17(f.descMonto)})">
+                        <input type="checkbox" ${f.osCobrada ? "checked" : ""} onchange="toggleCheckCobranza17(${t.id}, 'mutualCobrada', this.checked)">
+                        <span>${fmt17(f.valOSNeto)}</span>
+                    </label>
+                    <small style="display:block; font-size:0.66rem; color:var(--ink-500); margin-top:2px;">
+                        ${f.descPct > 0 ? `Bruto ${fmt17(f.valOSBruto)} (-${f.descPct}%)` : `Sin desc.`}
+                        ${f.osCobrada ? `<br>💰 ${esc17(t.fechaPagoMutual || "-")} ${t.liquidacionRef ? `• ${esc17(t.liquidacionRef)}` : ""}` : ""}
+                    </small>
+                `;
+
+            return `
+                <tr style="${f.completo ? "background:rgba(16,185,129,0.04);" : ""}">
+                    <td>
+                        <b>${esc17(t.fecha)}</b><br>
+                        <small style="color:var(--ink-500);">Trab: <b>${esc17(formatearMesYM17(f.mesTrabajo))}</b></small>
+                    </td>
+                    <td>
+                        <strong>${esc17(t.pacienteNombre)}</strong><br>
+                        <small style="color:var(--ink-500);">${esc17(mutCorta)}${f.pac?.nroAfiliado ? ` • ${esc17(f.pac.nroAfiliado)}` : ""}</small>
+                    </td>
+                    <td>${celdaToken}</td>
+                    <td>${celdaConsultorio}</td>
+                    <td>${celdaOS}</td>
+                    <td style="text-align:right; white-space:nowrap;">
+                        <label class="c17-check-pill ${f.completo ? "is-done" : ""}" title="Tildar para marcar todo cobrado">
+                            <input type="checkbox" ${f.completo ? "checked" : ""} onchange="toggleCobroCompleto17(${t.id}, this.checked)">
+                            <span>${f.completo ? "✓ Completo" : "Completo"}</span>
+                        </label>
+                        <button type="button" class="btn btn-ghost btn-sm" style="min-height:26px; padding:0 6px; margin-left:3px;"
+                            onclick="abrirModalDetalleCobroTurno17(${t.id})" title="Editar fecha de pago, mes liquidado, % colegio y medio">⚙️</button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+        const cardsMovil = regs.map(t => {
+            const f = analizarFinanzasTurno17(db, t);
+            const mutCorta = (f.mut?.nombre || t.mutualNombre || "Particular").replace(/\s*\(Sin Obra Social\)/i, "");
+            return `
+                <div class="cons-lote-row-mob" style="border-left-color:${f.completo ? "#10b981" : (f.faltaToken ? "#ef4444" : "#f59e0b")};">
+                    <div class="cons-lote-row-top">
+                        <div>
+                            <strong>${esc17(t.pacienteNombre)}</strong>
+                            <small style="display:block; color:var(--ink-500);">${esc17(t.fecha)} (Trab: ${esc17(formatearMesYM17(f.mesTrabajo))}) • ${esc17(mutCorta)}</small>
+                        </div>
+                        <button type="button" class="btn btn-ghost btn-sm" style="min-height:26px; padding:0 7px;" onclick="abrirModalDetalleCobroTurno17(${t.id})">⚙️</button>
+                    </div>
+                    <div style="display:flex; gap:0.32rem; flex-wrap:wrap; align-items:center;">
+                        ${!f.esPart ? `
+                            <label class="c17-check-pill ${f.tokenEntregado ? "is-ok" : (f.faltaToken ? "is-warn" : "")}">
+                                <input type="checkbox" ${f.tokenEntregado ? "checked" : ""} onchange="toggleCheckCobranza17(${t.id}, 'tokenEntregado', this.checked)">
+                                <span>🔑 Token</span>
+                            </label>
+                        ` : ""}
+                        ${f.montoConsultorio > 0 ? `
+                            <label class="c17-check-pill ${f.cosegCobrado ? "is-ok" : "is-warn"}">
+                                <input type="checkbox" ${f.cosegCobrado ? "checked" : ""} onchange="toggleCheckCobranza17(${t.id}, 'coseguroCobrado', this.checked)">
+                                <span>${f.esPart ? "Part." : "Coseg."} ${fmt17(f.montoConsultorio)}</span>
+                            </label>
+                        ` : ""}
+                        ${!f.esPart && f.valOSBruto > 0 ? `
+                            <label class="c17-check-pill ${f.osCobrada ? "is-ok" : "is-warn"}">
+                                <input type="checkbox" ${f.osCobrada ? "checked" : ""} onchange="toggleCheckCobranza17(${t.id}, 'mutualCobrada', this.checked)">
+                                <span>OS ${fmt17(f.valOSNeto)}</span>
+                            </label>
+                        ` : ""}
+                        <label class="c17-check-pill ${f.completo ? "is-done" : ""}">
+                            <input type="checkbox" ${f.completo ? "checked" : ""} onchange="toggleCobroCompleto17(${t.id}, this.checked)">
+                            <span>${f.completo ? "✓ Completo" : "Todo"}</span>
+                        </label>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        cont.innerHTML = `
+            <div class="table-wrap c17-desk-table">
+                <table class="app-table" style="font-size:0.79rem;">
+                    <thead>
+                        <tr>
+                            <th>Fecha / Mes Trab.</th>
+                            <th>Paciente / Obra Social</th>
+                            <th>🔑 Token y Presentación</th>
+                            <th>💵 Coseguro / Part.</th>
+                            <th>🏥 Obra Social (Neto)</th>
+                            <th style="text-align:right;">Estado / Pago</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filasPC}</tbody>
+                </table>
+            </div>
+            <div class="c17-mob-cards">${cardsMovil}</div>
+        `;
+    }
+
+    function renderCobSubPacientes17(cont, db, regs) {
+        if (!regs.length) {
+            cont.innerHTML = `<div class="empty-box" style="padding:1.25rem;">Sin datos de pacientes para este período.</div>`;
+            return;
+        }
+        const mapa = new Map();
+        regs.forEach(t => {
+            const k = t.pacienteId ? `id_${t.pacienteId}` : `nom_${norm17(t.pacienteNombre)}`;
+            const f = analizarFinanzasTurno17(db, t);
+            if (!mapa.has(k)) {
+                mapa.set(k, {
+                    pacId: t.pacienteId || null,
+                    pac: f.pac,
+                    nombre: t.pacienteNombre,
+                    mutual: f.mut?.nombre || t.mutualNombre || "Particular",
+                    sesiones: 0, faltaTok: 0, cobrado: 0, pendCoseg: 0, pendOS: 0
+                });
+            }
+            const g = mapa.get(k);
+            g.sesiones++;
+            if (f.faltaToken) g.faltaTok++;
+            g.cobrado += f.totalCobradoReal;
+            g.pendCoseg += f.pendConsultorio;
+            g.pendOS += f.pendOSNeto;
+        });
+
+        const lista = Array.from(mapa.values()).sort((a, b) => (b.pendCoseg + b.pendOS) - (a.pendCoseg + a.pendOS));
+
+        cont.innerHTML = `
+            <div class="table-wrap">
+                <table class="app-table" style="font-size:0.8rem;">
+                    <thead>
+                        <tr>
+                            <th>Paciente / Obra Social</th>
+                            <th>Cupo Sesiones</th>
+                            <th>Sesiones Filtro</th>
+                            <th>Cobrado</th>
+                            <th>Falta Coseg./Part.</th>
+                            <th>Falta Obra Social (Neto)</th>
+                            <th>Total Falta</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${lista.map(g => {
+                            const totalFalta = g.pendCoseg + g.pendOS;
+                            const cupo = g.pac ? calcularCupoPacienteCons17(db, g.pac) : null;
+                            const txtCupo = !cupo || cupo.esParticular
+                                ? `<small style="color:var(--ink-400);">Particular</small>`
+                                : `<span class="badge ${cupo.excedidoMes || cupo.excedidoAnio ? "badge-danger" : "badge-ok"}" style="font-size:0.68rem;">${cupo.atendidosMes}${cupo.topeMes ? `/${cupo.topeMes}` : ""} mes • ${cupo.usadasAnio}${cupo.topeAnio ? `/${cupo.topeAnio}` : ""} año</span>`;
+                            return `
+                                <tr>
+                                    <td><strong>${esc17(g.nombre)}</strong><br><small style="color:var(--ink-500);">${esc17(g.mutual)}</small></td>
+                                    <td>${txtCupo}</td>
+                                    <td><b>${g.sesiones}</b>${g.faltaTok ? ` <span class="badge badge-danger" style="font-size:0.65rem;">🔑 -${g.faltaTok}</span>` : ""}</td>
+                                    <td style="color:#059669; font-weight:800;">${fmt17(g.cobrado)}</td>
+                                    <td>${g.pendCoseg > 0 ? `<b style="color:#b91c1c;">${fmt17(g.pendCoseg)}</b>` : "$0"}</td>
+                                    <td>${g.pendOS > 0 ? `<b style="color:#b45309;">${fmt17(g.pendOS)}</b>` : "$0"}</td>
+                                    <td><span class="badge ${totalFalta > 0 ? "badge-danger" : "badge-ok"}">${totalFalta > 0 ? fmt17(totalFalta) : "Al día ✓"}</span></td>
+                                    <td style="text-align:right;">
+                                        ${g.pacId ? `<button type="button" class="btn btn-ghost btn-sm" onclick="verSesionesDePacienteEnCob17(${g.pacId})">Ver →</button>` : ""}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderCobSubMutuales17(cont, db, regs) {
+        if (!regs.length) {
+            cont.innerHTML = `<div class="empty-box" style="padding:1.25rem;">Sin prestaciones para agrupar por mutual y mes de trabajo.</div>`;
+            return;
+        }
+        const mapa = new Map();
+        regs.forEach(t => {
+            const f = analizarFinanzasTurno17(db, t);
+            const mutId = f.mut?.id || t.mutualId || "part";
+            const k = `${mutId}__${f.mesTrabajo}`;
+            if (!mapa.has(k)) {
+                mapa.set(k, {
+                    mutId, mut: f.mut,
+                    nombreMut: f.mut?.nombre || t.mutualNombre || "Particular",
+                    esPart: f.esPart, mesTrabajo: f.mesTrabajo,
+                    sesiones: 0, sinTok: 0, brutoOS: 0, descCol: 0,
+                    netoOSCobrado: 0, netoOSPend: 0, cosegPend: 0, sesPendOS: 0,
+                    esp: t.especialidad
+                });
+            }
+            const g = mapa.get(k);
+            g.sesiones++;
+            if (f.faltaToken) g.sinTok++;
+            g.brutoOS += f.valOSBruto;
+            g.descCol += f.descMonto;
+            g.netoOSCobrado += f.cobradoOSNeto;
+            g.netoOSPend += f.pendOSNeto;
+            g.cosegPend += f.pendConsultorio;
+            if (f.faltaOS) g.sesPendOS++;
+        });
+
+        const lista = Array.from(mapa.values()).sort((a, b) => b.mesTrabajo.localeCompare(a.mesTrabajo) || b.netoOSPend - a.netoOSPend);
+
+        cont.innerHTML = `
+            <div class="table-wrap">
+                <table class="app-table" style="font-size:0.79rem;">
+                    <thead>
+                        <tr>
+                            <th>Obra Social / Regla</th>
+                            <th>Mes Trabajado</th>
+                            <th>Sesiones</th>
+                            <th>Bruto OS / Desc. Col.</th>
+                            <th>OS Cobrado (Neto)</th>
+                            <th>Falta Cobrar OS</th>
+                            <th style="text-align:right;">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${lista.map(g => `
+                            <tr>
+                                <td>
+                                    <strong>${esc17(g.nombreMut)}</strong>
+                                    ${!g.esPart && g.mut ? `<br><small style="color:var(--ink-500);">📤 ${esc17(labelFrecPres17(g.mut.frecuenciaPresentacion))} • 💰 ${esc17(labelLiqMes17(g.mut.liquidacionesMes))}</small>` : ""}
+                                </td>
+                                <td><span class="badge badge-celeste">${esc17(formatearMesYM17(g.mesTrabajo))}</span></td>
+                                <td><b>${g.sesiones}</b>${g.sinTok ? ` <span class="badge badge-danger" style="font-size:0.65rem;">-${g.sinTok} tok</span>` : ""}</td>
+                                <td>${g.esPart ? "Particular" : `<b>${fmt17(g.brutoOS)}</b><br><small style="color:#b91c1c;">Col: -${fmt17(g.descCol)}</small>`}</td>
+                                <td style="color:#059669; font-weight:800;">${fmt17(g.netoOSCobrado)}</td>
+                                <td>
+                                    ${g.netoOSPend > 0
+                                        ? `<span class="badge badge-danger">${fmt17(g.netoOSPend)} (${g.sesPendOS})</span>`
+                                        : `<span class="badge badge-ok">Cobrado ✓</span>`}
+                                    ${g.cosegPend > 0 ? `<small style="display:block; color:#b45309; margin-top:2px;">+ Coseg/Part: ${fmt17(g.cosegPend)}</small>` : ""}
+                                </td>
+                                <td style="text-align:right;">
+                                    ${!g.esPart && g.sesPendOS > 0 ? `
+                                        <button type="button" class="btn btn-ok btn-sm"
+                                            onclick="abrirModalLiquidacionMasiva17('${escJs17(g.esp)}', '${escJs17(g.mutId)}', '${escJs17(g.mesTrabajo)}')">
+                                            💰 Liquidar
+                                        </button>
+                                    ` : `<span style="color:var(--ink-400); font-size:0.74rem;">—</span>`}
+                                </td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // NUEVA SUB-VISTA: HISTORIAL DE LIQUIDACIONES COBRADAS (AGRUPADAS POR FECHA DE PAGO Y MUTUAL)
+    function renderCobSubLiquidaciones17(cont, db, regs) {
+        const cobradas = regs.filter(t => {
+            const f = analizarFinanzasTurno17(db, t);
+            return !f.esPart && f.osCobrada;
+        });
+
+        if (!cobradas.length) {
+            cont.innerHTML = `<div class="empty-box" style="padding:1.25rem;">Todavía no hay liquidaciones de obras sociales cobradas en este filtro. Usá <b>💰 Liquidar Mutual</b> para registrar un pago.</div>`;
+            return;
+        }
+
+        const grupos = new Map();
+        const conteoMesPorMut = new Map();
+
+        cobradas.forEach(t => {
+            const f = analizarFinanzasTurno17(db, t);
+            const fechaPago = t.fechaPagoMutual || "-";
+            const mesPago = fechaPago.slice(0, 7);
+            const mutNom = f.mut?.nombre || t.mutualNombre || "Obra Social";
+            const refLiq = t.liquidacionRef || "1ª Liquidación Mensual";
+            const k = `${fechaPago}__${mutNom}__${refLiq}`;
+
+            if (!grupos.has(k)) {
+                grupos.set(k, {
+                    fechaPago, mesPago, mutNom, refLiq,
+                    liqConfig: f.mut ? labelLiqMes17(f.mut.liquidacionesMes) : "",
+                    medio: t.medioPagoMutual || "Transferencia",
+                    mesesTrab: new Set(),
+                    sesiones: 0, bruto: 0, descCol: 0, neto: 0
+                });
+                const km = `${mesPago}__${mutNom}`;
+                conteoMesPorMut.set(km, (conteoMesPorMut.get(km) || 0) + 1);
+            }
+            const g = grupos.get(k);
+            g.mesesTrab.add(formatearMesYM17(f.mesTrabajo));
+            g.sesiones++;
+            g.bruto += f.valOSBruto;
+            g.descCol += f.descMonto;
+            g.neto += f.valOSNeto;
+        });
+
+        const lista = Array.from(grupos.values()).sort((a, b) => b.fechaPago.localeCompare(a.fechaPago));
+        const totNeto = lista.reduce((a, g) => a + g.neto, 0);
+        const totDesc = lista.reduce((a, g) => a + g.descCol, 0);
+
+        cont.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.7rem; padding:0.55rem 0.75rem; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:12px; font-size:0.79rem;">
+                <span>🧾 <b>${lista.length} liquidación(es) cobradas</b> en el período filtrado</span>
+                <span>Desc. Colegio: <b style="color:#b91c1c;">-${fmt17(totDesc)}</b> • Neto acreditado en Caja: <b style="color:#059669;">${fmt17(totNeto)}</b></span>
+            </div>
+            <div class="table-wrap">
+                <table class="app-table" style="font-size:0.79rem;">
+                    <thead>
+                        <tr>
+                            <th>Fecha Pago</th>
+                            <th>Obra Social / Liquidación</th>
+                            <th>Meses Trabajados que pagó</th>
+                            <th>Sesiones</th>
+                            <th>Bruto / Desc. Col.</th>
+                            <th>Neto a Caja</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${lista.map(g => {
+                            const cantMes = conteoMesPorMut.get(`${g.mesPago}__${g.mutNom}`) || 1;
+                            return `
+                                <tr>
+                                    <td><b>${esc17(g.fechaPago)}</b><br><small style="color:var(--ink-500);">${esc17(g.medio)}</small></td>
+                                    <td>
+                                        <strong>${esc17(g.mutNom)}</strong>
+                                        <span class="badge badge-purple" style="margin-left:4px; font-size:0.65rem;">${esc17(g.refLiq)}</span>
+                                        <small style="display:block; color:var(--ink-500);">${cantMes} liq. registrada(s) en ${esc17(formatearMesYM17(g.mesPago))}${g.liqConfig ? ` • Pactado: ${esc17(g.liqConfig)}` : ""}</small>
+                                    </td>
+                                    <td>${Array.from(g.mesesTrab).map(m => `<span class="badge badge-celeste" style="font-size:0.66rem; margin-right:3px;">${esc17(m)}</span>`).join("")}</td>
+                                    <td><b>${g.sesiones}</b></td>
+                                    <td>${fmt17(g.bruto)}<br><small style="color:#b91c1c;">-${fmt17(g.descCol)}</small></td>
+                                    <td><strong style="color:#059669;">${fmt17(g.neto)}</strong></td>
+                                </tr>
+                            `;
+                        }).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // =====================================================================
+    // 8. ACCIONES RÁPIDAS DE CHECKLIST + MODAL DETALLE DE PAGO + LIQUIDACIÓN MASIVA
+    // =====================================================================
+    window.actualizarTokenCob17 = function (idTurno, val) {
+        const db = obtenerDatosConsultorioCDM();
+        const t = (db.turnos || []).find(x => Number(x.id) === Number(idTurno));
+        if (!t) return;
+        t.token = String(val || "").trim();
+        t.tokenEntregado = Boolean(t.token);
+        guardarDatosConsultorioCDM(db);
+        toast17("🔑 Token guardado.");
+        refrescarVistasCobranza17();
+    };
+
+    window.toggleCheckCobranza17 = function (idTurno, campo, checked) {
+        const db = obtenerDatosConsultorioCDM();
+        const t = (db.turnos || []).find(x => Number(x.id) === Number(idTurno));
+        if (!t) return;
+        const hoy = hoy17();
+
+        if (campo === "tokenEntregado") {
+            t.tokenEntregado = Boolean(checked);
+        } else if (campo === "presentado") {
+            t.presentado = Boolean(checked);
+            if (checked && !t.mesPresentacion) t.mesPresentacion = hoy.slice(0, 7);
+        } else if (campo === "coseguroCobrado") {
+            t.coseguroCobrado = Boolean(checked);
+            if (checked) {
+                t.fechaPagoCoseguro = t.fechaPagoCoseguro || hoy;
+                t.medioPagoCoseguro = t.medioPagoCoseguro || "Efectivo";
+            }
+        } else if (campo === "mutualCobrada") {
+            t.mutualCobrada = Boolean(checked);
+            if (checked) {
+                t.fechaPagoMutual = t.fechaPagoMutual || hoy;
+                t.mesCobroMutual = t.fechaPagoMutual.slice(0, 7);
+                t.medioPagoMutual = t.medioPagoMutual || "Transferencia";
+                t.liquidacionRef = t.liquidacionRef || "1ª Liquidación Mensual";
+                const fin = analizarFinanzasTurno17(db, t);
+                t.descuentoColegioPct = fin.descPct;
+            }
+        }
+
+        guardarDatosConsultorioCDM(db);
+        sincronizarCajaDesdeTurno17(db, t);
+        toast17(checked ? "✅ Estado actualizado y sincronizado con Caja." : "↺ Estado actualizado.");
+        refrescarVistasCobranza17();
+    };
+
+    window.toggleCobroCompleto17 = function (idTurno, checked) {
+        const db = obtenerDatosConsultorioCDM();
+        const t = (db.turnos || []).find(x => Number(x.id) === Number(idTurno));
+        if (!t) return;
+        const fin = analizarFinanzasTurno17(db, t);
+        const hoy = hoy17();
+
+        if (checked) {
+            if (fin.montoConsultorio > 0) {
+                t.coseguroCobrado = true;
+                t.fechaPagoCoseguro = t.fechaPagoCoseguro || hoy;
+                t.medioPagoCoseguro = t.medioPagoCoseguro || "Efectivo";
+            }
+            if (!fin.esPart && fin.valOSBruto > 0) {
+                t.mutualCobrada = true;
+                t.fechaPagoMutual = t.fechaPagoMutual || hoy;
+                t.mesCobroMutual = t.fechaPagoMutual.slice(0, 7);
+                t.medioPagoMutual = t.medioPagoMutual || "Transferencia";
+                t.liquidacionRef = t.liquidacionRef || "1ª Liquidación Mensual";
+                t.descuentoColegioPct = fin.descPct;
+            }
+        } else {
+            t.coseguroCobrado = false;
+            t.mutualCobrada = false;
+        }
+
+        guardarDatosConsultorioCDM(db);
+        sincronizarCajaDesdeTurno17(db, t);
+        toast17(checked ? "✅ Sesión marcada COMPLETA e ingresada en Caja." : "↺ Sesión reabierta como pendiente.");
+        refrescarVistasCobranza17();
+    };
+
+    window.abrirModalDetalleCobroTurno17 = function (idTurno) {
+        const db = obtenerDatosConsultorioCDM();
+        const t = (db.turnos || []).find(x => Number(x.id) === Number(idTurno));
+        if (!t) return;
+        const f = analizarFinanzasTurno17(db, t);
+        const hoy = hoy17();
+
+        const modal = asegurarModal17();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:580px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">💳 DETALLE DE COBRO Y LIQUIDACIÓN</span>
+                        <h3 style="margin-top:4px;">${esc17(t.pacienteNombre)} — Trab: ${esc17(t.fecha)}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalConsultorioCDM()">✕</button>
+                </div>
+
+                <form onsubmit="guardarDetalleCobroTurno17(event, ${t.id})">
+                    ${!f.esPart ? `
+                        <div style="background:var(--surface-subtle); border:1px solid var(--line); border-radius:12px; padding:0.7rem; margin-bottom:0.65rem;">
+                            <strong style="font-size:0.78rem; display:block; margin-bottom:0.45rem;">🔑 Token y Presentación (${esc17(f.mut?.nombre || t.mutualNombre)})</strong>
+                            <div class="grid-3">
+                                <div class="field"><label>Código Token / Orden</label><input type="text" id="dcTok" value="${esc17(t.token || "")}"></div>
+                                <div class="field"><label>Mes Presentación</label><input type="month" id="dcMesPres" value="${t.mesPresentacion || f.mesTrabajo}"></div>
+                                <div class="field" style="justify-content:flex-end;">
+                                    <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; margin-top:18px;">
+                                        <input type="checkbox" id="dcPres" ${t.presentado ? "checked" : ""} style="width:16px; height:16px; min-height:auto;"> Presentado
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ""}
+
+                    ${f.montoConsultorio > 0 ? `
+                        <div style="background:rgba(16,185,129,0.07); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:0.7rem; margin-bottom:0.65rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem;">
+                                <strong style="font-size:0.79rem;">💵 ${f.esPart ? "Sesión Particular" : "Coseguro"} (${fmt17(f.montoConsultorio)})</strong>
+                                <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.79rem; font-weight:800; cursor:pointer;">
+                                    <input type="checkbox" id="dcCosCob" ${t.coseguroCobrado ? "checked" : ""} style="width:16px; height:16px; min-height:auto;"> Cobrado
+                                </label>
+                            </div>
+                            <div class="grid-2">
+                                <div class="field"><label>Fecha Real de Pago</label><input type="date" id="dcCosFec" value="${t.fechaPagoCoseguro || t.fecha || hoy}"></div>
+                                <div class="field"><label>Medio de Pago</label>
+                                    <select id="dcCosMed">${MEDIOS_CAJA_17.map(m => `<option ${((t.medioPagoCoseguro || "Efectivo") === m) ? "selected" : ""}>${m}</option>`).join("")}</select>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ""}
+
+                    ${!f.esPart && f.valOSBruto > 0 ? `
+                        <div style="background:rgba(2,132,199,0.07); border:1px solid rgba(2,132,199,0.3); border-radius:12px; padding:0.7rem; margin-bottom:0.75rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem;">
+                                <strong style="font-size:0.79rem;">🏥 Liquidación Obra Social (Bruto ${fmt17(f.valOSBruto)})</strong>
+                                <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.79rem; font-weight:800; cursor:pointer;">
+                                    <input type="checkbox" id="dcOsCob" ${t.mutualCobrada ? "checked" : ""} style="width:16px; height:16px; min-height:auto;"> Cobrada
+                                </label>
+                            </div>
+                            <div class="grid-2" style="margin-bottom:0.5rem;">
+                                <div class="field"><label>Fecha Real de Cobro (Caja)</label><input type="date" id="dcOsFec" value="${t.fechaPagoMutual || hoy}"></div>
+                                <div class="field"><label>Liquidación</label>
+                                    <select id="dcOsLiq">${TIPOS_LIQ_PAGO.map(l => `<option ${((t.liquidacionRef || TIPOS_LIQ_PAGO[0]) === l) ? "selected" : ""}>${l}</option>`).join("")}</select>
+                                </div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="field"><label>% Descuento Colegio</label><input type="number" id="dcOsPct" min="0" max="50" step="0.1" value="${f.descPct}"></div>
+                                <div class="field"><label>Medio de Ingreso</label>
+                                    <select id="dcOsMed">${MEDIOS_CAJA_17.map(m => `<option ${((t.medioPagoMutual || "Transferencia") === m) ? "selected" : ""}>${m}</option>`).join("")}</select>
+                                </div>
+                            </div>
+                            <small style="display:block; margin-top:4px; color:var(--ink-600);">
+                                Mes trabajado: <b>${esc17(formatearMesYM17(f.mesTrabajo))}</b> • Neto estimado a Caja: <b>${fmt17(f.valOSNeto)}</b>
+                            </small>
+                        </div>
+                    ` : ""}
+
+                    <button type="submit" class="btn btn-primary" style="width:100%;">💾 Guardar y Actualizar Caja</button>
+                </form>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.guardarDetalleCobroTurno17 = function (e, idTurno) {
+        e.preventDefault();
+        const db = obtenerDatosConsultorioCDM();
+        const t = (db.turnos || []).find(x => Number(x.id) === Number(idTurno));
+        if (!t) return;
+
+        if (document.getElementById("dcTok")) {
+            t.token = document.getElementById("dcTok").value.trim();
+            if (t.token) t.tokenEntregado = true;
+            t.presentado = Boolean(document.getElementById("dcPres")?.checked);
+            t.mesPresentacion = document.getElementById("dcMesPres")?.value || "";
+        }
+        if (document.getElementById("dcCosCob")) {
+            t.coseguroCobrado = Boolean(document.getElementById("dcCosCob").checked);
+            t.fechaPagoCoseguro = document.getElementById("dcCosFec")?.value || hoy17();
+            t.medioPagoCoseguro = document.getElementById("dcCosMed")?.value || "Efectivo";
+        }
+        if (document.getElementById("dcOsCob")) {
+            t.mutualCobrada = Boolean(document.getElementById("dcOsCob").checked);
+            t.fechaPagoMutual = document.getElementById("dcOsFec")?.value || hoy17();
+            t.mesCobroMutual = t.fechaPagoMutual.slice(0, 7);
+            t.liquidacionRef = document.getElementById("dcOsLiq")?.value || TIPOS_LIQ_PAGO[0];
+            t.descuentoColegioPct = parseFloat(document.getElementById("dcOsPct")?.value) || 0;
+            t.medioPagoMutual = document.getElementById("dcOsMed")?.value || "Transferencia";
+        }
+
+        guardarDatosConsultorioCDM(db);
+        sincronizarCajaDesdeTurno17(db, t);
+        cerrarModalConsultorioCDM();
+        toast17("💾 Detalle de cobro actualizado y sincronizado con Caja.");
+        refrescarVistasCobranza17();
+    };
+
+    // --- LIQUIDACIÓN MASIVA DE UNA OBRA SOCIAL (CORREGIDO CAMBIO DE % COLEGIO) ---
+    window.abrirModalLiquidacionMasiva17 = function (espOpt = "TODAS", mutPreId = "", mesTrabPre = "TODOS") {
+        const db = obtenerDatosConsultorioCDM();
+        const mutualesOS = (db.mutuales || [])
+            .filter(m => !esMutualParticular17(m) && (espOpt === "TODAS" || mismaEsp17(m.especialidad, espOpt)))
+            .map(m => normalizarMutual17(m, db, m.especialidad));
+
+        if (!mutualesOS.length) {
+            toast17("⚠️ No hay obras sociales configuradas para liquidar.");
+            return;
+        }
+
+        const mutSel = mutualesOS.find(m => m.id === mutPreId) || mutualesOS[0];
+        const hoy = hoy17();
+
+        const modal = asegurarModal17();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:740px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-ok">💰 REGISTRAR LIQUIDACIÓN DE OBRA SOCIAL</span>
+                        <h3 style="margin-top:4px;">Cobro de Meses Trabajados (Mensual / BIS)</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalConsultorioCDM()">✕</button>
+                </div>
+
+                <form onsubmit="confirmarLiquidacionMasiva17(event)">
+                    <div class="grid-3" style="margin-bottom:0.65rem;">
+                        <div class="field">
+                            <label>Obra Social *</label>
+                            <select id="lmMutId" onchange="actualizarListaLiquidacionMasiva17('TODOS', true)">
+                                ${mutualesOS.map(m => `<option value="${esc17(m.id)}" ${m.id === mutSel.id ? "selected" : ""}>${esc17(m.nombre)} (${esc17(m.especialidad)})</option>`).join("")}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Mes Trabajado que abona</label>
+                            <select id="lmMesTrab" onchange="actualizarListaLiquidacionMasiva17(null, false)">
+                                <option value="TODOS" ${mesTrabPre === "TODOS" ? "selected" : ""}>Todos los pendientes</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Fecha Real de Pago (Caja) *</label>
+                            <input type="date" id="lmFechaPago" value="${hoy}" required>
+                        </div>
+                    </div>
+
+                    <div class="grid-3" style="margin-bottom:0.75rem;">
+                        <div class="field">
+                            <label>Liquidación</label>
+                            <select id="lmTipoLiq">${TIPOS_LIQ_PAGO.map(x => `<option>${x}</option>`).join("")}</select>
+                        </div>
+                        <div class="field">
+                            <label>% Descuento Colegio</label>
+                            <input type="number" id="lmDescPct" min="0" max="50" step="0.1" value="${mutSel.descuentoColegioPct}" oninput="recalcTotalesLiqMasiva17()">
+                        </div>
+                        <div class="field">
+                            <label>Medio de Ingreso</label>
+                            <select id="lmMedio">${MEDIOS_CAJA_17.map(m => `<option ${m === "Transferencia" ? "selected" : ""}>${m}</option>`).join("")}</select>
+                        </div>
+                    </div>
+
+                    <div id="lmListaTurnos" style="max-height:260px; overflow-y:auto; margin-bottom:0.75rem;"></div>
+                    <div id="lmResumenTotales" class="c17-neto-preview"></div>
+
+                    <button type="submit" class="btn btn-ok" style="width:100%;">💰 Confirmar Liquidación e Ingresar Neto a Caja</button>
+                </form>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+        actualizarListaLiquidacionMasiva17(mesTrabPre, true);
+    };
+
+    window.actualizarListaLiquidacionMasiva17 = function (mesForzado = null, sincronizarPctMutual = false) {
+        const db = obtenerDatosConsultorioCDM();
+        const mutId = document.getElementById("lmMutId")?.value;
+        const mut = resolverMutual17(db, mutId);
+        const selMes = document.getElementById("lmMesTrab");
+        const inpPct = document.getElementById("lmDescPct");
+        if (mut && inpPct && sincronizarPctMutual) {
+            inpPct.value = mut.descuentoColegioPct;
+        }
+
+        const pendTodos = (db.turnos || []).filter(t => {
+            if (!t || t.estado === "cancelado") return false;
+            const f = analizarFinanzasTurno17(db, t);
+            return !f.esPart && f.mut?.id === mutId && f.faltaOS;
+        }).sort((a, b) => String(a.fecha || "").localeCompare(String(b.fecha || "")));
+
+        const mesesUnicos = [...new Set(pendTodos.map(t => String(t.fecha || "").slice(0, 7)))].sort().reverse();
+        const mesActual = mesForzado !== null ? mesForzado : (selMes?.value || "TODOS");
+        if (selMes) {
+            selMes.innerHTML = `<option value="TODOS" ${mesActual === "TODOS" ? "selected" : ""}>Todos los pendientes (${pendTodos.length})</option>` +
+                mesesUnicos.map(ym => `<option value="${ym}" ${mesActual === ym ? "selected" : ""}>${esc17(formatearMesYM17(ym))}</option>`).join("");
+        }
+
+        const lista = mesActual === "TODOS" ? pendTodos : pendTodos.filter(t => String(t.fecha || "").startsWith(mesActual));
+        const cont = document.getElementById("lmListaTurnos");
+        if (!cont) return;
+
+        if (!lista.length) {
+            cont.innerHTML = `<div class="empty-box" style="padding:1rem;">🎉 No hay sesiones pendientes de cobro para esta obra social en el período elegido.</div>`;
+        } else {
+            cont.innerHTML = `
+                <div class="table-wrap">
+                    <table class="app-table" style="font-size:0.78rem;">
+                        <thead><tr><th style="width:32px;">✓</th><th>Fecha Trab.</th><th>Paciente</th><th>🔑 Token</th><th>Bruto OS</th></tr></thead>
+                        <tbody>
+                            ${lista.map(t => `
+                                <tr>
+                                    <td><input type="checkbox" class="lm-chk-turno" value="${t.id}" data-bruto="${Number(t.valorMutual) || 0}" checked onchange="recalcTotalesLiqMasiva17()" style="width:16px; height:16px; min-height:auto;"></td>
+                                    <td><b>${esc17(t.fecha)}</b></td>
+                                    <td>${esc17(t.pacienteNombre)}</td>
+                                    <td>${t.token ? `<b>${esc17(t.token)}</b>` : `<span style="color:#b91c1c;">Sin token</span>`}</td>
+                                    <td><b>${fmt17(t.valorMutual)}</b></td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+        recalcTotalesLiqMasiva17();
+    };
+
+    window.recalcTotalesLiqMasiva17 = function () {
+        const box = document.getElementById("lmResumenTotales");
+        if (!box) return;
+        const pct = Math.max(0, Math.min(50, parseFloat(document.getElementById("lmDescPct")?.value) || 0));
+        const checks = Array.from(document.querySelectorAll(".lm-chk-turno:checked"));
+        const bruto = checks.reduce((a, el) => a + (Number(el.dataset.bruto) || 0), 0);
+        const desc = Math.round(bruto * (pct / 100));
+        const neto = Math.max(0, bruto - desc);
+        box.innerHTML = `
+            📊 <b>${checks.length} sesión(es) seleccionadas</b> • Bruto: <b>${fmt17(bruto)}</b> − Colegio (${pct}%: <b>-${fmt17(desc)}</b>) = <b style="color:#047857; font-size:0.9rem;">${fmt17(neto)} neto a Caja</b>
+        `;
+    };
+
+    window.confirmarLiquidacionMasiva17 = function (e) {
+        e.preventDefault();
+        const ids = Array.from(document.querySelectorAll(".lm-chk-turno:checked")).map(el => Number(el.value));
+        if (!ids.length) return alert("⚠️ Seleccioná al menos una sesión para liquidar.");
+
+        const db = obtenerDatosConsultorioCDM();
+        const fechaPago = document.getElementById("lmFechaPago")?.value || hoy17();
+        const tipoLiq = document.getElementById("lmTipoLiq")?.value || TIPOS_LIQ_PAGO[0];
+        const descPct = Math.max(0, Math.min(50, parseFloat(document.getElementById("lmDescPct")?.value) || 0));
+        const medio = document.getElementById("lmMedio")?.value || "Transferencia";
+
+        let cant = 0;
+        ids.forEach(idT => {
+            const t = (db.turnos || []).find(x => Number(x.id) === idT);
+            if (!t) return;
+            t.mutualCobrada = true;
+            t.fechaPagoMutual = fechaPago;
+            t.mesCobroMutual = fechaPago.slice(0, 7);
+            t.liquidacionRef = tipoLiq;
+            t.descuentoColegioPct = descPct;
+            t.medioPagoMutual = medio;
+            cant++;
+        });
+
+        guardarDatosConsultorioCDM(db);
+        window.reconstruirAsientosConsultorioEnCaja17();
+        cerrarModalConsultorioCDM();
+        toast17(`💰 Liquidación registrada: ${cant} sesión(es) ingresadas a Caja con fecha ${fechaPago}.`);
+        refrescarVistasCobranza17();
+    };
+
+    // --- EXPORTACIÓN CSV Y PDF A4 DE COBRANZAS ---
+    window.exportarCobranzasCSV17 = function (espFija = "TODAS") {
+        const db = obtenerDatosConsultorioCDM();
+        const regs = obtenerTurnosFiltradosCobranza17(db, espFija);
+        if (!regs.length) return alert("No hay sesiones para exportar en este filtro.");
+        const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const head = ["Fecha Sesion", "Mes Trabajado", "Paciente", "Obra Social", "Token", "Token Entregado", "Presentado", "Coseg/Part", "Coseg Cobrado", "Fecha Pago Coseg", "OS Bruto", "% Colegio", "OS Neto", "OS Cobrada", "Fecha Pago OS", "Liquidacion", "Completo", "Falta Cobrar"];
+        let csv = head.map(esc).join(";") + "\n";
+        regs.forEach(t => {
+            const f = analizarFinanzasTurno17(db, t);
+            csv += [
+                t.fecha, f.mesTrabajo, t.pacienteNombre, f.mut?.nombre || t.mutualNombre, t.token || "",
+                f.tokenEntregado ? "SI" : "NO", t.presentado ? "SI" : "NO",
+                f.montoConsultorio, f.cosegCobrado ? "SI" : "NO", t.fechaPagoCoseguro || "",
+                f.valOSBruto, `${f.descPct}%`, f.valOSNeto, f.osCobrada ? "SI" : "NO",
+                t.fechaPagoMutual || "", t.liquidacionRef || "", f.completo ? "SI" : "NO", f.totalPendienteReal
+            ].map(esc).join(";") + "\n";
+        });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }));
+        a.download = `cobranzas_consultorio_${ui17.cobModoMes}_${ui17.cobMesTrabajo}.csv`;
+        a.click();
+        toast17("📊 Cobranzas y liquidaciones exportadas a Excel CSV.");
+    };
+
+    window.imprimirCobranzasPDF17 = function (espFija = "TODAS") {
+        const db = obtenerDatosConsultorioCDM();
+        const regs = obtenerTurnosFiltradosCobranza17(db, espFija);
+        if (!regs.length) return alert("Sin sesiones para imprimir en este filtro.");
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : { nombreEntidad: "Consultorio" };
+        let totCob = 0, totPend = 0, totCol = 0;
+        regs.forEach(t => { const f = analizarFinanzasTurno17(db, t); totCob += f.totalCobradoReal; totPend += f.totalPendienteReal; totCol += f.descMonto; });
+
+        imprimirHojaA4Consultorio(`
+            <div style="display:flex; justify-content:space-between; border-bottom:2.5px solid #0284c7; padding-bottom:0.7rem; margin-bottom:0.9rem;">
+                <div>
+                    <div style="font-size:0.7rem; font-weight:800; color:#0284c7;">CONTROL DE COBRANZAS, TOKENS Y LIQUIDACIONES</div>
+                    <h2 style="margin:2px 0; font-size:1.3rem;">${esc17(lic.nombreEntidad)}</h2>
+                    <small>${ui17.cobModoMes === "cobro" ? "Mes cobrado" : "Mes trabajado"}: <b>${ui17.cobMesTrabajo === "TODOS" ? "Todos" : formatearMesYM17(ui17.cobMesTrabajo)}</b> • Sesiones: <b>${regs.length}</b></small>
+                </div>
+                <div style="text-align:right; font-size:0.8rem;">
+                    <div><b>Cobrado Real:</b> ${fmt17(totCob)}</div>
+                    <div><b>Falta Cobrar:</b> ${fmt17(totPend)}</div>
+                    <div><b>Desc. Colegio:</b> -${fmt17(totCol)}</div>
+                </div>
+            </div>
+            <table>
+                <thead><tr><th>Fecha / Trab.</th><th>Paciente</th><th>Obra Social</th><th>Token</th><th>Coseg./Part.</th><th>OS Neto (Desc.)</th><th>Pago / Estado</th></tr></thead>
+                <tbody>
+                    ${regs.map(t => {
+                        const f = analizarFinanzasTurno17(db, t);
+                        return `<tr>
+                            <td>${esc17(t.fecha)}<br><small>${esc17(f.mesTrabajo)}</small></td>
+                            <td><b>${esc17(t.pacienteNombre)}</b></td>
+                            <td>${esc17(f.mut?.nombre || t.mutualNombre)}</td>
+                            <td>${f.esPart ? "-" : (t.token ? esc17(t.token) : (f.tokenEntregado ? "Sí" : "Falta"))}</td>
+                            <td>${fmt17(f.montoConsultorio)} ${f.montoConsultorio > 0 ? (f.cosegCobrado ? "✓" : "(Pend.)") : ""}</td>
+                            <td>${f.esPart ? "-" : `${fmt17(f.valOSNeto)} (-${f.descPct}%) ${f.osCobrada ? "✓" : "(Pend.)"}`}</td>
+                            <td>${f.completo ? `<b>Completo ✓</b>${t.fechaPagoMutual ? `<br><small>${esc17(t.fechaPagoMutual)} ${esc17(t.liquidacionRef || "")}</small>` : ""}` : `Falta ${fmt17(f.totalPendienteReal)}`}</td>
+                        </tr>`;
+                    }).join("")}
+                </tbody>
+            </table>
+        `);
+    };
+
+    // =====================================================================
+    // 9. ENGANCHES CON CONSULTORIO, HISTORIA CLÍNICA Y RECONSTRUCCIÓN DE CAJA
+    // =====================================================================
+    if (typeof window.renderizarConsultorioCompleto === "function") {
+        const _origRender17 = window.renderizarConsultorioCompleto;
+        window.renderizarConsultorioCompleto = function () {
+            _origRender17.apply(this, arguments);
+            inyectarCSS17();
+            window.reconstruirAsientosConsultorioEnCaja17();
+
+            const sec = document.getElementById("cdmSeccionConsultorioGlobal");
+            if (!sec || sec.classList.contains("hidden")) return;
+
+            const btnTabLote = sec.querySelector('.cons-tab[onclick*="cambiarTabConsultorioCDM(\'lote\')"]');
+            if (btnTabLote) {
+                const full = btnTabLote.querySelector(".cons-tab-full");
+                const sh = btnTabLote.querySelector(".cons-tab-short");
+                if (full) full.textContent = "Cobranzas y Liquidaciones";
+                if (sh) sh.textContent = "Cobranzas";
+            }
+
+            const tabActivaBtn = sec.querySelector(".cons-tab.active");
+            const onclickAct = tabActivaBtn?.getAttribute("onclick") || "";
+            const cuerpo = document.getElementById("consCuerpoTab");
+            const db = obtenerDatosConsultorioCDM();
+            const espAct = obtenerEspActiva17();
+
+            if (cuerpo && onclickAct.includes("'mutuales'")) {
+                renderTabMutualesPro17(cuerpo, db, espAct);
+            } else if (cuerpo && onclickAct.includes("'lote'")) {
+                renderizarPanelCobranzaConsultorio17(cuerpo, { espFiltro: espAct, desdeCaja: false });
+            } else if (onclickAct.includes("'pacientes'")) {
+                enriquecerTablaPacientesConCupo17(sec, db, espAct);
+            }
+        };
+    }
+
+    function engancharCupoEnHistoriaClinica17() {
+        if (window.__cdmHookClinCupo17 || typeof window.abrirSuiteClinicaPacientePro !== "function") return;
+        window.__cdmHookClinCupo17 = true;
+        const _origClin17 = window.abrirSuiteClinicaPacientePro;
+        window.abrirSuiteClinicaPacientePro = function (idPac) {
+            const res = _origClin17.apply(this, arguments);
+            setTimeout(() => {
+                const db = obtenerDatosConsultorioCDM();
+                const p = (db.pacientes || []).find(x => Number(x.id) === Number(idPac));
+                const heroSmall = document.querySelector("#modalSuiteClinicaProCDM .clin-hero small");
+                if (!p || !heroSmall || heroSmall.querySelector(".c17-clin-cupo")) return;
+                const cupo = calcularCupoPacienteCons17(db, p);
+                if (cupo && !cupo.esParticular) {
+                    const txtM = cupo.topeMes > 0 ? `${cupo.atendidosMes}/${cupo.topeMes} mes` : `${cupo.atendidosMes} mes`;
+                    const txtA = cupo.topeAnio > 0 ? `${cupo.usadasAnio}/${cupo.topeAnio} año` : `${cupo.usadasAnio} año`;
+                    heroSmall.insertAdjacentHTML("beforeend", ` • <span class="c17-clin-cupo" style="background:rgba(255,255,255,0.2); padding:1px 7px; border-radius:999px; font-weight:800;">🎯 Sesiones: ${txtM} | ${txtA}</span>`);
+                }
+            }, 30);
+            return res;
+        };
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        engancharCupoEnHistoriaClinica17();
+        setTimeout(() => {
+            engancharCupoEnHistoriaClinica17();
+            window.reconstruirAsientosConsultorioEnCaja17();
+        }, 650);
+    });
+})();
