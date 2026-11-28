@@ -3044,173 +3044,210 @@ window.especialidadFiltroConsultorioCDM = "TODAS";
         renderizarConsultorioCompleto();
     };
 
-    // =====================================================================
-    // 6. RENDER FULL-WIDTH DE ANOTACIONES EN VIVO (CERO COLUMNAS LATERALES)
-    // =====================================================================
-    function renderizarTabSesionVivo12(cont) {
-        const db = obtenerDatosConsultorioCDM();
-        const espAct = obtenerEspActiva12();
-        const colorEsp = typeof colorEspecialidadConsultorio === "function" ? colorEspecialidadConsultorio(espAct) : "#7c3aed";
-        const pacs = (db.pacientes || [])
-            .filter(p => normTxt12(p.especialidad) === normTxt12(espAct))
-            .sort((a, b) => String(a.apellido || "").localeCompare(String(b.apellido || "")));
+    // =========================================================================
+// 6. PERSISTENCIA LOCAL, SINCRONIZACIÓN CON SERVER.JS Y BACKUP JSON
+// =========================================================================
 
-        const pacSel = estadoVivo.pacienteId
-            ? pacs.find(p => Number(p.id) === Number(estadoVivo.pacienteId)) || null
-            : null;
+function guardarDatosCDM(omitirSyncServidor = false) {
+    basePersonas.forEach(p => asegurarPilaresPersona(p));
+    localStorage.setItem("cdm_personas_v1", JSON.stringify(basePersonas));
+    localStorage.setItem("cdm_rutinas_v1", JSON.stringify(baseRutinas));
+    localStorage.setItem("cdm_partidos_v1", JSON.stringify(basePartidos));
+    localStorage.setItem("cdm_alineaciones_v2", JSON.stringify(baseAlineaciones));
+    localStorage.setItem("cdm_microciclos_v1", JSON.stringify(baseMicrociclos));
+    localStorage.setItem("cdm_videoteca_v1", JSON.stringify(baseVideoteca));
+    localStorage.setItem("cdm_catalogo_ej_v1", JSON.stringify(baseCatalogoEjercicios));
 
-        const sesionesPac = pacSel
-            ? (db.sesiones || [])
-                .filter(s => Number(s.pacienteId) === Number(pacSel.id))
-                .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")) || (Number(b.id) - Number(a.id)))
-            : [];
-        const ultSes = sesionesPac[0] || null;
-        const turnoVinc = estadoVivo.turnoId ? (db.turnos || []).find(t => Number(t.id) === Number(estadoVivo.turnoId)) : null;
-        const cantArbol = Array.isArray(pacSel?.arbolFamiliar) ? pacSel.arbolFamiliar.length : 0;
+    if (!omitirSyncServidor) sincronizarCambiosHaciaServidorCDM();
+}
 
-        cont.innerHTML = `
-            <div class="psv-full-wrap">
-                <form class="cons-card" onsubmit="psicoVivoFinalizarYGuardar(event)">
-                    <!-- BARRA SUPERIOR COMPACTA: PACIENTE + BOTONES EN 1 SOLA LÍNEA -->
-                    <div class="psv-topbar-slim">
-                        <div class="psv-pac-picker-group">
-                            <span style="font-size:1.05rem;">✍️</span>
-                            <select id="psicoSelPaciente12" onchange="psicoVivoSeleccionarPaciente(this.value)">
-                                <option value="">-- Seleccionar paciente --</option>
-                                ${pacs.map(p => `<option value="${p.id}" ${Number(pacSel?.id) === Number(p.id) ? "selected" : ""}>${esc12(p.apellido)}, ${esc12(p.nombre)}${p.dni ? ` (DNI ${esc12(p.dni)})` : ""}</option>`).join("")}
-                            </select>
-                            ${turnoVinc ? `<span class="badge badge-purple" style="font-size:0.71rem;">⏰ ${esc12(turnoVinc.hora)} hs</span>` : ""}
-                            ${pacSel ? `<button type="button" class="btn btn-ghost btn-sm" onclick="abrirHistoriaClinicaPacienteCDM(${pacSel.id})" title="Ver Historia Clínica completa">🩺 Ficha</button>` : ""}
-                        </div>
+function sincronizarCambiosHaciaServidorCDM() {
+    if (window.location.protocol === "file:") return;
+    try {
+        const claveClub = obtenerClaveClubActivoCDM();
+        if (typeof guardarSnapshotClubActualEnMapaLocal === "function") {
+            guardarSnapshotClubActualEnMapaLocal();
+        }
+        const sesion = JSON.parse(localStorage.getItem("cdm_sesion_activa_v1") || "null");
+        if (sesion?.rol === "usuario" && sesion.personaId) {
+            const miPersona = basePersonas.find(x => Number(x.id) === Number(sesion.personaId));
+            if (miPersona) {
+                fetch(`/api/cdm/jugador/${miPersona.id}/sync`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ claveClub, personaActualizada: miPersona, catalogoEjercicios: baseCatalogoEjercicios })
+                }).catch(() => {});
+            }
+            return;
+        }
 
-                        <div class="psv-tools-bar">
-                            <button type="button" class="btn btn-sm" style="background:${estadoVivo.corriendo ? "#f59e0b" : "#10b981"}; color:#fff; border:none; font-weight:800;" onclick="psicoVivoIniciarOPausar()">
-                                ${estadoVivo.corriendo ? "⏸ Pausar" : (estadoVivo.iniciada ? "▶ Reanudar" : `▶ Iniciar (${estadoVivo.duracionMin}m)`)}
-                            </button>
-                            ${pacSel ? `
-                                <button type="button" class="btn btn-sm" style="background:${verResumenAnterior12 ? "#7c3aed" : "rgba(124,58,237,0.1)"}; color:${verResumenAnterior12 ? "#fff" : "#5b21b6"}; border:1.5px solid rgba(124,58,237,0.35); font-weight:800;"
-                                    onclick="psicoVivoToggleResumenAnterior()" title="Ver resumen de la última sesión">
-                                    🧠 Última Sesión${ultSes ? ` (${esc12(ultSes.fecha.slice(5))})` : ""}
-                                </button>
-                            ` : ""}
-                            <button type="button" class="btn btn-sm" style="background:rgba(124,58,237,0.12); color:#5b21b6; border:1.5px solid rgba(124,58,237,0.35); font-weight:800;"
-                                onclick="abrirModalArbolFamiliarEnVivo12(${pacSel ? pacSel.id : "null"})"
-                                title="Agregar o citar ramas del Árbol Familiar">
-                                🌳 Árbol Familiar${pacSel ? ` (${cantArbol})` : ""}
-                            </button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="psicoVivoInsertarTimestamp()" title="Insertar minuto actual">⏱️ + Sello</button>
-                            <button type="button" class="btn btn-ghost btn-sm" onclick="psicoVivoDescartarBorrador()" title="Limpiar borrador">🧹</button>
-                        </div>
-                    </div>
+        fetch("/api/cdm/estado", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                claveClub,
+                personas: basePersonas,
+                rutinas: baseRutinas,
+                partidos: basePartidos,
+                alineaciones: baseAlineaciones,
+                microciclos: baseMicrociclos,
+                videoteca: baseVideoteca,
+                catalogoEjercicios: baseCatalogoEjercicios,
+                licenciaConfig: obtenerLicenciaConfigCDM()
+            })
+        }).catch(() => {});
+    } catch {}
+}
 
-                    <!-- RESUMEN DE SESIÓN ANTERIOR (DESPLEGABLE SOLO SI SE TOCA EL BOTÓN) -->
-                    ${pacSel && verResumenAnterior12 ? `
-                        <div class="psv-prev-drawer">
-                            ${ultSes ? `
-                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:4px;">
-                                    <strong style="color:${colorEsp};">🧠 Última sesión registrada — ${esc12(ultSes.fecha)}</strong>
-                                    <div style="display:flex; gap:0.3rem;">
-                                        ${ultSes.animo != null ? `<span class="badge badge-celeste" style="font-size:0.68rem;">Ánimo ${ultSes.animo}/10</span>` : ""}
-                                        ${ultSes.ansiedad != null ? `<span class="badge badge-purple" style="font-size:0.68rem;">Ans. ${ultSes.ansiedad}/10</span>` : ""}
-                                    </div>
-                                </div>
-                                <div style="white-space:pre-line; color:var(--ink-700);">${esc12(ultSes.evolucion || "")}</div>
-                                ${(ultSes.retomarProxima || ultSes.indicaciones) ? `
-                                    <div style="margin-top:6px; padding-top:5px; border-top:1px dashed rgba(124,58,237,0.3); color:#5b21b6; font-weight:700;">
-                                        📌 Para retomar hoy: ${esc12(ultSes.retomarProxima || ultSes.indicaciones)}
-                                    </div>
-                                ` : ""}
-                            ` : `
-                                <div>Primera sesión de <b>${esc12(pacSel.nombre)}</b>.${pacSel.motivoConsulta ? ` <b>Motivo inicial:</b> ${esc12(pacSel.motivoConsulta)}` : ""}</div>
-                            `}
-                        </div>
-                    ` : ""}
+async function sincronizarEstadoDesdeServidorCDM() {
+    if (window.location.protocol === "file:") return false;
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const clubUrl = params.get("club") || params.get("cliente");
+        if (clubUrl) {
+            const limpio = clubUrl.trim().toLowerCase().replace(/[^a-z0-9_\-]/g, "_");
+            if (limpio) localStorage.setItem("cdm_club_activo_id_v1", limpio);
+        }
+        const claveClub = obtenerClaveClubActivoCDM();
+        const resp = await fetch(`/api/cdm/estado?club=${encodeURIComponent(claveClub)}`, { cache: "no-store" });
+        if (!resp.ok) return false;
+        const est = (await resp.json())?.estado;
+        if (!est) return false;
 
-                    <!-- ETIQUETAS RÁPIDAS EN 1 FILA -->
-                    <div class="psv-tags-wrap">
-                        ${ETIQUETAS_PSICO_VIVO.map(etq => {
-                            const act = (estadoVivo.etiquetas || []).includes(etq);
-                            const escQ = etq.replace(/'/g, "\\'");
-                            return `<button type="button" class="psv-tag-chip ${act ? "active" : ""}" onclick="psicoVivoToggleEtiqueta('${escQ}', this)">${etq}</button>`;
-                        }).join("")}
-                    </div>
+        if (est.licenciaConfig && Object.keys(est.licenciaConfig).length > 0) {
+            localStorage.setItem("cdm_licencia_config_v1", JSON.stringify(est.licenciaConfig));
+            if (typeof aplicarLicenciaYModulosCDM === "function") aplicarLicenciaYModulosCDM();
+            if (typeof window.sincronizarEtiquetaSidebarBaseGeneral === "function") window.sincronizarEtiquetaSidebarBaseGeneral();
+        }
 
-                    <!-- ÁREA DE ANOTACIONES A ANCHO COMPLETO -->
-                    <textarea id="psicoNotaVivo12" class="psv-notes-full"
-                        placeholder="Escribí acá durante toda la sesión... Podés tocar '🌳 Árbol Familiar' o '⏱️ + Sello' arriba en cualquier momento, y controlar el tiempo desde la gota flotante."
-                        oninput="psicoVivoActualizarCampo('notas', this.value)">${esc12(estadoVivo.notas || "")}</textarea>
+        // Hidratar Consultorio / Gabinete y Caja Unificada desde la misma respuesta
+        if (est.consultorio && typeof est.consultorio === "object") {
+            if (typeof window.hidratarConsultorioDesdeEstadoApp15 === "function") {
+                window.hidratarConsultorioDesdeEstadoApp15(est.consultorio, claveClub);
+            } else {
+                const tieneCons = (est.consultorio.pacientes || []).length || (est.consultorio.turnos || []).length || (est.consultorio.sesiones || []).length || (est.consultorio.derivaciones || []).length;
+                if (tieneCons) {
+                    localStorage.setItem(`cdm_consultorio_suite_v2_${claveClub}`, JSON.stringify(est.consultorio));
+                }
+            }
+        }
+        if (Array.isArray(est.finanzasMovimientos)) {
+            if (typeof window.cargarFinanzasDesdeEstadoClub === "function") {
+                window.cargarFinanzasDesdeEstadoClub(est.finanzasMovimientos, claveClub);
+            } else if (est.finanzasMovimientos.length > 0) {
+                localStorage.setItem(`cdm_finanzas_unif_v35_${claveClub}`, JSON.stringify(est.finanzasMovimientos));
+            }
+        }
 
-                    <!-- PIE COMPACTO: ÁNIMO + ANSIEDAD + CONSIGNA PRÓXIMA SESIÓN -->
-                    <div class="psv-bottom-controls">
-                        <div>
-                            <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-weight:800; margin-bottom:3px;">
-                                <span>🙂 Ánimo</span>
-                                <span id="psicoLblAnimo12" style="color:#0284c7;">${estadoVivo.animo}/10</span>
-                            </div>
-                            <input type="range" min="1" max="10" value="${estadoVivo.animo}" style="width:100%; min-height:auto; accent-color:#0284c7;" oninput="psicoVivoActualizarCampo('animo', Number(this.value))">
-                        </div>
-                        <div>
-                            <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-weight:800; margin-bottom:3px;">
-                                <span>⚡ Ansiedad</span>
-                                <span id="psicoLblAns12" style="color:#7c3aed;">${estadoVivo.ansiedad}/10</span>
-                            </div>
-                            <input type="range" min="1" max="10" value="${estadoVivo.ansiedad}" style="width:100%; min-height:auto; accent-color:#7c3aed;" oninput="psicoVivoActualizarCampo('ansiedad', Number(this.value))">
-                        </div>
-                        <div class="field">
-                            <label>📌 Retomar próxima sesión / Consigna</label>
-                            <input type="text" id="psicoRetomarVivo12"
-                                value="${esc12(estadoVivo.retomarProxima || "")}"
-                                placeholder="Acuerdos, tareas o tema a retomar..."
-                                oninput="psicoVivoActualizarCampo('retomarProxima', this.value)">
-                        </div>
-                    </div>
+        const esSecundario = claveClub !== "cdm_adelia_maria_principal";
+        if ((Array.isArray(est.personas) && est.personas.length > 0) || esSecundario) {
+            basePersonas = Array.isArray(est.personas) ? est.personas : [];
+            baseRutinas = Array.isArray(est.rutinas) ? est.rutinas : [];
+            basePartidos = Array.isArray(est.partidos) ? est.partidos : [];
+            baseAlineaciones = est.alineaciones && typeof est.alineaciones === "object" ? est.alineaciones : {};
+            baseMicrociclos = est.microciclos && typeof est.microciclos === "object" ? est.microciclos : {};
+            if (Array.isArray(est.videoteca) && est.videoteca.length > 0) baseVideoteca = est.videoteca;
+            if (Array.isArray(est.catalogoEjercicios) && est.catalogoEjercicios.length > 0) baseCatalogoEjercicios = est.catalogoEjercicios;
+            guardarDatosCDM(true);
+            return true;
+        } else if (basePersonas.length > 0) {
+            sincronizarCambiosHaciaServidorCDM();
+        }
+    } catch {}
+    return false;
+}
 
-                    ${turnoVinc ? `
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.65rem; flex-wrap:wrap; background:var(--surface-subtle); border:1px solid var(--line-strong); border-radius:12px; padding:0.55rem 0.8rem; margin-bottom:0.75rem;">
-                            <label style="display:inline-flex; align-items:center; gap:0.45rem; font-size:0.78rem; font-weight:700; cursor:pointer;">
-                                <input type="checkbox" style="width:17px; height:17px; min-height:auto; accent-color:#10b981;" ${estadoVivo.marcarTurnoAtendido ? "checked" : ""} onchange="psicoVivoActualizarCampo('marcarTurnoAtendido', this.checked)">
-                                <span>✓ Marcar turno de hoy (${esc12(turnoVinc.hora)} hs) como Atendido</span>
-                            </label>
-                            <input type="text" id="psicoTokenTurno12" value="${esc12(estadoVivo.tokenTurno || turnoVinc.token || "")}"
-                                placeholder="🔑 Token / N° Orden (opc.)"
-                                style="width:190px; min-height:32px; font-size:0.76rem;"
-                                oninput="psicoVivoActualizarCampo('tokenTurno', this.value)">
-                        </div>
-                    ` : ""}
+function exportarBackupJSON() {
+    const clave = obtenerClaveClubActivoCDM();
+    let consultorio = null;
+    let finanzasMovimientos = [];
+    try { consultorio = JSON.parse(localStorage.getItem(`cdm_consultorio_suite_v2_${clave}`) || "null"); } catch {}
+    try { finanzasMovimientos = JSON.parse(localStorage.getItem(`cdm_finanzas_unif_v35_${clave}`) || "[]") || []; } catch {}
 
-                    <button type="submit" class="btn btn-primary" style="width:100%; background:${colorEsp}; border-color:${colorEsp}; font-size:0.92rem; padding:0.72rem;">
-                        💾 Finalizar y Guardar en Sesiones del Paciente
-                    </button>
-                </form>
+    const dataObj = {
+        fechaExportacion: obtenerHoyISO(),
+        claveClub: clave,
+        personas: basePersonas,
+        rutinas: baseRutinas,
+        partidos: basePartidos,
+        alineaciones: baseAlineaciones,
+        microciclos: baseMicrociclos,
+        videoteca: baseVideoteca,
+        catalogoEjercicios: baseCatalogoEjercicios,
+        consultorio,
+        finanzasMovimientos
+    };
+    const a = document.createElement("a");
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataObj, null, 2));
+    a.download = `gsis_backup_${clave}_${obtenerHoyISO()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    mostrarToast("📥 Backup completo descargado (incluye Caja y Consultorio).");
+}
 
-                <!-- HISTORIAL RECIENTE DESPLEGABLE (OCULTADO POR DEFECTO PARA NO OCUPAR LUGAR) -->
-                ${pacSel && sesionesPac.length > 0 ? `
-                    <details class="cons-card" style="padding:0.85rem 1.05rem;">
-                        <summary style="cursor:pointer; font-weight:800; font-size:0.86rem; color:var(--ink-800); list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                            <span>📚 Sesiones guardadas de ${esc12(pacSel.nombre)} (${sesionesPac.length})</span>
-                            <span style="font-size:0.74rem; color:${colorEsp};">Tocá para desplegar ▾</span>
-                        </summary>
-                        <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.75rem; max-height:280px; overflow-y:auto;">
-                            ${sesionesPac.slice(0, 8).map(s => `
-                                <div style="background:var(--surface-subtle); border:1px solid var(--line); border-left:4px solid ${colorEsp}; border-radius:12px; padding:0.6rem 0.78rem; font-size:0.78rem;">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap; margin-bottom:3px;">
-                                        <strong>📅 ${esc12(s.fecha)}${s.duracionRealMin ? ` • ⏱️ ${s.duracionRealMin} min` : ""}</strong>
-                                        <div style="display:flex; gap:0.3rem;">
-                                            ${s.animo != null ? `<span class="badge badge-celeste" style="font-size:0.66rem;">Ánimo ${s.animo}/10</span>` : ""}
-                                            ${s.ansiedad != null ? `<span class="badge badge-purple" style="font-size:0.66rem;">Ans. ${s.ansiedad}/10</span>` : ""}
-                                        </div>
-                                    </div>
-                                    <div style="color:var(--ink-700); white-space:pre-line;">${esc12(s.evolucion || "")}</div>
-                                    ${(s.retomarProxima || s.indicaciones) ? `<div style="margin-top:4px; font-size:0.74rem; color:#5b21b6;"><b>📌 Próxima / Consigna:</b> ${esc12(s.retomarProxima || s.indicaciones)}</div>` : ""}
-                                </div>
-                            `).join("")}
-                        </div>
-                    </details>
-                ` : ""}
-            </div>
-        `;
-    }
+function importarBackupJSON(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!Array.isArray(data.personas)) throw new Error("Archivo JSON inválido.");
+            if (!confirm("⚠️ ¿Restaurar esta copia de seguridad? Reemplazará los datos actuales de este comercio.")) return;
 
+            const clave = obtenerClaveClubActivoCDM();
+            basePersonas = data.personas || [];
+            baseRutinas = data.rutinas || [];
+            basePartidos = data.partidos || [];
+            baseAlineaciones = data.alineaciones || {};
+            baseMicrociclos = data.microciclos || {};
+            if (Array.isArray(data.videoteca) && data.videoteca.length) baseVideoteca = data.videoteca;
+            if (Array.isArray(data.catalogoEjercicios) && data.catalogoEjercicios.length) baseCatalogoEjercicios = data.catalogoEjercicios;
+
+            if (data.consultorio && typeof data.consultorio === "object") {
+                localStorage.setItem(`cdm_consultorio_suite_v2_${clave}`, JSON.stringify(data.consultorio));
+                if (window.location.protocol !== "file:") {
+                    await fetch("/api/cdm/consultorio", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ claveClub: clave, consultorio: data.consultorio })
+                    }).catch(() => {});
+                }
+            }
+
+            if (Array.isArray(data.finanzasMovimientos)) {
+                localStorage.setItem(`cdm_finanzas_unif_v35_${clave}`, JSON.stringify(data.finanzasMovimientos));
+                if (window.location.protocol !== "file:") {
+                    await fetch("/api/cdm/finanzas", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ claveClub: clave, movimientos: data.finanzasMovimientos })
+                    }).catch(() => {});
+                }
+            }
+
+            guardarDatosCDM();
+            mostrarToast("✅ Backup restaurado completo.");
+            setTimeout(() => window.location.reload(), 700);
+        } catch (err) {
+            alert("No se pudo leer el backup: " + err.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+function limpiarTodoElSistema() {
+    if (!confirm("⚠️ ¿Vaciar todos los datos del sistema?")) return;
+    basePersonas = [];
+    baseRutinas = [];
+    basePartidos = [];
+    baseAlineaciones = {};
+    baseMicrociclos = {};
+    guardarDatosCDM();
+    mostrarToast("🗑️ Sistema limpio.");
+    setTimeout(() => window.location.reload(), 500);
+}
     // =====================================================================
     // 7. ENGANCHE CON CONSULTORIO.JS (BOTÓN EN PRÓXIMOS PACIENTES + TAB)
     // =====================================================================
@@ -3605,56 +3642,99 @@ window.especialidadFiltroConsultorioCDM = "TODAS";
     });
 })();
 // =========================================================================
-// 15. PERSISTENCIA INMEDIATA EN MONGODB PARA CONSULTORIO + DIAGNÓSTICO VISIBLE
-//     Reemplazar el Bloque 15 al final de js/consultorio.js
+// 15. PERSISTENCIA SEGURA EN MONGODB PARA CONSULTORIO / GABINETE
+//     - Protege contra sobrescritura vacía al abrir desde un dispositivo nuevo
+//     - Garantiza db.derivaciones y detecta derivaciones/configCobranza al hidratar
+//     - Sincroniza automáticamente con Caja (finanzas.js) y refresca Inicio/Ficha
 // =========================================================================
 
 (function () {
+    const consHidratadoPorClub15 = {};
+
     function obtenerClaveClub15() {
         return typeof obtenerClaveClubActivoCDM === "function"
             ? obtenerClaveClubActivoCDM()
             : (localStorage.getItem("cdm_club_activo_id_v1") || "cdm_adelia_maria_principal");
     }
 
-    function storageKey15() {
-        return `cdm_consultorio_suite_v2_${obtenerClaveClub15()}`;
+    function storageKey15(claveOpt = null) {
+        return `cdm_consultorio_suite_v2_${claveOpt || obtenerClaveClub15()}`;
     }
 
-    function tieneDatosCons15(c) {
+    function normalizarDBCons15(c) {
+        const obj = (c && typeof c === "object") ? c : {};
+        if (!Array.isArray(obj.pacientes)) obj.pacientes = [];
+        if (!Array.isArray(obj.turnos)) obj.turnos = [];
+        if (!Array.isArray(obj.mutuales)) obj.mutuales = [];
+        if (!Array.isArray(obj.profesionales)) obj.profesionales = [];
+        if (!Array.isArray(obj.sesiones)) obj.sesiones = [];
+        if (!Array.isArray(obj.derivaciones)) obj.derivaciones = [];
+        return obj;
+    }
+
+    function tieneDatosClinicosReales15(c) {
         if (!c || typeof c !== "object") return false;
         return (
             (Array.isArray(c.pacientes) && c.pacientes.length > 0) ||
             (Array.isArray(c.turnos) && c.turnos.length > 0) ||
             (Array.isArray(c.sesiones) && c.sesiones.length > 0) ||
-            (Array.isArray(c.profesionales) && c.profesionales.length > 0)
+            (Array.isArray(c.profesionales) && c.profesionales.length > 0) ||
+            (Array.isArray(c.derivaciones) && c.derivaciones.length > 0)
         );
     }
 
-    async function enviarConsultorioAMongo15(db, mostrarEstado = true) {
+    function tieneDatosCons15(c) {
+        if (tieneDatosClinicosReales15(c)) return true;
+        if (!c || typeof c !== "object") return false;
+        const mutsCustom = Array.isArray(c.mutuales) && c.mutuales.some(m =>
+            m && (m.topeMensual || m.topeAnual || m.descuentoColegioPct || !String(m.id || "").match(/^mut_(part|osde|apross|swiss|galeno)_/))
+        );
+        const tieneConf = Boolean(c.configCobranza && Object.keys(c.configCobranza).length > 0);
+        return mutsCustom || tieneConf;
+    }
+
+    // Garantizar que obtenerDatosConsultorioCDM siempre incluya derivaciones
+    if (typeof window.obtenerDatosConsultorioCDM === "function" && !window.__cdmConsGetWrapped15) {
+        window.__cdmConsGetWrapped15 = true;
+        const _origGet15 = window.obtenerDatosConsultorioCDM;
+        window.obtenerDatosConsultorioCDM = function () {
+            return normalizarDBCons15(_origGet15.apply(this, arguments));
+        };
+    }
+
+    async function enviarConsultorioAMongo15(db, notificarSoloError = true) {
         if (window.location.protocol === "file:") return;
         const clave = obtenerClaveClub15();
+        const limpio = normalizarDBCons15(db);
+
+        // Blindaje anti-borrado: si aún no descargamos MongoDB y solo hay mutuales autogeneradas (0 datos clínicos), no pisar la nube
+        if (!consHidratadoPorClub15[clave] && !tieneDatosClinicosReales15(limpio)) {
+            return;
+        }
+
         try {
             const resp = await fetch("/api/cdm/consultorio", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 keepalive: true,
-                body: JSON.stringify({ claveClub: clave, consultorio: db })
+                body: JSON.stringify({ claveClub: clave, consultorio: limpio })
             });
             const data = await resp.json().catch(() => ({}));
 
             if (!resp.ok || !data.ok) {
                 if (typeof mostrarToast === "function") {
-                    mostrarToast(`❌ Error al guardar en servidor (HTTP ${resp.status}): ${data.error || "Revisar server.js"}`);
+                    mostrarToast(`❌ Error al guardar consultorio (HTTP ${resp.status}): ${data.error || "Revisar server.js"}`);
                 }
                 return;
             }
 
             if (data.mongoGuardado) {
-                if (mostrarEstado && typeof mostrarToast === "function") {
-                    mostrarToast(`☁️ Guardado en MongoDB (${data.pacientes} pac. • ${data.turnos} turnos)`);
+                consHidratadoPorClub15[clave] = true;
+                if (!notificarSoloError && typeof mostrarToast === "function") {
+                    mostrarToast(`☁️ Consultorio sincronizado (${data.pacientes} pac. • ${data.turnos} turnos)`);
                 }
             } else if (typeof mostrarToast === "function") {
-                mostrarToast(`⚠️ NO guardó en MongoDB: ${data.mongoError || "Base desconectada"}`);
+                mostrarToast(`⚠️ Respaldo local (sin MongoDB): ${data.mongoError || "Base desconectada"}`);
             }
         } catch (err) {
             if (typeof mostrarToast === "function") {
@@ -3663,12 +3743,44 @@ window.especialidadFiltroConsultorioCDM = "TODAS";
         }
     }
 
-    // Interceptar guardarDatosConsultorioCDM para guardar al instante sin esperar 350ms
+    function aplicarHidratacionConsultorio15(remoto, claveClubOpt = null) {
+        const clave = claveClubOpt || obtenerClaveClub15();
+        const normRemoto = normalizarDBCons15(remoto);
+        const local = typeof obtenerDatosConsultorioCDM === "function" ? obtenerDatosConsultorioCDM() : normalizarDBCons15({});
+        consHidratadoPorClub15[clave] = true;
+
+        if (tieneDatosCons15(normRemoto)) {
+            localStorage.setItem(storageKey15(clave), JSON.stringify(normRemoto));
+
+            if (typeof renderizarConsultorioCompleto === "function") {
+                renderizarConsultorioCompleto();
+            }
+            if (typeof renderizarTarjetasModernasIndex === "function" && typeof basePersonas !== "undefined") {
+                renderizarTarjetasModernasIndex((basePersonas || []).filter(p => p && p.activo));
+            }
+            const esGab = typeof window.esModoGabineteClubGym18 === "function" && window.esModoGabineteClubGym18();
+            if (!esGab && typeof window.reconstruirAsientosConsultorioEnCaja17 === "function") {
+                window.reconstruirAsientosConsultorioEnCaja17();
+            }
+            if (typeof window.refrescarFinanzasSiVisible === "function") {
+                window.refrescarFinanzasSiVisible();
+            }
+            return true;
+        } else if (tieneDatosClinicosReales15(local)) {
+            enviarConsultorioAMongo15(local, true);
+        }
+        return false;
+    }
+
+    window.hidratarConsultorioDesdeEstadoApp15 = aplicarHidratacionConsultorio15;
+
+    // Interceptar guardarDatosConsultorioCDM para guardado inmediato y seguro
     if (typeof window.guardarDatosConsultorioCDM === "function" && !window.__cdmConsMongoWrapped15) {
         window.__cdmConsMongoWrapped15 = true;
         window.guardarDatosConsultorioCDM = function (db) {
-            try { localStorage.setItem(storageKey15(), JSON.stringify(db)); } catch {}
-            enviarConsultorioAMongo15(db, true);
+            const limpio = normalizarDBCons15(db);
+            try { localStorage.setItem(storageKey15(), JSON.stringify(limpio)); } catch {}
+            enviarConsultorioAMongo15(limpio, true);
         };
     }
 
@@ -3678,28 +3790,19 @@ window.especialidadFiltroConsultorioCDM = "TODAS";
         if (path.includes("login.html") || document.body?.classList.contains("login-page")) return;
 
         const clave = obtenerClaveClub15();
+        if (consHidratadoPorClub15[clave]) return;
+
         try {
             const resp = await fetch(`/api/cdm/consultorio?club=${encodeURIComponent(clave)}`, { cache: "no-store" });
             if (!resp.ok) return;
             const data = await resp.json();
             if (!data?.ok || !data.consultorio) return;
-
-            const local = typeof obtenerDatosConsultorioCDM === "function" ? obtenerDatosConsultorioCDM() : null;
-            const remoto = data.consultorio;
-
-            if (tieneDatosCons15(remoto)) {
-                localStorage.setItem(storageKey15(), JSON.stringify(remoto));
-                if (typeof renderizarConsultorioCompleto === "function") {
-                    renderizarConsultorioCompleto();
-                }
-            } else if (tieneDatosCons15(local)) {
-                await enviarConsultorioAMongo15(local, false);
-            }
+            aplicarHidratacionConsultorio15(data.consultorio, clave);
         } catch {}
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-        setTimeout(hidratarConsultorioDesdeMongo15, 250);
+        hidratarConsultorioDesdeMongo15();
     });
 })();
 // =========================================================================
@@ -6283,5 +6386,2509 @@ window.especialidadFiltroConsultorioCDM = "TODAS";
             engancharCupoEnHistoriaClinica17();
             window.reconstruirAsientosConsultorioEnCaja17();
         }, 650);
+    });
+})();
+// =========================================================================
+// 18. MODO GABINETE DE DESARROLLO DEPORTIVO, FÍSICO Y HOLÍSTICO (CLUBES Y GIMNASIOS)
+//     - Se activa automáticamente SOLO en comercios con Club o Gimnasio
+//     - En consultorios privados queda 100% inactivo (no toca Obras Sociales ni Cobranzas)
+//     - Conecta directo con basePersonas (sin cargar dos veces)
+//     - Perfiles: Nutrición Deportiva, Psicología Deportiva, Readaptación/Kine y Holístico
+//     - Incluye pestaña "🏟️ Talleres y Sesiones Grupales" por categoría + Informe PDF A4
+// Pegar al final de js/consultorio.js (debajo del Bloque 17)
+// =========================================================================
+(function () {
+    if (window.__cdmGabineteClubGym18) return;
+    window.__cdmGabineteClubGym18 = true;
+
+    const TIPOS_ENCUENTRO_GAB18 = [
+        "Evaluación Inicial",
+        "Seguimiento Individual",
+        "Preparación Pre-Competencia",
+        "Readaptación / Prevención",
+        "Trabajo Holístico / Bienestar",
+        "Control de Composición / Plan"
+    ];
+
+    const MODALIDADES_GRUPAL_GAB18 = [
+        "Charla / Taller de Categoría",
+        "Dinámica Grupal en Cancha / Sala",
+        "Trabajo Holístico / Respiración Grupal",
+        "Educación Nutricional / Hidratación",
+        "Prevención de Lesiones / Movilidad",
+        "Evaluación Colectiva"
+    ];
+
+    const SEMAFOROS_DT_GAB18 = [
+        { clave: "optimo", label: "🟢 Apto / Ritmo normal", badge: "badge-ok", estadoMedico: "Óptimo" },
+        { clave: "precaucion", label: "🟡 Adaptar carga / Seguimiento", badge: "badge-warn", estadoMedico: "Sobrecarga / Precaución" },
+        { clave: "pausa", label: "🔴 Pausa / Readaptación", badge: "badge-danger", estadoMedico: "Lesionado (Rehabilitación)" }
+    ];
+
+    const ETIQUETAS_POR_PERFIL18 = {
+        psicologia: ["Foco / Atención", "Confianza", "Presión Pre-Partido", "Manejo del Error", "Vuelta de Lesión", "Liderazgo / Grupo", "Rutina Mental", "Descanso / Estrés"],
+        nutricion: ["Composición Corporal", "Pre-Entreno", "Intra / Partido", "Recuperación Post", "Hidratación", "Suplementación", "Hábitos / Orden", "Descenso Grasa / Masa"],
+        fisico: ["Descarga Muscular", "Movilidad Articular", "Prevención", "Control de Carga", "Readaptación Campo", "Vuelta a Sala", "Postura / Core", "Alta Progresiva"],
+        holistico: ["Respiración Consciente", "Mindfulness / Calma", "Gestión del Estrés", "Calidad de Sueño", "Energía Vital", "Movilidad Consciente", "Equilibrio Cuerpo-Mente", "Objetivos Personales"]
+    };
+
+    const uiGab18 = {
+        tabGrupalesActiva: false,
+        filtroDeporte: "TODOS",
+        filtroCategoria: "TODAS",
+        busqPersona: "",
+        filtroGrupalDep: "TODOS"
+    };
+
+    function norm18(s) {
+        return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    function mismaEsp18(a, b) {
+        return norm18(a) === norm18(b);
+    }
+
+    function esc18(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function escJs18(s) {
+        return esc18(String(s ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+    }
+
+    function hoy18() {
+        return typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+    }
+
+    function toast18(msg) {
+        if (typeof mostrarToast === "function") mostrarToast(msg);
+    }
+
+    function esModoGabineteClubGym18() {
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const mod = lic?.modulos || { futbol: true, hockey: true, gym: true, consultorio: false };
+        const profs = typeof obtenerEspecialidadesHabilitadasConsultorioCDM === "function"
+            ? obtenerEspecialidadesHabilitadasConsultorioCDM()
+            : [];
+        if (profs.length === 0 || mod.consultorio === false) return false;
+        return Boolean(
+            mod.futbol ||
+            mod.hockey ||
+            mod.gym ||
+            (Array.isArray(lic?.deportesExtra) && lic.deportesExtra.length > 0)
+        );
+    }
+
+    window.esModoGabineteClubGym18 = esModoGabineteClubGym18;
+
+    function obtenerEspActiva18() {
+        const profs = typeof obtenerEspecialidadesHabilitadasConsultorioCDM === "function"
+            ? obtenerEspecialidadesHabilitadasConsultorioCDM()
+            : [];
+        const act = window.especialidadFiltroConsultorioCDM;
+        if (act && act !== "TODAS" && profs.some(pr => mismaEsp18(pr.clave, act))) {
+            return profs.find(pr => mismaEsp18(pr.clave, act)).clave;
+        }
+        return profs[0]?.clave || "Desarrollo";
+    }
+
+    function perfilGabinete18(esp) {
+        const k = norm18(esp);
+        if (k.includes("nutri") || k.includes("diet")) return "nutricion";
+        if (k.includes("psico") || k.includes("coach") || k.includes("mental")) return "psicologia";
+        if (k.includes("kine") || k.includes("quiro") || k.includes("trauma") || k.includes("fisio") || k.includes("osteo") || k.includes("readapt")) return "fisico";
+        return "holistico";
+    }
+
+    function infoPerfilGabinete18(esp) {
+        const tipo = perfilGabinete18(esp);
+        if (tipo === "nutricion") {
+            return {
+                tipo,
+                titulo: "Nutrición Deportiva y Composición",
+                sub: "Composición corporal, energía pre/post entrenamiento, hidratación y suplementación",
+                icono: "🥗"
+            };
+        }
+        if (tipo === "psicologia") {
+            return {
+                tipo,
+                titulo: "Psicología Deportiva y Coaching Mental",
+                sub: "Foco, confianza, manejo de la presión, hábitos competitivos y trabajo grupal",
+                icono: "🧠"
+            };
+        }
+        if (tipo === "fisico") {
+            return {
+                tipo,
+                titulo: "Kinesiología, Prevención y Readaptación",
+                sub: "Control de sobrecargas, Atlas Corporal HD, escala EVA y vuelta segura a cancha o sala",
+                icono: "🦿"
+            };
+        }
+        return {
+            tipo: "holistico",
+            titulo: "Desarrollo Holístico y Bienestar Integral",
+            sub: "Energía vital, respiración, gestión del estrés, descanso y equilibrio cuerpo-mente",
+            icono: "✨"
+        };
+    }
+
+    function semaforoMeta18(clave) {
+        return SEMAFOROS_DT_GAB18.find(s => s.clave === clave) || SEMAFOROS_DT_GAB18[0];
+    }
+
+    function obtenerPersonasActivasClub18() {
+        return (typeof basePersonas !== "undefined" ? basePersonas : [])
+            .filter(p => p && p.activo !== false)
+            .sort((a, b) => String(a.apellido || "").localeCompare(String(b.apellido || "")));
+    }
+
+    // Vincula silenciosamente un socio/jugador de basePersonas con db.pacientes (para agenda, Atlas HD y sesiones)
+    function asegurarPacienteVinculado18(db, persona, esp) {
+        if (!db || !persona) return null;
+        if (!Array.isArray(db.pacientes)) db.pacientes = [];
+        let pac = db.pacientes.find(x =>
+            Number(x.personaId) === Number(persona.id) && mismaEsp18(x.especialidad, esp)
+        );
+        if (!pac && persona.dni) {
+            pac = db.pacientes.find(x => x.dni && x.dni === persona.dni && mismaEsp18(x.especialidad, esp));
+            if (pac) pac.personaId = Number(persona.id);
+        }
+        if (!pac) {
+            pac = {
+                id: Date.now() + Math.floor(Math.random() * 999),
+                personaId: Number(persona.id),
+                esSocioClub: true,
+                codigoAcceso: persona.codigoAcceso || `SOC-${persona.id}`,
+                especialidad: esp,
+                nombre: persona.nombre || "",
+                apellido: persona.apellido || "",
+                dni: persona.dni || "",
+                fechaNacimiento: persona.fechaNacimiento || "",
+                whatsapp: persona.whatsapp || "",
+                deporteOrigen: persona.deporte || "Gimnasio",
+                categoriaOrigen: persona.categoria || "General",
+                mutualId: "",
+                nroAfiliado: "",
+                antecedentes: ""
+            };
+            db.pacientes.push(pac);
+        } else {
+            pac.nombre = persona.nombre || pac.nombre;
+            pac.apellido = persona.apellido || pac.apellido;
+            pac.whatsapp = persona.whatsapp || pac.whatsapp;
+            pac.deporteOrigen = persona.deporte || pac.deporteOrigen;
+            pac.categoriaOrigen = persona.categoria || pac.categoriaOrigen;
+        }
+        return pac;
+    }
+
+    function obtenerSeguimientosPersonaEsp18(db, personaId, esp) {
+        const pacIds = new Set(
+            (db.pacientes || [])
+                .filter(x => Number(x.personaId) === Number(personaId) && mismaEsp18(x.especialidad, esp))
+                .map(x => Number(x.id))
+        );
+        return (db.sesiones || [])
+            .filter(s =>
+                !s.esGrupalGabinete &&
+                mismaEsp18(s.especialidad, esp) &&
+                (Number(s.personaId) === Number(personaId) || (s.pacienteId && pacIds.has(Number(s.pacienteId))))
+            )
+            .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")) || (Number(b.id) - Number(a.id)));
+    }
+
+    function obtenerTalleresGrupalesEsp18(db, esp) {
+        return (db.sesiones || [])
+            .filter(s => s.esGrupalGabinete && mismaEsp18(s.especialidad, esp))
+            .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")) || (Number(b.id) - Number(a.id)));
+    }
+
+    function inyectarCSSGabinete18() {
+        if (document.getElementById("cdmCssGabinete18")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssGabinete18";
+        st.textContent = `
+            .gab18-filters {
+                display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center;
+                margin-bottom: 0.85rem;
+            }
+            .gab18-filters input, .gab18-filters select {
+                min-height: 36px; font-size: 0.79rem; width: auto;
+            }
+            .gab18-grid {
+                display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+                gap: 0.8rem;
+            }
+            .gab18-person-card {
+                background: var(--surface-subtle, #f8fafc);
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                border-left: 4px solid var(--cons-p, #0284c7);
+                border-radius: 16px; padding: 0.85rem 0.95rem;
+                display: flex; flex-direction: column; gap: 0.5rem;
+            }
+            .gab18-bridge-box {
+                background: rgba(16, 185, 129, 0.08);
+                border: 1px dashed rgba(16, 185, 129, 0.42);
+                border-radius: 11px; padding: 0.5rem 0.68rem;
+                font-size: 0.76rem; color: var(--ink-800, #1e293b);
+            }
+            .gab18-private-box {
+                background: rgba(124, 58, 237, 0.07);
+                border: 1px solid rgba(124, 58, 237, 0.25);
+                border-radius: 12px; padding: 0.72rem 0.85rem;
+            }
+            .gab18-tag-chip {
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-solid, #ffffff);
+                color: var(--ink-700, #334155);
+                font-size: 0.71rem; font-weight: 700;
+                padding: 0.22rem 0.58rem; border-radius: 999px; cursor: pointer;
+            }
+            .gab18-tag-chip.active {
+                background: var(--cons-p, #0284c7); border-color: var(--cons-p, #0284c7); color: #ffffff;
+            }
+            .gab18-metric-grid {
+                display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.55rem; background: var(--surface-subtle, #f8fafc);
+                border: 1px solid var(--line, #e2e8f0); border-radius: 12px; padding: 0.65rem 0.8rem;
+            }
+            .gab18-grupal-card {
+                background: var(--surface-subtle, #f8fafc);
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                border-left: 4px solid var(--cons-p, #0284c7);
+                border-radius: 16px; padding: 0.9rem 1rem;
+                display: flex; flex-direction: column; gap: 0.48rem;
+            }
+            .gab18-att-picker {
+                display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+                gap: 0.35rem; max-height: 155px; overflow-y: auto;
+                background: var(--surface-solid, #ffffff); border: 1px solid var(--line, #e2e8f0);
+                border-radius: 11px; padding: 0.55rem;
+            }
+            .gab18-att-item {
+                display: flex; align-items: center; gap: 0.38rem;
+                font-size: 0.75rem; font-weight: 700; cursor: pointer;
+            }
+            .gab18-att-item input { width: 15px; height: 15px; min-height: auto !important; }
+            @media (max-width: 640px) {
+                .gab18-metric-grid { grid-template-columns: 1fr; }
+                .gab18-grid { grid-template-columns: 1fr; }
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function asegurarModalGab18() {
+        let m = document.getElementById("modalConsultorioProCDM");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalConsultorioProCDM";
+            m.className = "modal-backdrop hidden";
+            m.onclick = (e) => { if (e.target === m && typeof cerrarModalConsultorioCDM === "function") cerrarModalConsultorioCDM(); };
+            document.body.appendChild(m);
+        }
+        return m;
+    }
+
+    // =====================================================================
+    // 1. TAB "SOCIOS Y DEPORTISTAS" (CONECTADO DIRECTO A basePersonas)
+    // =====================================================================
+    function renderTabPersonasGabinete18(cont, db, espAct) {
+        const info = infoPerfilGabinete18(espAct);
+        const todas = obtenerPersonasActivasClub18();
+        const deportes = ["TODOS", ...new Set(todas.map(p => p.deporte).filter(Boolean))];
+        const catsDisp = ["TODAS", ...new Set(
+            todas
+                .filter(p => uiGab18.filtroDeporte === "TODOS" || p.deporte === uiGab18.filtroDeporte)
+                .map(p => p.deporte === "Gimnasio" ? "Socio Gym" : (p.categoria || "General"))
+        )];
+
+        const q = norm18(uiGab18.busqPersona);
+        const lista = todas.filter(p => {
+            if (uiGab18.filtroDeporte !== "TODOS" && p.deporte !== uiGab18.filtroDeporte) return false;
+            const catP = p.deporte === "Gimnasio" ? "Socio Gym" : (p.categoria || "General");
+            if (uiGab18.filtroCategoria !== "TODAS" && catP !== uiGab18.filtroCategoria) return false;
+            if (q && !norm18(`${p.nombre} ${p.apellido} ${p.dni} ${p.deporte} ${p.categoria} ${p.puesto}`).includes(q)) return false;
+            return true;
+        });
+
+        cont.innerHTML = `
+            <div class="cons-card">
+                <div class="cons-card-head">
+                    <div>
+                        <h3>${info.icono} Socios y Deportistas — ${esc18(espAct)} (${lista.length})</h3>
+                        <small style="color:var(--ink-500); font-size:0.74rem;">
+                            Conectado directo al padrón del club y gimnasio. Las notas privadas solo las ve el profesional.
+                        </small>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalTallerGrupalGab18()">🏟️ + Registrar Taller Grupal</button>
+                </div>
+
+                <div class="gab18-filters">
+                    <input type="text" value="${esc18(uiGab18.busqPersona)}" placeholder="🔍 Buscar socio o deportista..." style="flex:1; min-width:190px;"
+                        oninput="gab18SetFiltro('busqPersona', this.value)">
+                    <select onchange="gab18SetFiltro('filtroDeporte', this.value)">
+                        ${deportes.map(d => `<option value="${esc18(d)}" ${uiGab18.filtroDeporte === d ? "selected" : ""}>${d === "TODOS" ? "Todas las Áreas" : esc18(d)}</option>`).join("")}
+                    </select>
+                    <select onchange="gab18SetFiltro('filtroCategoria', this.value)">
+                        ${catsDisp.map(c => `<option value="${esc18(c)}" ${uiGab18.filtroCategoria === c ? "selected" : ""}>${c === "TODAS" ? "Todas las Categorías" : esc18(c)}</option>`).join("")}
+                    </select>
+                </div>
+
+                ${lista.length === 0 ? `<div class="empty-box" style="padding:1.4rem;">No se encontraron socios o deportistas con este filtro.</div>` : `
+                    <div class="gab18-grid">
+                        ${lista.map(p => {
+                            const segs = obtenerSeguimientosPersonaEsp18(db, p.id, espAct);
+                            const ult = segs[0] || null;
+                            const sem = ult?.semaforoDT ? semaforoMeta18(ult.semaforoDT) : null;
+                            const edad = typeof calcularEdadExacta === "function" ? calcularEdadExacta(p) : (p.edad || "-");
+                            const areaTxt = p.deporte === "Gimnasio" ? "🏋️ Gimnasio" : `${esc18(p.deporte)} • ${esc18(p.categoria || "General")}`;
+                            return `
+                                <div class="gab18-person-card">
+                                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.45rem;">
+                                        <div>
+                                            <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:3px;">
+                                                <span class="badge badge-celeste" style="font-size:0.65rem;">${areaTxt}</span>
+                                                <span class="badge badge-purple" style="font-size:0.65rem;">${segs.length} seg.</span>
+                                                ${sem ? `<span class="badge ${sem.badge}" style="font-size:0.64rem;">${sem.label}</span>` : ""}
+                                            </div>
+                                            <strong style="font-size:0.95rem;">${esc18(p.apellido)}, ${esc18(p.nombre)}</strong>
+                                            <small style="display:block; color:var(--ink-500); font-size:0.73rem;">
+                                                ${edad ? `${edad} años • ` : ""}${p.peso || "-"} kg / ${p.altura || "-"} cm • Salud: <b>${esc18(p.estadoMedico || "Óptimo")}</b>
+                                            </small>
+                                        </div>
+                                    </div>
+
+                                    ${ult ? `
+                                        <div class="gab18-bridge-box">
+                                            <div style="font-size:0.7rem; font-weight:800; color:#047857; margin-bottom:2px;">
+                                                📌 Último seguimiento (${esc18(ult.fecha)})${ult.resumenMetricas ? ` • ${esc18(ult.resumenMetricas)}` : ""}
+                                            </div>
+                                            <div>${ult.sugerenciaDT ? `<b>Para el Profe/DT:</b> ${esc18(ult.sugerenciaDT)}` : `<span style="color:var(--ink-500);">Seguimiento privado cargado (sin restricción para entrenar).</span>`}</div>
+                                        </div>
+                                    ` : `<small style="color:var(--ink-500); font-size:0.74rem;">Sin seguimientos registrados aún en ${esc18(espAct)}.</small>`}
+
+                                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:auto;">
+                                        <button type="button" class="btn btn-primary btn-sm" style="flex:1;" onclick="abrirModalSeguimientoGabinete18(${p.id})">📋 Seguimiento</button>
+                                        <button type="button" class="btn btn-ok btn-sm" onclick="abrirModalTurnoConsultorio(null, null, ${p.id})">📅 Turno</button>
+                                        ${info.tipo === "fisico" ? `<button type="button" class="btn btn-secondary btn-sm" onclick="abrirAtlasGabinetePersona18(${p.id})" title="Abrir Atlas Corporal HD">🧍 Atlas</button>` : ""}
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="irAPaginaIndividual(${p.id})" title="Ver Ficha del Club/Gym">↗</button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                `}
+            </div>
+        `;
+    }
+
+    window.gab18SetFiltro = function (campo, val) {
+        uiGab18[campo] = val;
+        if (campo === "filtroDeporte") uiGab18.filtroCategoria = "TODAS";
+        renderizarConsultorioCompleto();
+    };
+
+    window.abrirAtlasGabinetePersona18 = function (personaId) {
+        const db = obtenerDatosConsultorioCDM();
+        const esp = obtenerEspActiva18();
+        const p = obtenerPersonasActivasClub18().find(x => Number(x.id) === Number(personaId));
+        if (!p) return;
+        const pac = asegurarPacienteVinculado18(db, p, esp);
+        guardarDatosConsultorioCDM(db);
+        if (pac && typeof window.abrirSuiteClinicaPacientePro === "function") {
+            window.abrirSuiteClinicaPacientePro(pac.id, "mapa");
+        }
+    };
+
+    // =====================================================================
+    // 2. MODAL DE SEGUIMIENTO INDIVIDUAL (ENFOQUE DEPORTIVO / FÍSICO / HOLÍSTICO)
+    // =====================================================================
+    window.abrirModalSeguimientoGabinete18 = function (personaId) {
+        const db = obtenerDatosConsultorioCDM();
+        const esp = obtenerEspActiva18();
+        const info = infoPerfilGabinete18(esp);
+        const p = obtenerPersonasActivasClub18().find(x => Number(x.id) === Number(personaId));
+        if (!p) return;
+
+        const segs = obtenerSeguimientosPersonaEsp18(db, p.id, esp);
+        const tags = ETIQUETAS_POR_PERFIL18[info.tipo] || ETIQUETAS_POR_PERFIL18.holistico;
+        const modal = asegurarModalGab18();
+
+        let bloqueMetricas = "";
+        if (info.tipo === "nutricion") {
+            bloqueMetricas = `
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:0.5rem; margin-bottom:0.65rem;">
+                    <div class="field"><label>Peso (kg)</label><input type="number" step="0.1" id="g18Peso" value="${p.peso || ""}" placeholder="72.5"></div>
+                    <div class="field"><label>% Grasa</label><input type="number" step="0.1" id="g18Grasa" value="${p.grasaPct ?? ""}" placeholder="13.5"></div>
+                    <div class="field"><label>% Músculo</label><input type="number" step="0.1" id="g18Musc" value="${p.musculoPct ?? ""}" placeholder="45.0"></div>
+                    <div class="field"><label>Hidratación</label><input type="text" id="g18Hidra" placeholder="Ej: 2.5 L/día"></div>
+                </div>
+                <div class="grid-2" style="margin-bottom:0.65rem;">
+                    <div class="field"><label>⚡ Pauta Pre / Intra / Post Entreno</label><input type="text" id="g18PlanEntreno" placeholder="Ej: Carbo complejo 90m antes + proteína post..."></div>
+                    <div class="field"><label>💊 Suplementación Deportiva</label><input type="text" id="g18Suple" placeholder="Ej: Creatina 5g, electrolitos en partido..."></div>
+                </div>
+                <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.76rem; font-weight:700; margin-bottom:0.65rem; cursor:pointer;">
+                    <input type="checkbox" id="g18SyncPeso" checked style="width:15px; height:15px; min-height:auto;"> Actualizar peso y composición en la ficha física del club/gym
+                </label>
+            `;
+        } else if (info.tipo === "psicologia") {
+            bloqueMetricas = `
+                <div class="gab18-metric-grid" style="margin-bottom:0.65rem;">
+                    <div class="field"><label>🎯 Foco / Atención: <b id="g18LblM1">7/10</b></label><input type="range" id="g18M1" min="1" max="10" value="7" oninput="document.getElementById('g18LblM1').textContent=this.value+'/10'"></div>
+                    <div class="field"><label>💪 Confianza: <b id="g18LblM2">7/10</b></label><input type="range" id="g18M2" min="1" max="10" value="7" oninput="document.getElementById('g18LblM2').textContent=this.value+'/10'"></div>
+                    <div class="field"><label>⚡ Manejo de Presión: <b id="g18LblM3">6/10</b></label><input type="range" id="g18M3" min="1" max="10" value="6" oninput="document.getElementById('g18LblM3').textContent=this.value+'/10'"></div>
+                    <div class="field"><label>😴 Descanso / Recuperación: <b id="g18LblM4">7/10</b></label><input type="range" id="g18M4" min="1" max="10" value="7" oninput="document.getElementById('g18LblM4').textContent=this.value+'/10'"></div>
+                </div>
+            `;
+        } else if (info.tipo === "fisico") {
+            bloqueMetricas = `
+                <div class="grid-3" style="margin-bottom:0.65rem;">
+                    <div class="field"><label>Dolor EVA (0–10): <b id="g18LblEva">3/10</b></label><input type="range" id="g18Eva" min="0" max="10" value="3" oninput="document.getElementById('g18LblEva').textContent=this.value+'/10'"></div>
+                    <div class="field"><label>Fase Return-to-Play</label>
+                        <select id="g18FaseRtp">
+                            <option>Prevención / Descarga</option>
+                            <option>Rehabilitación Inicial</option>
+                            <option>Readaptación en Cancha / Sala</option>
+                            <option>Alta Deportiva / Normal</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>Zona / Estructura</label><input type="text" id="g18Zona" placeholder="Ej: Isquiotibial der. / Hombro"></div>
+                </div>
+                <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.76rem; font-weight:700; margin-bottom:0.65rem; cursor:pointer;">
+                    <input type="checkbox" id="g18SyncEstado" checked style="width:15px; height:15px; min-height:auto;"> Actualizar estado físico del jugador/socio según el semáforo elegido
+                </label>
+            `;
+        } else {
+            bloqueMetricas = `
+                <div class="gab18-metric-grid" style="margin-bottom:0.65rem;">
+                    <div class="field"><label>✨ Energía Vital: <b id="g18LblH1">7/10</b></label><input type="range" id="g18H1" min="1" max="10" value="7" oninput="document.getElementById('g18LblH1').textContent=this.value+'/10'"></div>
+                    <div class="field"><label>😴 Calidad de Sueño: <b id="g18LblH2">7/10</b></label><input type="range" id="g18H2" min="1" max="10" value="7" oninput="document.getElementById('g18LblH2').textContent=this.value+'/10'"></div>
+                    <div class="field"><label>🧘 Calma / Bajo Estrés: <b id="g18LblH3">6/10</b></label><input type="range" id="g18H3" min="1" max="10" value="6" oninput="document.getElementById('g18LblH3').textContent=this.value+'/10'"></div>
+                    <div class="field"><label>🌿 Soltura / Movilidad: <b id="g18LblH4">7/10</b></label><input type="range" id="g18H4" min="1" max="10" value="7" oninput="document.getElementById('g18LblH4').textContent=this.value+'/10'"></div>
+                </div>
+            `;
+        }
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:780px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">${info.icono} ${esc18(esp.toUpperCase())} • ${esc18(p.deporte)}${p.deporte === "Gimnasio" ? "" : ` (${esc18(p.categoria || "General")})`}</span>
+                        <h3 style="margin-top:4px;">${esc18(p.apellido)}, ${esc18(p.nombre)}</h3>
+                    </div>
+                    <div style="display:flex; gap:0.35rem; align-items:center;">
+                        ${info.tipo === "fisico" ? `<button type="button" class="btn btn-secondary btn-sm" onclick="abrirAtlasGabinetePersona18(${p.id})">🧍 Atlas HD</button>` : ""}
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalConsultorioCDM()">✕</button>
+                    </div>
+                </div>
+
+                <form onsubmit="guardarSeguimientoGabinete18(event, ${p.id}, '${escJs18(esp)}')" style="margin-bottom:1rem;">
+                    <div class="grid-2" style="margin-bottom:0.6rem;">
+                        <div class="field"><label>Fecha *</label><input type="date" id="g18Fecha" value="${hoy18()}" required></div>
+                        <div class="field"><label>Tipo de Encuentro</label>
+                            <select id="g18TipoEnc">${TIPOS_ENCUENTRO_GAB18.map(x => `<option>${x}</option>`).join("")}</select>
+                        </div>
+                    </div>
+
+                    ${bloqueMetricas}
+
+                    <div style="display:flex; gap:0.32rem; flex-wrap:wrap; margin-bottom:0.65rem;" id="g18TagsWrap">
+                        ${tags.map(t => `<button type="button" class="gab18-tag-chip" data-tag="${esc18(t)}" onclick="this.classList.toggle('active')">${esc18(t)}</button>`).join("")}
+                    </div>
+
+                    <div class="gab18-private-box" style="margin-bottom:0.65rem;">
+                        <div class="field" style="margin-bottom:0.5rem;">
+                            <label>🔒 Evolución / Notas Privadas del Profesional *</label>
+                            <textarea id="g18NotaPriv" rows="3" required placeholder="Lo trabajado en el encuentro, observaciones del proceso y acuerdos personales..."></textarea>
+                        </div>
+                        <div class="field">
+                            <label>📌 Hábito / Consigna para el Socio o Deportista (próximo encuentro)</label>
+                            <input type="text" id="g18Consigna" placeholder="Ej: Respiración 4-7-8 antes de dormir / Visualización 5 min antes del partido...">
+                        </div>
+                    </div>
+
+                    <div class="gab18-bridge-box" style="margin-bottom:0.75rem;">
+                        <strong style="display:block; font-size:0.77rem; color:#047857; margin-bottom:0.45rem;">🚦 Puente con el Entrenador / Profe (sin mostrar tus notas privadas)</strong>
+                        <div class="grid-2">
+                            <div class="field"><label>Semáforo de Disponibilidad</label>
+                                <select id="g18SemDT">${SEMAFOROS_DT_GAB18.map(s => `<option value="${s.clave}">${s.label}</option>`).join("")}</select>
+                            </div>
+                            <div class="field"><label>Recomendación breve para el DT / Profe (opcional)</label>
+                                <input type="text" id="g18SugDT" placeholder="Ej: Bajar impacto 48hs / Reforzar hidratación / Entrena normal">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width:100%;">💾 Guardar Seguimiento de Desarrollo</button>
+                </form>
+
+                <strong style="display:block; font-size:0.84rem; margin-bottom:0.5rem;">📚 Historial en ${esc18(esp)} (${segs.length})</strong>
+                <div style="display:flex; flex-direction:column; gap:0.5rem; max-height:240px; overflow-y:auto;">
+                    ${segs.length === 0 ? `<div class="empty-box" style="padding:0.9rem; font-size:0.79rem;">Sin seguimientos previos en esta especialidad.</div>` :
+                    segs.map(s => {
+                        const sm = s.semaforoDT ? semaforoMeta18(s.semaforoDT) : null;
+                        return `
+                            <div style="background:var(--surface-subtle); border:1px solid var(--line); border-left:4px solid var(--cons-p, #0284c7); border-radius:12px; padding:0.65rem 0.8rem; font-size:0.79rem;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap; margin-bottom:3px;">
+                                    <div>
+                                        <b>📅 ${esc18(s.fecha)}</b>
+                                        ${s.tipoEncuentro ? `<span class="badge badge-celeste" style="margin-left:4px; font-size:0.65rem;">${esc18(s.tipoEncuentro)}</span>` : ""}
+                                        ${s.resumenMetricas ? `<span class="badge badge-purple" style="margin-left:4px; font-size:0.65rem;">${esc18(s.resumenMetricas)}</span>` : ""}
+                                        ${sm ? `<span class="badge ${sm.badge}" style="margin-left:4px; font-size:0.64rem;">${sm.label}</span>` : ""}
+                                    </div>
+                                    <button type="button" class="btn btn-danger btn-sm" style="min-height:24px; padding:0 6px;" onclick="eliminarSeguimientoGab18(${s.id}, ${p.id})">🗑️</button>
+                                </div>
+                                <div style="white-space:pre-line; color:var(--ink-800);">${esc18(s.evolucion || "")}</div>
+                                ${s.indicaciones ? `<div style="margin-top:3px; font-size:0.74rem; color:#5b21b6;"><b>📌 Consigna:</b> ${esc18(s.indicaciones)}</div>` : ""}
+                                ${s.sugerenciaDT ? `<div style="margin-top:3px; font-size:0.74rem; color:#047857;"><b>🚦 Para el Profe/DT:</b> ${esc18(s.sugerenciaDT)}</div>` : ""}
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.guardarSeguimientoGabinete18 = function (e, personaId, esp) {
+        e.preventDefault();
+        const db = obtenerDatosConsultorioCDM();
+        const p = obtenerPersonasActivasClub18().find(x => Number(x.id) === Number(personaId));
+        if (!p) return;
+
+        const info = infoPerfilGabinete18(esp);
+        const pac = asegurarPacienteVinculado18(db, p, esp);
+        const tagsSel = Array.from(document.querySelectorAll("#g18TagsWrap .gab18-tag-chip.active")).map(b => b.dataset.tag);
+
+        let resumenMetricas = "";
+        const extra = {};
+
+        if (info.tipo === "nutricion") {
+            const peso = document.getElementById("g18Peso")?.value;
+            const grasa = document.getElementById("g18Grasa")?.value;
+            const musc = document.getElementById("g18Musc")?.value;
+            const hidra = (document.getElementById("g18Hidra")?.value || "").trim();
+            const planE = (document.getElementById("g18PlanEntreno")?.value || "").trim();
+            const suple = (document.getElementById("g18Suple")?.value || "").trim();
+            const parts = [];
+            if (peso) parts.push(`${peso} kg`);
+            if (grasa) parts.push(`${grasa}% Grasa`);
+            if (musc) parts.push(`${musc}% Músc.`);
+            if (hidra) parts.push(`💧 ${hidra}`);
+            resumenMetricas = parts.join(" • ");
+            extra.planEntreno = planE;
+            extra.suplementacion = suple;
+            if (document.getElementById("g18SyncPeso")?.checked) {
+                if (peso) p.peso = Number(peso);
+                if (grasa !== "") p.grasaPct = Number(grasa);
+                if (musc !== "") p.musculoPct = Number(musc);
+                if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+            }
+        } else if (info.tipo === "psicologia") {
+            const m1 = Number(document.getElementById("g18M1")?.value || 7);
+            const m2 = Number(document.getElementById("g18M2")?.value || 7);
+            const m3 = Number(document.getElementById("g18M3")?.value || 6);
+            const m4 = Number(document.getElementById("g18M4")?.value || 7);
+            extra.animo = m2;
+            extra.ansiedad = 11 - m3;
+            extra.foco = m1;
+            extra.descanso = m4;
+            resumenMetricas = `Foco ${m1} • Confianza ${m2} • Presión ${m3} • Desc. ${m4}`;
+        } else if (info.tipo === "fisico") {
+            const eva = Number(document.getElementById("g18Eva")?.value || 0);
+            const fase = document.getElementById("g18FaseRtp")?.value || "";
+            const zona = (document.getElementById("g18Zona")?.value || "").trim();
+            extra.eva = eva;
+            extra.faseRtp = fase;
+            extra.zona = zona;
+            resumenMetricas = `EVA ${eva}/10 • ${fase}${zona ? ` (${zona})` : ""}`;
+            if (document.getElementById("g18SyncEstado")?.checked) {
+                const sm = semaforoMeta18(document.getElementById("g18SemDT")?.value || "optimo");
+                p.estadoMedico = sm.estadoMedico;
+                if (typeof guardarDatosCDM === "function") guardarDatosCDM();
+            }
+        } else {
+            const h1 = Number(document.getElementById("g18H1")?.value || 7);
+            const h2 = Number(document.getElementById("g18H2")?.value || 7);
+            const h3 = Number(document.getElementById("g18H3")?.value || 6);
+            const h4 = Number(document.getElementById("g18H4")?.value || 7);
+            resumenMetricas = `Energía ${h1} • Sueño ${h2} • Calma ${h3} • Movilidad ${h4}`;
+        }
+
+        const notaPriv = (document.getElementById("g18NotaPriv")?.value || "").trim();
+        const extraTxt = [
+            tagsSel.length ? `[Ejes: ${tagsSel.join(", ")}]` : "",
+            extra.planEntreno ? `⚡ Pre/Post Entreno: ${extra.planEntreno}` : "",
+            extra.suplementacion ? `💊 Suplementación: ${extra.suplementacion}` : "",
+            notaPriv
+        ].filter(Boolean).join("\n");
+
+        if (!Array.isArray(db.sesiones)) db.sesiones = [];
+        db.sesiones.unshift({
+            id: Date.now(),
+            esGabinete: true,
+            esGrupalGabinete: false,
+            personaId: Number(p.id),
+            pacienteId: pac ? Number(pac.id) : null,
+            especialidad: esp,
+            perfilGabinete: info.tipo,
+            fecha: document.getElementById("g18Fecha")?.value || hoy18(),
+            tipoEncuentro: document.getElementById("g18TipoEnc")?.value || TIPOS_ENCUENTRO_GAB18[1],
+            etiquetas: tagsSel,
+            resumenMetricas,
+            evolucion: extraTxt,
+            indicaciones: (document.getElementById("g18Consigna")?.value || "").trim(),
+            semaforoDT: document.getElementById("g18SemDT")?.value || "optimo",
+            sugerenciaDT: (document.getElementById("g18SugDT")?.value || "").trim(),
+            ...extra
+        });
+
+        guardarDatosConsultorioCDM(db);
+        toast18(`✅ Seguimiento guardado para ${p.nombre} ${p.apellido}.`);
+        abrirModalSeguimientoGabinete18(p.id);
+        renderizarConsultorioCompleto();
+    };
+
+    window.eliminarSeguimientoGab18 = function (idSes, personaId) {
+        if (!confirm("🗑️ ¿Eliminar este seguimiento?")) return;
+        const db = obtenerDatosConsultorioCDM();
+        db.sesiones = (db.sesiones || []).filter(s => Number(s.id) !== Number(idSes));
+        guardarDatosConsultorioCDM(db);
+        abrirModalSeguimientoGabinete18(personaId);
+        renderizarConsultorioCompleto();
+    };
+
+    // =====================================================================
+    // 3. TAB "🏟️ TALLERES Y SESIONES GRUPALES" POR CATEGORÍA + PDF A4
+    // =====================================================================
+    function renderTabGrupalesGabinete18(cont, db, espAct) {
+        const info = infoPerfilGabinete18(espAct);
+        const talleres = obtenerTalleresGrupalesEsp18(db, espAct);
+        const deportes = ["TODOS", ...new Set(obtenerPersonasActivasClub18().map(p => p.deporte).filter(Boolean)), "Todo el Club"];
+        const filtrados = uiGab18.filtroGrupalDep === "TODOS"
+            ? talleres
+            : talleres.filter(t => t.deporteDestino === uiGab18.filtroGrupalDep);
+
+        cont.innerHTML = `
+            <div class="cons-card">
+                <div class="cons-card-head">
+                    <div>
+                        <h3>🏟️ Talleres y Sesiones Grupales — ${esc18(espAct)} (${filtrados.length})</h3>
+                        <small style="color:var(--ink-500); font-size:0.74rem;">
+                            Charlas, dinámicas de plantel, nutrición grupal o jornadas holísticas por categoría o gimnasio.
+                        </small>
+                    </div>
+                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                        <select style="width:auto; min-height:34px; font-size:0.78rem;" onchange="gab18SetFiltro('filtroGrupalDep', this.value)">
+                            ${deportes.map(d => `<option value="${esc18(d)}" ${uiGab18.filtroGrupalDep === d ? "selected" : ""}>${d === "TODOS" ? "Todas las Áreas" : esc18(d)}</option>`).join("")}
+                        </select>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalTallerGrupalGab18()">+ Nuevo Taller / Sesión Grupal</button>
+                    </div>
+                </div>
+
+                ${filtrados.length === 0 ? `
+                    <div class="empty-box" style="padding:1.6rem;">
+                        Todavía no registraste sesiones grupales en <b>${esc18(espAct)}</b>.<br>
+                        <button type="button" class="btn btn-primary btn-sm" style="margin-top:0.7rem;" onclick="abrirModalTallerGrupalGab18()">🏟️ Registrar primer taller</button>
+                    </div>
+                ` : `
+                    <div style="display:flex; flex-direction:column; gap:0.7rem;">
+                        ${filtrados.map(t => `
+                            <div class="gab18-grupal-card">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.6rem; flex-wrap:wrap;">
+                                    <div>
+                                        <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:4px;">
+                                            <span class="badge badge-celeste">📅 ${esc18(t.fecha)}</span>
+                                            <span class="badge badge-purple">${esc18(t.deporteDestino || "General")} • ${esc18(t.categoriaDestino || "General")}</span>
+                                            <span class="badge badge-ok">${esc18(t.modalidadGrupal || "Taller")}</span>
+                                            <span class="badge">👥 ${t.asistentesTodoPlantel ? "Todo el plantel / grupo" : `${(t.asistentesNombres || []).length} participante(s)`}</span>
+                                        </div>
+                                        <strong style="font-size:1rem;">${info.icono} ${esc18(t.titulo || "Sesión Grupal")}</strong>
+                                    </div>
+                                    <div style="display:flex; gap:0.32rem; flex-shrink:0;">
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="imprimirTallerGrupalPDF18(${t.id})">🖨️ Informe PDF</button>
+                                        <button type="button" class="btn btn-ghost btn-sm" onclick="abrirModalTallerGrupalGab18(${t.id})">✏️</button>
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="eliminarTallerGrupalGab18(${t.id})">🗑️</button>
+                                    </div>
+                                </div>
+                                <div style="font-size:0.82rem; color:var(--ink-800); white-space:pre-line;">${esc18(t.evolucion || "")}</div>
+                                ${t.sugerenciaDT ? `<div class="gab18-bridge-box"><b>🚦 Pautas / Devolución para el Cuerpo Técnico:</b> ${esc18(t.sugerenciaDT)}</div>` : ""}
+                                ${!t.asistentesTodoPlantel && (t.asistentesNombres || []).length ? `<small style="color:var(--ink-500); font-size:0.72rem;"><b>Participaron:</b> ${esc18(t.asistentesNombres.join(", "))}</small>` : ""}
+                            </div>
+                        `).join("")}
+                    </div>
+                `}
+            </div>
+        `;
+    }
+
+    window.abrirModalTallerGrupalGab18 = function (idEdit = null) {
+        const db = obtenerDatosConsultorioCDM();
+        const esp = obtenerEspActiva18();
+        const info = infoPerfilGabinete18(esp);
+        const edit = idEdit ? (db.sesiones || []).find(s => Number(s.id) === Number(idEdit)) : null;
+        const personas = obtenerPersonasActivasClub18();
+        const deportes = [...new Set(personas.map(p => p.deporte).filter(Boolean)), "Todo el Club"];
+        const depIni = edit?.deporteDestino || deportes[0] || "Gimnasio";
+        const tags = ETIQUETAS_POR_PERFIL18[info.tipo] || ETIQUETAS_POR_PERFIL18.holistico;
+
+        const modal = asegurarModalGab18();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:680px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-purple">🏟️ TALLER / SESIÓN GRUPAL • ${esc18(esp.toUpperCase())}</span>
+                        <h3 style="margin-top:4px;">${edit ? "Editar Sesión Grupal" : "Registrar Taller o Dinámica Grupal"}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalConsultorioCDM()">✕</button>
+                </div>
+
+                <form onsubmit="guardarTallerGrupalGab18(event, ${edit ? edit.id : "null"}, '${escJs18(esp)}')">
+                    <div class="grid-2" style="margin-bottom:0.65rem;">
+                        <div class="field"><label>Título del Taller / Charla *</label><input type="text" id="tg18Tit" required value="${esc18(edit?.titulo || "")}" placeholder="Ej: Manejo de presión pre-partido / Hidratación en verano"></div>
+                        <div class="field"><label>Fecha *</label><input type="date" id="tg18Fec" required value="${edit?.fecha || hoy18()}"></div>
+                    </div>
+
+                    <div class="grid-3" style="margin-bottom:0.65rem;">
+                        <div class="field"><label>Área / Deporte *</label>
+                            <select id="tg18Dep" onchange="poblarCatsYAsistentesTaller18()">
+                                ${deportes.map(d => `<option value="${esc18(d)}" ${depIni === d ? "selected" : ""}>${esc18(d)}</option>`).join("")}
+                            </select>
+                        </div>
+                        <div class="field"><label>Categoría / Grupo</label>
+                            <select id="tg18Cat" onchange="poblarAsistentesTaller18()"></select>
+                        </div>
+                        <div class="field"><label>Modalidad</label>
+                            <select id="tg18Mod">${MODALIDADES_GRUPAL_GAB18.map(m => `<option ${edit?.modalidadGrupal === m ? "selected" : ""}>${m}</option>`).join("")}</select>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:0.32rem; flex-wrap:wrap; margin-bottom:0.65rem;" id="tg18Tags">
+                        ${tags.map(t => {
+                            const act = Array.isArray(edit?.etiquetas) && edit.etiquetas.includes(t);
+                            return `<button type="button" class="gab18-tag-chip ${act ? "active" : ""}" data-tag="${esc18(t)}" onclick="this.classList.toggle('active')">${esc18(t)}</button>`;
+                        }).join("")}
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.6rem;">
+                        <label>Temas Trabajados y Desarrollo de la Jornada *</label>
+                        <textarea id="tg18Desc" rows="3" required placeholder="Dinámica aplicada, participación del grupo, conclusiones clave...">${esc18(edit?.evolucion || "")}</textarea>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.65rem;">
+                        <label>🚦 Devolución / Pautas para el Cuerpo Técnico o Profes (opcional)</label>
+                        <input type="text" id="tg18SugDT" value="${esc18(edit?.sugerenciaDT || "")}" placeholder="Ej: Continuar rutina de respiración 3 min antes de entrar en calor...">
+                    </div>
+
+                    <div style="background:var(--surface-subtle); border:1px solid var(--line); border-radius:12px; padding:0.65rem; margin-bottom:0.8rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; margin-bottom:0.45rem; flex-wrap:wrap;">
+                            <strong style="font-size:0.78rem;">👥 Participantes del Grupo</strong>
+                            <label style="display:flex; align-items:center; gap:0.38rem; font-size:0.76rem; font-weight:700; cursor:pointer;">
+                                <input type="checkbox" id="tg18TodoPlantel" ${!edit || edit.asistentesTodoPlantel ? "checked" : ""} onchange="document.getElementById('tg18ListaAsist').classList.toggle('hidden', this.checked)" style="width:15px; height:15px; min-height:auto;">
+                                Todo el plantel / grupo completo
+                            </label>
+                        </div>
+                        <div id="tg18ListaAsist" class="gab18-att-picker ${!edit || edit.asistentesTodoPlantel ? "hidden" : ""}" data-pre="${esc18(JSON.stringify(edit?.asistentesIds || []))}"></div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width:100%;">💾 Guardar Taller Grupal</button>
+                </form>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+        poblarCatsYAsistentesTaller18(edit?.categoriaDestino || "General");
+    };
+
+    window.poblarCatsYAsistentesTaller18 = function (catPre = null) {
+        const dep = document.getElementById("tg18Dep")?.value || "Gimnasio";
+        const selCat = document.getElementById("tg18Cat");
+        if (!selCat) return;
+        if (dep === "Gimnasio" || dep === "Todo el Club") {
+            selCat.innerHTML = `<option value="General">${dep === "Gimnasio" ? "Socios Gimnasio" : "General / Todo el Club"}</option>`;
+        } else {
+            const cats = ["General", ...new Set(obtenerPersonasActivasClub18().filter(p => p.deporte === dep).map(p => p.categoria).filter(Boolean))];
+            selCat.innerHTML = cats.map(c => `<option value="${esc18(c)}" ${catPre === c ? "selected" : ""}>${c === "General" ? "Todas las categorías" : esc18(c)}</option>`).join("");
+        }
+        poblarAsistentesTaller18();
+    };
+
+    window.poblarAsistentesTaller18 = function () {
+        const box = document.getElementById("tg18ListaAsist");
+        if (!box) return;
+        const dep = document.getElementById("tg18Dep")?.value || "Gimnasio";
+        const cat = document.getElementById("tg18Cat")?.value || "General";
+        let preIds = [];
+        try { preIds = JSON.parse(box.dataset.pre || "[]"); } catch {}
+
+        const pers = obtenerPersonasActivasClub18().filter(p => {
+            if (dep !== "Todo el Club" && p.deporte !== dep) return false;
+            if (cat !== "General" && dep !== "Gimnasio" && p.categoria !== cat) return false;
+            return true;
+        });
+
+        box.innerHTML = pers.length === 0
+            ? `<small style="color:var(--ink-500);">Sin personas cargadas en esta selección.</small>`
+            : pers.map(p => `
+                <label class="gab18-att-item">
+                    <input type="checkbox" class="tg18-chk-asist" value="${p.id}" data-nom="${esc18(`${p.apellido}, ${p.nombre}`)}" ${preIds.includes(Number(p.id)) ? "checked" : ""}>
+                    <span>${esc18(p.apellido)}, ${esc18(p.nombre)}</span>
+                </label>
+            `).join("");
+    };
+
+    window.guardarTallerGrupalGab18 = function (e, idEdit, esp) {
+        e.preventDefault();
+        const db = obtenerDatosConsultorioCDM();
+        if (!Array.isArray(db.sesiones)) db.sesiones = [];
+
+        const todoPlantel = Boolean(document.getElementById("tg18TodoPlantel")?.checked);
+        const checks = todoPlantel ? [] : Array.from(document.querySelectorAll(".tg18-chk-asist:checked"));
+        const tags = Array.from(document.querySelectorAll("#tg18Tags .gab18-tag-chip.active")).map(b => b.dataset.tag);
+
+        const obj = {
+            id: idEdit || Date.now(),
+            esGabinete: true,
+            esGrupalGabinete: true,
+            pacienteId: null,
+            especialidad: esp,
+            titulo: (document.getElementById("tg18Tit")?.value || "").trim(),
+            fecha: document.getElementById("tg18Fec")?.value || hoy18(),
+            deporteDestino: document.getElementById("tg18Dep")?.value || "Gimnasio",
+            categoriaDestino: document.getElementById("tg18Cat")?.value || "General",
+            modalidadGrupal: document.getElementById("tg18Mod")?.value || MODALIDADES_GRUPAL_GAB18[0],
+            etiquetas: tags,
+            evolucion: (document.getElementById("tg18Desc")?.value || "").trim(),
+            sugerenciaDT: (document.getElementById("tg18SugDT")?.value || "").trim(),
+            asistentesTodoPlantel: todoPlantel,
+            asistentesIds: checks.map(c => Number(c.value)),
+            asistentesNombres: checks.map(c => c.dataset.nom)
+        };
+
+        if (idEdit) {
+            const idx = db.sesiones.findIndex(x => Number(x.id) === Number(idEdit));
+            if (idx >= 0) db.sesiones[idx] = obj;
+            else db.sesiones.unshift(obj);
+        } else {
+            db.sesiones.unshift(obj);
+        }
+
+        guardarDatosConsultorioCDM(db);
+        cerrarModalConsultorioCDM();
+        uiGab18.tabGrupalesActiva = true;
+        toast18(`🏟️ Taller grupal guardado: ${obj.titulo}`);
+        renderizarConsultorioCompleto();
+    };
+
+    window.eliminarTallerGrupalGab18 = function (idSes) {
+        if (!confirm("🗑️ ¿Eliminar este taller grupal?")) return;
+        const db = obtenerDatosConsultorioCDM();
+        db.sesiones = (db.sesiones || []).filter(s => Number(s.id) !== Number(idSes));
+        guardarDatosConsultorioCDM(db);
+        renderizarConsultorioCompleto();
+    };
+
+    window.imprimirTallerGrupalPDF18 = function (idSes) {
+        const db = obtenerDatosConsultorioCDM();
+        const t = (db.sesiones || []).find(s => Number(s.id) === Number(idSes));
+        if (!t) return;
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : { nombreEntidad: "Club" };
+        if (typeof window.imprimirHojaA4Consultorio !== "function") return;
+
+        window.imprimirHojaA4Consultorio(`
+            <div style="border-bottom:2.5px solid #0284c7; padding-bottom:0.75rem; margin-bottom:1rem; display:flex; justify-content:space-between;">
+                <div>
+                    <div style="font-size:0.7rem; font-weight:800; color:#0284c7;">INFORME DE TALLER / SESIÓN GRUPAL — ${esc18(String(t.especialidad || "").toUpperCase())}</div>
+                    <h2 style="margin:2px 0; font-size:1.35rem;">${esc18(t.titulo)}</h2>
+                    <small>${esc18(lic.nombreEntidad)} • ${esc18(t.deporteDestino)} (${esc18(t.categoriaDestino)})</small>
+                </div>
+                <div style="text-align:right; font-size:0.8rem;">
+                    <b>Fecha:</b> ${esc18(t.fecha)}<br>
+                    <b>Modalidad:</b> ${esc18(t.modalidadGrupal || "Taller")}
+                </div>
+            </div>
+            ${(t.etiquetas || []).length ? `<p style="font-size:0.82rem;"><b>Ejes trabajados:</b> ${esc18(t.etiquetas.join(" • "))}</p>` : ""}
+            <h4 style="margin:0 0 6px;">Desarrollo y Conclusiones</h4>
+            <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.85rem; font-size:0.86rem; white-space:pre-line; margin-bottom:0.9rem;">${esc18(t.evolucion || "")}</div>
+            ${t.sugerenciaDT ? `
+                <h4 style="margin:0 0 6px;">Pautas para el Cuerpo Técnico / Profesores</h4>
+                <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:0.8rem; font-size:0.84rem; margin-bottom:0.9rem;">${esc18(t.sugerenciaDT)}</div>
+            ` : ""}
+            <h4 style="margin:0 0 6px;">Participantes</h4>
+            <p style="font-size:0.82rem;">${t.asistentesTodoPlantel ? "Plantel / grupo completo." : esc18((t.asistentesNombres || []).join(", ") || "No detallados.")}</p>
+            <div style="margin-top:2rem; text-align:right; font-size:0.78rem; color:#475569;">______________________________<br>Firma Profesional del Gabinete</div>
+        `);
+    };
+
+    // =====================================================================
+    // 4. MODAL DE TURNO / ENCUENTRO EN MODO GABINETE (SIN MUTUALES NI PRECIOS)
+    // =====================================================================
+    const _origAbrirTurno18 = window.abrirModalTurnoConsultorio;
+    window.abrirModalTurnoConsultorio = function (idTurno = null, fechaPre = null, idPersonaPre = null) {
+        if (!esModoGabineteClubGym18()) {
+            return _origAbrirTurno18.apply(this, arguments);
+        }
+
+        const db = obtenerDatosConsultorioCDM();
+        const t = idTurno ? (db.turnos || []).find(x => Number(x.id) === Number(idTurno)) : null;
+        const esp = t?.especialidad || obtenerEspActiva18();
+        const colorEsp = typeof colorEspecialidadConsultorio === "function" ? colorEspecialidadConsultorio(esp) : "#0284c7";
+        const fechaTarget = t?.fecha || fechaPre || hoy18();
+        const personas = obtenerPersonasActivasClub18();
+
+        let pSel = idPersonaPre ? personas.find(x => Number(x.id) === Number(idPersonaPre)) : null;
+        if (!pSel && t?.personaId) pSel = personas.find(x => Number(x.id) === Number(t.personaId));
+
+        const profsEsp = (db.profesionales || []).filter(pr => mismaEsp18(pr.especialidad, esp));
+        const modal = asegurarModalGab18();
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:600px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge" style="background:${colorEsp}; color:#fff;">${typeof iconoEspecialidadConsultorio === "function" ? iconoEspecialidadConsultorio(esp) : "🏆"} ENCUENTRO DE GABINETE • ${esc18(esp.toUpperCase())}</span>
+                        <h3 style="margin-top:4px;">${t ? `Editar Encuentro — ${esc18(t.pacienteNombre)}` : `Agendar Encuentro (${esc18(fechaTarget)})`}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalConsultorioCDM()">✕</button>
+                </div>
+
+                <form onsubmit="guardarTurnoGabinete18(event, ${t ? t.id : "null"}, '${escJs18(esp)}')">
+                    <div class="grid-3" style="margin-bottom:0.65rem;">
+                        <div class="field"><label>Fecha *</label><input type="date" id="gt18Fecha" value="${fechaTarget}" required></div>
+                        <div class="field"><label>Hora *</label><input type="time" id="gt18Hora" value="${t?.hora || "10:00"}" required></div>
+                        <div class="field"><label>Tipo de Encuentro</label>
+                            <select id="gt18Tipo">${TIPOS_ENCUENTRO_GAB18.map(x => `<option ${t?.tipoEncuentro === x ? "selected" : ""}>${x}</option>`).join("")}</select>
+                        </div>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.65rem;">
+                        <label>Socio o Deportista del Club / Gimnasio *</label>
+                        <select id="gt18PersonaId" required>
+                            <option value="">-- Elegir socio o deportista --</option>
+                            ${personas.map(p => `<option value="${p.id}" ${Number(pSel?.id) === Number(p.id) ? "selected" : ""}>${esc18(p.apellido)}, ${esc18(p.nombre)} — ${esc18(p.deporte)}${p.deporte === "Gimnasio" ? "" : ` (${esc18(p.categoria || "General")})`}</option>`).join("")}
+                        </select>
+                    </div>
+
+                    <div class="grid-2" style="margin-bottom:0.8rem;">
+                        <div class="field">
+                            <label>Profesional a cargo</label>
+                            <select id="gt18Prof">
+                                <option value="">-- Titular del área --</option>
+                                ${profsEsp.map(pr => `<option value="${esc18(pr.nombre)}" ${t?.profesional === pr.nombre ? "selected" : ""}>${esc18(pr.nombre)}</option>`).join("")}
+                            </select>
+                        </div>
+                        <div class="field"><label>Objetivo / Nota para el encuentro</label>
+                            <input type="text" id="gt18Motivo" value="${esc18(t?.motivo || "")}" placeholder="Ej: Revisar foco antes del torneo / Control post-lesión">
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:0.45rem;">
+                        <button type="submit" class="btn btn-primary" style="flex:1; background:${colorEsp}; border-color:${colorEsp};">💾 Confirmar Encuentro</button>
+                        ${t ? `<button type="button" class="btn btn-danger" onclick="eliminarTurnoCons(${t.id})">🗑️</button>` : ""}
+                    </div>
+                </form>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.guardarTurnoGabinete18 = function (e, idEdit, esp) {
+        e.preventDefault();
+        const db = obtenerDatosConsultorioCDM();
+        const pid = Number(document.getElementById("gt18PersonaId")?.value);
+        const p = obtenerPersonasActivasClub18().find(x => Number(x.id) === pid);
+        if (!p) return alert("⚠️ Elegí un socio o deportista.");
+
+        const pac = asegurarPacienteVinculado18(db, p, esp);
+        const previo = idEdit ? (db.turnos || []).find(x => Number(x.id) === Number(idEdit)) : null;
+        const tipoEnc = document.getElementById("gt18Tipo")?.value || TIPOS_ENCUENTRO_GAB18[1];
+
+        const obj = {
+            ...(previo || {}),
+            id: idEdit || Date.now(),
+            creadoEn: previo?.creadoEn || Date.now(),
+            esGabinete: true,
+            fecha: document.getElementById("gt18Fecha")?.value || hoy18(),
+            hora: document.getElementById("gt18Hora")?.value || "10:00",
+            especialidad: esp,
+            personaId: Number(p.id),
+            pacienteId: pac ? Number(pac.id) : null,
+            pacienteNombre: `${p.nombre} ${p.apellido}`,
+            mutualId: "",
+            mutualNombre: `${p.deporte}${p.deporte === "Gimnasio" ? "" : ` (${p.categoria || "General"})`} • ${tipoEnc}`,
+            tipoEncuentro: tipoEnc,
+            token: "",
+            valorMutual: 0,
+            coseguro: 0,
+            valorParticular: 0,
+            profesional: document.getElementById("gt18Prof")?.value || "",
+            motivo: (document.getElementById("gt18Motivo")?.value || "").trim(),
+            estado: previo?.estado || "confirmado",
+            aviso24hEnviado: previo && previo.fecha === document.getElementById("gt18Fecha")?.value ? Boolean(previo.aviso24hEnviado) : false
+        };
+
+        if (idEdit) {
+            const idx = db.turnos.findIndex(x => Number(x.id) === Number(idEdit));
+            if (idx >= 0) db.turnos[idx] = obj;
+        } else {
+            db.turnos.push(obj);
+        }
+
+        guardarDatosConsultorioCDM(db);
+        cerrarModalConsultorioCDM();
+        toast18(`📅 Encuentro agendado: ${obj.pacienteNombre} (${obj.hora} hs)`);
+        renderizarConsultorioCompleto();
+    };
+
+    // =====================================================================
+    // 5. ENGANCHES CON CONSULTORIO.JS (SOLO CUANDO ES CLUB / GIMNASIO)
+    // =====================================================================
+    const _origCambiarTab18 = window.cambiarTabConsultorioCDM;
+    if (typeof _origCambiarTab18 === "function") {
+        window.cambiarTabConsultorioCDM = function (tab) {
+            if (esModoGabineteClubGym18() && tab === "grupales") {
+                uiGab18.tabGrupalesActiva = true;
+                renderizarConsultorioCompleto();
+                return;
+            }
+            uiGab18.tabGrupalesActiva = false;
+            return _origCambiarTab18.apply(this, arguments);
+        };
+    }
+
+    const _origCambiarEsp18 = window.cambiarEspecialidadFiltroConsultorioCDM;
+    if (typeof _origCambiarEsp18 === "function") {
+        window.cambiarEspecialidadFiltroConsultorioCDM = function () {
+            uiGab18.tabGrupalesActiva = false;
+            return _origCambiarEsp18.apply(this, arguments);
+        };
+    }
+
+    if (typeof window.renderizarConsultorioCompleto === "function") {
+        const _origRender18 = window.renderizarConsultorioCompleto;
+        window.renderizarConsultorioCompleto = function () {
+            _origRender18.apply(this, arguments);
+            if (!esModoGabineteClubGym18()) return;
+
+            const sec = document.getElementById("cdmSeccionConsultorioGlobal");
+            if (!sec || sec.classList.contains("hidden")) return;
+
+            inyectarCSSGabinete18();
+            const db = obtenerDatosConsultorioCDM();
+            const espAct = obtenerEspActiva18();
+            const info = infoPerfilGabinete18(espAct);
+            const colorEsp = typeof colorEspecialidadConsultorio === "function" ? colorEspecialidadConsultorio(espAct) : "#0284c7";
+            const personasActivas = obtenerPersonasActivasClub18();
+            const talleresEsp = obtenerTalleresGrupalesEsp18(db, espAct);
+
+            // 1. Adaptar cabecera a Gabinete de Desarrollo
+            const badgeHdr = sec.querySelector(".cons-header .badge");
+            if (badgeHdr) badgeHdr.textContent = `${info.icono} GABINETE DE DESARROLLO • CLUB / GIMNASIO`;
+            const smallHdr = sec.querySelector(".cons-header small");
+            if (smallHdr) smallHdr.innerHTML = `${esc18(info.sub)} • <b>${personasActivas.length} socios/deportistas</b> • ${talleresEsp.length} taller(es) grupal(es)`;
+
+            // Reemplazar botón "+ Nuevo Paciente" por "+ Taller Grupal"
+            const btnNuevoPac = sec.querySelector('.cons-header button[onclick*="abrirModalPacienteConsultorio"]');
+            if (btnNuevoPac) {
+                btnNuevoPac.innerHTML = "🏟️ + Taller Grupal";
+                btnNuevoPac.onclick = () => abrirModalTallerGrupalGab18();
+            }
+
+            // 2. Reordenar pestañas: ocultar Mutuales y Lote, renombrar Pacientes y sumar Talleres Grupales
+            const tabsBar = sec.querySelector(".cons-tabs");
+            if (tabsBar) {
+                tabsBar.querySelector('.cons-tab[onclick*="\'mutuales\'"]')?.remove();
+                tabsBar.querySelector('.cons-tab[onclick*="\'lote\'"]')?.remove();
+
+                const tabPac = tabsBar.querySelector('.cons-tab[onclick*="\'pacientes\'"]');
+                if (tabPac) {
+                    const f = tabPac.querySelector(".cons-tab-full");
+                    const s = tabPac.querySelector(".cons-tab-short");
+                    if (f) f.textContent = `Socios y Deportistas (${personasActivas.length})`;
+                    if (s) s.textContent = `Socios (${personasActivas.length})`;
+                }
+
+                if (!tabsBar.querySelector('[data-gab-tab="grupales"]')) {
+                    const btnGrup = document.createElement("button");
+                    btnGrup.type = "button";
+                    btnGrup.className = `cons-tab ${uiGab18.tabGrupalesActiva ? "active" : ""}`;
+                    btnGrup.setAttribute("data-gab-tab", "grupales");
+                    if (uiGab18.tabGrupalesActiva) btnGrup.style.background = colorEsp;
+                    btnGrup.innerHTML = `
+                        <span class="cons-tab-ico">🏟️</span>
+                        <span class="cons-tab-full">Talleres Grupales (${talleresEsp.length})</span>
+                        <span class="cons-tab-short">Grupales</span>
+                    `;
+                    btnGrup.onclick = () => cambiarTabConsultorioCDM("grupales");
+                    const tabProf = tabsBar.querySelector('.cons-tab[onclick*="\'profesionales\'"]');
+                    if (tabProf) tabsBar.insertBefore(btnGrup, tabProf);
+                    else tabsBar.appendChild(btnGrup);
+                }
+            }
+
+            const cuerpo = document.getElementById("consCuerpoTab");
+            if (!cuerpo) return;
+
+            // 3. Render según pestaña activa
+            if (uiGab18.tabGrupalesActiva) {
+                tabsBar?.querySelectorAll(".cons-tab").forEach(b => {
+                    const esG = b.getAttribute("data-gab-tab") === "grupales";
+                    b.classList.toggle("active", esG);
+                    b.style.background = esG ? colorEsp : "";
+                });
+                renderTabGrupalesGabinete18(cuerpo, db, espAct);
+                return;
+            }
+
+            const tabActBtn = tabsBar?.querySelector(".cons-tab.active");
+            const onclk = tabActBtn?.getAttribute("onclick") || "";
+            if (onclk.includes("'pacientes'")) {
+                renderTabPersonasGabinete18(cuerpo, db, espAct);
+            } else if (onclk.includes("'agenda'")) {
+                // Redirigir el botón "🩺 Ficha" de las tarjetas de Próximos Pacientes al seguimiento deportivo
+                sec.querySelectorAll(".cons-next-card").forEach(card => {
+                    const btnFicha = card.querySelector('button[onclick*="abrirHistoriaClinicaPacienteCDM("]');
+                    if (!btnFicha) return;
+                    const m = btnFicha.getAttribute("onclick")?.match(/\((\d+)/);
+                    if (!m) return;
+                    const pac = (db.pacientes || []).find(x => Number(x.id) === Number(m[1]));
+                    if (pac?.personaId) {
+                        btnFicha.innerHTML = "📋 Seguimiento";
+                        btnFicha.onclick = (ev) => {
+                            ev.preventDefault();
+                            abrirModalSeguimientoGabinete18(pac.personaId);
+                        };
+                    }
+                });
+            }
+        };
+    }
+})();
+// =========================================================================
+// 19. INTEGRACIÓN DEL GABINETE EN LA EVOLUCIÓN GENERAL Y PDF DEL JUGADOR/SOCIO
+//     - Solo activo en Clubes y Gimnasios (cuando esModoGabineteClubGym18() es true)
+//     - Muestra indicadores, semáforo, recomendaciones al DT, consignas y talleres
+//       en jugador.html (Avances + Salud) y en el Boletín Individual PDF A4
+//     - Mantiene 100% privadas las notas confidenciales (evolucion) del profesional
+// Pegar al final de js/consultorio.js (debajo del Bloque 18)
+// =========================================================================
+(function () {
+    if (window.__cdmGabineteEnFicha19) return;
+    window.__cdmGabineteEnFicha19 = true;
+
+    let pdfPersonaId19 = null;
+
+    const SEMAFORO_19 = {
+        optimo:     { label: "🟢 Apto / Normal", badge: "badge-ok",     color: "#10b981" },
+        precaucion: { label: "🟡 Adaptar carga", badge: "badge-warn",   color: "#f59e0b" },
+        pausa:      { label: "🔴 Readaptación",  badge: "badge-danger", color: "#ef4444" }
+    };
+
+    function norm19(s) {
+        return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    function esc19(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function escJs19(s) {
+        return esc19(String(s ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+    }
+
+    function modoGabineteActivo19() {
+        return typeof window.esModoGabineteClubGym18 === "function" && window.esModoGabineteClubGym18();
+    }
+
+    function esUsuarioFinal19() {
+        try {
+            const ses = JSON.parse(localStorage.getItem("cdm_sesion_activa_v1") || "null");
+            if (ses?.rol === "usuario") return true;
+            if (document.body?.getAttribute("data-rol") === "usuario") return true;
+        } catch {}
+        return false;
+    }
+
+    function iconoEsp19(esp) {
+        return typeof window.iconoEspecialidadConsultorio === "function"
+            ? window.iconoEspecialidadConsultorio(esp)
+            : "🧬";
+    }
+
+    function colorEsp19(esp) {
+        return typeof window.colorEspecialidadConsultorio === "function"
+            ? window.colorEspecialidadConsultorio(esp)
+            : "#0284c7";
+    }
+
+    function construirMetricasSeguras19(s) {
+        if (s.resumenMetricas) return s.resumenMetricas;
+        const partes = [];
+        if (s.foco != null) partes.push(`Foco ${s.foco}/10`);
+        if (s.animo != null) partes.push(`Ánimo/Conf. ${s.animo}/10`);
+        if (s.descanso != null) partes.push(`Descanso ${s.descanso}/10`);
+        if (s.eva != null) partes.push(`EVA ${s.eva}/10`);
+        if (s.faseRtp) partes.push(s.faseRtp);
+        if (s.zona) partes.push(s.zona);
+        if (s.duracionRealMin) partes.push(`${s.duracionRealMin} min`);
+        return partes.join(" • ");
+    }
+
+    // Reúne todos los datos NO confidenciales del Gabinete para una persona
+    window.obtenerResumenGabineteParaPersona19 = function (p) {
+        if (!p || !modoGabineteActivo19() || typeof window.obtenerDatosConsultorioCDM !== "function") {
+            return { individuales: [], porEspecialidad: [], talleres: [] };
+        }
+
+        const db = obtenerDatosConsultorioCDM();
+        const pid = Number(p.id);
+        const dniNorm = norm19(p.dni);
+
+        const pacIds = new Set(
+            (db.pacientes || [])
+                .filter(x => Number(x.personaId) === pid || (dniNorm && x.dni && norm19(x.dni) === dniNorm))
+                .map(x => Number(x.id))
+        );
+
+        const individuales = (db.sesiones || [])
+            .filter(s => !s.esGrupalGabinete && (Number(s.personaId) === pid || (s.pacienteId && pacIds.has(Number(s.pacienteId)))))
+            .map(s => ({
+                id: s.id,
+                fecha: s.fecha || "-",
+                especialidad: s.especialidad || "Gabinete",
+                tipoEncuentro: s.tipoEncuentro || "Seguimiento",
+                metricas: construirMetricasSeguras19(s),
+                semaforo: SEMAFORO_19[s.semaforoDT] || null,
+                sugerenciaDT: String(s.sugerenciaDT || "").trim(),
+                consigna: String(s.indicaciones || s.retomarProxima || "").trim(),
+                etiquetas: Array.isArray(s.etiquetas) ? s.etiquetas : [],
+                planEntreno: String(s.planEntreno || "").trim(),
+                suplementacion: String(s.suplementacion || "").trim()
+            }))
+            .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || (Number(b.id) - Number(a.id)));
+
+        // Último registro por cada especialidad
+        const mapaEsp = new Map();
+        individuales.forEach(item => {
+            const k = norm19(item.especialidad);
+            if (!mapaEsp.has(k)) {
+                mapaEsp.set(k, {
+                    especialidad: item.especialidad,
+                    ultimo: item,
+                    cantidad: 1
+                });
+            } else {
+                mapaEsp.get(k).cantidad++;
+            }
+        });
+
+        // Talleres grupales en los que participó (individualmente o por categoría/plantel)
+        const depP = norm19(p.deporte);
+        const catP = norm19(p.categoria || "General");
+        const talleres = (db.sesiones || [])
+            .filter(s => {
+                if (!s.esGrupalGabinete) return false;
+                if (Array.isArray(s.asistentesIds) && s.asistentesIds.some(id => Number(id) === pid)) return true;
+                if (s.asistentesTodoPlantel) {
+                    const depT = norm19(s.deporteDestino);
+                    const catT = norm19(s.categoriaDestino || "General");
+                    if (depT === "todo el club") return true;
+                    if (depT === depP && (catT === "general" || !catT || catT === catP || depP === "gimnasio")) return true;
+                }
+                return false;
+            })
+            .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+
+        return {
+            individuales,
+            porEspecialidad: Array.from(mapaEsp.values()),
+            talleres
+        };
+    };
+
+    function inyectarCSSGabFicha19() {
+        if (document.getElementById("cdmCssGabFicha19")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssGabFicha19";
+        st.textContent = `
+            .gab19-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+                gap: 0.7rem;
+            }
+            .gab19-esp-card {
+                background: var(--surface-subtle, #f8fafc);
+                border: 1.5px solid var(--line, #e2e8f0);
+                border-left: 4px solid #0284c7;
+                border-radius: 14px;
+                padding: 0.72rem 0.85rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.35rem;
+                font-size: 0.79rem;
+            }
+            .gab19-dt-tip {
+                background: rgba(16, 185, 129, 0.09);
+                border: 1px dashed rgba(16, 185, 129, 0.42);
+                border-radius: 9px;
+                padding: 0.42rem 0.6rem;
+                font-size: 0.75rem;
+                color: var(--ink-800, #1e293b);
+            }
+            .gab19-consigna {
+                background: rgba(124, 58, 237, 0.08);
+                border: 1px solid rgba(124, 58, 237, 0.24);
+                border-radius: 9px;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.74rem;
+                color: var(--ink-800, #1e293b);
+            }
+            .gab19-taller-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                background: var(--surface-subtle, #f8fafc);
+                border: 1px solid var(--line-strong, #cbd5e1);
+                border-radius: 999px;
+                padding: 0.25rem 0.65rem;
+                font-size: 0.73rem;
+                font-weight: 700;
+            }
+            /* Estilos mínimos del modal de seguimiento cuando se abre directo desde jugador.html */
+            .gab18-private-box { background: rgba(124,58,237,0.07); border: 1px solid rgba(124,58,237,0.25); border-radius: 12px; padding: 0.72rem 0.85rem; }
+            .gab18-bridge-box { background: rgba(16,185,129,0.08); border: 1px dashed rgba(16,185,129,0.42); border-radius: 11px; padding: 0.5rem 0.68rem; font-size: 0.76rem; }
+            .gab18-metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; background: var(--surface-subtle, #f8fafc); border: 1px solid var(--line, #e2e8f0); border-radius: 12px; padding: 0.65rem 0.8rem; }
+            .gab18-tag-chip { border: 1.5px solid var(--line-strong, #cbd5e1); background: var(--surface-solid, #fff); color: var(--ink-700, #334155); font-size: 0.71rem; font-weight: 700; padding: 0.22rem 0.58rem; border-radius: 999px; cursor: pointer; }
+            .gab18-tag-chip.active { background: #0284c7; border-color: #0284c7; color: #fff; }
+            @media (max-width: 640px) { .gab18-metric-grid { grid-template-columns: 1fr; } }
+        `;
+        document.head.appendChild(st);
+    }
+
+    window.abrirSeguimientoGabineteDesdeFicha19 = function (personaId, especialidad) {
+        window.especialidadFiltroConsultorioCDM = especialidad;
+        if (typeof window.abrirModalSeguimientoGabinete18 === "function") {
+            window.abrirModalSeguimientoGabinete18(personaId);
+        }
+    };
+
+    // 1. INYECTAR TARJETA DE GABINETE EN LA EVOLUCIÓN GENERAL (#jfPulsoEjecutivo)
+    function renderizarTarjetaGabineteEnPulso19(p) {
+        if (!p || !modoGabineteActivo19()) return;
+        const pulso = document.getElementById("jfPulsoEjecutivo");
+        if (!pulso) return;
+
+        inyectarCSSGabFicha19();
+        document.getElementById("jfGabineteEvolucionCard19")?.remove();
+
+        const data = obtenerResumenGabineteParaPersona19(p);
+        const esAdmin = !esUsuarioFinal19();
+        const profs = typeof obtenerEspecialidadesHabilitadasConsultorioCDM === "function"
+            ? obtenerEspecialidadesHabilitadasConsultorioCDM()
+            : [];
+
+        const hayContenido = data.porEspecialidad.length > 0 || data.talleres.length > 0;
+        if (!hayContenido && !esAdmin) return;
+
+        const card = document.createElement("div");
+        card.id = "jfGabineteEvolucionCard19";
+        card.className = "jf-card";
+
+        const botonesCargaAdmin = esAdmin && profs.length > 0
+            ? `<div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                ${profs.map(pr => `
+                    <button type="button" class="btn btn-secondary btn-sm" style="min-height:26px; font-size:0.71rem;"
+                        onclick="abrirSeguimientoGabineteDesdeFicha19(${p.id}, '${escJs19(pr.clave)}')">
+                        + ${pr.icono} ${esc19(pr.clave)}
+                    </button>
+                `).join("")}
+               </div>`
+            : "";
+
+        card.innerHTML = `
+            <div class="jf-card-head">
+                <div>
+                    <h4>🧬 Seguimiento del Gabinete Interdisciplinario (${data.individuales.length})</h4>
+                    <small style="color:var(--ink-500); font-size:0.72rem;">
+                        Indicadores deportivos, físicos y holísticos • 🔒 Notas privadas protegidas
+                    </small>
+                </div>
+                ${botonesCargaAdmin}
+            </div>
+
+            ${data.porEspecialidad.length === 0 ? `
+                <div style="font-size:0.79rem; color:var(--ink-500); padding:0.35rem 0;">
+                    Sin seguimientos individuales cargados por el gabinete todavía. Usá los botones de arriba para registrar uno.
+                </div>
+            ` : `
+                <div class="gab19-grid">
+                    ${data.porEspecialidad.map(({ especialidad, ultimo, cantidad }) => {
+                        const col = colorEsp19(especialidad);
+                        const ico = iconoEsp19(especialidad);
+                        return `
+                            <div class="gab19-esp-card" style="border-left-color:${col};">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                                    <strong style="font-size:0.86rem;">${ico} ${esc19(especialidad)}</strong>
+                                    <span class="badge badge-celeste" style="font-size:0.65rem;">${cantidad} reg. • ${esc19(ultimo.fecha)}</span>
+                                </div>
+                                <div style="display:flex; gap:0.3rem; flex-wrap:wrap; align-items:center;">
+                                    ${ultimo.semaforo ? `<span class="badge ${ultimo.semaforo.badge}" style="font-size:0.65rem;">${ultimo.semaforo.label}</span>` : ""}
+                                    ${ultimo.metricas ? `<span class="badge badge-purple" style="font-size:0.65rem;">${esc19(ultimo.metricas)}</span>` : ""}
+                                </div>
+                                ${ultimo.planEntreno ? `<div style="font-size:0.74rem; color:var(--ink-700);"><b>⚡ Pre/Post:</b> ${esc19(ultimo.planEntreno)}</div>` : ""}
+                                ${ultimo.suplementacion ? `<div style="font-size:0.74rem; color:var(--ink-700);"><b>💊 Suplem.:</b> ${esc19(ultimo.suplementacion)}</div>` : ""}
+                                ${ultimo.sugerenciaDT ? `<div class="gab19-dt-tip"><b>🚦 Para Entrenamiento:</b> ${esc19(ultimo.sugerenciaDT)}</div>` : ""}
+                                ${ultimo.consigna ? `<div class="gab19-consigna"><b>📌 Hábito / Consigna:</b> ${esc19(ultimo.consigna)}</div>` : ""}
+                                ${ultimo.etiquetas.length ? `<small style="color:var(--ink-500); font-size:0.69rem;">Ejes: ${esc19(ultimo.etiquetas.slice(0, 4).join(" • "))}</small>` : ""}
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            `}
+
+            ${data.talleres.length > 0 ? `
+                <div style="margin-top:0.3rem; padding-top:0.55rem; border-top:1px dashed var(--line);">
+                    <small style="display:block; font-size:0.71rem; font-weight:800; color:var(--ink-500); margin-bottom:0.38rem;">
+                        🏟️ TALLERES Y SESIONES GRUPALES (${data.talleres.length}):
+                    </small>
+                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                        ${data.talleres.slice(0, 6).map(t => `
+                            <span class="gab19-taller-pill" title="${esc19(t.sugerenciaDT || t.modalidadGrupal || "")}">
+                                ${iconoEsp19(t.especialidad)} ${esc19(t.fecha)} — ${esc19(t.titulo)}
+                            </span>
+                        `).join("")}
+                    </div>
+                </div>
+            ` : ""}
+        `;
+
+        pulso.appendChild(card);
+    }
+
+    // 2. INYECTAR HISTORIAL DEL GABINETE EN LA PESTAÑA DE SALUD (#contenedorClinicoJugador)
+    function renderizarHistorialGabineteEnSalud19(p) {
+        if (!p || !modoGabineteActivo19()) return;
+        const cont = document.getElementById("contenedorClinicoJugador");
+        if (!cont) return;
+
+        document.getElementById("jfGabineteSaludBox19")?.remove();
+        const data = obtenerResumenGabineteParaPersona19(p);
+        if (!data.individuales.length) return;
+
+        inyectarCSSGabFicha19();
+        const wrap = document.createElement("div");
+        wrap.id = "jfGabineteSaludBox19";
+        wrap.style.cssText = "margin-bottom:0.9rem;";
+        wrap.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem;">
+                <strong style="font-size:0.84rem;">🧬 Evolución del Gabinete Interdisciplinario (${data.individuales.length})</strong>
+                <small style="color:var(--ink-500); font-size:0.71rem;">🔒 Solo datos de desarrollo</small>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.42rem;">
+                ${data.individuales.slice(0, 12).map(s => `
+                    <div style="padding:0.58rem 0.78rem; background:var(--surface-subtle); border:1px solid var(--line); border-left:4px solid ${colorEsp19(s.especialidad)}; border-radius:11px; font-size:0.78rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                            <b>${iconoEsp19(s.especialidad)} ${esc19(s.especialidad)} — ${esc19(s.fecha)}</b>
+                            <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                                ${s.semaforo ? `<span class="badge ${s.semaforo.badge}" style="font-size:0.64rem;">${s.semaforo.label}</span>` : ""}
+                                ${s.metricas ? `<span class="badge badge-purple" style="font-size:0.64rem;">${esc19(s.metricas)}</span>` : ""}
+                            </div>
+                        </div>
+                        ${s.sugerenciaDT ? `<div style="margin-top:3px; color:#047857;"><b>🚦 Para entrenamiento:</b> ${esc19(s.sugerenciaDT)}</div>` : ""}
+                        ${s.consigna ? `<div style="margin-top:2px; color:var(--ink-700);"><b>📌 Hábito / Consigna:</b> ${esc19(s.consigna)}</div>` : ""}
+                    </div>
+                `).join("")}
+            </div>
+        `;
+        cont.prepend(wrap);
+    }
+
+    // 3. BLOQUE DEL GABINETE PARA EL BOLETÍN INDIVIDUAL PDF A4
+    function generarSeccionPDFGabinete19(p) {
+        if (!p || !modoGabineteActivo19()) return "";
+        const data = obtenerResumenGabineteParaPersona19(p);
+        if (!data.porEspecialidad.length && !data.talleres.length) return "";
+
+        const nroSec = p.deporte === "Gimnasio" ? "2." : "3.";
+        let html = `<h4 style="margin:0 0 6px;">${nroSec} Seguimiento del Gabinete de Desarrollo (${data.individuales.length} reg.)</h4>`;
+
+        if (data.porEspecialidad.length) {
+            html += `
+                <table style="margin-bottom:0.85rem;">
+                    <thead>
+                        <tr>
+                            <th>Especialidad</th>
+                            <th>Últ. Fecha</th>
+                            <th>Indicadores / Métricas</th>
+                            <th>Semáforo</th>
+                            <th>Pautas de Entrenamiento y Hábitos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.porEspecialidad.map(({ especialidad, ultimo, cantidad }) => {
+                            const pautas = [
+                                ultimo.sugerenciaDT ? `Entreno: ${ultimo.sugerenciaDT}` : "",
+                                ultimo.consigna ? `Hábito: ${ultimo.consigna}` : "",
+                                ultimo.planEntreno ? `Pre/Post: ${ultimo.planEntreno}` : "",
+                                ultimo.suplementacion ? `Suplem.: ${ultimo.suplementacion}` : ""
+                            ].filter(Boolean).join(" | ");
+                            return `
+                                <tr>
+                                    <td><b>${esc19(especialidad)}</b><br><small>${cantidad} seguimiento(s)</small></td>
+                                    <td>${esc19(ultimo.fecha)}</td>
+                                    <td>${esc19(ultimo.metricas || ultimo.tipoEncuentro)}</td>
+                                    <td>${esc19(ultimo.semaforo ? ultimo.semaforo.label : "Normal")}</td>
+                                    <td>${esc19(pautas || "Sin restricciones / Seguimiento en curso")}</td>
+                                </tr>
+                            `;
+                        }).join("")}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        if (data.talleres.length) {
+            html += `
+                <div style="font-size:0.76rem; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:0.5rem 0.7rem; margin-bottom:0.9rem;">
+                    <b>Talleres grupales en los que participó (${data.talleres.length}):</b>
+                    ${data.talleres.slice(0, 6).map(t => `${esc19(t.fecha)} — ${esc19(t.titulo)} (${esc19(t.especialidad)})`).join(" • ")}
+                </div>
+            `;
+        }
+
+        return html;
+    }
+
+    // 4. ENGANCHES CON JUGADOR-FICHA.JS Y REFRESH POST-SYNC MONGODB
+    function refrescarBloqueGabineteEnFicha19() {
+        if (document.body?.dataset?.page !== "perfil-individual") return;
+        const p = typeof window.obtenerJugadorActualPorURL === "function" ? window.obtenerJugadorActualPorURL() : null;
+        if (!p) return;
+        renderizarTarjetaGabineteEnPulso19(p);
+        renderizarHistorialGabineteEnSalud19(p);
+    }
+
+    function instalarHooksFichaGabinete19() {
+        if (typeof window.renderizarPulsoEjecutivoJugador === "function" && !window.__gab19HookPulso) {
+            window.__gab19HookPulso = true;
+            const _origPulso = window.renderizarPulsoEjecutivoJugador;
+            window.renderizarPulsoEjecutivoJugador = function (p) {
+                const res = _origPulso.apply(this, arguments);
+                renderizarTarjetaGabineteEnPulso19(p);
+                return res;
+            };
+        }
+
+        if (typeof window.renderizarClinicoJugador === "function" && !window.__gab19HookClin) {
+            window.__gab19HookClin = true;
+            const _origClin = window.renderizarClinicoJugador;
+            window.renderizarClinicoJugador = function (p) {
+                const res = _origClin.apply(this, arguments);
+                renderizarHistorialGabineteEnSalud19(p);
+                return res;
+            };
+        }
+
+        if (typeof window.abrirInformeIndividualPDF === "function" && !window.__gab19HookPdf) {
+            window.__gab19HookPdf = true;
+            const _origInf = window.abrirInformeIndividualPDF;
+            window.abrirInformeIndividualPDF = function (idPersona) {
+                pdfPersonaId19 = Number(idPersona);
+                try {
+                    return _origInf.apply(this, arguments);
+                } finally {
+                    pdfPersonaId19 = null;
+                }
+            };
+        }
+
+        if (typeof window.imprimirDocumentoA4Limpio === "function" && !window.__gab19HookPrint) {
+            window.__gab19HookPrint = true;
+            const _origPrint = window.imprimirDocumentoA4Limpio;
+            window.imprimirDocumentoA4Limpio = function (htmlInterno) {
+                let htmlFinal = htmlInterno;
+                if (pdfPersonaId19 && modoGabineteActivo19()) {
+                    const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(pdfPersonaId19));
+                    const bloque = generarSeccionPDFGabinete19(p);
+                    if (bloque) {
+                        const marcaPie = '<div style="margin-top:1.8rem;';
+                        htmlFinal = htmlFinal.includes(marcaPie)
+                            ? htmlFinal.replace(marcaPie, bloque + marcaPie)
+                            : (htmlFinal + bloque);
+                    }
+                }
+                return _origPrint.call(this, htmlFinal);
+            };
+        }
+
+        // Cuando Bloque 15 hidrata MongoDB o Bloque 18 guarda un seguimiento, refresca jugador.html
+        if (typeof window.renderizarConsultorioCompleto === "function" && !window.__gab19HookConsRend) {
+            window.__gab19HookConsRend = true;
+            const _origConsRend = window.renderizarConsultorioCompleto;
+            window.renderizarConsultorioCompleto = function () {
+                const res = _origConsRend.apply(this, arguments);
+                refrescarBloqueGabineteEnFicha19();
+                return res;
+            };
+        }
+    }
+
+    instalarHooksFichaGabinete19();
+    document.addEventListener("DOMContentLoaded", () => {
+        instalarHooksFichaGabinete19();
+        setTimeout(refrescarBloqueGabineteEnFicha19, 200);
+        setTimeout(refrescarBloqueGabineteEnFicha19, 900);
+    });
+})();
+// =========================================================================
+// 20. CIRCUITO COMPLETO DEL GABINETE (CLUBES Y GIMNASIOS):
+//     1) Derivaciones internas (Profe/DT -> Gabinete + bandeja del profesional)
+//     2) Alertas 🟡/🔴 del Gabinete en el panel de Inicio (index.html)
+//     3) Curvas de evolución del Gabinete (Nutrición, Psicología, Kine, Holística) en jugador.html
+//     - 100% inactivo en consultorios privados; sincroniza directo con MongoDB vía Bloque 15
+// Pegar al final de js/consultorio.js (debajo del Bloque 19)
+// =========================================================================
+(function () {
+    if (window.__cdmGabinetePlus20) return;
+    window.__cdmGabinetePlus20 = true;
+
+    let chartGabineteFicha20 = null;
+    let espGraficoSel20 = "";
+
+    const PRIORIDADES_DERIV20 = {
+        normal:     { label: "🔵 Normal",      badge: "badge-celeste", color: "#0284c7" },
+        alta:       { label: "🟡 Prioritario", badge: "badge-warn",    color: "#f59e0b" },
+        urgente:    { label: "🔴 Urgente",     badge: "badge-danger",  color: "#ef4444" }
+    };
+
+    function norm20(s) {
+        return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    function mismaEsp20(a, b) {
+        return norm20(a) === norm20(b);
+    }
+
+    function esc20(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function escJs20(s) {
+        return esc20(String(s ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+    }
+
+    function hoy20() {
+        return typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
+    }
+
+    function toast20(msg) {
+        if (typeof mostrarToast === "function") mostrarToast(msg);
+    }
+
+    function modoGabineteActivo20() {
+        return typeof window.esModoGabineteClubGym18 === "function" && window.esModoGabineteClubGym18();
+    }
+
+    function esUsuarioFinal20() {
+        try {
+            const ses = JSON.parse(localStorage.getItem("cdm_sesion_activa_v1") || "null");
+            if (ses?.rol === "usuario") return true;
+            if (document.body?.getAttribute("data-rol") === "usuario") return true;
+        } catch {}
+        return false;
+    }
+
+    function obtenerNombreUsuarioActual20() {
+        try {
+            const ses = JSON.parse(localStorage.getItem("cdm_sesion_activa_v1") || "null");
+            return ses?.nombre || ses?.usuario || "Profesor / DT";
+        } catch {
+            return "Profesor / DT";
+        }
+    }
+
+    function obtenerEspActiva20() {
+        const profs = typeof obtenerEspecialidadesHabilitadasConsultorioCDM === "function"
+            ? obtenerEspecialidadesHabilitadasConsultorioCDM()
+            : [];
+        const act = window.especialidadFiltroConsultorioCDM;
+        if (act && act !== "TODAS" && profs.some(pr => mismaEsp20(pr.clave, act))) {
+            return profs.find(pr => mismaEsp20(pr.clave, act)).clave;
+        }
+        return profs[0]?.clave || "Desarrollo";
+    }
+
+    function perfilArea20(esp) {
+        const k = norm20(esp);
+        if (k.includes("nutri") || k.includes("diet")) return "nutricion";
+        if (k.includes("psico") || k.includes("coach") || k.includes("mental")) return "psicologia";
+        if (k.includes("kine") || k.includes("quiro") || k.includes("trauma") || k.includes("fisio") || k.includes("osteo") || k.includes("readapt")) return "fisico";
+        return "holistico";
+    }
+
+    function asegurarArrayDerivaciones20(db) {
+        if (!Array.isArray(db.derivaciones)) db.derivaciones = [];
+        return db.derivaciones;
+    }
+
+    function inyectarCSSGabinetePlus20() {
+        if (document.getElementById("cdmCssGabinetePlus20")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssGabinetePlus20";
+        st.textContent = `
+            .gab20-inbox {
+                background: linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(2, 132, 199, 0.07) 100%);
+                border: 1.5px solid rgba(245, 158, 11, 0.42);
+                border-radius: 18px;
+                padding: 0.85rem 1rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.55rem;
+            }
+            .gab20-inbox-row {
+                background: var(--surface-solid, #ffffff);
+                border: 1px solid var(--line, #e2e8f0);
+                border-left: 4px solid #f59e0b;
+                border-radius: 12px;
+                padding: 0.6rem 0.78rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.6rem;
+                flex-wrap: wrap;
+                font-size: 0.8rem;
+            }
+            #indexGabineteAlertas20 {
+                margin-top: 1rem;
+            }
+            .gab20-home-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 0.65rem;
+            }
+            .gab20-home-card {
+                background: var(--surface-subtle, #f8fafc);
+                border: 1px solid var(--line, #e2e8f0);
+                border-left: 4px solid #f59e0b;
+                border-radius: 13px;
+                padding: 0.68rem 0.82rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.6rem;
+                font-size: 0.8rem;
+            }
+            .gab20-chart-panel {
+                margin-top: 0.55rem;
+                padding-top: 0.65rem;
+                border-top: 1px dashed var(--line-strong, #cbd5e1);
+            }
+            .gab20-chart-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-bottom: 0.55rem;
+            }
+            .gab20-chart-box {
+                position: relative;
+                height: 235px;
+                width: 100%;
+                background: var(--surface-subtle, #f8fafc);
+                border: 1px solid var(--line, #e2e8f0);
+                border-radius: 13px;
+                padding: 0.55rem;
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function asegurarModalDeriv20() {
+        let m = document.getElementById("modalDerivacionGabinete20");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalDerivacionGabinete20";
+            m.className = "modal-backdrop hidden";
+            m.onclick = (e) => { if (e.target === m) cerrarModalDerivacion20(); };
+            document.body.appendChild(m);
+        }
+        m.style.zIndex = "99999";
+        document.body.appendChild(m);
+        return m;
+    }
+
+    window.cerrarModalDerivacion20 = function () {
+        document.getElementById("modalDerivacionGabinete20")?.classList.add("hidden");
+    };
+
+    // =====================================================================
+    // 1. DERIVACIONES INTERNAS (PROFE / DT -> GABINETE)
+    // =====================================================================
+    window.abrirModalDerivarAlGabinete20 = function (personaId) {
+        if (!modoGabineteActivo20()) return;
+        const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(personaId));
+        if (!p) return;
+
+        const profs = typeof obtenerEspecialidadesHabilitadasConsultorioCDM === "function"
+            ? obtenerEspecialidadesHabilitadasConsultorioCDM()
+            : [];
+        if (!profs.length) {
+            toast20("⚠️ No hay especialidades del gabinete habilitadas.");
+            return;
+        }
+
+        const db = obtenerDatosConsultorioCDM();
+        const previas = asegurarArrayDerivaciones20(db)
+            .filter(d => Number(d.personaId) === Number(p.id))
+            .sort((a, b) => Number(b.id) - Number(a.id));
+
+        const modal = asegurarModalDeriv20();
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:560px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">📩 DERIVACIÓN INTERNA AL GABINETE</span>
+                        <h3 style="margin-top:4px;">${esc20(p.apellido)}, ${esc20(p.nombre)}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalDerivacion20()">✕</button>
+                </div>
+
+                <form onsubmit="guardarDerivacionGabinete20(event, ${p.id})" style="margin-bottom:0.9rem;">
+                    <div class="grid-2" style="margin-bottom:0.65rem;">
+                        <div class="field">
+                            <label>Especialidad destino *</label>
+                            <select id="d20Esp" required>
+                                ${profs.map(pr => `<option value="${esc20(pr.clave)}">${pr.icono} ${esc20(pr.clave)}</option>`).join("")}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Prioridad</label>
+                            <select id="d20Prio">
+                                <option value="normal">🔵 Normal (Seguimiento)</option>
+                                <option value="alta">🟡 Prioritario (Esta semana)</option>
+                                <option value="urgente">🔴 Urgente (Evaluar pronto)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field" style="margin-bottom:0.8rem;">
+                        <label>Motivo / Observación del Profesor o DT *</label>
+                        <textarea id="d20Motivo" rows="3" required placeholder="Ej: Refiere molestia en isquiotibial al sprint / Quiere plan nutricional para subir masa muscular / Bajón de confianza post lesión..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width:100%;">📩 Enviar Derivación al Profesional</button>
+                </form>
+
+                ${previas.length ? `
+                    <strong style="display:block; font-size:0.8rem; margin-bottom:0.4rem;">📋 Derivaciones de ${esc20(p.nombre)} (${previas.length})</strong>
+                    <div style="display:flex; flex-direction:column; gap:0.38rem; max-height:170px; overflow-y:auto;">
+                        ${previas.slice(0, 6).map(d => {
+                            const pr = PRIORIDADES_DERIV20[d.prioridad] || PRIORIDADES_DERIV20.normal;
+                            const atend = d.estado === "atendida";
+                            return `
+                                <div style="background:var(--surface-subtle); border:1px solid var(--line); border-left:3.5px solid ${atend ? "#10b981" : pr.color}; border-radius:10px; padding:0.48rem 0.65rem; font-size:0.76rem;">
+                                    <div style="display:flex; justify-content:space-between; gap:0.4rem; flex-wrap:wrap;">
+                                        <b>${esc20(d.especialidad)} — ${esc20(d.fecha)}</b>
+                                        <span class="badge ${atend ? "badge-ok" : pr.badge}" style="font-size:0.64rem;">${atend ? "✓ Atendida" : pr.label}</span>
+                                    </div>
+                                    <div style="color:var(--ink-700); margin-top:2px;">${esc20(d.motivo)}</div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                ` : ""}
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.guardarDerivacionGabinete20 = function (e, personaId) {
+        e.preventDefault();
+        const p = (typeof basePersonas !== "undefined" ? basePersonas : []).find(x => Number(x.id) === Number(personaId));
+        if (!p) return;
+
+        const esp = document.getElementById("d20Esp")?.value || obtenerEspActiva20();
+        const prio = document.getElementById("d20Prio")?.value || "normal";
+        const motivo = (document.getElementById("d20Motivo")?.value || "").trim();
+        if (!motivo) return;
+
+        const db = obtenerDatosConsultorioCDM();
+        asegurarArrayDerivaciones20(db);
+
+        // Garantizar que haya al menos un registro de paciente vinculado para hidratación MongoDB (Bloque 15)
+        if (!Array.isArray(db.pacientes)) db.pacientes = [];
+        if (!db.pacientes.some(x => Number(x.personaId) === Number(p.id) && mismaEsp20(x.especialidad, esp))) {
+            db.pacientes.push({
+                id: Date.now() + Math.floor(Math.random() * 500),
+                personaId: Number(p.id),
+                esSocioClub: true,
+                codigoAcceso: p.codigoAcceso || `SOC-${p.id}`,
+                especialidad: esp,
+                nombre: p.nombre || "",
+                apellido: p.apellido || "",
+                dni: p.dni || "",
+                fechaNacimiento: p.fechaNacimiento || "",
+                whatsapp: p.whatsapp || "",
+                deporteOrigen: p.deporte || "Gimnasio",
+                categoriaOrigen: p.categoria || "General",
+                mutualId: "",
+                nroAfiliado: "",
+                antecedentes: ""
+            });
+        }
+
+        db.derivaciones.unshift({
+            id: Date.now(),
+            fecha: hoy20(),
+            personaId: Number(p.id),
+            personaNombre: `${p.apellido}, ${p.nombre}`,
+            deporte: p.deporte || "Gimnasio",
+            categoria: p.deporte === "Gimnasio" ? "Socio Gym" : (p.categoria || "General"),
+            especialidad: esp,
+            prioridad: prio,
+            motivo,
+            solicitadoPor: obtenerNombreUsuarioActual20(),
+            estado: "pendiente",
+            fechaAtendida: ""
+        });
+
+        guardarDatosConsultorioCDM(db);
+        cerrarModalDerivacion20();
+        toast20(`📩 Derivación enviada a ${esp} para ${p.nombre}.`);
+        renderizarAlertasGabineteEnInicio20();
+    };
+
+    window.marcarDerivacionAtendida20 = function (idDeriv) {
+        const db = obtenerDatosConsultorioCDM();
+        const d = asegurarArrayDerivaciones20(db).find(x => Number(x.id) === Number(idDeriv));
+        if (!d) return;
+        d.estado = "atendida";
+        d.fechaAtendida = hoy20();
+        guardarDatosConsultorioCDM(db);
+        toast20("✅ Derivación marcada como atendida.");
+        if (typeof renderizarConsultorioCompleto === "function") renderizarConsultorioCompleto();
+        renderizarAlertasGabineteEnInicio20();
+    };
+
+    window.eliminarDerivacion20 = function (idDeriv) {
+        if (!confirm("🗑️ ¿Eliminar esta derivación?")) return;
+        const db = obtenerDatosConsultorioCDM();
+        db.derivaciones = asegurarArrayDerivaciones20(db).filter(x => Number(x.id) !== Number(idDeriv));
+        guardarDatosConsultorioCDM(db);
+        if (typeof renderizarConsultorioCompleto === "function") renderizarConsultorioCompleto();
+        renderizarAlertasGabineteEnInicio20();
+    };
+
+    function renderizarBandejaDerivacionesEnGabinete20() {
+        if (!modoGabineteActivo20()) return;
+        const sec = document.getElementById("cdmSeccionConsultorioGlobal");
+        if (!sec || sec.classList.contains("hidden")) return;
+
+        inyectarCSSGabinetePlus20();
+        document.getElementById("gab20InboxDerivaciones")?.remove();
+
+        const db = obtenerDatosConsultorioCDM();
+        const espAct = obtenerEspActiva20();
+        const pesoPrio = { urgente: 0, alta: 1, normal: 2 };
+        const pendientes = asegurarArrayDerivaciones20(db)
+            .filter(d => d.estado !== "atendida" && mismaEsp20(d.especialidad, espAct))
+            .sort((a, b) => (pesoPrio[a.prioridad] ?? 2) - (pesoPrio[b.prioridad] ?? 2) || Number(b.id) - Number(a.id));
+
+        if (!pendientes.length) return;
+
+        const box = document.createElement("div");
+        box.id = "gab20InboxDerivaciones";
+        box.className = "gab20-inbox";
+        box.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                <strong style="font-size:0.88rem;">📩 Derivaciones Pendientes de Profesores / DT (${pendientes.length})</strong>
+                <span class="badge badge-warn" style="font-size:0.68rem;">${esc20(espAct)}</span>
+            </div>
+            ${pendientes.map(d => {
+                const pr = PRIORIDADES_DERIV20[d.prioridad] || PRIORIDADES_DERIV20.normal;
+                return `
+                    <div class="gab20-inbox-row" style="border-left-color:${pr.color};">
+                        <div style="flex:1; min-width:210px;">
+                            <div style="display:flex; gap:0.35rem; align-items:center; flex-wrap:wrap; margin-bottom:2px;">
+                                <strong>${esc20(d.personaNombre)}</strong>
+                                <span class="badge badge-celeste" style="font-size:0.64rem;">${esc20(d.deporte)} • ${esc20(d.categoria)}</span>
+                                <span class="badge ${pr.badge}" style="font-size:0.64rem;">${pr.label}</span>
+                            </div>
+                            <div style="color:var(--ink-700); font-size:0.78rem;">${esc20(d.motivo)}</div>
+                            <small style="color:var(--ink-500); font-size:0.7rem;">Pedido por ${esc20(d.solicitadoPor || "Profe")} el ${esc20(d.fecha)}</small>
+                        </div>
+                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; flex-shrink:0;">
+                            <button type="button" class="btn btn-ok btn-sm" style="min-height:28px; font-size:0.72rem;" onclick="abrirModalTurnoConsultorio(null, null, ${d.personaId})">📅 Agendar</button>
+                            <button type="button" class="btn btn-primary btn-sm" style="min-height:28px; font-size:0.72rem;" onclick="abrirModalSeguimientoGabinete18(${d.personaId})">📋 Evaluar</button>
+                            <button type="button" class="btn btn-secondary btn-sm" style="min-height:28px; font-size:0.72rem;" onclick="marcarDerivacionAtendida20(${d.id})" title="Marcar atendida">✓ Listo</button>
+                            <button type="button" class="btn btn-danger btn-sm" style="min-height:28px; padding:0 7px; font-size:0.72rem;" onclick="eliminarDerivacion20(${d.id})">✕</button>
+                        </div>
+                    </div>
+                `;
+            }).join("")}
+        `;
+
+        const tabs = sec.querySelector(".cons-tabs");
+        if (tabs) tabs.insertAdjacentElement("beforebegin", box);
+        else sec.prepend(box);
+    }
+
+    // =====================================================================
+    // 2. ALERTAS DEL GABINETE EN EL INICIO (INDEX.HTML)
+    // =====================================================================
+    function renderizarAlertasGabineteEnInicio20() {
+        const hub = document.getElementById("indexExecutiveHub");
+        if (!hub) return;
+
+        const existente = document.getElementById("indexGabineteAlertas20");
+        if (!modoGabineteActivo20() || esUsuarioFinal20() || hub.classList.contains("hidden")) {
+            existente?.remove();
+            return;
+        }
+
+        const db = obtenerDatosConsultorioCDM();
+        const personas = (typeof basePersonas !== "undefined" ? basePersonas : []).filter(p => p && p.activo !== false);
+        const alertas = [];
+
+        personas.forEach(p => {
+            if (typeof window.obtenerResumenGabineteParaPersona19 !== "function") return;
+            const res = window.obtenerResumenGabineteParaPersona19(p);
+            res.porEspecialidad.forEach(({ especialidad, ultimo }) => {
+                const esAlertaSem = ultimo.semaforo && (ultimo.semaforo.badge === "badge-warn" || ultimo.semaforo.badge === "badge-danger");
+                if (esAlertaSem) {
+                    alertas.push({
+                        persona: p,
+                        especialidad,
+                        fecha: ultimo.fecha,
+                        semaforo: ultimo.semaforo,
+                        sugerenciaDT: ultimo.sugerenciaDT || ultimo.metricas || "Revisar pautas del gabinete"
+                    });
+                }
+            });
+        });
+
+        const derivUrgentes = asegurarArrayDerivaciones20(db).filter(d => d.estado !== "atendida");
+
+        if (!alertas.length && !derivUrgentes.length) {
+            existente?.remove();
+            return;
+        }
+
+        inyectarCSSGabinetePlus20();
+        let panel = existente;
+        if (!panel) {
+            panel = document.createElement("section");
+            panel.id = "indexGabineteAlertas20";
+            panel.className = "app-panel animate-in";
+            hub.insertAdjacentElement("afterend", panel);
+        }
+
+        alertas.sort((a, b) => (a.semaforo.badge === "badge-danger" ? 0 : 1) - (b.semaforo.badge === "badge-danger" ? 0 : 1));
+
+        panel.innerHTML = `
+            <div class="panel-head">
+                <div>
+                    <h3>🧬 Alertas del Gabinete para Entrenamiento</h3>
+                    <small style="color:var(--ink-500); font-size:0.75rem;">
+                        Socios y deportistas con recomendación de carga adaptada o seguimiento activo (sin datos privados)
+                    </small>
+                </div>
+                <div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center;">
+                    ${alertas.length ? `<span class="badge badge-warn">${alertas.length} en cuidado</span>` : ""}
+                    ${derivUrgentes.length ? `<span class="badge badge-celeste">📩 ${derivUrgentes.length} derivación(es) pend.</span>` : ""}
+                </div>
+            </div>
+
+            ${alertas.length ? `
+                <div class="gab20-home-grid">
+                    ${alertas.slice(0, 8).map(a => `
+                        <div class="gab20-home-card" style="border-left-color:${a.semaforo.color};">
+                            <div style="min-width:0; flex:1;">
+                                <div style="display:flex; gap:0.32rem; flex-wrap:wrap; align-items:center; margin-bottom:2px;">
+                                    <strong>${esc20(a.persona.apellido)}, ${esc20(a.persona.nombre)}</strong>
+                                    <span class="badge ${a.semaforo.badge}" style="font-size:0.63rem;">${a.semaforo.label}</span>
+                                </div>
+                                <small style="display:block; color:var(--ink-500); font-size:0.71rem;">
+                                    ${esc20(a.persona.deporte)}${a.persona.deporte === "Gimnasio" ? "" : ` (${esc20(a.persona.categoria)})`} • ${esc20(a.especialidad)} (${esc20(a.fecha)})
+                                </small>
+                                <div style="font-size:0.76rem; color:var(--ink-700); margin-top:3px;">🚦 ${esc20(a.sugerenciaDT)}</div>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" style="flex-shrink:0;" onclick="irAPaginaIndividual(${a.persona.id})">Ver →</button>
+                        </div>
+                    `).join("")}
+                </div>
+            ` : `
+                <div style="font-size:0.8rem; color:var(--ink-600);">
+                    🟢 Sin restricciones activas de carga. Hay <b>${derivUrgentes.length}</b> derivación(es) esperando atención en el Gabinete.
+                </div>
+            `}
+        `;
+    }
+
+    // =====================================================================
+    // 3. CURVAS DE EVOLUCIÓN DEL GABINETE EN JUGADOR.HTML
+    // =====================================================================
+    function extraerNumeroRegex20(txt, regex) {
+        const m = String(txt || "").match(regex);
+        if (!m) return null;
+        const n = parseFloat(String(m[1]).replace(",", "."));
+        return isNaN(n) ? null : n;
+    }
+
+    function extraerMetricasNumericasSesion20(s, tipoPerfil) {
+        const txt = String(s.resumenMetricas || "");
+        if (tipoPerfil === "nutricion") {
+            return {
+                peso:    s.peso    != null ? Number(s.peso)    : extraerNumeroRegex20(txt, /(\d+(?:[.,]\d+)?)\s*kg/i),
+                grasa:   s.grasa   != null ? Number(s.grasa)   : extraerNumeroRegex20(txt, /(\d+(?:[.,]\d+)?)\s*%\s*grasa/i),
+                musculo: s.musculo != null ? Number(s.musculo) : extraerNumeroRegex20(txt, /(\d+(?:[.,]\d+)?)\s*%\s*m[uú]sc/i)
+            };
+        }
+        if (tipoPerfil === "psicologia") {
+            const presionCalc = s.presion != null ? Number(s.presion) : (s.ansiedad != null ? Math.max(1, 11 - Number(s.ansiedad)) : extraerNumeroRegex20(txt, /presi[oó]n\s+(\d+(?:[.,]\d+)?)/i));
+            return {
+                foco:      s.foco     != null ? Number(s.foco)     : extraerNumeroRegex20(txt, /foco\s+(\d+(?:[.,]\d+)?)/i),
+                confianza: s.animo    != null ? Number(s.animo)    : extraerNumeroRegex20(txt, /confianza\s+(\d+(?:[.,]\d+)?)/i),
+                presion:   presionCalc,
+                descanso:  s.descanso != null ? Number(s.descanso) : extraerNumeroRegex20(txt, /desc(?:\.|anso)\s*(\d+(?:[.,]\d+)?)/i)
+            };
+        }
+        if (tipoPerfil === "fisico") {
+            return {
+                eva: s.eva != null ? Number(s.eva) : extraerNumeroRegex20(txt, /eva\s+(\d+(?:[.,]\d+)?)/i)
+            };
+        }
+        return {
+            energia:   s.energia   != null ? Number(s.energia)   : extraerNumeroRegex20(txt, /energ[ií]a\s+(\d+(?:[.,]\d+)?)/i),
+            sueno:     s.sueno     != null ? Number(s.sueno)     : extraerNumeroRegex20(txt, /sue[ñn]o\s+(\d+(?:[.,]\d+)?)/i),
+            calma:     s.calma     != null ? Number(s.calma)     : extraerNumeroRegex20(txt, /calma\s+(\d+(?:[.,]\d+)?)/i),
+            movilidad: s.movilidad != null ? Number(s.movilidad) : extraerNumeroRegex20(txt, /movilidad\s+(\d+(?:[.,]\d+)?)/i)
+        };
+    }
+
+    function obtenerSesionesCrudasPersonaEsp20(p, esp) {
+        const db = obtenerDatosConsultorioCDM();
+        const pid = Number(p.id);
+        const dniNorm = norm20(p.dni);
+        const pacIds = new Set(
+            (db.pacientes || [])
+                .filter(x => Number(x.personaId) === pid || (dniNorm && x.dni && norm20(x.dni) === dniNorm))
+                .map(x => Number(x.id))
+        );
+
+        return (db.sesiones || [])
+            .filter(s =>
+                !s.esGrupalGabinete &&
+                mismaEsp20(s.especialidad, esp) &&
+                (Number(s.personaId) === pid || (s.pacienteId && pacIds.has(Number(s.pacienteId))))
+            )
+            .sort((a, b) => String(a.fecha || "").localeCompare(String(b.fecha || "")) || (Number(a.id) - Number(b.id)));
+    }
+
+    window.dibujarCurvaGabineteFicha20 = function (espOpt = null) {
+        const p = typeof window.obtenerJugadorActualPorURL === "function" ? window.obtenerJugadorActualPorURL() : null;
+        const cv = document.getElementById("canvasGabineteEvolucion20");
+        const msgBox = document.getElementById("gab20ChartEmptyMsg");
+        if (!p || !cv || typeof Chart === "undefined") return;
+
+        const sel = document.getElementById("selEspCurvaGab20");
+        const esp = espOpt || sel?.value || espGraficoSel20;
+        if (!esp) return;
+        espGraficoSel20 = esp;
+
+        const sesiones = obtenerSesionesCrudasPersonaEsp20(p, esp);
+        const tipo = perfilArea20(esp);
+
+        if (chartGabineteFicha20) {
+            chartGabineteFicha20.destroy();
+            chartGabineteFicha20 = null;
+        }
+
+        const labels = sesiones.map(s => s.fecha || "-");
+        const metricas = sesiones.map(s => extraerMetricasNumericasSesion20(s, tipo));
+
+        let datasets = [];
+        let dualAxisNutri = false;
+
+        if (tipo === "nutricion") {
+            const dPeso = metricas.map(m => m.peso);
+            const dMusc = metricas.map(m => m.musculo);
+            const dGras = metricas.map(m => m.grasa);
+            if (dPeso.some(v => v != null)) datasets.push({ label: "Peso (kg)", data: dPeso, borderColor: "#0284c7", backgroundColor: "rgba(2,132,199,0.12)", yAxisID: "y", borderWidth: 2.5, tension: 0.3, spanGaps: true });
+            if (dMusc.some(v => v != null)) { datasets.push({ label: "% Músculo", data: dMusc, borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.1)", yAxisID: "y1", borderWidth: 2.2, tension: 0.3, spanGaps: true }); dualAxisNutri = true; }
+            if (dGras.some(v => v != null)) { datasets.push({ label: "% Grasa", data: dGras, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.1)", yAxisID: "y1", borderWidth: 2.2, borderDash: [5, 4], tension: 0.3, spanGaps: true }); dualAxisNutri = true; }
+        } else if (tipo === "psicologia") {
+            const defs = [
+                ["Foco", "foco", "#0284c7"],
+                ["Confianza", "confianza", "#10b981"],
+                ["Manejo Presión", "presion", "#7c3aed"],
+                ["Descanso", "descanso", "#f59e0b"]
+            ];
+            defs.forEach(([lbl, k, col]) => {
+                const arr = metricas.map(m => m[k]);
+                if (arr.some(v => v != null)) datasets.push({ label: lbl, data: arr, borderColor: col, backgroundColor: col + "22", borderWidth: 2.3, tension: 0.3, spanGaps: true });
+            });
+        } else if (tipo === "fisico") {
+            const dEva = metricas.map(m => m.eva);
+            if (dEva.some(v => v != null)) {
+                datasets.push({ label: "Dolor EVA (0-10)", data: dEva, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,0.16)", borderWidth: 2.8, fill: true, tension: 0.3, spanGaps: true });
+            }
+        } else {
+            const defs = [
+                ["Energía Vital", "energia", "#0284c7"],
+                ["Sueño", "sueno", "#6366f1"],
+                ["Calma", "calma", "#10b981"],
+                ["Movilidad", "movilidad", "#f59e0b"]
+            ];
+            defs.forEach(([lbl, k, col]) => {
+                const arr = metricas.map(m => m[k]);
+                if (arr.some(v => v != null)) datasets.push({ label: lbl, data: arr, borderColor: col, backgroundColor: col + "22", borderWidth: 2.3, tension: 0.3, spanGaps: true });
+            });
+        }
+
+        if (sesiones.length < 2 || datasets.length === 0) {
+            cv.style.display = "none";
+            if (msgBox) {
+                msgBox.classList.remove("hidden");
+                msgBox.textContent = sesiones.length === 1
+                    ? `Hay 1 registro en ${esp}. Al cargar el segundo control se traza automáticamente la curva de evolución.`
+                    : `Sin indicadores numéricos suficientes en ${esp} todavía.`;
+            }
+            return;
+        }
+
+        cv.style.display = "block";
+        msgBox?.classList.add("hidden");
+
+        const isDark = document.body?.getAttribute("data-theme") === "dark";
+        const gridCol = isDark ? "rgba(148,163,184,0.14)" : "rgba(15,23,42,0.08)";
+        const tickCol = isDark ? "#cbd5e1" : "#475569";
+
+        const scales = tipo === "nutricion"
+            ? {
+                x: { ticks: { color: tickCol }, grid: { color: gridCol } },
+                y: { type: "linear", position: "left", ticks: { color: tickCol }, grid: { color: gridCol }, title: { display: true, text: "kg", color: tickCol } },
+                ...(dualAxisNutri ? { y1: { type: "linear", position: "right", ticks: { color: tickCol }, grid: { drawOnChartArea: false }, title: { display: true, text: "%", color: tickCol } } } : {})
+            }
+            : {
+                x: { ticks: { color: tickCol }, grid: { color: gridCol } },
+                y: { min: 0, max: 10, ticks: { stepSize: 2, color: tickCol }, grid: { color: gridCol } }
+            };
+
+        chartGabineteFicha20 = new Chart(cv.getContext("2d"), {
+            type: "line",
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: tickCol, boxWidth: 12, font: { size: 11 } } } },
+                scales
+            }
+        });
+    };
+
+    function decorarFichaJugadorConDerivacionYCurvas20() {
+        if (document.body?.dataset?.page !== "perfil-individual" || !modoGabineteActivo20()) return;
+        const p = typeof window.obtenerJugadorActualPorURL === "function" ? window.obtenerJugadorActualPorURL() : null;
+        if (!p) return;
+
+        inyectarCSSGabinetePlus20();
+        const esAdmin = !esUsuarioFinal20();
+
+        // A) Botón "📩 Derivar" en la cabecera de jugador.html (solo Admin/Profe)
+        const actions = document.querySelector("#fichaCabeceraJugador .cab33-actions");
+        if (esAdmin && actions && !document.getElementById("btnDerivarGabineteCab20")) {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.id = "btnDerivarGabineteCab20";
+            b.className = "btn btn-secondary btn-sm";
+            b.innerHTML = "📩 Derivar";
+            b.title = "Enviar derivación interna a un profesional del Gabinete";
+            b.onclick = () => abrirModalDerivarAlGabinete20(p.id);
+            actions.insertBefore(b, actions.lastElementChild);
+        }
+
+        // B) Sumar botón Derivar + Panel de Curvas dentro de #jfGabineteEvolucionCard19
+        const cardGab = document.getElementById("jfGabineteEvolucionCard19");
+        if (!cardGab) return;
+
+        if (esAdmin && !cardGab.querySelector("#btnDerivarGabCard20")) {
+            const head = cardGab.querySelector(".jf-card-head");
+            const btnsCont = head?.querySelector("div:last-child");
+            if (btnsCont && btnsCont !== head.firstElementChild) {
+                const bd = document.createElement("button");
+                bd.type = "button";
+                bd.id = "btnDerivarGabCard20";
+                bd.className = "btn btn-ok btn-sm";
+                bd.style.cssText = "min-height:26px; font-size:0.71rem;";
+                bd.innerHTML = "📩 Derivar";
+                bd.onclick = () => abrirModalDerivarAlGabinete20(p.id);
+                btnsCont.prepend(bd);
+            }
+        }
+
+        const data = typeof window.obtenerResumenGabineteParaPersona19 === "function"
+            ? window.obtenerResumenGabineteParaPersona19(p)
+            : { porEspecialidad: [] };
+
+        if (!data.porEspecialidad.length || cardGab.querySelector("#gab20ChartPanel")) return;
+
+        const esps = data.porEspecialidad.map(x => x.especialidad);
+        if (!espGraficoSel20 || !esps.some(e => mismaEsp20(e, espGraficoSel20))) {
+            espGraficoSel20 = esps[0];
+        }
+
+        const panelChart = document.createElement("div");
+        panelChart.id = "gab20ChartPanel";
+        panelChart.className = "gab20-chart-panel";
+        panelChart.innerHTML = `
+            <div class="gab20-chart-head">
+                <strong style="font-size:0.82rem;">📈 Curva de Evolución del Gabinete</strong>
+                <select id="selEspCurvaGab20" style="width:auto; min-height:30px; font-size:0.76rem; font-weight:700;" onchange="dibujarCurvaGabineteFicha20(this.value)">
+                    ${esps.map(e => `<option value="${esc20(e)}" ${mismaEsp20(e, espGraficoSel20) ? "selected" : ""}>${esc20(e)}</option>`).join("")}
+                </select>
+            </div>
+            <div class="gab20-chart-box">
+                <canvas id="canvasGabineteEvolucion20"></canvas>
+                <div id="gab20ChartEmptyMsg" class="hidden" style="height:100%; display:flex; align-items:center; justify-content:center; text-align:center; font-size:0.78rem; color:var(--ink-500); padding:0.75rem;"></div>
+            </div>
+        `;
+        cardGab.appendChild(panelChart);
+        dibujarCurvaGabineteFicha20(espGraficoSel20);
+    }
+
+    // =====================================================================
+    // 4. ENRIQUECER GUARDADO DE BLOQUE 18 CON MÉTRICAS NUMÉRICAS + ENGANCHES
+    // =====================================================================
+    if (typeof window.guardarSeguimientoGabinete18 === "function" && !window.__gab20WrapGuardar18) {
+        window.__gab20WrapGuardar18 = true;
+        const _origGuardar18 = window.guardarSeguimientoGabinete18;
+        window.guardarSeguimientoGabinete18 = function (e, personaId, esp) {
+            const tipo = perfilArea20(esp);
+            const captura = {};
+            if (tipo === "nutricion") {
+                const pV = document.getElementById("g18Peso")?.value;
+                const gV = document.getElementById("g18Grasa")?.value;
+                const mV = document.getElementById("g18Musc")?.value;
+                if (pV !== "" && pV != null) captura.peso = Number(pV);
+                if (gV !== "" && gV != null) captura.grasa = Number(gV);
+                if (mV !== "" && mV != null) captura.musculo = Number(mV);
+            } else if (tipo === "psicologia") {
+                captura.presion = Number(document.getElementById("g18M3")?.value || 6);
+            } else if (tipo === "holistico") {
+                captura.energia = Number(document.getElementById("g18H1")?.value || 7);
+                captura.sueno = Number(document.getElementById("g18H2")?.value || 7);
+                captura.calma = Number(document.getElementById("g18H3")?.value || 6);
+                captura.movilidad = Number(document.getElementById("g18H4")?.value || 7);
+            }
+
+            const res = _origGuardar18.apply(this, arguments);
+
+            if (Object.keys(captura).length > 0) {
+                const db = obtenerDatosConsultorioCDM();
+                const ult = (db.sesiones || [])[0];
+                if (ult && Number(ult.personaId) === Number(personaId)) {
+                    Object.assign(ult, captura);
+                    guardarDatosConsultorioCDM(db);
+                }
+            }
+            setTimeout(decorarFichaJugadorConDerivacionYCurvas20, 80);
+            return res;
+        };
+    }
+
+  function instalarHooksPlus20() {
+        if (typeof window.renderizarConsultorioCompleto === "function" && !window.__gab20HookCons) {
+            window.__gab20HookCons = true;
+            const _origCons = window.renderizarConsultorioCompleto;
+            window.renderizarConsultorioCompleto = function () {
+                const r = _origCons.apply(this, arguments);
+                renderizarBandejaDerivacionesEnGabinete20();
+                decorarFichaJugadorConDerivacionYCurvas20();
+                renderizarAlertasGabineteEnInicio20();
+                return r;
+            };
+        }
+
+        if (typeof window.renderizarWidgetsLimpiosIndex === "function" && !window.__gab20HookHome) {
+            window.__gab20HookHome = true;
+            const _origHome = window.renderizarWidgetsLimpiosIndex;
+            window.renderizarWidgetsLimpiosIndex = function () {
+                const r = _origHome.apply(this, arguments);
+                renderizarAlertasGabineteEnInicio20();
+                return r;
+            };
+        }
+
+        if (typeof window.renderizarPulsoEjecutivoJugador === "function" && !window.__gab20HookPulso) {
+            window.__gab20HookPulso = true;
+            const _origP = window.renderizarPulsoEjecutivoJugador;
+            window.renderizarPulsoEjecutivoJugador = function () {
+                const r = _origP.apply(this, arguments);
+                decorarFichaJugadorConDerivacionYCurvas20();
+                return r;
+            };
+        }
+
+        if (typeof window.refrescarGraficosFichaActual === "function" && !window.__gab20HookTheme) {
+            window.__gab20HookTheme = true;
+            const _origRef = window.refrescarGraficosFichaActual;
+            window.refrescarGraficosFichaActual = function () {
+                const r = _origRef.apply(this, arguments);
+                if (document.getElementById("canvasGabineteEvolucion20")) dibujarCurvaGabineteFicha20();
+                return r;
+            };
+        }
+
+        if (typeof window.abrirModuloConsultorioIndependienteCDM === "function" && !window.__gab20HookOpenCons) {
+            window.__gab20HookOpenCons = true;
+            const _origOpen = window.abrirModuloConsultorioIndependienteCDM;
+            window.abrirModuloConsultorioIndependienteCDM = function () {
+                const r = _origOpen.apply(this, arguments);
+                document.getElementById("indexGabineteAlertas20")?.remove();
+                return r;
+            };
+        }
+
+        if (typeof window.volverAlInicioDesdeConsultorio === "function" && !window.__gab20HookVolver) {
+            window.__gab20HookVolver = true;
+            const _origVol = window.volverAlInicioDesdeConsultorio;
+            window.volverAlInicioDesdeConsultorio = function () {
+                const r = _origVol.apply(this, arguments);
+                setTimeout(renderizarAlertasGabineteEnInicio20, 120);
+                return r;
+            };
+        }
+    }
+
+    instalarHooksPlus20();
+    document.addEventListener("DOMContentLoaded", () => {
+        instalarHooksPlus20();
+        setTimeout(() => {
+            renderizarAlertasGabineteEnInicio20();
+            decorarFichaJugadorConDerivacionYCurvas20();
+        }, 350);
+        setTimeout(() => {
+            renderizarAlertasGabineteEnInicio20();
+            decorarFichaJugadorConDerivacionYCurvas20();
+        }, 1100);
     });
 })();

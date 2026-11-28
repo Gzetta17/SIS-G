@@ -1,6 +1,6 @@
 {
   "claveClub": "cdm_adelia_maria_principal",
-  "ultimaActualizacionISO": "2026-11-25T01:40:49.610Z",
+  "ultimaActualizacionISO": "2026-11-28T03:15:12.237Z",
   "personas": [
     {
       "id": 101,
@@ -30,7 +30,7 @@
       "motivoPuntos": "Figura vs. San Basilio",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
         "2026-11-18",
@@ -84,7 +84,10 @@
       "categoriasExtra": [],
       "historialCategorias": [],
       "historialScore": [],
-      "puntosCategoria": 9
+      "puntosCategoria": 9,
+      "ultimoPagoFecha": null,
+      "ultimoPagoMedio": null,
+      "ultimoPagoMovId": null
     },
     {
       "id": 102,
@@ -156,7 +159,10 @@
       "lesionesHistorial": [],
       "snapshotsMensuales": [],
       "modoVistaRutina": "simple",
-      "puedeCrearRutinas": false
+      "puedeCrearRutinas": false,
+      "ultimoPagoFecha": null,
+      "ultimoPagoMedio": null,
+      "ultimoPagoMovId": null
     },
     {
       "id": 103,
@@ -186,7 +192,7 @@
       "motivoPuntos": "Gran despliegue",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
         "2026-11-19",
@@ -199,7 +205,10 @@
       "categoriasExtra": [],
       "historialCategorias": [],
       "historialScore": [],
-      "puntosCategoria": 8.3
+      "puntosCategoria": 8.3,
+      "ultimoPagoFecha": null,
+      "ultimoPagoMedio": null,
+      "ultimoPagoMovId": null
     },
     {
       "id": 201,
@@ -229,7 +238,7 @@
       "motivoPuntos": "Gol de córner corto",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
         "2026-11-18",
@@ -243,7 +252,10 @@
       "categoriasExtra": [],
       "historialCategorias": [],
       "historialScore": [],
-      "puntosCategoria": 8.9
+      "puntosCategoria": 8.9,
+      "ultimoPagoFecha": null,
+      "ultimoPagoMedio": null,
+      "ultimoPagoMovId": null
     },
     {
       "id": 301,
@@ -268,7 +280,7 @@
       "motivoPuntos": "",
       "frecuenciaSemanal": 3,
       "estadoMedico": "Óptimo",
-      "pagoEstado": "Al Día",
+      "pagoEstado": "Pendiente",
       "montoCuota": 25000,
       "asistencias": [
         "2026-11-18",
@@ -318,7 +330,10 @@
         }
       },
       "lesionesHistorial": [],
-      "snapshotsMensuales": []
+      "snapshotsMensuales": [],
+      "ultimoPagoFecha": null,
+      "ultimoPagoMedio": null,
+      "ultimoPagoMovId": null
     },
     {
       "id": 302,
@@ -368,7 +383,70 @@
         }
       },
       "lesionesHistorial": [],
-      "snapshotsMensuales": []
+      "snapshotsMensuales": [],
+      "ultimoPagoFecha": null,
+      "ultimoPagoMedio": null,
+      "ultimoPagoMovId": null
+    },
+    {
+      "id": 1795834295701,
+      "deporte": "Gimnasio",
+      "categoria": "General",
+      "puesto": "-",
+      "nombre": "Gonzalo",
+      "apellido": "Adanchu",
+      "dni": "40835985",
+      "whatsapp": "-",
+      "fechaNacimiento": "1998-01-01",
+      "anioNacimiento": 1998,
+      "edad": 28,
+      "sangre": "0+",
+      "peso": null,
+      "altura": null,
+      "pierna": "Derecha",
+      "brazo": "Derecho",
+      "frecuenciaSemanal": 3,
+      "estadoMedico": "Óptimo",
+      "pagoEstado": "Pendiente",
+      "montoCuota": 25000,
+      "foto": null,
+      "modoVistaRutina": "heredar",
+      "puedeCrearRutinas": false,
+      "activo": true,
+      "pilares": null,
+      "puntosCategoria": null,
+      "motivoPuntos": "Alta en Base General",
+      "asistencias": [
+        "2026-11-28"
+      ],
+      "evaluaciones": [],
+      "categoriasExtra": [],
+      "historialCategorias": [],
+      "clinico": [],
+      "codigoAcceso": "GYM-Y7VB",
+      "historialPagos": [
+        {
+          "id": 1795834334451,
+          "movId": 1795834334507,
+          "fecha": "2026-11-28",
+          "mesCuota": "2026-11",
+          "monto": 15000,
+          "medio": "Transferencia",
+          "nota": ""
+        }
+      ],
+      "historialScore": [],
+      "asistenciasDetalle": {
+        "2026-11-28": {
+          "estado": "presente",
+          "nota": ""
+        }
+      },
+      "lesionesHistorial": [],
+      "snapshotsMensuales": [],
+      "ultimoPagoFecha": "2026-11-28",
+      "ultimoPagoMedio": "Transferencia",
+      "ultimoPagoMovId": 1795834334507
     }
   ],
   "rutinas": [
@@ -1346,8 +1424,128 @@
     "profesionales": [],
     "sesiones": []
   },
+  "finanzasMovimientos": [
+    {
+      "id": 1795834334507,
+      "fecha": "2026-11-28",
+      "mesCuota": "2026-11",
+      "tipo": "ingreso",
+      "rubro": "Cuota Gimnasio",
+      "concepto": "Pago parcial cuota Nov 2026 • Adanchu, Gonzalo (Gimnasio)",
+      "monto": 15000,
+      "medio": "Transferencia",
+      "personaId": 1795834295701,
+      "esCuota": true
+    }
+  ],
   "subAdmins": [],
-  "auditoria": [],
+  "auditoria": [
+    {
+      "id": 1795835712210,
+      "fechaISO": "2026-11-28T03:15:12.210Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "COBRO_CUOTA",
+      "detalle": "Torres, Bautista • $25.000 (MercadoPago • Nov 2026)"
+    },
+    {
+      "id": 1795835676250,
+      "fechaISO": "2026-11-28T03:14:36.250Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Torres, Bautista vuelto a Impago (Nov 2026)"
+    },
+    {
+      "id": 1795835103280,
+      "fechaISO": "2026-11-28T03:05:03.280Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Torres, Bautista vuelto a Impago (Nov 2026)"
+    },
+    {
+      "id": 1795835100345,
+      "fechaISO": "2026-11-28T03:05:00.345Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Ruiz, Valentina vuelto a Impago (Nov 2026)"
+    },
+    {
+      "id": 1795835098799,
+      "fechaISO": "2026-11-28T03:04:58.799Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Ledesma, Joaquín vuelto a Impago (Nov 2026)"
+    },
+    {
+      "id": 1795835096077,
+      "fechaISO": "2026-11-28T03:04:56.077Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Gómez, Mateo vuelto a Impago (Nov 2026)"
+    },
+    {
+      "id": 1795834834752,
+      "fechaISO": "2026-11-28T03:00:34.752Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Gómez, Mateo • Descontado $25.000 de Caja"
+    },
+    {
+      "id": 1795834829175,
+      "fechaISO": "2026-11-28T03:00:29.175Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "COBRO_CUOTA",
+      "detalle": "Gómez, Mateo • $25.000 (Transferencia • Nov 2026)"
+    },
+    {
+      "id": 1795834334495,
+      "fechaISO": "2026-11-28T02:52:14.495Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "COBRO_PARCIAL",
+      "detalle": "Adanchu, Gonzalo • $15.000 (Transferencia • Nov 2026)"
+    },
+    {
+      "id": 1795834240631,
+      "fechaISO": "2026-11-28T02:50:40.631Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "AUMENTO_CUOTAS",
+      "detalle": "Fijar en $25.000 en Todos los activos (6 persona/s)"
+    },
+    {
+      "id": 1795832886749,
+      "fechaISO": "2026-11-28T02:28:06.749Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Torres, Bautista vuelto a Pendiente"
+    },
+    {
+      "id": 1795832885418,
+      "fechaISO": "2026-11-28T02:28:05.418Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Ruiz, Valentina vuelto a Pendiente"
+    },
+    {
+      "id": 1795832883834,
+      "fechaISO": "2026-11-28T02:28:03.834Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Peralta, Lucas vuelto a Pendiente"
+    },
+    {
+      "id": 1795832882389,
+      "fechaISO": "2026-11-28T02:28:02.389Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Ledesma, Joaquín vuelto a Pendiente"
+    },
+    {
+      "id": 1795832880639,
+      "fechaISO": "2026-11-28T02:28:00.639Z",
+      "usuario": "SuperAdmin • Club Deportivo Municipal",
+      "accion": "ANULAR_COBRO",
+      "detalle": "Gómez, Mateo vuelto a Pendiente"
+    }
+  ],
   "credencialesBiometricas": [],
   "licenciaConfig": {
     "nombreEntidad": "Club Deportivo Municipal",
@@ -1410,7 +1608,7 @@
   "clubes": {
     "cdm_adelia_maria_principal": {
       "claveClub": "cdm_adelia_maria_principal",
-      "ultimaActualizacionISO": "2026-11-25T01:40:49.610Z",
+      "ultimaActualizacionISO": "2026-11-28T03:15:12.237Z",
       "personas": [
         {
           "id": 101,
@@ -1440,7 +1638,7 @@
           "motivoPuntos": "Figura vs. San Basilio",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
             "2026-11-18",
@@ -1494,7 +1692,10 @@
           "categoriasExtra": [],
           "historialCategorias": [],
           "historialScore": [],
-          "puntosCategoria": 9
+          "puntosCategoria": 9,
+          "ultimoPagoFecha": null,
+          "ultimoPagoMedio": null,
+          "ultimoPagoMovId": null
         },
         {
           "id": 102,
@@ -1566,7 +1767,10 @@
           "lesionesHistorial": [],
           "snapshotsMensuales": [],
           "modoVistaRutina": "simple",
-          "puedeCrearRutinas": false
+          "puedeCrearRutinas": false,
+          "ultimoPagoFecha": null,
+          "ultimoPagoMedio": null,
+          "ultimoPagoMovId": null
         },
         {
           "id": 103,
@@ -1596,7 +1800,7 @@
           "motivoPuntos": "Gran despliegue",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
             "2026-11-19",
@@ -1609,7 +1813,10 @@
           "categoriasExtra": [],
           "historialCategorias": [],
           "historialScore": [],
-          "puntosCategoria": 8.3
+          "puntosCategoria": 8.3,
+          "ultimoPagoFecha": null,
+          "ultimoPagoMedio": null,
+          "ultimoPagoMovId": null
         },
         {
           "id": 201,
@@ -1639,7 +1846,7 @@
           "motivoPuntos": "Gol de córner corto",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
             "2026-11-18",
@@ -1653,7 +1860,10 @@
           "categoriasExtra": [],
           "historialCategorias": [],
           "historialScore": [],
-          "puntosCategoria": 8.9
+          "puntosCategoria": 8.9,
+          "ultimoPagoFecha": null,
+          "ultimoPagoMedio": null,
+          "ultimoPagoMovId": null
         },
         {
           "id": 301,
@@ -1678,7 +1888,7 @@
           "motivoPuntos": "",
           "frecuenciaSemanal": 3,
           "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
+          "pagoEstado": "Pendiente",
           "montoCuota": 25000,
           "asistencias": [
             "2026-11-18",
@@ -1728,7 +1938,10 @@
             }
           },
           "lesionesHistorial": [],
-          "snapshotsMensuales": []
+          "snapshotsMensuales": [],
+          "ultimoPagoFecha": null,
+          "ultimoPagoMedio": null,
+          "ultimoPagoMovId": null
         },
         {
           "id": 302,
@@ -1778,7 +1991,70 @@
             }
           },
           "lesionesHistorial": [],
-          "snapshotsMensuales": []
+          "snapshotsMensuales": [],
+          "ultimoPagoFecha": null,
+          "ultimoPagoMedio": null,
+          "ultimoPagoMovId": null
+        },
+        {
+          "id": 1795834295701,
+          "deporte": "Gimnasio",
+          "categoria": "General",
+          "puesto": "-",
+          "nombre": "Gonzalo",
+          "apellido": "Adanchu",
+          "dni": "40835985",
+          "whatsapp": "-",
+          "fechaNacimiento": "1998-01-01",
+          "anioNacimiento": 1998,
+          "edad": 28,
+          "sangre": "0+",
+          "peso": null,
+          "altura": null,
+          "pierna": "Derecha",
+          "brazo": "Derecho",
+          "frecuenciaSemanal": 3,
+          "estadoMedico": "Óptimo",
+          "pagoEstado": "Pendiente",
+          "montoCuota": 25000,
+          "foto": null,
+          "modoVistaRutina": "heredar",
+          "puedeCrearRutinas": false,
+          "activo": true,
+          "pilares": null,
+          "puntosCategoria": null,
+          "motivoPuntos": "Alta en Base General",
+          "asistencias": [
+            "2026-11-28"
+          ],
+          "evaluaciones": [],
+          "categoriasExtra": [],
+          "historialCategorias": [],
+          "clinico": [],
+          "codigoAcceso": "GYM-Y7VB",
+          "historialPagos": [
+            {
+              "id": 1795834334451,
+              "movId": 1795834334507,
+              "fecha": "2026-11-28",
+              "mesCuota": "2026-11",
+              "monto": 15000,
+              "medio": "Transferencia",
+              "nota": ""
+            }
+          ],
+          "historialScore": [],
+          "asistenciasDetalle": {
+            "2026-11-28": {
+              "estado": "presente",
+              "nota": ""
+            }
+          },
+          "lesionesHistorial": [],
+          "snapshotsMensuales": [],
+          "ultimoPagoFecha": "2026-11-28",
+          "ultimoPagoMedio": "Transferencia",
+          "ultimoPagoMovId": 1795834334507
         }
       ],
       "rutinas": [
@@ -2756,8 +3032,128 @@
         "profesionales": [],
         "sesiones": []
       },
+      "finanzasMovimientos": [
+        {
+          "id": 1795834334507,
+          "fecha": "2026-11-28",
+          "mesCuota": "2026-11",
+          "tipo": "ingreso",
+          "rubro": "Cuota Gimnasio",
+          "concepto": "Pago parcial cuota Nov 2026 • Adanchu, Gonzalo (Gimnasio)",
+          "monto": 15000,
+          "medio": "Transferencia",
+          "personaId": 1795834295701,
+          "esCuota": true
+        }
+      ],
       "subAdmins": [],
-      "auditoria": [],
+      "auditoria": [
+        {
+          "id": 1795835712210,
+          "fechaISO": "2026-11-28T03:15:12.210Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "COBRO_CUOTA",
+          "detalle": "Torres, Bautista • $25.000 (MercadoPago • Nov 2026)"
+        },
+        {
+          "id": 1795835676250,
+          "fechaISO": "2026-11-28T03:14:36.250Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Torres, Bautista vuelto a Impago (Nov 2026)"
+        },
+        {
+          "id": 1795835103280,
+          "fechaISO": "2026-11-28T03:05:03.280Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Torres, Bautista vuelto a Impago (Nov 2026)"
+        },
+        {
+          "id": 1795835100345,
+          "fechaISO": "2026-11-28T03:05:00.345Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Ruiz, Valentina vuelto a Impago (Nov 2026)"
+        },
+        {
+          "id": 1795835098799,
+          "fechaISO": "2026-11-28T03:04:58.799Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Ledesma, Joaquín vuelto a Impago (Nov 2026)"
+        },
+        {
+          "id": 1795835096077,
+          "fechaISO": "2026-11-28T03:04:56.077Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Gómez, Mateo vuelto a Impago (Nov 2026)"
+        },
+        {
+          "id": 1795834834752,
+          "fechaISO": "2026-11-28T03:00:34.752Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Gómez, Mateo • Descontado $25.000 de Caja"
+        },
+        {
+          "id": 1795834829175,
+          "fechaISO": "2026-11-28T03:00:29.175Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "COBRO_CUOTA",
+          "detalle": "Gómez, Mateo • $25.000 (Transferencia • Nov 2026)"
+        },
+        {
+          "id": 1795834334495,
+          "fechaISO": "2026-11-28T02:52:14.495Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "COBRO_PARCIAL",
+          "detalle": "Adanchu, Gonzalo • $15.000 (Transferencia • Nov 2026)"
+        },
+        {
+          "id": 1795834240631,
+          "fechaISO": "2026-11-28T02:50:40.631Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "AUMENTO_CUOTAS",
+          "detalle": "Fijar en $25.000 en Todos los activos (6 persona/s)"
+        },
+        {
+          "id": 1795832886749,
+          "fechaISO": "2026-11-28T02:28:06.749Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Torres, Bautista vuelto a Pendiente"
+        },
+        {
+          "id": 1795832885418,
+          "fechaISO": "2026-11-28T02:28:05.418Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Ruiz, Valentina vuelto a Pendiente"
+        },
+        {
+          "id": 1795832883834,
+          "fechaISO": "2026-11-28T02:28:03.834Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Peralta, Lucas vuelto a Pendiente"
+        },
+        {
+          "id": 1795832882389,
+          "fechaISO": "2026-11-28T02:28:02.389Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Ledesma, Joaquín vuelto a Pendiente"
+        },
+        {
+          "id": 1795832880639,
+          "fechaISO": "2026-11-28T02:28:00.639Z",
+          "usuario": "SuperAdmin • Club Deportivo Municipal",
+          "accion": "ANULAR_COBRO",
+          "detalle": "Gómez, Mateo vuelto a Pendiente"
+        }
+      ],
       "credencialesBiometricas": [],
       "licenciaConfig": {
         "nombreEntidad": "Club Deportivo Municipal",
@@ -2818,1022 +3214,9 @@
         }
       }
     },
-    "gimasio_426": {
-      "claveClub": "gimasio_426",
-      "ultimaActualizacionISO": "2026-11-26T00:31:27.282Z",
-      "personas": [
-        {
-          "id": 101,
-          "deporte": "Futbol",
-          "categoria": "Sub 13",
-          "puesto": "Centrodelantero (#9)",
-          "nombre": "Mateo",
-          "apellido": "Gómez",
-          "dni": "48111222",
-          "whatsapp": "5493584112233",
-          "edad": 13,
-          "fechaNacimiento": "2013-04-12",
-          "anioNacimiento": 2013,
-          "sangre": "0+",
-          "peso": 54,
-          "altura": 162,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": {
-            "fisico": 8.6,
-            "gym": 8.2,
-            "tecnico": 9,
-            "actitud": 9.2,
-            "bonus": 0.3
-          },
-          "motivoPuntos": "Figura vs. San Basilio",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-18",
-            "2026-11-20",
-            "2026-11-22"
-          ],
-          "clinico": [
-            {
-              "id": 1,
-              "fecha": "2026-11-22",
-              "peso": 54,
-              "rpe": 6,
-              "sueno": 5,
-              "dolor": "Sin molestias"
-            }
-          ],
-          "evaluaciones": [
-            {
-              "id": 11,
-              "fecha": "2026-10-28",
-              "ejercicio": "Sentadilla Trasera con Barra",
-              "tipo": "fuerza_kg",
-              "valor": 65,
-              "unidad": "kg (1RM)",
-              "detalle": "55 kg × 6 reps (1RM: 65 kg)",
-              "nota": "Base"
-            },
-            {
-              "id": 12,
-              "fecha": "2026-11-10",
-              "ejercicio": "Sentadilla Trasera con Barra",
-              "tipo": "fuerza_kg",
-              "valor": 72,
-              "unidad": "kg (1RM)",
-              "detalle": "62 kg × 5 reps (1RM: 72 kg)",
-              "nota": "Progreso"
-            },
-            {
-              "id": 13,
-              "fecha": "2026-11-22",
-              "ejercicio": "Sentadilla Trasera con Barra",
-              "tipo": "fuerza_kg",
-              "valor": 80,
-              "unidad": "kg (1RM)",
-              "detalle": "70 kg × 4 reps (1RM: 80 kg)",
-              "nota": "Récord"
-            }
-          ],
-          "codigoAcceso": "GYM-H6BZ",
-          "historialPagos": [],
-          "categoriasExtra": [],
-          "historialCategorias": [],
-          "historialScore": [],
-          "puntosCategoria": 9
-        },
-        {
-          "id": 102,
-          "deporte": "Futbol",
-          "categoria": "Sub 13",
-          "puesto": "Enganche (#10)",
-          "nombre": "Bautista",
-          "apellido": "Torres",
-          "dni": "48222333",
-          "whatsapp": "5493584223344",
-          "edad": 13,
-          "fechaNacimiento": "2013-08-20",
-          "anioNacimiento": 2013,
-          "sangre": "A+",
-          "peso": 51,
-          "altura": 159,
-          "pierna": "Izquierda",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": {
-            "fisico": 8,
-            "gym": 7.6,
-            "tecnico": 8.8,
-            "actitud": 8.5,
-            "bonus": 0.1
-          },
-          "motivoPuntos": "Asistencia de gol",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-18",
-            "2026-11-20",
-            "2026-11-22"
-          ],
-          "clinico": [],
-          "evaluaciones": [],
-          "codigoAcceso": "GYM-AXGB",
-          "historialPagos": [],
-          "categoriasExtra": [],
-          "historialCategorias": [],
-          "historialScore": [],
-          "puntosCategoria": 8.3
-        },
-        {
-          "id": 103,
-          "deporte": "Futbol",
-          "categoria": "Sub 15",
-          "puesto": "Volante Central (#5)",
-          "nombre": "Joaquín",
-          "apellido": "Ledesma",
-          "dni": "47333444",
-          "whatsapp": "5493584334455",
-          "edad": 15,
-          "fechaNacimiento": "2011-02-10",
-          "anioNacimiento": 2011,
-          "sangre": "0+",
-          "peso": 60,
-          "altura": 168,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": {
-            "fisico": 8.4,
-            "gym": 8,
-            "tecnico": 7.8,
-            "actitud": 9,
-            "bonus": 0
-          },
-          "motivoPuntos": "Gran despliegue",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-19",
-            "2026-11-22"
-          ],
-          "clinico": [],
-          "evaluaciones": [],
-          "codigoAcceso": "GYM-MTK6",
-          "historialPagos": [],
-          "categoriasExtra": [],
-          "historialCategorias": [],
-          "historialScore": [],
-          "puntosCategoria": 8.3
-        },
-        {
-          "id": 201,
-          "deporte": "Hockey",
-          "categoria": "Sub 13",
-          "puesto": "Wing Derecha (#8)",
-          "nombre": "Valentina",
-          "apellido": "Ruiz",
-          "dni": "48555666",
-          "whatsapp": "5493584556677",
-          "edad": 13,
-          "fechaNacimiento": "2013-05-14",
-          "anioNacimiento": 2013,
-          "sangre": "B+",
-          "peso": 49,
-          "altura": 158,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": {
-            "fisico": 8.8,
-            "gym": 8,
-            "tecnico": 9,
-            "actitud": 9.2,
-            "bonus": 0.2
-          },
-          "motivoPuntos": "Gol de córner corto",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-18",
-            "2026-11-20",
-            "2026-11-22"
-          ],
-          "clinico": [],
-          "evaluaciones": [],
-          "codigoAcceso": "GYM-T7CU",
-          "historialPagos": [],
-          "categoriasExtra": [],
-          "historialCategorias": [],
-          "historialScore": [],
-          "puntosCategoria": 8.9
-        },
-        {
-          "id": 301,
-          "deporte": "Gimnasio",
-          "categoria": "General",
-          "puesto": "Musculación e Hipertrofia",
-          "nombre": "Lucas",
-          "apellido": "Peralta",
-          "dni": "39111444",
-          "whatsapp": "5493584889900",
-          "edad": 26,
-          "fechaNacimiento": "2000-09-03",
-          "anioNacimiento": 2000,
-          "sangre": "0+",
-          "peso": 78,
-          "altura": 176,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": null,
-          "puntosCategoria": null,
-          "motivoPuntos": "",
-          "frecuenciaSemanal": 3,
-          "estadoMedico": "Óptimo",
-          "pagoEstado": "Al Día",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-18",
-            "2026-11-20",
-            "2026-11-22"
-          ],
-          "clinico": [],
-          "evaluaciones": [
-            {
-              "id": 51,
-              "fecha": "2026-10-28",
-              "ejercicio": "Press de Banca Plano",
-              "tipo": "fuerza_kg",
-              "valor": 88,
-              "unidad": "kg (1RM)",
-              "detalle": "78 kg × 4 reps (1RM: 88 kg)",
-              "nota": ""
-            },
-            {
-              "id": 52,
-              "fecha": "2026-11-22",
-              "ejercicio": "Press de Banca Plano",
-              "tipo": "fuerza_kg",
-              "valor": 102,
-              "unidad": "kg (1RM)",
-              "detalle": "88 kg × 5 reps (1RM: 102 kg)",
-              "nota": "PR en Banca"
-            }
-          ],
-          "codigoAcceso": "GYM-MM66",
-          "historialPagos": [],
-          "categoriasExtra": [],
-          "historialCategorias": [],
-          "historialScore": []
-        },
-        {
-          "id": 302,
-          "deporte": "Gimnasio",
-          "categoria": "General",
-          "puesto": "Funcional, Core y Salud",
-          "nombre": "Martín",
-          "apellido": "Cabrera",
-          "dni": "41222555",
-          "whatsapp": "5493584990011",
-          "edad": 23,
-          "fechaNacimiento": "2003-11-18",
-          "anioNacimiento": 2003,
-          "sangre": "A+",
-          "peso": 84,
-          "altura": 179,
-          "pierna": "Derecha",
-          "brazo": "Derecho",
-          "activo": true,
-          "pilares": null,
-          "puntosCategoria": null,
-          "motivoPuntos": "",
-          "frecuenciaSemanal": 5,
-          "estadoMedico": "Sobrecarga / Precaución",
-          "pagoEstado": "Pendiente",
-          "montoCuota": 25000,
-          "asistencias": [
-            "2026-11-19",
-            "2026-11-21"
-          ],
-          "clinico": [],
-          "evaluaciones": [],
-          "codigoAcceso": "GYM-55BG",
-          "historialPagos": [],
-          "categoriasExtra": [],
-          "historialCategorias": [],
-          "historialScore": []
-        }
-      ],
-      "rutinas": [
-        {
-          "id": 501,
-          "esGrupal": true,
-          "deporteDestino": "Futbol",
-          "categoriaDestino": "Sub 13",
-          "personaId": null,
-          "etiquetaDestino": "🏟️ Plantel Futbol Sub 13",
-          "fecha": "14/11/2026",
-          "nombre": "Potencia Explosiva y Prevención",
-          "objetivo": "Potencia y Transferencia",
-          "dias": "Martes y Jueves",
-          "notas": "Cuidar técnica en caída.",
-          "ejercicios": [
-            {
-              "nombre": "Sentadilla Trasera con Barra",
-              "series": 4,
-              "reps": "6",
-              "peso": "Moderado",
-              "pausa": "90s",
-              "forma": "Subir rápido"
-            },
-            {
-              "nombre": "Plancha Abdominal RKC y Core Antirotacional",
-              "series": 3,
-              "reps": "35s",
-              "peso": "Peso Corp.",
-              "pausa": "45s",
-              "forma": "Abdomen firme"
-            }
-          ]
-        },
-        {
-          "id": 502,
-          "esGrupal": false,
-          "deporteDestino": "Gimnasio",
-          "categoriaDestino": "General",
-          "personaId": 301,
-          "etiquetaDestino": "👤 Lucas Peralta",
-          "fecha": "14/11/2026",
-          "nombre": "Día 1 - Hipertrofia Empuje y Tracción",
-          "objetivo": "Hipertrofia Estructural",
-          "dias": "Lunes, Miércoles y Viernes",
-          "notas": "RIR 1-2 en series principales.",
-          "ejercicios": [
-            {
-              "nombre": "Press de Banca Plano",
-              "series": 4,
-              "reps": "8",
-              "peso": "85kg",
-              "pausa": "2m",
-              "forma": "Controlar excéntrica"
-            },
-            {
-              "nombre": "Dominadas / Jalón al Pecho en Polea",
-              "series": 4,
-              "reps": "8-10",
-              "peso": "Lastre 10kg",
-              "pausa": "90s",
-              "forma": "Rango completo"
-            },
-            {
-              "nombre": "Remo Unilateral con Mancuerna",
-              "series": 3,
-              "reps": "10 c/lado",
-              "peso": "32kg",
-              "pausa": "75s",
-              "forma": "Tracción a la cadera"
-            }
-          ]
-        },
-        {
-          "id": 503,
-          "esGrupal": false,
-          "deporteDestino": "Gimnasio",
-          "categoriaDestino": "General",
-          "personaId": 303,
-          "etiquetaDestino": "👤 Sofía Navarro",
-          "fecha": "14/11/2026",
-          "nombre": "Día 1 - Fuerza Tren Inferior y Glúteos",
-          "objetivo": "Fuerza Máxima",
-          "dias": "Lunes, Miércoles y Viernes",
-          "notas": "Pausa de 1 seg arriba en Hip Thrust.",
-          "ejercicios": [
-            {
-              "nombre": "Hip Thrust con Barra (Empuje de Cadera)",
-              "series": 4,
-              "reps": "8-10",
-              "peso": "100kg",
-              "pausa": "90s",
-              "forma": "Contracción máxima arriba"
-            },
-            {
-              "nombre": "Sentadilla Búlgara Unilateral",
-              "series": 3,
-              "reps": "8 c/pierna",
-              "peso": "Mancuernas 16kg",
-              "pausa": "75s",
-              "forma": "Torso levemente inclinado"
-            },
-            {
-              "nombre": "Peso Muerto Rumano (Isquios y Glúteos)",
-              "series": 4,
-              "reps": "8",
-              "peso": "65kg",
-              "pausa": "90s",
-              "forma": "Espalda neutra"
-            }
-          ]
-        },
-        {
-          "id": 1795653087270,
-          "esPlantillaBiblioteca": true,
-          "esGrupal": false,
-          "personaId": null,
-          "categoriaVisualId": "hipertrofia",
-          "objetivo": "Hipertrofia Estructural",
-          "nombre": "Tren Superior — Hipertrofia",
-          "nivel": "Principiante",
-          "dias": "Lun, Mié y Vie",
-          "notas": "Controlar la técnica y respetar las pausas.",
-          "fecha": "25/11/2026",
-          "ejercicios": [
-            {
-              "nombre": "Press de Banca Plano",
-              "series": 4,
-              "reps": "8-10",
-              "peso": "Moderado-Alto",
-              "pausa": "90s",
-              "forma": "Escápulas retraídas y bajada controlada"
-            },
-            {
-              "nombre": "Dominadas / Jalón al Pecho en Polea",
-              "series": 4,
-              "reps": "8-12",
-              "peso": "Moderado",
-              "pausa": "90s",
-              "forma": "Pecho arriba sin balanceo"
-            },
-            {
-              "nombre": "Remo Unilateral con Mancuerna",
-              "series": 3,
-              "reps": "10 c/lado",
-              "peso": "Moderado",
-              "pausa": "75s",
-              "forma": "Tirar hacia la cadera"
-            }
-          ]
-        },
-        {
-          "id": 1795653087271,
-          "esPlantillaBiblioteca": true,
-          "esGrupal": false,
-          "personaId": null,
-          "categoriaVisualId": "fuerza",
-          "objetivo": "Fuerza Máxima",
-          "nombre": "Fuerza Base 5×5",
-          "nivel": "Intermedio",
-          "dias": "Lun, Mié y Vie",
-          "notas": "Controlar la técnica y respetar las pausas.",
-          "fecha": "25/11/2026",
-          "ejercicios": [
-            {
-              "nombre": "Sentadilla Trasera con Barra",
-              "series": 5,
-              "reps": "5",
-              "peso": "80% 1RM",
-              "pausa": "180s",
-              "forma": "Core firme y profundidad controlada"
-            },
-            {
-              "nombre": "Press de Banca Plano",
-              "series": 5,
-              "reps": "5",
-              "peso": "80% 1RM",
-              "pausa": "180s",
-              "forma": "Pausa breve en el pecho"
-            },
-            {
-              "nombre": "Peso Muerto Rumano (Isquios y Glúteos)",
-              "series": 4,
-              "reps": "5",
-              "peso": "80% 1RM",
-              "pausa": "150s",
-              "forma": "Espalda neutra"
-            }
-          ]
-        },
-        {
-          "id": 1795653087272,
-          "esPlantillaBiblioteca": true,
-          "esGrupal": false,
-          "personaId": null,
-          "categoriaVisualId": "fuerza",
-          "objetivo": "Fuerza Máxima",
-          "nombre": "Fuerza Tren Inferior y Glúteos",
-          "nivel": "Avanzado",
-          "dias": "Mar y Jue",
-          "notas": "Controlar la técnica y respetar las pausas.",
-          "fecha": "25/11/2026",
-          "ejercicios": [
-            {
-              "nombre": "Hip Thrust con Barra (Empuje de Cadera)",
-              "series": 4,
-              "reps": "8-10",
-              "peso": "Pesado",
-              "pausa": "90s",
-              "forma": "Sostener 1s arriba"
-            },
-            {
-              "nombre": "Sentadilla Búlgara Unilateral",
-              "series": 3,
-              "reps": "8 c/pierna",
-              "peso": "Mancuernas",
-              "pausa": "75s",
-              "forma": "Rodilla alineada con el pie"
-            },
-            {
-              "nombre": "Peso Muerto Rumano (Isquios y Glúteos)",
-              "series": 4,
-              "reps": "8",
-              "peso": "Controlado",
-              "pausa": "90s",
-              "forma": "Bisagra de cadera"
-            }
-          ]
-        },
-        {
-          "id": 1795653087273,
-          "esPlantillaBiblioteca": true,
-          "esGrupal": false,
-          "personaId": null,
-          "categoriaVisualId": "levantamiento",
-          "objetivo": "Levantamiento y Potencia",
-          "nombre": "Levantamiento y Potencia Explosiva",
-          "nivel": "Principiante",
-          "dias": "Mar y Jue",
-          "notas": "Controlar la técnica y respetar las pausas.",
-          "fecha": "25/11/2026",
-          "ejercicios": [
-            {
-              "nombre": "Cargada Colgante (Hang Clean)",
-              "series": 5,
-              "reps": "3",
-              "peso": "70% 1RM",
-              "pausa": "120s",
-              "forma": "Extensión explosiva de cadera"
-            },
-            {
-              "nombre": "Press Militar de Hombros",
-              "series": 4,
-              "reps": "5",
-              "peso": "75% 1RM",
-              "pausa": "120s",
-              "forma": "Bloqueo firme arriba"
-            },
-            {
-              "nombre": "Salto al Cajón Explosivo (Box Jump)",
-              "series": 4,
-              "reps": "5",
-              "peso": "Corporal",
-              "pausa": "90s",
-              "forma": "Aterrizaje suave"
-            }
-          ]
-        },
-        {
-          "id": 1795653087274,
-          "esPlantillaBiblioteca": true,
-          "esGrupal": false,
-          "personaId": null,
-          "categoriaVisualId": "aerobico",
-          "objetivo": "Aeróbico y Resistencia",
-          "nombre": "Aeróbico / HIIT Metabólico",
-          "nivel": "Intermedio",
-          "dias": "Mar, Jue y Sáb",
-          "notas": "Controlar la técnica y respetar las pausas.",
-          "fecha": "25/11/2026",
-          "ejercicios": [
-            {
-              "nombre": "Bloque Intermitente 30/30 (Cinta / Bici)",
-              "series": 10,
-              "reps": "30 seg",
-              "peso": "RPE 8",
-              "pausa": "30s",
-              "forma": "Ritmo parejo en todas las rondas"
-            },
-            {
-              "nombre": "Zancadas Alternas Dinámicas",
-              "series": 4,
-              "reps": "16 totales",
-              "peso": "Corporal",
-              "pausa": "45s",
-              "forma": "Torso erguido"
-            },
-            {
-              "nombre": "Burpees Técnicos",
-              "series": 4,
-              "reps": "12",
-              "peso": "Corporal",
-              "pausa": "60s",
-              "forma": "Respiración continua"
-            }
-          ]
-        },
-        {
-          "id": 1795653087275,
-          "esPlantillaBiblioteca": true,
-          "esGrupal": false,
-          "personaId": null,
-          "categoriaVisualId": "funcional",
-          "objetivo": "Funcional y Core",
-          "nombre": "Funcional, Core y Estabilidad",
-          "nivel": "Avanzado",
-          "dias": "Lun, Mié y Vie",
-          "notas": "Controlar la técnica y respetar las pausas.",
-          "fecha": "25/11/2026",
-          "ejercicios": [
-            {
-              "nombre": "Plancha Abdominal RKC y Core",
-              "series": 4,
-              "reps": "35s",
-              "peso": "Corporal",
-              "pausa": "45s",
-              "forma": "Glúteos y abdomen firmes"
-            },
-            {
-              "nombre": "Sentadilla Búlgara Unilateral",
-              "series": 3,
-              "reps": "10 c/pierna",
-              "peso": "Moderado",
-              "pausa": "60s",
-              "forma": "Control de estabilidad"
-            },
-            {
-              "nombre": "Press Pallof Antirrotación",
-              "series": 3,
-              "reps": "12 c/lado",
-              "peso": "Banda / Polea",
-              "pausa": "45s",
-              "forma": "Evitar rotar el torso"
-            }
-          ]
-        },
-        {
-          "id": 1795653087276,
-          "esPlantillaBiblioteca": true,
-          "esGrupal": false,
-          "personaId": null,
-          "categoriaVisualId": "rehabilitacion",
-          "objetivo": "Rehabilitación / Lesión",
-          "nombre": "Readaptación y Estabilidad Articular",
-          "nivel": "Principiante",
-          "dias": "3 días / sem",
-          "notas": "Controlar la técnica y respetar las pausas.",
-          "fecha": "25/11/2026",
-          "ejercicios": [
-            {
-              "nombre": "Hip Thrust con Barra (Empuje de Cadera)",
-              "series": 3,
-              "reps": "12",
-              "peso": "Suave / Sin dolor",
-              "pausa": "60s",
-              "forma": "Escala de dolor menor a 3"
-            },
-            {
-              "nombre": "Sentadilla Isométrica en Pared",
-              "series": 3,
-              "reps": "30s",
-              "peso": "Corporal",
-              "pausa": "60s",
-              "forma": "Rodillas a 90° alineadas"
-            },
-            {
-              "nombre": "Plancha Abdominal RKC y Core",
-              "series": 3,
-              "reps": "30s",
-              "peso": "Corporal",
-              "pausa": "45s",
-              "forma": "Sin tensión lumbar"
-            }
-          ]
-        }
-      ],
-      "partidos": [
-        {
-          "id": 601,
-          "fecha": "2026-11-21",
-          "deporte": "Futbol",
-          "categoria": "Sub 13",
-          "rival": "vs. San Basilio",
-          "resultado": "2 - 1",
-          "formacion": "4-3-3",
-          "eventos": [
-            {
-              "id": 1,
-              "minuto": 24,
-              "minutoDisplay": "1T • 24'",
-              "jugadorId": 101,
-              "jugadorNombre": "Gómez, Mateo",
-              "puestoEnCancha": "#9 DC",
-              "tipo": "⚽ Gol Convertido",
-              "detalle": "Remate cruzado",
-              "impactoPuntos": 0.3
-            }
-          ],
-          "conclusion": "Victoria 2-1 con gran partido de Mateo Gómez.",
-          "resumenJugadores": [
-            {
-              "id": 101,
-              "nombre": "Gómez, Mateo",
-              "puesto": "#9 DC",
-              "eventos": 1,
-              "puntosSugeridos": 0.3
-            }
-          ],
-          "puntosAplicadosAlRanking": true
-        }
-      ],
-      "alineaciones": {
-        "Futbol_Sub 13_4-3-3": {
-          "7": 102,
-          "9": 101
-        }
-      },
-      "microciclos": {},
-      "videoteca": [
-        {
-          "id": 9001,
-          "nombre": "Sentadilla Trasera con Barra",
-          "grupo": "Tren Inferior",
-          "grupoSecundario": "Piernas y Glúteos",
-          "nivel": "Intermedio / Avanzado",
-          "equipo": "Barra Olímpica y Rack",
-          "seriesSugeridas": 4,
-          "repsSugeridas": "6-8",
-          "pausaSugerida": "2m",
-          "videoUrl": "https://www.youtube.com/watch?v=ultWZbUMPL8",
-          "imagenPreview": "https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Pies al ancho de hombros, tomar aire profundo (bracing abdominal), descender controlando cadera y rodillas en línea con la punta de los pies, subir empujando el piso con fuerza.",
-          "erroresComunes": "Evitar que las rodillas colapsen hacia adentro (valgo) o despegar los talones del suelo."
-        },
-        {
-          "id": 9002,
-          "nombre": "Press de Banca Plano",
-          "grupo": "Empuje / Torso",
-          "grupoSecundario": "Pecho y Empuje",
-          "nivel": "Todos los niveles",
-          "equipo": "Banco Plano y Barra",
-          "seriesSugeridas": 4,
-          "repsSugeridas": "8-10",
-          "pausaSugerida": "90s",
-          "videoUrl": "https://www.youtube.com/watch?v=rT7DgCr-3pg",
-          "imagenPreview": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Retraer escápulas contra el banco, apoyar firme los pies en el piso, bajar la barra de forma controlada hasta la línea media del esternón con codos a 45°.",
-          "erroresComunes": "No abrir los codos a 90° a la altura del cuello ni rebotar la barra contra el pecho."
-        },
-        {
-          "id": 9003,
-          "nombre": "Peso Muerto Rumano (Isquios y Glúteos)",
-          "grupo": "Tren Inferior",
-          "grupoSecundario": "Piernas y Glúteos",
-          "nivel": "Intermedio",
-          "equipo": "Barra o Mancuernas",
-          "seriesSugeridas": 4,
-          "repsSugeridas": "8-10",
-          "pausaSugerida": "90s",
-          "videoUrl": "https://www.youtube.com/watch?v=JCXUYuzwNrM",
-          "imagenPreview": "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Bisagra de cadera llevando la cola hacia atrás con leve flexión de rodillas. Mantener la barra pegada a los muslos y espalda 100% neutra sintiendo el estiramiento femoral.",
-          "erroresComunes": "Encorvar la zona lumbar o bajar flexionando demasiado las rodillas como si fuera una sentadilla."
-        },
-        {
-          "id": 9004,
-          "nombre": "Dominadas / Jalón al Pecho en Polea",
-          "grupo": "Tracción / Espalda",
-          "grupoSecundario": "Espalda y Tracción",
-          "nivel": "Todos los niveles",
-          "equipo": "Barra Fija o Polea Alta",
-          "seriesSugeridas": 4,
-          "repsSugeridas": "8-12",
-          "pausaSugerida": "90s",
-          "videoUrl": "https://www.youtube.com/watch?v=eGo4IYlbE5g",
-          "imagenPreview": "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Iniciar el movimiento deprimiendo las escápulas (hombros lejos de las orejas) y traccionar llevando los codos hacia las costillas hasta pasar el mentón o tocar el pecho superior.",
-          "erroresComunes": "Balancear las piernas o tirar encogiendo los hombros y adelantando el cuello."
-        },
-        {
-          "id": 9005,
-          "nombre": "Sentadilla Búlgara Unilateral",
-          "grupo": "Tren Inferior",
-          "grupoSecundario": "Piernas y Glúteos",
-          "nivel": "Intermedio",
-          "equipo": "Banco y Mancuernas",
-          "seriesSugeridas": 3,
-          "repsSugeridas": "8-10 c/pierna",
-          "pausaSugerida": "75s",
-          "videoUrl": "https://www.youtube.com/watch?v=2C-uNgKwPLE",
-          "imagenPreview": "https://images.unsplash.com/photo-1579758629938-03607ccdbaba?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Empezar siempre por la pierna menos hábil. Inclinarse levemente hacia adelante para enfatizar glúteo y cuádriceps, bajando hasta que la rodilla trasera quede cerca del piso.",
-          "erroresComunes": "Perder la alineación de la rodilla delantera o apoyar demasiado peso en el pie de atrás."
-        },
-        {
-          "id": 9006,
-          "nombre": "Hip Thrust con Barra (Empuje de Cadera)",
-          "grupo": "Tren Inferior",
-          "grupoSecundario": "Piernas y Glúteos",
-          "nivel": "Todos los niveles",
-          "equipo": "Banco, Almohadilla y Barra",
-          "seriesSugeridas": 4,
-          "repsSugeridas": "10-12",
-          "pausaSugerida": "90s",
-          "videoUrl": "https://www.youtube.com/watch?v=SEdqd1n0cvg",
-          "imagenPreview": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Apoyar el borde inferior de las escápulas en el banco, mirada al frente (mentón pegado), empujar con los talones y sostener 1 segundo de contracción máxima arriba.",
-          "erroresComunes": "Hiperextender la espalda baja arriba en vez de bloquear con la pelvis."
-        },
-        {
-          "id": 9007,
-          "nombre": "Remo Unilateral con Mancuerna",
-          "grupo": "Tracción / Espalda",
-          "grupoSecundario": "Espalda y Tracción",
-          "nivel": "Todos los niveles",
-          "equipo": "Banco y Mancuerna",
-          "seriesSugeridas": 3,
-          "repsSugeridas": "10-12 c/lado",
-          "pausaSugerida": "60s",
-          "videoUrl": "https://www.youtube.com/watch?v=pYcpY20QaE8",
-          "imagenPreview": "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Tronco firme paralelo al suelo, llevar la mancuerna en trayectoria curva hacia el bolsillo de la cadera sintiendo el dorsal ancho.",
-          "erroresComunes": "Rotar excesivamente el torso o tirar solo con el bíceps hacia el hombro."
-        },
-        {
-          "id": 9008,
-          "nombre": "Press Militar de Hombros (Overhead Press)",
-          "grupo": "Empuje / Torso",
-          "grupoSecundario": "Pecho y Empuje",
-          "nivel": "Intermedio",
-          "equipo": "Barra o Mancuernas",
-          "seriesSugeridas": 4,
-          "repsSugeridas": "8-10",
-          "pausaSugerida": "90s",
-          "videoUrl": "https://www.youtube.com/watch?v=2yjwXTZQDDI",
-          "imagenPreview": "https://images.unsplash.com/photo-1532029837206-abbe2b7620e3?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Contraer glúteos y abdomen para proteger la columna lumbar. Empujar en línea vertical desde la clavícula hasta bloquear arriba de la corona de la cabeza.",
-          "erroresComunes": "Arquear la cintura hacia atrás para compensar falta de estabilidad en el core."
-        },
-        {
-          "id": 9009,
-          "nombre": "Plancha Abdominal RKC y Core Antirotacional",
-          "grupo": "Core y Funcional",
-          "grupoSecundario": "Core y Funcional",
-          "nivel": "Todos los niveles",
-          "equipo": "Colchoneta / Peso Corporal",
-          "seriesSugeridas": 4,
-          "repsSugeridas": "35s sostén",
-          "pausaSugerida": "45s",
-          "videoUrl": "https://www.youtube.com/watch?v=ASdvN_XEl_c",
-          "imagenPreview": "https://images.unsplash.com/photo-1566241440091-ec10de8db2e1?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Codos debajo de los hombros, traccionar codos hacia las puntas de los pies isométricamente, glúteos y abdomen contraídos al 100%.",
-          "erroresComunes": "Dejar caer la cadera generando tensión lumbar o contener la respiración."
-        },
-        {
-          "id": 9010,
-          "nombre": "Salto al Cajón Explosivo (Box Jump / Pliometría)",
-          "grupo": "Potencia y Pliometría",
-          "grupoSecundario": "Piernas y Glúteos",
-          "nivel": "Intermedio / Avanzado",
-          "equipo": "Cajón Pliométrico",
-          "seriesSugeridas": 4,
-          "repsSugeridas": "5 saltos",
-          "pausaSugerida": "90s",
-          "videoUrl": "https://www.youtube.com/watch?v=52r_Ul5k03g",
-          "imagenPreview": "https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Triple extensión rápida de tobillo, rodilla y cadera. Aterrizar suave en el cajón en posición de media sentadilla amortiguando el impacto.",
-          "erroresComunes": "Aterrizar con las rodillas rígidas o en valgo, o bajar saltando de espaldas."
-        },
-        {
-          "id": 9011,
-          "nombre": "Protocolo Isométrico y Estabilidad de Rodilla",
-          "grupo": "Movilidad y Rehab",
-          "grupoSecundario": "Rehabilitación",
-          "nivel": "Readaptación / Preventivo",
-          "equipo": "Banda Elástica / Pared",
-          "seriesSugeridas": 4,
-          "repsSugeridas": "30-40s sin dolor",
-          "pausaSugerida": "60s",
-          "videoUrl": "https://www.youtube.com/watch?v=y28L1k1vW9s",
-          "imagenPreview": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=700&q=80",
-          "clavesTecnicas": "Mantener ángulo controlado libre de dolor articular, activando el vasto interno del cuádriceps y glúteo medio con banda en rodillas.",
-          "erroresComunes": "Trabajar por encima del umbral de dolor o hacer rebotes bruscos."
-        }
-      ],
-      "catalogoEjercicios": [
-        {
-          "id": "ej_1",
-          "nombre": "Sentadilla Trasera con Barra",
-          "tipo": "fuerza_1rm"
-        },
-        {
-          "id": "ej_2",
-          "nombre": "Press de Banca Plano",
-          "tipo": "fuerza_1rm"
-        },
-        {
-          "id": "ej_3",
-          "nombre": "Peso Muerto Rumano",
-          "tipo": "fuerza_1rm"
-        },
-        {
-          "id": "ej_4",
-          "nombre": "Sentadilla Búlgara Unilateral",
-          "tipo": "unilateral_asimetria"
-        },
-        {
-          "id": "ej_5",
-          "nombre": "Dominadas Lastradas",
-          "tipo": "peso_corporal_lastre"
-        },
-        {
-          "id": "ej_6",
-          "nombre": "Salto al Cajón / CMJ",
-          "tipo": "salto_watts"
-        },
-        {
-          "id": "ej_7",
-          "nombre": "Sprint 20 Metros",
-          "tipo": "tiempo_sprint"
-        },
-        {
-          "id": "ej_8",
-          "nombre": "Yo-Yo Test Intermitente",
-          "tipo": "resistencia_yoyo"
-        }
-      ],
-      "consultorio": {
-        "pacientes": [],
-        "turnos": [],
-        "mutuales": [],
-        "profesionales": [],
-        "sesiones": []
-      },
-      "subAdmins": [],
-      "auditoria": [],
-      "credencialesBiometricas": [],
-      "licenciaConfig": {
-        "claveClub": "gimasio_426",
-        "nombreEntidad": "GIMASIO",
-        "subtituloEntidad": "Adelia María",
-        "siglaCodigo": "GYM",
-        "logoUrl": "",
-        "planActivo": "solo_gym",
-        "modulos": {
-          "futbol": false,
-          "hockey": false,
-          "gym": true,
-          "consultorio": false
-        },
-        "adminUsuario": "gym",
-        "adminClave": "GYM2026",
-        "estadoServicio": "activo",
-        "deportesExtra": [],
-        "bloquearCobranza": false,
-        "profesionesHabilitadas": [],
-        "modoComplejidad": "simple",
-        "funciones": {
-          "salud": {
-            "agenda": true,
-            "mutuales": true,
-            "genograma": true,
-            "evolucion": true,
-            "eva": true,
-            "portalEstudios": true,
-            "equipo": true,
-            "loteMutuales": true,
-            "consentimiento": true,
-            "mapaCorporal": true
-          },
-          "deporte": {
-            "cobranza": true,
-            "rutinasVideos": true,
-            "evaluaciones1RM": true,
-            "partidosPizarra": true,
-            "ranking": true,
-            "planSemanal": true,
-            "aumentoMasivo": true,
-            "totemYCupos": true,
-            "emmacYEstadisticas": true
-          },
-          "general": {
-            "notasRapidas": true,
-            "cierreCaja": true,
-            "whatsappAuto24h": false
-          }
-        }
-      }
-    },
     "lic_alina_caudana_425": {
       "claveClub": "lic_alina_caudana_425",
-      "ultimaActualizacionISO": "2026-11-26T00:04:28.675Z",
+      "ultimaActualizacionISO": "2026-11-28T03:17:54.327Z",
       "personas": [],
       "rutinas": [],
       "partidos": [],
@@ -4111,6 +3494,7 @@
         "profesionales": [],
         "sesiones": []
       },
+      "finanzasMovimientos": [],
       "subAdmins": [],
       "auditoria": [],
       "credencialesBiometricas": [],
@@ -4169,9 +3553,12 @@
         "aliasTransferencia": "",
         "titularTransferencia": "",
         "temaMarca": {
-          "primario": "#db2777",
-          "secundario": "#500724",
+          "primario": "#0284c7",
+          "secundario": "#0c192c",
           "estiloSidebar": "oscuro_tenido"
+        },
+        "coloresEspecialidades": {
+          "psicologia": "#0284c7"
         }
       }
     }

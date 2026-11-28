@@ -1,7 +1,8 @@
 /**
  * server.js - Servidor Backend Oficial Multi-Club, Multi-Gimnasio & Consultorios (SaaS Suite)
  * Incluye control de Demos vs Sistema Real (privacidad por mail), Biometría WebAuthn (Huella/Face ID),
- * Sub-Administradores con permisos granulares, Auditoría y Persistencia Consultorio
+ * Sub-Administradores con permisos granulares, Auditoría, Persistencia Consultorio/Gabinete,
+ * Rutinas Autogestionadas por Usuario, Eliminación Libre de Comercios/Demos y Contabilidad/Caja en MongoDB
  * Desarrollado por Gonzalo Adanchú
  */
 
@@ -40,7 +41,8 @@ const cdmClubStateSchema = new mongoose.Schema({
     microciclos: { type: Object, default: {} },
     videoteca: { type: Array, default: [] },
     catalogoEjercicios: { type: Array, default: [] },
-    consultorio: { type: Object, default: () => ({ pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] }) },
+    consultorio: { type: Object, default: () => ({ pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [], derivaciones: [] }) },
+    finanzasMovimientos: { type: Array, default: [] },
     licenciaConfig: { type: Object, default: {} },
     subAdmins: { type: Array, default: [] },
     auditoria: { type: Array, default: [] },
@@ -207,7 +209,9 @@ function tieneDatosConsultorio(cons) {
         (Array.isArray(cons.pacientes) && cons.pacientes.length > 0) ||
         (Array.isArray(cons.turnos) && cons.turnos.length > 0) ||
         (Array.isArray(cons.sesiones) && cons.sesiones.length > 0) ||
-        (Array.isArray(cons.profesionales) && cons.profesionales.length > 0)
+        (Array.isArray(cons.profesionales) && cons.profesionales.length > 0) ||
+        (Array.isArray(cons.mutuales) && cons.mutuales.length > 0) ||
+        (Array.isArray(cons.derivaciones) && cons.derivaciones.length > 0)
     );
 }
 
@@ -246,7 +250,6 @@ async function enviarCorreoCodigoSeguridad({ para, nombreEntidad, codigo, tipo =
         </div>
     `;
 
-    // Opción 1: Resend API (recomendado en Hostinger, 0 librerías extra)
     if (process.env.RESEND_API_KEY) {
         const resp = await fetch('https://api.resend.com/emails', {
             method: 'POST',
@@ -263,7 +266,6 @@ async function enviarCorreoCodigoSeguridad({ para, nombreEntidad, codigo, tipo =
         return { ok: true, proveedor: 'resend' };
     }
 
-    // Opción 2: Brevo API (0 librerías extra)
     if (process.env.BREVO_API_KEY) {
         const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
             method: 'POST',
@@ -285,7 +287,6 @@ async function enviarCorreoCodigoSeguridad({ para, nombreEntidad, codigo, tipo =
         return { ok: true, proveedor: 'brevo' };
     }
 
-    // Opción 3: SMTP de Hostinger / Gmail (requiere npm i nodemailer)
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
         let nodemailer = null;
         try {
@@ -317,7 +318,8 @@ function crearEstadoVacioClub(claveClub = CLAVE_CLUB_POR_DEFECTO, licenciaInicia
         microciclos: {},
         videoteca: [],
         catalogoEjercicios: [],
-        consultorio: { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] },
+        consultorio: { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [], derivaciones: [] },
+        finanzasMovimientos: [],
         subAdmins: [],
         auditoria: [],
         credencialesBiometricas: [],
@@ -366,7 +368,12 @@ function leerMapaClubesDesdeDisco() {
 
 function guardarMapaClubesEnDisco(mapaClubes) {
     try {
-        const principal = mapaClubes[CLAVE_CLUB_POR_DEFECTO] || Object.values(mapaClubes)[0] || crearEstadoVacioClub();
+        const claves = Object.keys(mapaClubes || {});
+        if (claves.length === 0) {
+            fs.writeFileSync(ARCHIVO_RESPALDO_DISCO, JSON.stringify({ clubes: {} }, null, 2), 'utf8');
+            return;
+        }
+        const principal = mapaClubes[CLAVE_CLUB_POR_DEFECTO] || mapaClubes[claves[0]];
         fs.writeFileSync(ARCHIVO_RESPALDO_DISCO, JSON.stringify({ ...principal, clubes: mapaClubes }, null, 2), 'utf8');
     } catch (e) {
         console.error('⚠️ Error guardando respaldo en disco:', e.message);
@@ -450,10 +457,20 @@ async function guardarEstadoMaestroClub(nuevoEstado, claveClubParam = null) {
         });
     }
 
-    let consultorioFinal = previo.consultorio || { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] };
+    let consultorioFinal = previo.consultorio || { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [], derivaciones: [] };
     if (nuevoEstado.consultorio && typeof nuevoEstado.consultorio === 'object') {
         if (nuevoEstado.forzarConsultorio || tieneDatosConsultorio(nuevoEstado.consultorio) || !tieneDatosConsultorio(consultorioFinal)) {
-            consultorioFinal = nuevoEstado.consultorio;
+            consultorioFinal = {
+                ...consultorioFinal,
+                ...nuevoEstado.consultorio
+            };
+        }
+    }
+
+    let finanzasFinal = Array.isArray(previo.finanzasMovimientos) ? previo.finanzasMovimientos : [];
+    if (Array.isArray(nuevoEstado.finanzasMovimientos)) {
+        if (nuevoEstado.forzarFinanzas || nuevoEstado.finanzasMovimientos.length > 0 || finanzasFinal.length === 0) {
+            finanzasFinal = nuevoEstado.finanzasMovimientos;
         }
     }
 
@@ -483,6 +500,7 @@ async function guardarEstadoMaestroClub(nuevoEstado, claveClubParam = null) {
         videoteca: Array.isArray(nuevoEstado.videoteca) ? nuevoEstado.videoteca : (previo.videoteca || []),
         catalogoEjercicios: Array.isArray(nuevoEstado.catalogoEjercicios) ? nuevoEstado.catalogoEjercicios : (previo.catalogoEjercicios || []),
         consultorio: consultorioFinal,
+        finanzasMovimientos: finanzasFinal,
         subAdmins: subAdminsFinal,
         auditoria: Array.isArray(nuevoEstado.auditoria) ? nuevoEstado.auditoria.slice(0, 200) : (previo.auditoria || []),
         credencialesBiometricas: Array.isArray(nuevoEstado.credencialesBiometricas)
@@ -535,6 +553,7 @@ function sanitizarEstadoParaRespuesta(estado) {
     if (!estado) return estado;
     const copia = {
         ...estado,
+        finanzasMovimientos: Array.isArray(estado.finanzasMovimientos) ? estado.finanzasMovimientos : [],
         licenciaConfig: sanitizarLicenciaPublica(estado.licenciaConfig || {}),
         subAdmins: Array.isArray(estado.subAdmins) ? estado.subAdmins.map(sanitizarStaffPublico) : []
     };
@@ -591,15 +610,28 @@ app.post('/api/cdm/estado', async (req, res) => {
     }
 });
 
+// ============================================================================
+// 3A. PERSISTENCIA DEDICADA DE CONSULTORIO / GABINETE Y CONTABILIDAD (CAJA)
+// ============================================================================
+
 app.get('/api/cdm/consultorio', async (req, res) => {
     try {
         const clave = String(req.query.club || CLAVE_CLUB_POR_DEFECTO).trim();
         const estado = await obtenerEstadoMaestroClub(clave);
+        const cons = estado.consultorio || {};
         res.json({
             ok: true,
             claveClub: clave,
             motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
-            consultorio: estado.consultorio || { pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [] }
+            consultorio: {
+                ...cons,
+                pacientes: Array.isArray(cons.pacientes) ? cons.pacientes : [],
+                turnos: Array.isArray(cons.turnos) ? cons.turnos : [],
+                mutuales: Array.isArray(cons.mutuales) ? cons.mutuales : [],
+                profesionales: Array.isArray(cons.profesionales) ? cons.profesionales : [],
+                sesiones: Array.isArray(cons.sesiones) ? cons.sesiones : [],
+                derivaciones: Array.isArray(cons.derivaciones) ? cons.derivaciones : []
+            }
         });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
@@ -616,11 +648,16 @@ app.post('/api/cdm/consultorio', async (req, res) => {
 
         const estadoActual = await obtenerEstadoMaestroClub(clave);
         estadoActual.consultorio = {
+            ...(estadoActual.consultorio || {}),
+            ...consultorio,
             pacientes: Array.isArray(consultorio.pacientes) ? consultorio.pacientes : [],
             turnos: Array.isArray(consultorio.turnos) ? consultorio.turnos : [],
             mutuales: Array.isArray(consultorio.mutuales) ? consultorio.mutuales : [],
             profesionales: Array.isArray(consultorio.profesionales) ? consultorio.profesionales : [],
-            sesiones: Array.isArray(consultorio.sesiones) ? consultorio.sesiones : []
+            sesiones: Array.isArray(consultorio.sesiones) ? consultorio.sesiones : [],
+            derivaciones: Array.isArray(consultorio.derivaciones)
+                ? consultorio.derivaciones
+                : (Array.isArray(estadoActual.consultorio?.derivaciones) ? estadoActual.consultorio.derivaciones : [])
         };
         estadoActual.forzarConsultorio = true;
 
@@ -633,7 +670,49 @@ app.post('/api/cdm/consultorio', async (req, res) => {
             motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
             pacientes: guardado.consultorio.pacientes.length,
             turnos: guardado.consultorio.turnos.length,
-            sesiones: guardado.consultorio.sesiones.length
+            sesiones: guardado.consultorio.sesiones.length,
+            derivaciones: (guardado.consultorio.derivaciones || []).length
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.get('/api/cdm/finanzas', async (req, res) => {
+    try {
+        const clave = String(req.query.club || CLAVE_CLUB_POR_DEFECTO).trim();
+        const estado = await obtenerEstadoMaestroClub(clave);
+        res.json({
+            ok: true,
+            claveClub: clave,
+            motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
+            movimientos: Array.isArray(estado.finanzasMovimientos) ? estado.finanzasMovimientos : []
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+app.post('/api/cdm/finanzas', async (req, res) => {
+    try {
+        const clave = String(req.body?.claveClub || req.query.club || CLAVE_CLUB_POR_DEFECTO).trim();
+        const movimientos = req.body?.movimientos;
+        if (!Array.isArray(movimientos)) {
+            return res.status(400).json({ ok: false, error: 'Lista de movimientos inválida.' });
+        }
+
+        const estadoActual = await obtenerEstadoMaestroClub(clave);
+        estadoActual.finanzasMovimientos = movimientos;
+        estadoActual.forzarFinanzas = true;
+
+        const guardado = await guardarEstadoMaestroClub(estadoActual, clave);
+        res.json({
+            ok: true,
+            claveClub: clave,
+            mongoGuardado: Boolean(guardado._mongoGuardado),
+            mongoError: guardado._mongoError || null,
+            motor: mongoConectado ? `mongoose_${cdmConnection.name}` : 'json_disco_local',
+            cantidad: guardado.finanzasMovimientos.length
         });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
@@ -669,8 +748,8 @@ app.post('/api/cdm/clubes/nuevo', async (req, res) => {
 app.delete('/api/cdm/clubes/:claveClub', async (req, res) => {
     try {
         const clave = String(req.params.claveClub || '').trim();
-        if (!clave || clave === CLAVE_CLUB_POR_DEFECTO) {
-            return res.status(400).json({ ok: false, error: 'No se puede eliminar la cuenta principal por defecto.' });
+        if (!clave) {
+            return res.status(400).json({ ok: false, error: 'Falta la clave del comercio a eliminar.' });
         }
         const mapa = leerMapaClubesDesdeDisco();
         delete mapa[clave];
@@ -679,7 +758,7 @@ app.delete('/api/cdm/clubes/:claveClub', async (req, res) => {
             await CdmStateModel.deleteOne({ claveClub: clave });
         }
         const todos = await obtenerTodosLosClubes();
-        res.json({ ok: true, clubes: resumirListaClubes(todos) });
+        res.json({ ok: true, eliminado: clave, clubes: resumirListaClubes(todos) });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
@@ -838,20 +917,42 @@ app.post('/api/cdm/auditoria', async (req, res) => {
 app.post('/api/cdm/jugador/:id/sync', async (req, res) => {
     try {
         const idJugador = Number(req.params.id);
-        const { personaActualizada, catalogoEjercicios, claveClub } = req.body || {};
+        const { personaActualizada, catalogoEjercicios, rutinasPropiasUsuario, claveClub } = req.body || {};
         const estadoActual = await obtenerEstadoMaestroClub(claveClub || req.query.club || CLAVE_CLUB_POR_DEFECTO);
 
+        let puedeAutoRutinas = false;
         if (personaActualizada && idJugador) {
             const idx = (estadoActual.personas || []).findIndex(p => Number(p.id) === idJugador);
             if (idx !== -1) {
                 const existente = estadoActual.personas[idx];
+                puedeAutoRutinas = Boolean(existente.puedeCrearRutinas);
                 existente.peso = personaActualizada.peso ?? existente.peso;
                 existente.foto = personaActualizada.foto !== undefined ? personaActualizada.foto : existente.foto;
                 existente.evaluaciones = Array.isArray(personaActualizada.evaluaciones) ? personaActualizada.evaluaciones : existente.evaluaciones;
                 existente.clinico = Array.isArray(personaActualizada.clinico) ? personaActualizada.clinico : existente.clinico;
+                if (personaActualizada.progresionesPersonales && typeof personaActualizada.progresionesPersonales === 'object') {
+                    existente.progresionesPersonales = personaActualizada.progresionesPersonales;
+                }
                 estadoActual.personas[idx] = existente;
             }
         }
+
+        // Solo acepta rutinas propias si el entrenador le abrió el candado en el servidor (nunca toca rutinas del profe)
+        if (puedeAutoRutinas && Array.isArray(rutinasPropiasUsuario) && idJugador) {
+            const otrasRutinas = (estadoActual.rutinas || []).filter(r =>
+                !(r && r.creadaPorUsuario && Number(r.personaId) === idJugador)
+            );
+            const limpiasUsuario = rutinasPropiasUsuario
+                .filter(r => r && typeof r === 'object' && r.nombre)
+                .map(r => ({
+                    ...r,
+                    personaId: idJugador,
+                    esGrupal: false,
+                    creadaPorUsuario: true
+                }));
+            estadoActual.rutinas = [...limpiasUsuario, ...otrasRutinas];
+        }
+
         if (Array.isArray(catalogoEjercicios) && catalogoEjercicios.length > 0) {
             estadoActual.catalogoEjercicios = catalogoEjercicios;
         }
@@ -944,7 +1045,6 @@ app.post('/api/cdm/auth-admin', async (req, res) => {
                 });
             }
 
-            // Si es SISTEMA REAL y aún no cambió sus credenciales iniciales -> flujo obligatorio con código de email
             if (lic.tipoCuenta === 'real' && !lic.credencialesPrivadasConfirmadas) {
                 const tokenSetup = firmarTokenInterno({
                     proposito: 'setup_privado',
@@ -1030,7 +1130,6 @@ app.post('/api/cdm/auth-admin', async (req, res) => {
     }
 });
 
-// Paso 1 Activación Cuenta Real: enviar código de 6 dígitos al email del cliente
 app.post('/api/cdm/auth-privacidad/enviar-codigo', async (req, res) => {
     try {
         const { tokenSetup, email, nuevoUsuario } = req.body || {};
@@ -1084,7 +1183,6 @@ app.post('/api/cdm/auth-privacidad/enviar-codigo', async (req, res) => {
     }
 });
 
-// Paso 2 Activación Cuenta Real: validar código, encriptar nueva clave y borrar la clave provisoria
 app.post('/api/cdm/auth-privacidad/confirmar', async (req, res) => {
     try {
         const { tokenSetup, email, codigo, nuevoUsuario, nuevaClave } = req.body || {};
@@ -1155,7 +1253,6 @@ app.post('/api/cdm/auth-privacidad/confirmar', async (req, res) => {
     }
 });
 
-// Recuperación de contraseña autónoma por email (para cuentas reales con clave privada)
 app.post('/api/cdm/auth-recuperar/enviar-codigo', async (req, res) => {
     try {
         const identificador = String(req.body?.identificador || '').trim().toLowerCase();
@@ -1227,7 +1324,6 @@ app.post('/api/cdm/auth-recuperar/confirmar', async (req, res) => {
     }
 });
 
-// Login por código personal (Deportistas CDM-XXXX y Pacientes PAC-XXXX)
 app.post('/api/cdm/auth-codigo', async (req, res) => {
     try {
         const rawInput = String(req.body?.codigo || '').trim().toUpperCase();
@@ -1385,7 +1481,6 @@ app.post('/api/cdm/webauthn/register-verify', async (req, res) => {
             return res.status(400).json({ ok: false, mensaje: 'Origen inválido para registro biométrico.' });
         }
 
-        // Validar que la clave pública SPKI sea válida en Node crypto
         crypto.createPublicKey({ key: fromBase64Url(publicKeySpki), format: 'der', type: 'spki' });
 
         const estado = await obtenerEstadoMaestroClub(tk.claveClub);
@@ -1502,7 +1597,6 @@ app.post('/api/cdm/webauthn/login-verify', async (req, res) => {
             return res.status(401).json({ ok: false, mensaje: 'Firma biométrica inválida.' });
         }
 
-        // Chequear estado del servicio / vencimiento de demo
         const lic = estado.licenciaConfig || {};
         if (lic.estadoServicio === 'suspendido' || estaDemoVencida(lic)) {
             return res.status(403).json({
@@ -1698,8 +1792,25 @@ setInterval(procesarRecordatoriosAutomaticos24h, 15 * 60 * 1000);
 setTimeout(procesarRecordatoriosAutomaticos24h, 30 * 1000);
 
 // ============================================================================
-// 4. SERVIR FRONTEND Y ARRANCAR SERVIDOR
+// 4. BLINDAJE DE ARCHIVOS DEL SERVIDOR + FRONTEND ESTÁTICO
 // ============================================================================
+
+app.use((req, res, next) => {
+    const p = String(req.path || '').toLowerCase();
+    const bloqueado =
+        p === '/server.js' ||
+        p === '/cdm_datos_servidor.json' ||
+        p === '/package.json' ||
+        p === '/package-lock.json' ||
+        p.startsWith('/node_modules') ||
+        p.includes('/.') ||
+        p.endsWith('.env');
+
+    if (bloqueado) {
+        return res.status(403).send('Acceso denegado');
+    }
+    next();
+});
 
 app.use(express.static(__dirname));
 

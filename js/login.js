@@ -1461,6 +1461,8 @@ function activarBlindajeAntiDescargaYCaptura(sesion) {
     if (window.__cdmBlindajeActivo) return;
     window.__cdmBlindajeActivo = true;
 
+    const entidad = (obtenerLicenciaConfigCDM().nombreEntidad || "la plataforma").trim();
+
     // 1. Anular impresión / exportación a PDF por JS
     window.print = function () {
         if (typeof mostrarToast === "function") {
@@ -1477,23 +1479,23 @@ function activarBlindajeAntiDescargaYCaptura(sesion) {
     // 3. Bloquear clic derecho, copiar, cortar y arrastrar
     document.addEventListener("contextmenu", (e) => e.preventDefault());
     document.addEventListener("copy", (e) => {
-        e.clipboardData?.setData("text/plain", "🔒 Contenido protegido — CDM Adelia María");
+        e.clipboardData?.setData("text/plain", `🔒 Contenido protegido — ${entidad}`);
         e.preventDefault();
     });
     document.addEventListener("cut", (e) => e.preventDefault());
     document.addEventListener("dragstart", (e) => e.preventDefault());
 
-    // 4. Crear escudo anti-captura (se activa al ocultar pestaña o tocar teclas de captura, pero NO al usar inputs ni ver videos)
+    // 4. Escudo ante intentos explícitos de captura o inspección (SIN molestar al cambiar a Spotify/WhatsApp)
     let shield = document.getElementById("cdmAntiCaptureShield");
     if (!shield) {
         shield = document.createElement("div");
         shield.id = "cdmAntiCaptureShield";
         shield.innerHTML = `
-            <div style="text-align:center; padding:2.2rem; max-width:390px; background:rgba(13,24,41,0.92); border:1px solid rgba(56,189,248,0.3); border-radius:24px; box-shadow:0 24px 48px rgba(0,0,0,0.6);">
-                <i class="ri-shield-keyhole-fill" style="font-size:3rem; color:#38bdf8;"></i>
-                <h3 style="color:#ffffff; margin-top:0.6rem; font-size:1.22rem;">Contenido Protegido</h3>
-                <p style="color:#94a3b8; font-size:0.84rem; margin-top:0.45rem; line-height:1.5;">
-                    Por privacidad del Club Deportivo Municipal, la pantalla se protege automáticamente ante intentos de captura o cambio de aplicación.
+            <div style="text-align:center; padding:2rem; max-width:390px; background:rgba(13,24,41,0.92); border:1px solid rgba(56,189,248,0.3); border-radius:24px; box-shadow:0 24px 48px rgba(0,0,0,0.6);">
+                <i class="ri-shield-keyhole-fill" style="font-size:2.8rem; color:#38bdf8;"></i>
+                <h3 style="color:#ffffff; margin-top:0.5rem; font-size:1.18rem;">Contenido Protegido</h3>
+                <p style="color:#94a3b8; font-size:0.83rem; margin-top:0.45rem; line-height:1.5;">
+                    Por privacidad de <b>${entidad}</b>, las capturas y descargas están deshabilitadas en esta vista.
                 </p>
                 <button type="button" class="btn btn-primary btn-sm" style="margin-top:1.1rem; width:100%;" onclick="document.getElementById('cdmAntiCaptureShield').classList.remove('active')">
                     Continuar en mi Panel
@@ -1502,21 +1504,6 @@ function activarBlindajeAntiDescargaYCaptura(sesion) {
         `;
         document.body.appendChild(shield);
     }
-
-    const desactivarEscudo = () => shield.classList.remove("active");
-
-    document.addEventListener("visibilitychange", () => {
-        if (document.hidden) shield.classList.add("active");
-        else desactivarEscudo();
-    });
-
-    window.addEventListener("blur", () => {
-        setTimeout(() => {
-            if (document.activeElement && document.activeElement.tagName === "IFRAME") return;
-            if (document.hidden) shield.classList.add("active");
-        }, 120);
-    });
-    window.addEventListener("focus", desactivarEscudo);
 
     // 5. Interceptar teclas de captura (PrintScreen, Win+Shift+S, Cmd+Shift+3/4, Ctrl+P, Ctrl+S, F12)
     window.addEventListener("keydown", (e) => {
@@ -1532,7 +1519,7 @@ function activarBlindajeAntiDescargaYCaptura(sesion) {
             e.stopPropagation();
             shield.classList.add("active");
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText("🔒 Captura bloqueada por CDM Adelia María").catch(() => {});
+                navigator.clipboard.writeText(`🔒 Captura bloqueada por ${entidad}`).catch(() => {});
             }
             if (typeof mostrarToast === "function") {
                 mostrarToast("🔒 Las capturas de pantalla y descargas están deshabilitadas.");
@@ -3634,20 +3621,32 @@ function regenerarCodigoIndividualCDM(idPersona) {
 
 function enviarCodigoPorWhatsAppCDM(idPersona) {
     const personas = asegurarCodigosEnStorage();
-    const p = personas.find(x => x.id === idPersona);
+    const p = personas.find(x => Number(x.id) === Number(idPersona));
     if (!p) return;
 
+    const lic = obtenerLicenciaConfigCDM();
+    const entidad = (lic.nombreEntidad || "Tu Gimnasio / Club").trim();
+    const esGym = p.deporte === "Gimnasio";
+    const linkIngreso = window.location.protocol !== "file:" && window.location.origin && window.location.origin !== "null"
+        ? `${window.location.origin}/login.html`
+        : "";
     const tel = (p.whatsapp || "").replace(/\D/g, "");
-    let msg = `💙🤍 *CREDENCIAL DE INGRESO OFICIAL — CDM ADELIA MARÍA*\n`;
+
+    let msg = `🔑 *TU ACCESO PERSONAL — ${entidad.toUpperCase()}*\n`;
     msg += `----------------------------------\n`;
-    msg += `Hola *${p.nombre}*, acá tenés tu código personal único para entrar a la plataforma del Club:\n\n`;
-    msg += `🔑 *TU CÓDIGO PERSONAL:* *${p.codigoAcceso}*\n\n`;
-    msg += `📲 *¿Qué podés hacer con tu código?*\n`;
-    msg += `• Ver tus rutinas con videos técnicos y cargar tus propios avances de peso/marca.\n`;
-    msg += `• Seguir tu curva de evolución física, radar 360° y tabla de cargas (% 1RM).\n`;
-    msg += `• Consultar la Videoteca completa y el Ranking oficial.\n`;
+    msg += `Hola *${p.nombre}*, acá tenés tu código único para entrar desde el celular:\n\n`;
+    if (linkIngreso) msg += `🔗 *Link:* ${linkIngreso}\n`;
+    msg += `🔑 *TU CÓDIGO:* *${p.codigoAcceso}*\n\n`;
+    msg += `📲 *¿Qué podés hacer adentro?*\n`;
+    if (esGym) {
+        msg += `• Ver tus rutinas con videos técnicos y reloj de descanso.\n`;
+        msg += `• Anotar tus kilos, seguir tus récords (PR) y calcular tu tabla % 1RM.\n`;
+    } else {
+        msg += `• Ver tus rutinas, videos técnicos y evolución deportiva 360°.\n`;
+        msg += `• Consultar tus avances, tabla % 1RM y ranking de tu categoría.\n`;
+    }
     msg += `----------------------------------\n`;
-    msg += `_Al abrir la App, elegí "Deportista / Socio" e ingresá tu código ${p.codigoAcceso}._`;
+    msg += `_Al abrir la app, tocá "Deportista / Socio" e ingresá ${p.codigoAcceso}._`;
 
     const url = tel
         ? `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`
@@ -11707,4 +11706,580 @@ guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
         inicializarMarcaGSIS();
         setTimeout(inicializarMarcaGSIS, 200);
     }
+})();
+// =========================================================================
+// 25. INTEGRACIÓN CLOUD EN LOGIN.JS: FINANZAS MONGODB, BACKUP REAL Y SYNC WA 24H
+//     - Conecta finanzasMovimientos al cambiar de comercio y en snapshots locales
+//     - Actualiza Backup / Restauración Individual (Bloque 17) a las claves reales
+//       (Caja v35 + Consultorio/Gabinete v2 + Staff + Auditoría) con sync a MongoDB
+//     - Persiste whatsappAuto24h (Bloque 20) en MongoDB al guardar el comercio
+// Pegar al final de js/login.js (debajo del Bloque 24)
+// =========================================================================
+(function () {
+    if (window.__cdmSyncCloudLogin25) return;
+    window.__cdmSyncCloudLogin25 = true;
+
+    function keyFinanzas25(claveClub) {
+        return `cdm_finanzas_unif_v35_${claveClub || obtenerClaveClubActivoCDM()}`;
+    }
+
+    function keyConsultorio25(claveClub) {
+        return `cdm_consultorio_suite_v2_${claveClub || obtenerClaveClubActivoCDM()}`;
+    }
+
+    // 1. Hidratar finanzasMovimientos al entrar a un comercio o loguearse
+    if (typeof cargarEstadoClubEnLocalStorage === "function") {
+        const _origCargarEstado25 = cargarEstadoClubEnLocalStorage;
+        cargarEstadoClubEnLocalStorage = function (estadoClub, claveClub) {
+            _origCargarEstado25.apply(this, arguments);
+            if (!estadoClub || typeof estadoClub !== "object") return;
+            const clave = claveClub || estadoClub.claveClub || CLAVE_CLUB_DEFECTO_CDM;
+
+            if (Array.isArray(estadoClub.finanzasMovimientos)) {
+                localStorage.setItem(keyFinanzas25(clave), JSON.stringify(estadoClub.finanzasMovimientos));
+                if (typeof window.cargarFinanzasDesdeEstadoClub === "function") {
+                    window.cargarFinanzasDesdeEstadoClub(estadoClub.finanzasMovimientos, clave);
+                }
+            }
+        };
+    }
+
+    // 2. Guardar finanzasMovimientos en el snapshot local del comercio activo
+    if (typeof guardarSnapshotClubActualEnMapaLocal === "function") {
+        const _origGuardarSnap25 = guardarSnapshotClubActualEnMapaLocal;
+        guardarSnapshotClubActualEnMapaLocal = function () {
+            const mapa = _origGuardarSnap25.apply(this, arguments);
+            const clave = obtenerClaveClubActivoCDM();
+            if (mapa && mapa[clave]) {
+                try {
+                    const movs = JSON.parse(localStorage.getItem(keyFinanzas25(clave)) || "null");
+                    if (Array.isArray(movs)) {
+                        mapa[clave].finanzasMovimientos = movs;
+                        localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+                    }
+                } catch {}
+            }
+            return mapa;
+        };
+    }
+
+    // 3. Persistir whatsappAuto24h (Bloque 20) también en MongoDB al guardar comercio
+    if (typeof guardarComercioDesdeModal === "function") {
+        const _origGuardarComercio25 = guardarComercioDesdeModal;
+        guardarComercioDesdeModal = async function (e, claveClubExistente = "") {
+            const swAuto = document.querySelector('.mc-feat-switch-14[data-grupo="general"][data-clave="whatsappAuto24h"]');
+            const autoVal = Boolean(swAuto?.checked);
+            const nombreInput = (document.getElementById("mcNombreEntidad")?.value || "").trim().toLowerCase();
+
+            await _origGuardarComercio25.apply(this, arguments);
+
+            if (window.location.protocol === "file:") return;
+            const mapa = obtenerMapaLocalClubesCDM();
+            let claveTarget = claveClubExistente;
+            if (!claveTarget && nombreInput) {
+                const match = Object.values(mapa).find(c => (c.licenciaConfig?.nombreEntidad || "").toLowerCase() === nombreInput);
+                if (match) claveTarget = match.claveClub;
+            }
+            if (!claveTarget) return;
+
+            try {
+                const respEst = await fetch(`/api/cdm/estado?club=${encodeURIComponent(claveTarget)}`, { cache: "no-store" });
+                if (!respEst.ok) return;
+                const dEst = await respEst.json();
+                const estActual = dEst.estado || {};
+                const licPrev = estActual.licenciaConfig || {};
+                const funcPrev = licPrev.funciones || {};
+                estActual.licenciaConfig = {
+                    ...licPrev,
+                    ...(mapa[claveTarget]?.licenciaConfig || {}),
+                    whatsappAuto24h: autoVal,
+                    funciones: {
+                        ...funcPrev,
+                        ...(mapa[claveTarget]?.licenciaConfig?.funciones || {}),
+                        general: {
+                            ...(funcPrev.general || {}),
+                            ...(mapa[claveTarget]?.licenciaConfig?.funciones?.general || {}),
+                            whatsappAuto24h: autoVal
+                        }
+                    }
+                };
+                await fetch("/api/cdm/estado", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ...estActual, claveClub: claveTarget })
+                });
+            } catch {}
+        };
+    }
+
+    // 4. Backup Individual v2 (incluye Caja Unificada v35 + Consultorio/Gabinete v2 + Staff + Auditoría)
+    window.exportarBackupIndividualComercio17 = async function (claveClub) {
+        if (!claveClub) return;
+        guardarSnapshotClubActualEnMapaLocal();
+        const mapa = obtenerMapaLocalClubesCDM();
+        let clubData = mapa[claveClub] ? { ...mapa[claveClub] } : null;
+
+        // Intentar traer la versión más fresca de MongoDB si hay servidor activo
+        if (window.location.protocol !== "file:") {
+            try {
+                const resp = await fetch(`/api/cdm/estado?club=${encodeURIComponent(claveClub)}`, { cache: "no-store" });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data?.ok && data.estado) clubData = data.estado;
+                }
+            } catch {}
+        }
+
+        if (!clubData) {
+            alert("No se encontraron datos guardados para este comercio.");
+            return;
+        }
+
+        let consultorioV2 = clubData.consultorio || null;
+        try {
+            const locCons = JSON.parse(localStorage.getItem(keyConsultorio25(claveClub)) || "null");
+            if (locCons && typeof locCons === "object" && !consultorioV2) consultorioV2 = locCons;
+        } catch {}
+
+        let finanzasV35 = Array.isArray(clubData.finanzasMovimientos) ? clubData.finanzasMovimientos : [];
+        try {
+            const locFin = JSON.parse(localStorage.getItem(keyFinanzas25(claveClub)) || "null");
+            if (Array.isArray(locFin) && finanzasV35.length === 0) finanzasV35 = locFin;
+        } catch {}
+
+        let notasClub = [];
+        try {
+            const allNotas = JSON.parse(localStorage.getItem("cdm_notas_rapidas_pro_v23") || "{}");
+            if (Array.isArray(allNotas[claveClub])) notasClub = allNotas[claveClub];
+        } catch {}
+
+        let pacientesUniversalesClub = {};
+        try {
+            const allUniv = JSON.parse(localStorage.getItem("cdm_registro_universal_pacientes_v19") || "{}");
+            Object.entries(allUniv).forEach(([k, v]) => {
+                if (v && (!v.claveClub || v.claveClub === claveClub)) pacientesUniversalesClub[k] = v;
+            });
+        } catch {}
+
+        let cuposClub = null, arancelesClub = {};
+        try { cuposClub = JSON.parse(localStorage.getItem(`cdm_gym_cupos_v26_${claveClub}`) || "null"); } catch {}
+        try { arancelesClub = JSON.parse(localStorage.getItem(`cdm_aranceles_lote_v25_${claveClub}`) || "{}"); } catch {}
+
+        const paqueteBackup = {
+            tipoBackup: "COMERCIO_INDIVIDUAL_SAAS_V2",
+            fechaExportacion: new Date().toISOString(),
+            claveClub,
+            nombreEntidad: clubData.licenciaConfig?.nombreEntidad || claveClub,
+            datosPrincipales: {
+                ...clubData,
+                consultorio: consultorioV2,
+                finanzasMovimientos: finanzasV35
+            },
+            extrasComercio: {
+                consultorioSuiteV2: consultorioV2,
+                finanzasUnificadasV35: finanzasV35,
+                notasRapidas: notasClub,
+                pacientesUniversales: pacientesUniversalesClub,
+                gymCupos: cuposClub,
+                arancelesLote: arancelesClub
+            }
+        };
+
+        const hoy = new Date().toISOString().split("T")[0];
+        const blob = new Blob([JSON.stringify(paqueteBackup, null, 2)], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `backup_${claveClub}_${hoy}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+        if (typeof mostrarToast === "function") {
+            mostrarToast(`💾 Backup completo de "${paqueteBackup.nombreEntidad}" descargado.`);
+        }
+    };
+
+    // 5. Restauración Individual v2 (retrocompatible con v1 + sincroniza Caja y Consultorio con MongoDB)
+    window.importarBackupIndividualComercio17 = function (event, claveClubDestino) {
+        const file = event.target.files?.[0];
+        if (!file || !claveClubDestino) return;
+
+        const reader = new FileReader();
+        reader.onload = async function (ev) {
+            try {
+                const parsed = JSON.parse(ev.target.result);
+                const esPaquete = parsed && (parsed.tipoBackup === "COMERCIO_INDIVIDUAL_SAAS_V2" || parsed.tipoBackup === "COMERCIO_INDIVIDUAL_SAAS_V1") && parsed.datosPrincipales;
+                const datosClub = esPaquete ? parsed.datosPrincipales : parsed;
+                const ex = esPaquete ? (parsed.extrasComercio || {}) : {};
+
+                if (!datosClub || typeof datosClub !== "object" || (!Array.isArray(datosClub.personas) && !datosClub.licenciaConfig)) {
+                    throw new Error("El archivo no corresponde a una copia de seguridad válida.");
+                }
+
+                const mapa = obtenerMapaLocalClubesCDM();
+                const nombreDestino = mapa[claveClubDestino]?.licenciaConfig?.nombreEntidad || claveClubDestino;
+                if (!confirm(`⚠️ ¿Restaurar este backup únicamente dentro de "${nombreDestino}"?\n\nLos demás comercios de tu Hub NO se modificarán.`)) {
+                    event.target.value = "";
+                    return;
+                }
+
+                const licRestaurada = {
+                    ...(mapa[claveClubDestino]?.licenciaConfig || {}),
+                    ...(datosClub.licenciaConfig || {}),
+                    claveClub: claveClubDestino
+                };
+
+                const consRestaurado = ex.consultorioSuiteV2 || datosClub.consultorio || ex.consultorio || {
+                    pacientes: [], turnos: [], mutuales: [], profesionales: [], sesiones: [], derivaciones: []
+                };
+                const finRestauradas = Array.isArray(ex.finanzasUnificadasV35)
+                    ? ex.finanzasUnificadasV35
+                    : (Array.isArray(datosClub.finanzasMovimientos)
+                        ? datosClub.finanzasMovimientos
+                        : (Array.isArray(ex.cajaMovimientos) ? ex.cajaMovimientos : []));
+
+                mapa[claveClubDestino] = {
+                    claveClub: claveClubDestino,
+                    ultimaActualizacionISO: new Date().toISOString(),
+                    personas: Array.isArray(datosClub.personas) ? datosClub.personas : [],
+                    rutinas: Array.isArray(datosClub.rutinas) ? datosClub.rutinas : [],
+                    partidos: Array.isArray(datosClub.partidos) ? datosClub.partidos : [],
+                    alineaciones: datosClub.alineaciones && typeof datosClub.alineaciones === "object" ? datosClub.alineaciones : {},
+                    microciclos: datosClub.microciclos && typeof datosClub.microciclos === "object" ? datosClub.microciclos : {},
+                    videoteca: Array.isArray(datosClub.videoteca) ? datosClub.videoteca : [],
+                    catalogoEjercicios: Array.isArray(datosClub.catalogoEjercicios) ? datosClub.catalogoEjercicios : [],
+                    consultorio: consRestaurado,
+                    finanzasMovimientos: finRestauradas,
+                    subAdmins: Array.isArray(datosClub.subAdmins) ? datosClub.subAdmins : [],
+                    auditoria: Array.isArray(datosClub.auditoria) ? datosClub.auditoria : [],
+                    licenciaConfig: licRestaurada
+                };
+
+                localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+                localStorage.setItem(keyConsultorio25(claveClubDestino), JSON.stringify(consRestaurado));
+                localStorage.setItem(keyFinanzas25(claveClubDestino), JSON.stringify(finRestauradas));
+
+                if (Array.isArray(ex.notasRapidas)) {
+                    const allNotas = JSON.parse(localStorage.getItem("cdm_notas_rapidas_pro_v23") || "{}");
+                    allNotas[claveClubDestino] = ex.notasRapidas;
+                    localStorage.setItem("cdm_notas_rapidas_pro_v23", JSON.stringify(allNotas));
+                }
+                if (ex.pacientesUniversales && typeof ex.pacientesUniversales === "object") {
+                    const allUniv = JSON.parse(localStorage.getItem("cdm_registro_universal_pacientes_v19") || "{}");
+                    Object.entries(ex.pacientesUniversales).forEach(([k, v]) => {
+                        allUniv[k] = { ...v, claveClub: claveClubDestino };
+                    });
+                    localStorage.setItem("cdm_registro_universal_pacientes_v19", JSON.stringify(allUniv));
+                }
+                if (Array.isArray(ex.gymCupos)) {
+                    localStorage.setItem(`cdm_gym_cupos_v26_${claveClubDestino}`, JSON.stringify(ex.gymCupos));
+                }
+                if (ex.arancelesLote && typeof ex.arancelesLote === "object") {
+                    localStorage.setItem(`cdm_aranceles_lote_v25_${claveClubDestino}`, JSON.stringify(ex.arancelesLote));
+                }
+
+                if (obtenerClaveClubActivoCDM() === claveClubDestino) {
+                    cargarEstadoClubEnLocalStorage(mapa[claveClubDestino], claveClubDestino);
+                }
+
+                if (window.location.protocol !== "file:") {
+                    try {
+                        await fetch("/api/cdm/estado", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ ...mapa[claveClubDestino], forzarConsultorio: true, forzarFinanzas: true })
+                        });
+                    } catch {}
+                }
+
+                alert(`✅ Backup completo restaurado en "${licRestaurada.nombreEntidad || nombreDestino}" (incluye Caja y Consultorio/Gabinete).`);
+                await mostrarHubSelectorDeComercios();
+            } catch (err) {
+                alert("❌ Error al restaurar backup: " + err.message);
+            } finally {
+                event.target.value = "";
+            }
+        };
+        reader.readAsText(file);
+    };
+    // 6. Blindar también eliminarPersonaDefinitivo para usuarios Staff sin permiso de borrado
+    document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(() => {
+            if (typeof obtenerNivelAdminCDM === "function" && obtenerNivelAdminCDM() === "staff" &&
+                typeof window.eliminarPersonaDefinitivo === "function" && !window.__cdmGuardElimDef25) {
+                window.__cdmGuardElimDef25 = true;
+                const _origElimDef = window.eliminarPersonaDefinitivo;
+                window.eliminarPersonaDefinitivo = function () {
+                    if (typeof tienePermisoAdminCDM === "function" && !tienePermisoAdminCDM("eliminar")) {
+                        if (typeof mostrarToast === "function") mostrarToast("🔒 No tenés permiso para eliminar socios o jugadores.");
+                        else alert("🔒 No tenés permiso para eliminar socios o jugadores.");
+                        return;
+                    }
+                    return _origElimDef.apply(this, arguments);
+                };
+            }
+        }, 300);
+    });
+})();
+// =========================================================================
+// 26. ELIMINACIÓN REAL DE COMERCIOS Y DEMOS DESDE EL HUB SUPERADMIN
+//     - Botón "🗑️ Eliminar" directo en cada tarjeta del Hub y en Módulos/Editar
+//     - Permite borrar cualquier demo (incluida la cuenta base inicial)
+//     - Evita que guardarSnapshotClubActualEnMapaLocal resucite comercios borrados
+//     - Limpia MongoDB, respaldo en disco y todas las claves satélites locales
+// Pegar al final de js/login.js
+// =========================================================================
+(function () {
+    if (window.__cdmEliminarComerciosPro26) return;
+    window.__cdmEliminarComerciosPro26 = true;
+
+    function esc26(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    // 1. No volver a crear CDM automáticamente si ya existe el mapa de comercios
+    if (typeof obtenerMapaLocalClubesCDM === "function") {
+        const _origMapa26 = obtenerMapaLocalClubesCDM;
+        obtenerMapaLocalClubesCDM = function () {
+            const raw = localStorage.getItem(STORAGE_MAPA_CLUBES_KEY);
+            if (raw !== null) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === "object") return parsed;
+                } catch {}
+            }
+            return _origMapa26.apply(this, arguments);
+        };
+    }
+
+    // 2. En el Hub (login.html) nunca resucitar un comercio recién borrado al hacer snapshot
+    if (typeof guardarSnapshotClubActualEnMapaLocal === "function") {
+        const _origSnap26 = guardarSnapshotClubActualEnMapaLocal;
+        guardarSnapshotClubActualEnMapaLocal = function () {
+            const enLogin = (window.location.pathname || "").toLowerCase().includes("login.html") ||
+                document.body?.classList.contains("login-page");
+            if (enLogin) {
+                const mapa = obtenerMapaLocalClubesCDM();
+                const claveAct = localStorage.getItem(STORAGE_CLUB_ACTIVO_KEY);
+                if (!claveAct || !mapa[claveAct]) {
+                    return mapa;
+                }
+            }
+            return _origSnap26.apply(this, arguments);
+        };
+    }
+
+    function limpiarClavesLocalesDeComercio26(claveClub) {
+        if (!claveClub) return;
+        const mapa = obtenerMapaLocalClubesCDM();
+        delete mapa[claveClub];
+        localStorage.setItem(STORAGE_MAPA_CLUBES_KEY, JSON.stringify(mapa));
+
+        // Limpiar módulos satélites del comercio borrado
+        [
+            `cdm_consultorio_suite_v2_${claveClub}`,
+            `cdm_finanzas_unif_v35_${claveClub}`,
+            `cdm_caja_movs_v25_${claveClub}`,
+            `cdm_subadmins_v1_${claveClub}`,
+            `cdm_auditoria_v1_${claveClub}`,
+            `cdm_gym_cupos_v26_${claveClub}`,
+            `cdm_aranceles_lote_v25_${claveClub}`,
+            `cdm_popup_notas_auto_v1_${claveClub}`
+        ].forEach(k => localStorage.removeItem(k));
+
+        try {
+            const notas = JSON.parse(localStorage.getItem("cdm_notas_rapidas_pro_v23") || "{}");
+            if (notas && notas[claveClub]) {
+                delete notas[claveClub];
+                localStorage.setItem("cdm_notas_rapidas_pro_v23", JSON.stringify(notas));
+            }
+        } catch {}
+
+        try {
+            const univ = JSON.parse(localStorage.getItem("cdm_registro_universal_pacientes_v19") || "{}");
+            let cambio = false;
+            Object.keys(univ).forEach(k => {
+                if (univ[k]?.claveClub === claveClub) {
+                    delete univ[k];
+                    cambio = true;
+                }
+            });
+            if (cambio) localStorage.setItem("cdm_registro_universal_pacientes_v19", JSON.stringify(univ));
+        } catch {}
+
+        // Si era el comercio activo en este navegador, cambiar al siguiente disponible o limpiar caché
+        if (localStorage.getItem(STORAGE_CLUB_ACTIVO_KEY) === claveClub) {
+            const restantes = Object.keys(mapa);
+            if (restantes.length > 0) {
+                localStorage.setItem(STORAGE_CLUB_ACTIVO_KEY, restantes[0]);
+                if (typeof cargarEstadoClubEnLocalStorage === "function" && mapa[restantes[0]]) {
+                    cargarEstadoClubEnLocalStorage(mapa[restantes[0]], restantes[0]);
+                }
+            } else {
+                localStorage.removeItem(STORAGE_CLUB_ACTIVO_KEY);
+                ["cdm_personas_v1", "cdm_rutinas_v1", "cdm_partidos_v1", "cdm_alineaciones_v2", "cdm_microciclos_v1", STORAGE_LICENCIA_KEY].forEach(k => {
+                    localStorage.removeItem(k);
+                });
+            }
+        }
+    }
+
+    // 3. Modal limpio de confirmación para eliminar cualquier comercio/demo
+    window.abrirModalConfirmarEliminarComercio26 = async function (claveClub) {
+        if (!claveClub) return;
+        const lista = await obtenerListaCompletaComerciosCDM();
+        const item = lista.find(c => c.claveClub === claveClub) || { claveClub, licenciaConfig: {} };
+        const lic = item.licenciaConfig || {};
+        const nombre = lic.nombreEntidad || claveClub;
+        const esReal = lic.tipoCuenta === "real";
+        const cantActivos = Number(item.cantidadPersonas || 0);
+
+        let modal = document.getElementById("modalEliminarComercio26");
+        if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "modalEliminarComercio26";
+            modal.className = "modal-backdrop";
+            modal.style.zIndex = "99999";
+            modal.onclick = (e) => { if (e.target === modal) modal.classList.add("hidden"); };
+            document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:460px; text-align:left;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-danger">🗑️ ELIMINAR COMERCIO / DEMO</span>
+                        <h3 style="margin-top:4px; color:var(--ink-900);">${esc26(nombre)}</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalEliminarComercio26').classList.add('hidden')">✕</button>
+                </div>
+
+                <div style="background:rgba(239,68,68,0.08); border:1.5px solid rgba(239,68,68,0.35); border-radius:14px; padding:0.8rem 0.95rem; margin-bottom:0.9rem; font-size:0.82rem; line-height:1.45;">
+                    <div><b>Entorno:</b> ${esReal ? "🔒 SISTEMA REAL" : "🎁 MODO DEMO"} • <b>Registros activos:</b> ${cantActivos}</div>
+                    <div style="margin-top:4px; color:#b91c1c; font-weight:700;">
+                        Esta acción borra permanentemente el comercio, sus socios/pacientes, rutinas, consultorio y caja de MongoDB y de este dispositivo.
+                    </div>
+                </div>
+
+                ${esReal ? `
+                    <div class="field" style="margin-bottom:0.9rem;">
+                        <label>Por ser una cuenta REAL, escribí <b>ELIMINAR</b> para confirmar *</label>
+                        <input type="text" id="inpConfirmEliminarReal26" placeholder="ELIMINAR" autocomplete="off">
+                    </div>
+                ` : ""}
+
+                <div id="msgErrEliminar26" style="font-size:0.78rem; font-weight:700; color:#dc2626; margin-bottom:0.6rem;"></div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.45rem;">
+                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('modalEliminarComercio26').classList.add('hidden')">Cancelar</button>
+                    <button type="button" id="btnExecEliminarComercio26" class="btn btn-danger" onclick="ejecutarEliminacionComercio26('${esc26(claveClub)}', ${esReal ? "true" : "false"})">
+                        🗑️ Sí, Eliminar Definitivamente
+                    </button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    };
+
+    window.ejecutarEliminacionComercio26 = async function (claveClub, esReal) {
+        const msgEl = document.getElementById("msgErrEliminar26");
+        const btn = document.getElementById("btnExecEliminarComercio26");
+
+        if (esReal) {
+            const val = (document.getElementById("inpConfirmEliminarReal26")?.value || "").trim().toUpperCase();
+            if (val !== "ELIMINAR") {
+                if (msgEl) msgEl.textContent = "⚠️ Escribí exactamente ELIMINAR para confirmar.";
+                return;
+            }
+        }
+
+        if (btn) { btn.disabled = true; btn.textContent = "⏳ Eliminando..."; }
+        if (msgEl) msgEl.textContent = "";
+
+        if (window.location.protocol !== "file:") {
+            try {
+                const resp = await fetch(`/api/cdm/clubes/${encodeURIComponent(claveClub)}`, { method: "DELETE" });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || !data.ok) {
+                    if (msgEl) msgEl.textContent = "❌ El servidor rechazó la eliminación: " + (data.error || `HTTP ${resp.status}`);
+                    if (btn) { btn.disabled = false; btn.textContent = "🗑️ Sí, Eliminar Definitivamente"; }
+                    return;
+                }
+            } catch (err) {
+                if (msgEl) msgEl.textContent = "❌ Sin conexión con el servidor: " + err.message;
+                if (btn) { btn.disabled = false; btn.textContent = "🗑️ Sí, Eliminar Definitivamente"; }
+                return;
+            }
+        }
+
+        limpiarClavesLocalesDeComercio26(claveClub);
+        document.getElementById("modalEliminarComercio26")?.classList.add("hidden");
+        document.getElementById("modalSuperAdminCDM")?.classList.add("hidden");
+
+        if (typeof mostrarToast === "function") mostrarToast("🗑️ Comercio eliminado definitivamente.");
+        await mostrarHubSelectorDeComercios();
+    };
+
+    // Reemplazar también la función vieja del modal "Módulos / Editar"
+    window.eliminarComercioDesdeModal = function (claveClub) {
+        abrirModalConfirmarEliminarComercio26(claveClub);
+    };
+
+    // 4. Asegurar que el botón "Eliminar Comercio" aparezca en el modal Módulos / Editar incluso para la cuenta base
+    const _origAbrirModal26 = abrirModalCrearOEditarComercio;
+    abrirModalCrearOEditarComercio = async function (claveClubEditar = null) {
+        await _origAbrirModal26.apply(this, arguments);
+        if (!claveClubEditar) return;
+        const modal = document.getElementById("modalSuperAdminCDM");
+        const pie = modal?.querySelector("form > div:last-child");
+        if (!pie || pie.querySelector('button[onclick*="eliminarComercioDesdeModal"]')) return;
+
+        const btnDel = document.createElement("button");
+        btnDel.type = "button";
+        btnDel.className = "btn btn-danger btn-sm";
+        btnDel.innerHTML = `<i class="ri-delete-bin-line"></i> Eliminar Comercio`;
+        btnDel.onclick = () => abrirModalConfirmarEliminarComercio26(claveClubEditar);
+        if (pie.firstElementChild?.tagName === "SPAN") pie.firstElementChild.replaceWith(btnDel);
+        else pie.prepend(btnDel);
+    };
+
+    // 5. Agregar botón "🗑️ Eliminar" directo en cada tarjeta del Hub SuperAdmin
+    const _origMostrarHub26 = mostrarHubSelectorDeComercios;
+    mostrarHubSelectorDeComercios = async function () {
+        await _origMostrarHub26.apply(this, arguments);
+        const grid = document.getElementById("gridTarjetasComerciosHub");
+        if (!grid) return;
+
+        const lista = await obtenerListaCompletaComerciosCDM();
+        if (!lista.length) {
+            grid.innerHTML = `<div class="empty-box" style="grid-column:1/-1; padding:1.5rem;">No hay comercios cargados. Tocá <b>+ Nuevo Club / Gimnasio</b> arriba para crear uno.</div>`;
+            return;
+        }
+
+        grid.querySelectorAll(".hub-comercio-card").forEach((card, idx) => {
+            if (card.querySelector(".hub-btn-eliminar-26")) return;
+            const btnAbrir = card.querySelector('button[onclick*="entrarAComercioDesdeHub("]');
+            const m = (btnAbrir?.getAttribute("onclick") || "").match(/entrarAComercioDesdeHub\('([^']+)'\)/);
+            const clave = m ? m[1] : lista[idx]?.claveClub;
+            if (!clave) return;
+
+            const pie = card.lastElementChild;
+            if (!pie) return;
+
+            const btnDel = document.createElement("button");
+            btnDel.type = "button";
+            btnDel.className = "btn btn-danger btn-sm hub-btn-eliminar-26";
+            btnDel.style.cssText = "width:100%; font-size:0.72rem; min-height:29px; margin-top:2px;";
+            btnDel.innerHTML = `<i class="ri-delete-bin-line"></i> Eliminar Comercio / Demo`;
+            btnDel.onclick = () => abrirModalConfirmarEliminarComercio26(clave);
+            pie.appendChild(btnDel);
+        });
+    };
 })();

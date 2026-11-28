@@ -1,7 +1,7 @@
 /**
- * js/base-general.js — Padrón Maestro por Años Cumplidos, Migraciones,
- * Modal Único de Persona y Base Maestra de Ejercicios (con Patrón Biomecánico)
- * CDM Pro Suite — Desarrollado por Gonzalo Adanchú
+ * js/base-general.js — Padrón Maestro por Años Cumplidos (solo Clubes), Migraciones,
+ * Modal Único de Persona (adaptado a Club o Solo Gimnasio) y Base Maestra de Ejercicios
+ * G-SIS — Desarrollado por Gonzalo Adanchú
  */
 
 (function () {
@@ -27,7 +27,6 @@
         { clave: "jump", label: "🦘 Salto / Pliometría / Velocidad" }
     ];
 
-    // Estilos de Base General y herramientas de categoría
     if (!document.getElementById("cdmCssBaseGeneral")) {
         const st = document.createElement("style");
         st.id = "cdmCssBaseGeneral";
@@ -67,16 +66,48 @@
         document.head.appendChild(st);
     }
 
-    function obtenerDeportesDisponibles() {
-        const set = new Set(["Futbol", "Hockey", "Gimnasio"]);
+    function esSoloGimnasioBG() {
+        if (typeof window.esComercioSoloGimnasioCDM === "function") {
+            return window.esComercioSoloGimnasioCDM();
+        }
         const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const mod = lic?.modulos || { futbol: true, hockey: true, gym: true };
+        const tieneDepClub = (mod.futbol !== false) || (mod.hockey !== false) ||
+            (Array.isArray(lic?.deportesExtra) && lic.deportesExtra.filter(Boolean).length > 0);
+        return (mod.gym !== false) && !tieneDepClub;
+    }
+
+    function obtenerDeportesDisponibles() {
+        if (esSoloGimnasioBG()) return ["Gimnasio"];
+        const lic = typeof obtenerLicenciaConfigCDM === "function" ? obtenerLicenciaConfigCDM() : {};
+        const mod = lic?.modulos || { futbol: true, hockey: true, gym: true };
+        const set = new Set();
+        if (mod.futbol !== false) set.add("Futbol");
+        if (mod.hockey !== false) set.add("Hockey");
+        if (mod.gym !== false) set.add("Gimnasio");
         (lic.deportesExtra || []).forEach(d => {
             const limpio = String(d).replace(/^[^\wÁÉÍÓÚáéíóúÑñ]+/, "").trim();
             if (limpio) set.add(limpio);
         });
         (basePersonas || []).forEach(p => { if (p?.deporte) set.add(p.deporte); });
+        if (!set.size) set.add("Gimnasio");
         return Array.from(set);
     }
+
+    window.sincronizarEtiquetaSidebarBaseGeneral = function () {
+        const link = document.querySelector('.app-sidebar .side-link[data-nav="base_general"]');
+        if (!link) return;
+        const soloGym = esSoloGimnasioBG();
+        const span = link.querySelector("span");
+        const ico = link.querySelector("i");
+        if (soloGym) {
+            if (span) span.textContent = "Base de Ejercicios";
+            if (ico) ico.className = "ri-dumbbell-line";
+        } else {
+            if (span) span.textContent = "Base General";
+            if (ico) ico.className = "ri-database-2-line";
+        }
+    };
 
     // =====================================================================
     // 1. FILTRO OFICIAL DE PLANTEL POR DEPORTE Y CATEGORÍA (CON DOBLE CAT.)
@@ -97,40 +128,35 @@
     };
 
     // =====================================================================
-    // 2. MODAL ÚNICO DE ALTA / EDICIÓN DE PERSONA (CON FECHA DE NACIMIENTO)
+    // 2. MODAL ÚNICO DE ALTA RÁPIDA / EDICIÓN (ESENCIAL ARRIBA + AVANZADO COLAPSABLE)
     // =====================================================================
     function construirHTMLModalPersona() {
         const modal = document.getElementById("modalPersona");
         if (!modal) return;
+        const soloGym = esSoloGimnasioBG();
+        const datalistOpciones = soloGym
+            ? `<option value="Musculación e Hipertrofia"><option value="Fuerza y Potencia"><option value="Funcional, Core y Salud"><option value="Aeróbico y Resistencia"><option value="Readaptación y Salud"><option value="Pase Libre">`
+            : `<option value="Musculación e Hipertrofia"><option value="Fuerza y Potencia"><option value="Funcional, Core y Salud">
+               <option value="Arquero / Arquera"><option value="Marcador Central"><option value="Lateral Derecho"><option value="Lateral Izquierdo">
+               <option value="Volante Central"><option value="Enganche / Interior"><option value="Extremo / Wing"><option value="Centrodelantero">`;
+
         modal.innerHTML = `
-            <div class="modal-window" style="max-width:660px;">
+            <div class="modal-window" style="max-width:620px;">
                 <div class="modal-top">
-                    <h3 id="tituloModal" style="color:var(--ink-900);">Ficha de Deportista / Socio</h3>
+                    <div>
+                        <span class="badge badge-celeste">${soloGym ? "🏋️ ALTA RÁPIDA DE SOCIO" : "⚡ ALTA RÁPIDA DE PERSONA"}</span>
+                        <h3 id="tituloModal" style="color:var(--ink-900); margin-top:3px;">${soloGym ? "Nuevo Socio de Gimnasio" : "Ficha de Deportista / Socio"}</h3>
+                    </div>
                     <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalPersona()">✕</button>
                 </div>
+
                 <form id="formPersonaCDM" onsubmit="guardarPersonaCDM(event)">
                     <input type="hidden" id="pId">
                     <input type="hidden" id="pFotoData">
 
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:0.85rem; flex-wrap:wrap; background:var(--surface-subtle); border:1px solid var(--line-strong); padding:0.7rem 0.9rem; border-radius:15px; margin-bottom:0.8rem;">
-                        <div style="display:flex; align-items:center; gap:0.75rem;">
-                            <div id="previewAvatarModalPersona" class="ath-avatar has-photo" style="width:54px; height:54px; border-radius:15px; font-size:1.2rem;"><span>👤</span></div>
-                            <div>
-                                <strong style="font-size:0.84rem; display:block;">📷 Foto de Perfil (Opcional)</strong>
-                                <small style="color:var(--ink-500); font-size:0.72rem;">Se comprime automáticamente.</small>
-                            </div>
-                        </div>
-                        <div style="display:flex; gap:0.4rem;">
-                            <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
-                                <i class="ri-upload-2-line"></i> Subir Foto
-                                <input type="file" accept="image/*" onchange="cargarFotoEnModalPersonaCDM(event)" style="display:none;">
-                            </label>
-                            <button type="button" id="btnQuitarFotoModalPersona" class="btn btn-danger btn-sm hidden" onclick="quitarFotoEnModalPersonaCDM()">Quitar</button>
-                        </div>
-                    </div>
-
-                    <div class="grid-3" style="margin-bottom:0.7rem;">
-                        <div class="field"><label>Área / Deporte *</label><select id="pDeporte" required></select></div>
+                    <!-- BLOQUE 1: DATOS ESENCIALES (10 SEGUNDOS EN MOSTRADOR) -->
+                    <div id="gridAreaModalPersona" class="grid-3" style="margin-bottom:0.65rem;">
+                        <div class="field" id="wrapPDeporte"><label>Área / Deporte *</label><select id="pDeporte" required></select></div>
                         <div class="field" id="wrapPCategoria">
                             <label>Categoría *</label>
                             <select id="pCategoria">
@@ -138,78 +164,127 @@
                             </select>
                         </div>
                         <div class="field">
-                            <label>Puesto / Plan Gym *</label>
-                            <input type="text" id="pPuesto" list="listaPuestosSugeridosModal" required placeholder="Ej: Delantero / Musculación">
-                            <datalist id="listaPuestosSugeridosModal">
-                                <option value="Musculación e Hipertrofia"><option value="Fuerza y Potencia"><option value="Funcional, Core y Salud">
-                                <option value="Arquero / Arquera"><option value="Marcador Central"><option value="Lateral Derecho"><option value="Lateral Izquierdo">
-                                <option value="Volante Central"><option value="Enganche / Interior"><option value="Extremo / Wing"><option value="Centrodelantero">
-                            </datalist>
+                            <label id="lblPPuestoModal">${soloGym ? "Objetivo / Plan (opcional)" : "Puesto / Plan Gym"}</label>
+                            <input type="text" id="pPuesto" list="listaPuestosSugeridosModal" placeholder="${soloGym ? "Ej: Musculación / Funcional" : "Ej: Delantero / Musculación"}">
+                            <datalist id="listaPuestosSugeridosModal">${datalistOpciones}</datalist>
                         </div>
                     </div>
 
-                    <div class="grid-3" style="margin-bottom:0.7rem;">
-                        <div class="field"><label>Nombre *</label><input type="text" id="pNombre" required></div>
-                        <div class="field"><label>Apellido *</label><input type="text" id="pApellido" required></div>
-                        <div class="field"><label>DNI *</label><input type="text" id="pDni" required></div>
+                    <div class="grid-3" style="margin-bottom:0.65rem;">
+                        <div class="field"><label>Nombre *</label><input type="text" id="pNombre" required placeholder="Ej: Lucas"></div>
+                        <div class="field"><label>Apellido *</label><input type="text" id="pApellido" required placeholder="Ej: Peralta"></div>
+                        <div class="field"><label>DNI *</label><input type="text" id="pDni" required placeholder="Sin puntos"></div>
                     </div>
 
-                    <div class="grid-4" style="margin-bottom:0.7rem;">
-                        <div class="field"><label>WhatsApp *</label><input type="tel" id="pWhatsapp" required placeholder="5493584..."></div>
-                        <div class="field">
-                            <label>Fecha de Nac. *</label>
-                            <input type="date" id="pFechaNac" oninput="sincronizarEdadDesdeFechaNacModal()">
-                        </div>
-                        <div class="field"><label>Años Cumplidos *</label><input type="number" id="pEdad" required min="5" max="90" value="15"></div>
-                        <div class="field">
-                            <label>Sangre</label>
-                            <select id="pSangre">
-                                <option value="0+">0+</option><option value="0-">0-</option><option value="A+">A+</option><option value="A-">A-</option>
-                                <option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option>
+                    <div class="grid-3" style="margin-bottom:0.75rem; background:var(--cdm-50); border:1px solid var(--line-celeste); padding:0.7rem; border-radius:12px;">
+                        <div class="field"><label>WhatsApp (opcional)</label><input type="tel" id="pWhatsapp" placeholder="5493584..."></div>
+                        <div class="field"><label>Cuota Mensual ($)</label><input type="number" id="pMontoCuota" value="25000" min="0" step="500"></div>
+                        <div class="field"><label>Estado de Cuota</label>
+                            <select id="pPagoEstado">
+                                <option value="Al Día">💳 Al Día</option>
+                                <option value="Pendiente">⚠️ Pendiente</option>
                             </select>
                         </div>
                     </div>
 
-                    <div class="grid-4" style="margin-bottom:0.7rem;">
-                        <div class="field"><label>Peso (kg) *</label><input type="number" step="0.1" id="pPeso" required value="65"></div>
-                        <div class="field"><label>Altura (cm) *</label><input type="number" id="pAltura" required value="170"></div>
-                        <div class="field"><label>Pierna</label><select id="pPierna"><option value="Derecha">Derecha</option><option value="Izquierda">Izquierda</option><option value="Ambidiestro">Ambidiestro</option></select></div>
-                        <div class="field"><label>Brazo</label><select id="pBrazo"><option value="Derecho">Derecho</option><option value="Izquierdo">Izquierdo</option><option value="Ambidiestro">Ambidiestro</option></select></div>
-                    </div>
-
-                    <div id="wrapPScoreDeporte" style="margin-bottom:0.7rem; background:var(--surface-subtle); border:1px solid var(--line-celeste); padding:0.7rem; border-radius:10px;">
-                        <small style="display:block; font-weight:800; color:var(--cdm-600); margin-bottom:0.4rem;">⭐ CALIFICACIÓN INICIAL (1 A 10 — SOLO DEPORTES)</small>
-                        <div class="grid-4">
-                            <div class="field"><label>Físico</label><input type="number" step="0.1" min="1" max="10" id="pScoreFisico" value="7.0"></div>
-                            <div class="field"><label>Gym</label><input type="number" step="0.1" min="1" max="10" id="pScoreGym" value="7.0"></div>
-                            <div class="field"><label>Técnico</label><input type="number" step="0.1" min="1" max="10" id="pScoreTecnico" value="7.0"></div>
-                            <div class="field"><label>Actitud</label><input type="number" step="0.1" min="1" max="10" id="pScoreActitud" value="7.5"></div>
+                    ${!soloGym ? `
+                        <div class="grid-2" style="margin-bottom:0.75rem;">
+                            <div class="field">
+                                <label>Fecha de Nacimiento (para edad exacta)</label>
+                                <input type="date" id="pFechaNac" oninput="sincronizarEdadDesdeFechaNacModal()">
+                            </div>
+                            <div class="field">
+                                <label>Años Cumplidos</label>
+                                <input type="number" id="pEdad" min="4" max="90" value="15">
+                            </div>
                         </div>
-                    </div>
+                    ` : ""}
 
-                    <div class="grid-4" style="margin-bottom:0.8rem; background:var(--cdm-50); padding:0.7rem; border-radius:10px;">
-                        <div class="field"><label>Días x Sem.</label><select id="pFrecuencia"><option value="2">2 días</option><option value="3" selected>3 días</option><option value="4">4 días</option><option value="5">5 días</option></select></div>
-                        <div class="field"><label>Salud</label><select id="pEstadoMedico"><option value="Óptimo">🟢 Óptimo</option><option value="Sobrecarga / Precaución">🟡 Precaución</option><option value="Lesionado (Rehabilitación)">🔴 Lesionado</option></select></div>
-                        <div class="field"><label>Cuota</label><select id="pPagoEstado"><option value="Al Día">💳 Al Día</option><option value="Pendiente">⚠️ Pendiente</option></select></div>
-                        <div class="field"><label>Monto ($)</label><input type="number" id="pMontoCuota" value="25000"></div>
-                    </div>
+                    <!-- BLOQUE 2: DATOS FÍSICOS, FOTO Y OPCIONES AVANZADAS (COLAPSADO POR DEFECTO) -->
+                    <details id="detallesAvanzadosPersona" style="margin-bottom:0.9rem; background:var(--surface-subtle); border:1.5px solid var(--line-strong); border-radius:14px; padding:0.65rem 0.85rem;">
+                        <summary style="cursor:pointer; font-size:0.81rem; font-weight:800; color:var(--ink-800); display:flex; align-items:center; justify-content:space-between; list-style:none;">
+                            <span>⚙️ Foto, datos físicos y permisos avanzados (Opcional)</span>
+                            <span style="font-size:0.72rem; color:var(--cdm-600);">Desplegar ▾</span>
+                        </summary>
 
-                    <!-- Permisos de vista y autogestión (nativos, compatibles con login.js) -->
-                    <div style="margin-bottom:0.9rem; background:var(--surface-subtle); border:1px solid var(--line-strong); padding:0.7rem 0.9rem; border-radius:12px; display:flex; justify-content:space-between; align-items:center; gap:0.7rem; flex-wrap:wrap;">
-                        <select id="pModoVistaRutina" style="width:auto; min-width:210px; font-weight:700; font-size:0.78rem;">
-                            <option value="heredar">🎚️ Vista Rutina: Automática</option>
-                            <option value="simple">🟢 Vista Rutina: Simple</option>
-                            <option value="avanzado">🚀 Vista Rutina: Avanzada</option>
-                        </select>
-                        <label style="display:inline-flex; align-items:center; gap:0.45rem; font-size:0.78rem; font-weight:700; cursor:pointer;">
-                            <input type="checkbox" id="pPuedeCrearRutinas" style="width:18px; height:18px; min-height:auto;">
-                            <span>🔓 Permitir armar sus propias rutinas</span>
-                        </label>
-                    </div>
+                        <div style="margin-top:0.8rem; padding-top:0.75rem; border-top:1px dashed var(--line-strong);">
+                            <!-- Foto de perfil -->
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap; background:var(--surface-solid); border:1px solid var(--line); padding:0.6rem 0.8rem; border-radius:12px; margin-bottom:0.75rem;">
+                                <div style="display:flex; align-items:center; gap:0.65rem;">
+                                    <div id="previewAvatarModalPersona" class="ath-avatar has-photo" style="width:46px; height:46px; border-radius:13px; font-size:1.1rem;"><span>👤</span></div>
+                                    <div>
+                                        <strong style="font-size:0.8rem; display:block;">📷 Foto de Perfil</strong>
+                                        <small style="color:var(--ink-500); font-size:0.7rem;">Se comprime automáticamente.</small>
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:0.35rem;">
+                                    <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                                        <i class="ri-upload-2-line"></i> Subir
+                                        <input type="file" accept="image/*" onchange="cargarFotoEnModalPersonaCDM(event)" style="display:none;">
+                                    </label>
+                                    <button type="button" id="btnQuitarFotoModalPersona" class="btn btn-danger btn-sm hidden" onclick="quitarFotoEnModalPersonaCDM()">Quitar</button>
+                                </div>
+                            </div>
+
+                            ${soloGym ? `
+                                <div class="grid-2" style="margin-bottom:0.65rem;">
+                                    <div class="field">
+                                        <label>Fecha de Nacimiento</label>
+                                        <input type="date" id="pFechaNac" oninput="sincronizarEdadDesdeFechaNacModal()">
+                                    </div>
+                                    <div class="field">
+                                        <label>Edad</label>
+                                        <input type="number" id="pEdad" min="10" max="95" placeholder="Ej: 26">
+                                    </div>
+                                </div>
+                            ` : ""}
+
+                            <div class="grid-4" style="margin-bottom:0.65rem;">
+                                <div class="field"><label>Peso (kg)</label><input type="number" step="0.1" id="pPeso" placeholder="Ej: 72"></div>
+                                <div class="field"><label>Altura (cm)</label><input type="number" id="pAltura" placeholder="Ej: 175"></div>
+                                <div class="field"><label>Días x Sem.</label><select id="pFrecuencia"><option value="2">2 días</option><option value="3" selected>3 días</option><option value="4">4 días</option><option value="5">5 días</option></select></div>
+                                <div class="field"><label>Salud</label><select id="pEstadoMedico"><option value="Óptimo">🟢 Óptimo</option><option value="Sobrecarga / Precaución">🟡 Precaución</option><option value="Lesionado (Rehabilitación)">🔴 Lesionado</option></select></div>
+                            </div>
+
+                            <div class="grid-3" style="margin-bottom:0.65rem;">
+                                <div class="field">
+                                    <label>Grupo Sanguíneo</label>
+                                    <select id="pSangre">
+                                        <option value="0+">0+</option><option value="0-">0-</option><option value="A+">A+</option><option value="A-">A-</option>
+                                        <option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option>
+                                    </select>
+                                </div>
+                                <div class="field"><label>Pierna hábil</label><select id="pPierna"><option value="Derecha">Derecha</option><option value="Izquierda">Izquierda</option><option value="Ambidiestro">Ambidiestro</option></select></div>
+                                <div class="field"><label>Brazo hábil</label><select id="pBrazo"><option value="Derecho">Derecho</option><option value="Izquierdo">Izquierdo</option><option value="Ambidiestro">Ambidiestro</option></select></div>
+                            </div>
+
+                            <div id="wrapPScoreDeporte" style="margin-bottom:0.65rem; background:var(--surface-solid); border:1px solid var(--line-celeste); padding:0.65rem; border-radius:10px;">
+                                <small style="display:block; font-weight:800; color:var(--cdm-600); margin-bottom:0.35rem;">⭐ CALIFICACIÓN INICIAL (1 A 10 — SOLO DEPORTES)</small>
+                                <div class="grid-4">
+                                    <div class="field"><label>Físico</label><input type="number" step="0.1" min="1" max="10" id="pScoreFisico" value="7.0"></div>
+                                    <div class="field"><label>Gym</label><input type="number" step="0.1" min="1" max="10" id="pScoreGym" value="7.0"></div>
+                                    <div class="field"><label>Técnico</label><input type="number" step="0.1" min="1" max="10" id="pScoreTecnico" value="7.0"></div>
+                                    <div class="field"><label>Actitud</label><input type="number" step="0.1" min="1" max="10" id="pScoreActitud" value="7.5"></div>
+                                </div>
+                            </div>
+
+                            <div style="background:var(--surface-solid); border:1px solid var(--line); padding:0.65rem 0.8rem; border-radius:11px; display:flex; justify-content:space-between; align-items:center; gap:0.65rem; flex-wrap:wrap;">
+                                <select id="pModoVistaRutina" style="width:auto; min-width:205px; font-weight:700; font-size:0.78rem;">
+                                    <option value="heredar">🎚️ Vista Rutina: Automática</option>
+                                    <option value="simple">🟢 Vista Rutina: Simple</option>
+                                    <option value="avanzado">🚀 Vista Rutina: Avanzada</option>
+                                </select>
+                                <label style="display:inline-flex; align-items:center; gap:0.45rem; font-size:0.78rem; font-weight:700; cursor:pointer;">
+                                    <input type="checkbox" id="pPuedeCrearRutinas" style="width:18px; height:18px; min-height:auto;">
+                                    <span>🔓 Permitir armar sus propias rutinas</span>
+                                </label>
+                            </div>
+                        </div>
+                    </details>
 
                     <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
                         <button type="button" class="btn btn-ghost" onclick="cerrarModalPersona()">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">💾 Guardar Persona</button>
+                        <button type="submit" class="btn btn-primary">💾 ${soloGym ? "Guardar Socio" : "Guardar Persona"}</button>
                     </div>
                 </form>
             </div>
@@ -225,9 +300,18 @@
     };
 
     function actualizarVisibilidadModalPersona() {
-        const esGym = document.getElementById("pDeporte")?.value === "Gimnasio";
+        const soloGym = esSoloGimnasioBG();
+        const esGym = soloGym || document.getElementById("pDeporte")?.value === "Gimnasio";
+        document.getElementById("wrapPDeporte")?.classList.toggle("hidden", soloGym);
         document.getElementById("wrapPCategoria")?.classList.toggle("hidden", esGym);
         document.getElementById("wrapPScoreDeporte")?.classList.toggle("hidden", esGym);
+
+        const grid = document.getElementById("gridAreaModalPersona");
+        if (grid) {
+            if (soloGym) grid.style.gridTemplateColumns = "1fr";
+            else if (esGym) grid.style.gridTemplateColumns = "1fr 1fr";
+            else grid.style.gridTemplateColumns = "";
+        }
     }
 
     function actualizarPreviewFotoModal(fotoData, ini = "👤") {
@@ -259,6 +343,7 @@
         const selDep = document.getElementById("pDeporte");
         if (!modal || !selDep) return;
 
+        const soloGym = esSoloGimnasioBG();
         const deps = obtenerDeportesDisponibles();
         selDep.innerHTML = deps.map(d => `<option value="${d}">${d === "Futbol" ? "⚽ Fútbol" : d === "Hockey" ? "🏑 Hockey" : d === "Gimnasio" ? "🏋️ Gimnasio" : "🏆 " + d}</option>`).join("");
 
@@ -266,20 +351,20 @@
             const p = basePersonas.find(x => Number(x.id) === Number(idEditar));
             if (!p) return;
             asegurarPilaresPersona(p);
-            document.getElementById("tituloModal").innerText = `Editar: ${p.nombre} ${p.apellido}`;
+            document.getElementById("tituloModal").innerText = `${soloGym ? "Editar Socio" : "Editar"}: ${p.nombre} ${p.apellido}`;
             document.getElementById("pId").value = p.id;
-            selDep.value = p.deporte;
-            document.getElementById("pCategoria").value = p.categoria || "Primera";
+            selDep.value = soloGym ? "Gimnasio" : p.deporte;
+            document.getElementById("pCategoria").value = soloGym ? "General" : (p.categoria || "Primera");
             document.getElementById("pPuesto").value = p.puesto || "";
             document.getElementById("pNombre").value = p.nombre || "";
             document.getElementById("pApellido").value = p.apellido || "";
             document.getElementById("pDni").value = p.dni || "";
             document.getElementById("pWhatsapp").value = p.whatsapp || "";
-            document.getElementById("pFechaNac").value = p.fechaNacimiento || `${obtenerAnioNacimiento(p)}-06-15`;
-            document.getElementById("pEdad").value = calcularEdadExacta(p);
+            document.getElementById("pFechaNac").value = p.fechaNacimiento || "";
+            document.getElementById("pEdad").value = calcularEdadExacta(p) || "";
             document.getElementById("pSangre").value = p.sangre || "0+";
-            document.getElementById("pPeso").value = p.peso || 70;
-            document.getElementById("pAltura").value = p.altura || 170;
+            document.getElementById("pPeso").value = p.peso ?? "";
+            document.getElementById("pAltura").value = p.altura ?? "";
             document.getElementById("pPierna").value = p.pierna || "Derecha";
             document.getElementById("pBrazo").value = p.brazo || "Derecho";
             document.getElementById("pFrecuencia").value = p.frecuenciaSemanal || 3;
@@ -291,7 +376,7 @@
             document.getElementById("pPuedeCrearRutinas").checked = Boolean(p.puedeCrearRutinas);
             actualizarPreviewFotoModal(p.foto || "", obtenerInicialesPersonaCDM(p));
 
-            if (p.deporte !== "Gimnasio" && p.pilares) {
+            if (!soloGym && p.deporte !== "Gimnasio" && p.pilares) {
                 document.getElementById("pScoreFisico").value = p.pilares.fisico;
                 document.getElementById("pScoreGym").value = p.pilares.gym;
                 document.getElementById("pScoreTecnico").value = p.pilares.tecnico;
@@ -301,16 +386,22 @@
             document.getElementById("pId").value = "";
             document.getElementById("pFotoData").value = "";
             actualizarPreviewFotoModal("", "👤");
-            selDep.value = deportePagina || deps[0] || "Futbol";
-            document.getElementById("pCategoria").value = categoriaActiva || "Sub 13";
-            const anioDef = new Date().getFullYear() - 15;
-            document.getElementById("pFechaNac").value = `${anioDef}-06-15`;
-            document.getElementById("pEdad").value = 15;
+            selDep.value = soloGym ? "Gimnasio" : (deportePagina || deps[0] || "Futbol");
+            document.getElementById("pCategoria").value = soloGym ? "General" : (categoriaActiva || "Sub 13");
+            if (!soloGym) {
+                const anioDef = new Date().getFullYear() - 15;
+                document.getElementById("pFechaNac").value = `${anioDef}-06-15`;
+                document.getElementById("pEdad").value = 15;
+            } else {
+                document.getElementById("pFechaNac").value = "";
+                document.getElementById("pEdad").value = "";
+            }
         }
 
         actualizarVisibilidadModalPersona();
         selDep.onchange = actualizarVisibilidadModalPersona;
         modal.classList.remove("hidden");
+        setTimeout(() => document.getElementById("pNombre")?.focus(), 40);
     };
 
     window.cerrarModalPersona = function () {
@@ -319,14 +410,19 @@
 
     window.guardarPersonaCDM = function (e) {
         e.preventDefault();
+        const soloGym = esSoloGimnasioBG();
         const idEdit = document.getElementById("pId").value;
-        const dep = document.getElementById("pDeporte").value;
+        const dep = soloGym ? "Gimnasio" : document.getElementById("pDeporte").value;
         const cat = dep === "Gimnasio" ? "General" : document.getElementById("pCategoria").value;
-        const peso = parseFloat(document.getElementById("pPeso").value) || 70;
+        const pesoRaw = document.getElementById("pPeso")?.value;
+        const alturaRaw = document.getElementById("pAltura")?.value;
+        const peso = pesoRaw !== "" && pesoRaw != null ? parseFloat(pesoRaw) : null;
+        const altura = alturaRaw !== "" && alturaRaw != null ? parseInt(alturaRaw, 10) : null;
         const fechaNac = document.getElementById("pFechaNac")?.value || "";
-        const edadInp = parseInt(document.getElementById("pEdad").value, 10) || 15;
-        const edadFinal = fechaNac ? calcularEdadExacta({ fechaNacimiento: fechaNac }) : edadInp;
-        const anioNac = fechaNac ? parseInt(fechaNac.slice(0, 4), 10) : (new Date().getFullYear() - edadFinal);
+        const edadInp = parseInt(document.getElementById("pEdad")?.value, 10);
+        const edadFinal = fechaNac ? calcularEdadExacta({ fechaNacimiento: fechaNac }) : (!isNaN(edadInp) && edadInp > 0 ? edadInp : (soloGym ? 0 : 15));
+        const anioNac = fechaNac ? parseInt(fechaNac.slice(0, 4), 10) : (edadFinal ? (new Date().getFullYear() - edadFinal) : null);
+        const puestoInp = (document.getElementById("pPuesto")?.value || "").trim();
         const hoy = obtenerHoyISO();
 
         const pilares = dep === "Gimnasio" ? null : {
@@ -340,17 +436,17 @@
         const datos = {
             deporte: dep,
             categoria: cat,
-            puesto: document.getElementById("pPuesto").value.trim(),
+            puesto: puestoInp || (dep === "Gimnasio" ? "Musculación / General" : "Jugador"),
             nombre: document.getElementById("pNombre").value.trim(),
             apellido: document.getElementById("pApellido").value.trim(),
             dni: document.getElementById("pDni").value.trim(),
-            whatsapp: document.getElementById("pWhatsapp").value.trim(),
+            whatsapp: (document.getElementById("pWhatsapp")?.value || "").trim(),
             fechaNacimiento: fechaNac,
             anioNacimiento: anioNac,
             edad: edadFinal,
             sangre: document.getElementById("pSangre").value,
             peso,
-            altura: parseInt(document.getElementById("pAltura").value, 10) || 170,
+            altura,
             pierna: document.getElementById("pPierna").value,
             brazo: document.getElementById("pBrazo").value,
             frecuenciaSemanal: parseInt(document.getElementById("pFrecuencia").value, 10) || 3,
@@ -381,12 +477,12 @@
                 activo: true,
                 pilares,
                 puntosCategoria: dep === "Gimnasio" ? null : 7.1,
-                motivoPuntos: "Alta en Base General",
+                motivoPuntos: soloGym ? "" : "Alta en Base General",
                 asistencias: [hoy],
                 evaluaciones: [],
                 categoriasExtra: [],
                 historialCategorias: [],
-                clinico: [{ id: Date.now() + 1, fecha: hoy, peso, rpe: 5, sueno: 5, dolor: "Sin molestias" }]
+                clinico: peso ? [{ id: Date.now() + 1, fecha: hoy, peso, rpe: 5, sueno: 5, dolor: "Sin molestias" }] : []
             };
             asegurarPilaresPersona(nueva);
             basePersonas.push(nueva);
@@ -413,7 +509,7 @@
     };
 
     // =====================================================================
-    // 3. ABSORCIÓN POR EDAD Y MIGRACIÓN ENTRE CATEGORÍAS
+    // 3. ABSORCIÓN POR EDAD Y MIGRACIÓN ENTRE CATEGORÍAS (SOLO CLUBES)
     // =====================================================================
     function asegurarModalBase() {
         let m = document.getElementById("modalBaseGeneral37");
@@ -618,7 +714,7 @@
     };
 
     // =====================================================================
-    // 4. SECCIÓN "🗄️ BASE GENERAL" (JUGADORES POR EDAD + BASE DE EJERCICIOS)
+    // 4. SECCIÓN "🗄️ BASE GENERAL" (EN SOLO GIMNASIO: DIRECTO A BASE DE EJERCICIOS)
     // =====================================================================
     window._bgState = { tab: "jugadores", edadFiltro: "TODAS", depFiltro: "TODOS", busq: "" };
 
@@ -627,11 +723,15 @@
     };
 
     window.abrirModuloBaseGeneral = function (tabOpt = null) {
-        if (tabOpt) window._bgState.tab = tabOpt;
+        const soloGym = esSoloGimnasioBG();
+        if (soloGym) window._bgState.tab = "ejercicios";
+        else if (tabOpt) window._bgState.tab = tabOpt;
+
         if (typeof alternarSidebarMovil === "function") alternarSidebarMovil(true);
         const main = document.querySelector(".app-content");
         if (!main) return;
 
+        window.sincronizarEtiquetaSidebarBaseGeneral();
         document.querySelectorAll(".app-sidebar .side-link").forEach(l => l.classList.toggle("active", l.dataset.nav === "base_general"));
         Array.from(main.children).forEach(ch => { if (ch.id !== "cdmSeccionBaseGeneral37") ch.classList.add("hidden"); });
 
@@ -645,7 +745,11 @@
         sec.classList.remove("hidden");
 
         const h2 = document.querySelector(".topbar-title h2");
-        if (h2) h2.innerHTML = `🗄️ Base de Datos General <span class="cat-active-pill">Edades y Ejercicios</span>`;
+        if (h2) {
+            h2.innerHTML = soloGym
+                ? `🏋️ Base de Ejercicios <span class="cat-active-pill">Catálogo del Gimnasio</span>`
+                : `🗄️ Base de Datos General <span class="cat-active-pill">Edades y Ejercicios</span>`;
+        }
         renderizarSeccionBaseGeneral();
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
@@ -707,7 +811,6 @@
 
         agregarEjercicioInventadoAlCatalogoCDM(nom, tip, true, { grupo: grp, patron: pat, video: vid });
 
-        // Sincronizar también en la Videoteca del Gimnasio
         if (Array.isArray(baseVideoteca)) {
             const norm = normalizarTextoEjercicioCDM(nom);
             if (!baseVideoteca.some(v => normalizarTextoEjercicioCDM(v.nombre) === norm)) {
@@ -746,28 +849,35 @@
     window.renderizarSeccionBaseGeneral = function () {
         const sec = document.getElementById("cdmSeccionBaseGeneral37");
         if (!sec) return;
+        window.sincronizarEtiquetaSidebarBaseGeneral();
+
+        const soloGym = esSoloGimnasioBG();
         const st = window._bgState;
+        if (soloGym) st.tab = "ejercicios";
+
         const todos = basePersonas.filter(p => p && p.activo);
         const edades = [...new Set(todos.map(p => calcularEdadExacta(p)))].sort((a, b) => a - b);
         const deps = obtenerDeportesDisponibles();
         const ejercicios = baseCatalogoEjercicios || [];
 
-        sec.innerHTML = `
-            <div class="module-tabs tabs-2" style="margin-bottom:1.1rem;">
-                <button type="button" class="mod-tab ${st.tab === "jugadores" ? "active" : ""}" onclick="window._bgState.tab='jugadores'; renderizarSeccionBaseGeneral();">
-                    <i class="ri-group-line"></i><span>👥 Base de Jugadores por Edad (${todos.length})</span>
-                </button>
-                <button type="button" class="mod-tab ${st.tab === "ejercicios" ? "active" : ""}" onclick="window._bgState.tab='ejercicios'; renderizarSeccionBaseGeneral();">
-                    <i class="ri-dumbbell-line"></i><span>🏋️ Base Maestra de Ejercicios (${ejercicios.length})</span>
-                </button>
-            </div>
-            <div id="bg37Body"></div>
-        `;
+        sec.innerHTML = soloGym
+            ? `<div id="bg37Body"></div>`
+            : `
+                <div class="module-tabs tabs-2" style="margin-bottom:1.1rem;">
+                    <button type="button" class="mod-tab ${st.tab === "jugadores" ? "active" : ""}" onclick="window._bgState.tab='jugadores'; renderizarSeccionBaseGeneral();">
+                        <i class="ri-group-line"></i><span>👥 Base de Jugadores por Edad (${todos.length})</span>
+                    </button>
+                    <button type="button" class="mod-tab ${st.tab === "ejercicios" ? "active" : ""}" onclick="window._bgState.tab='ejercicios'; renderizarSeccionBaseGeneral();">
+                        <i class="ri-dumbbell-line"></i><span>🏋️ Base Maestra de Ejercicios (${ejercicios.length})</span>
+                    </button>
+                </div>
+                <div id="bg37Body"></div>
+            `;
 
         const body = document.getElementById("bg37Body");
         if (!body) return;
 
-        if (st.tab === "jugadores") {
+        if (!soloGym && st.tab === "jugadores") {
             const filtrados = todos.filter(p => {
                 if (st.edadFiltro !== "TODAS" && calcularEdadExacta(p) !== Number(st.edadFiltro)) return false;
                 if (st.depFiltro !== "TODOS" && p.deporte !== st.depFiltro) return false;
@@ -866,7 +976,10 @@
                     </div>
 
                     <div class="app-panel">
-                        <div class="panel-head"><h3><i class="ri-list-check-2"></i> Catálogo Activo (${ejercicios.length})</h3></div>
+                        <div class="panel-head">
+                            <h3><i class="ri-list-check-2"></i> Catálogo Activo (${ejercicios.length})</h3>
+                            ${soloGym ? `<a href="gym.html" class="btn btn-secondary btn-sm">👥 Ir a Socios del Gym →</a>` : ""}
+                        </div>
                         <div class="table-wrap">
                             <table class="app-table" style="font-size:0.82rem;">
                                 <thead><tr><th>Ejercicio</th><th>Grupo</th><th>Patrón</th><th style="text-align:right;"></th></tr></thead>
@@ -889,8 +1002,11 @@
         }
     };
 
-    // Inyectar botones "📥 Absorber de Base" y "🔀 Migrar" en la barra de categorías de cada deporte
     document.addEventListener("DOMContentLoaded", () => {
+        window.sincronizarEtiquetaSidebarBaseGeneral();
+        setTimeout(window.sincronizarEtiquetaSidebarBaseGeneral, 350);
+        setTimeout(window.sincronizarEtiquetaSidebarBaseGeneral, 950);
+
         if (document.body?.getAttribute("data-rol") === "usuario") return;
         const catBar = document.querySelector(".category-bar-panel");
         if (catBar && deportePagina && deportePagina !== "Gimnasio" && !document.getElementById("bg37CatTools")) {

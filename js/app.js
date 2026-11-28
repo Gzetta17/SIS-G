@@ -7,6 +7,7 @@
  *   3. Normalización de Personas (Edad exacta, Doble Categoría, Score 1-10)
  *   4. Catálogo Unificado de Ejercicios + Fotos de Perfil + Backup / Demo
  *   5. Portal Ejecutivo Moderno (index.html) + Inicializador modular seguro
+ *   6. Novedades y Comunicados Pop-up con imagen para Clubes y Gimnasios
  */
 
 // =========================================================================
@@ -390,10 +391,18 @@ function sincronizarCambiosHaciaServidorCDM() {
         if (sesion?.rol === "usuario" && sesion.personaId) {
             const miPersona = basePersonas.find(x => Number(x.id) === Number(sesion.personaId));
             if (miPersona) {
+                const rutinasPropiasUsuario = (baseRutinas || []).filter(r =>
+                    r && r.creadaPorUsuario && Number(r.personaId) === Number(miPersona.id)
+                );
                 fetch(`/api/cdm/jugador/${miPersona.id}/sync`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ claveClub, personaActualizada: miPersona, catalogoEjercicios: baseCatalogoEjercicios })
+                    body: JSON.stringify({
+                        claveClub,
+                        personaActualizada: miPersona,
+                        rutinasPropiasUsuario,
+                        catalogoEjercicios: baseCatalogoEjercicios
+                    })
                 }).catch(() => {});
             }
             return;
@@ -435,6 +444,7 @@ async function sincronizarEstadoDesdeServidorCDM() {
         if (est.licenciaConfig && Object.keys(est.licenciaConfig).length > 0) {
             localStorage.setItem("cdm_licencia_config_v1", JSON.stringify(est.licenciaConfig));
             if (typeof aplicarLicenciaYModulosCDM === "function") aplicarLicenciaYModulosCDM();
+            if (typeof window.sincronizarEtiquetaSidebarBaseGeneral === "function") window.sincronizarEtiquetaSidebarBaseGeneral();
         }
 
         const esSecundario = claveClub !== "cdm_adelia_maria_principal";
@@ -655,7 +665,7 @@ function quitarFotoPerfilActualCDM() {
 
 // =========================================================================
 // 8. PORTAL EJECUTIVO MODERNO (INDEX.HTML):
-//    IDENTIDAD DINÁMICA + TARJETAS GRANDES (DEPORTES / CONSULTORIO)
+//    IDENTIDAD DINÁMICA + TARJETAS GRANDES (DEPORTES / GIMNASIO / CONSULTORIO)
 // =========================================================================
 
 function obtenerProfesionesConsultorioIndex(lic) {
@@ -685,6 +695,14 @@ function esComercioSoloConsultorio(lic) {
     return (mod.consultorio !== false) && profs.length > 0 && !tieneDepOGym;
 }
 
+function esComercioSoloGimnasioCDM(licOpt = null) {
+    const lic = licOpt || obtenerLicenciaConfigCDM();
+    const mod = lic?.modulos || { futbol: true, hockey: true, gym: true, consultorio: false };
+    const tieneDeportesClub = (mod.futbol !== false) || (mod.hockey !== false) ||
+        (Array.isArray(lic?.deportesExtra) && lic.deportesExtra.filter(Boolean).length > 0);
+    return (mod.gym !== false) && !tieneDeportesClub;
+}
+
 function obtenerEncabezadoTarjetasIndex() {
     const grid = document.querySelector(".sports-showcase-grid");
     if (!grid) return null;
@@ -698,6 +716,11 @@ function sincronizarIdentidadComercioUI() {
     const nombre = (lic.nombreEntidad || "CDM Pro Suite").trim();
     const ciudad = (lic.ciudad || lic.localidad || lic.ubicacion || lic.subtitulo || "").trim();
     const soloCons = esComercioSoloConsultorio(lic);
+    const soloGym = esComercioSoloGimnasioCDM(lic);
+
+    if (typeof window.sincronizarEtiquetaSidebarBaseGeneral === "function") {
+        window.sincronizarEtiquetaSidebarBaseGeneral();
+    }
     if (!document.querySelector(".sports-showcase-grid")) return;
 
     document.title = `${nombre} — Panel Principal`;
@@ -718,11 +741,13 @@ function sincronizarIdentidadComercioUI() {
         if (sub) {
             sub.innerText = soloCons
                 ? "Panel de consultorio, agenda de turnos, pacientes e historia clínica"
-                : "Panel general de planteles, gimnasio, asistencia diaria y cuotas";
+                : soloGym
+                    ? "Panel de gimnasio, socios, asistencia diaria, rutinas y cuotas"
+                    : "Panel general de planteles, gimnasio, asistencia diaria y cuotas";
         }
     }
 
-    // 2. Encabezado real arriba de las tarjetas (cambia "Disciplinas y Áreas del Club")
+    // 2. Encabezado real arriba de las tarjetas
     const head = obtenerEncabezadoTarjetasIndex();
     if (head) {
         const tit = head.querySelector("h1, h2, h3, strong");
@@ -730,6 +755,9 @@ function sincronizarIdentidadComercioUI() {
         if (soloCons) {
             if (tit) tit.innerText = "Especialidades del Consultorio";
             if (desc) desc.innerText = "Seleccioná una especialidad para abrir su agenda, pacientes, obras sociales e historia clínica";
+        } else if (soloGym) {
+            if (tit) tit.innerText = "Áreas del Gimnasio";
+            if (desc) desc.innerText = "Seleccioná un módulo para gestionar socios, rutinas, videoteca, profesionales o cuotas";
         } else {
             if (tit) tit.innerText = "Disciplinas y Áreas del Club";
             if (desc) desc.innerText = "Seleccioná un módulo para gestionar planteles, pizarras, rutinas o cuotas";
@@ -742,7 +770,9 @@ function sincronizarIdentidadComercioUI() {
         btnNueva.id = "btnAltaTopbarCDM";
         btnNueva.innerHTML = soloCons
             ? `<i class="ri-user-add-line"></i> + Nuevo Paciente`
-            : `<i class="ri-user-add-line"></i> + Nueva Persona`;
+            : soloGym
+                ? `<i class="ri-user-add-line"></i> + Nuevo Socio`
+                : `<i class="ri-user-add-line"></i> + Nueva Persona`;
     }
 }
 
@@ -828,7 +858,7 @@ function inyectarCSSIndexModerno() {
         }
         .idx-hero-card:hover .idx-hero-arrow { background: #ffffff; color: #0f172a; transform: translateX(3px); }
 
-        /* DIVISOR MODERNO (SOLO EN CLUBES DEPORTIVOS) */
+        /* DIVISOR MODERNO (SOLO EN CLUBES Y GIMNASIOS) */
         .idx-section-divider {
             display: flex; align-items: center; gap: 1rem; margin: 2rem 0 1.45rem;
         }
@@ -844,7 +874,7 @@ function inyectarCSSIndexModerno() {
             letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
         }
 
-        /* WIDGETS INFERIORES DE CLUB (LESIONES + RECORDATORIOS) */
+        /* WIDGETS INFERIORES (LESIONES + RECORDATORIOS) */
         .idx-bottom-grid {
             display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 1.15rem; align-items: start;
@@ -1345,17 +1375,17 @@ function renderizarTarjetasModernasIndex(activos) {
                     lesionados: 0
                 }));
             });
-        } else {
+       } else {
             const fbCons = "https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=900&q=80";
             cards.push(construirTarjetaHeroIndex({
                 areaKey: "consultorio",
                 onclick: `if(typeof abrirEspecialidadDesdeInicioCDM==='function') abrirEspecialidadDesdeInicioCDM('TODAS');`,
-                tag: "🩺 Consultorio", titulo: "Consultorio",
+                tag: "🧬 Gabinete", titulo: "Gabinete de Desarrollo",
                 sub: `${profesiones.map(p => p.clave).slice(0, 3).join(" • ")}`,
                 bgImageCss: `url('${fbCons}')`,
                 defaultPreview: fbCons,
                 overlay: "linear-gradient(160deg, rgba(13, 148, 136, 0.62) 0%, rgba(15, 23, 42, 0.92) 100%)",
-                cantidad: profesiones.length, sufijo: "áreas", lesionados: 0
+                cantidad: profesiones.length, sufijo: profesiones.length === 1 ? "área" : "áreas", lesionados: 0
             }));
         }
     }
@@ -1364,7 +1394,6 @@ function renderizarTarjetasModernasIndex(activos) {
     grid.innerHTML = cards.join("");
 }
 
-
 function renderizarWidgetsLimpiosIndex(activos) {
     const grid = document.querySelector(".sports-showcase-grid");
     const mainContent = document.querySelector(".app-content");
@@ -1372,6 +1401,7 @@ function renderizarWidgetsLimpiosIndex(activos) {
 
     const lic = obtenerLicenciaConfigCDM();
     const soloCons = esComercioSoloConsultorio(lic);
+    const soloGym = esComercioSoloGimnasioCDM(lic);
 
     // EN CONSULTORIO: Inicio limpio solo con las tarjetas grandes (sin calendario repetido abajo)
     if (soloCons) {
@@ -1404,7 +1434,9 @@ function renderizarWidgetsLimpiosIndex(activos) {
         mainContent.appendChild(hub);
     }
 
-    const lesionados = activos.filter(p => {
+    const activosVisibles = soloGym ? activos.filter(p => p.deporte === "Gimnasio") : activos;
+
+    const lesionados = activosVisibles.filter(p => {
         const lesActivas = Array.isArray(p.lesionesHistorial) && p.lesionesHistorial.some(l => !l.fechaAlta);
         const alertaMed = p.estadoMedico && p.estadoMedico !== "Óptimo";
         return lesActivas || alertaMed;
@@ -1424,7 +1456,7 @@ function renderizarWidgetsLimpiosIndex(activos) {
                 <span class="badge ${lesionados.length ? "badge-danger" : "badge-ok"}">${lesionados.length ? `${lesionados.length} en seguimiento` : "Todo óptimo"}</span>
             </div>
             ${lesionados.length === 0 ? `
-                <div class="idx-ok-empty"><i class="ri-shield-check-fill" style="font-size:1.25rem;"></i><span>Plantel 100% apto — Sin lesionados ni sobrecargas activas.</span></div>
+                <div class="idx-ok-empty"><i class="ri-shield-check-fill" style="font-size:1.25rem;"></i><span>${soloGym ? "Socios 100% aptos" : "Plantel 100% apto"} — Sin lesionados ni sobrecargas activas.</span></div>
             ` : `
                 <div class="idx-injury-list">
                     ${lesionados.map(p => {
@@ -1452,7 +1484,7 @@ function renderizarWidgetsLimpiosIndex(activos) {
                 <span class="badge badge-celeste">${pendientes} pend.</span>
             </div>
             <form class="idx-rem-form" onsubmit="agregarRecordatorioIndex(event)">
-                <input type="text" id="inpRecProfeIndex" required placeholder="Ej: Traer pecheras, revisar rodilla de Mateo, partido 15hs...">
+                <input type="text" id="inpRecProfeIndex" required placeholder="${soloGym ? "Ej: Revisar hombro de Martín, renovar rutina de Lucas..." : "Ej: Traer pecheras, revisar rodilla de Mateo, partido 15hs..."}">
                 <select id="selPrioRecIndex" title="Prioridad"><option value="normal">📌 Normal</option><option value="urgente">🔥 Urgente</option></select>
                 <button type="submit" class="btn btn-primary btn-sm">+</button>
             </form>
@@ -1493,12 +1525,68 @@ function enviarAlertaAsistenciaWhatsApp(idPersona) {
 }
 
 // =========================================================================
-// 9. DATOS DEMO LIMPIOS (CON FECHA DE NACIMIENTO PARA BASE GENERAL)
+// 9. DATOS DEMO LIMPIOS (ADAPTADOS A CLUB O SOLO GIMNASIO)
 // =========================================================================
 
 function cargarDatosDemoCDM() {
     const d0 = isoHaceDias(0), d1 = isoHaceDias(1), d2 = isoHaceDias(2), d3 = isoHaceDias(3), d4 = isoHaceDias(4), d12 = isoHaceDias(12), d25 = isoHaceDias(25);
     const anio = new Date().getFullYear();
+
+    if (esComercioSoloGimnasioCDM()) {
+        basePersonas = [
+            {
+                id: 301, deporte: "Gimnasio", categoria: "General", puesto: "Musculación e Hipertrofia",
+                nombre: "Lucas", apellido: "Peralta", dni: "39111444", whatsapp: "5493584889900",
+                edad: 26, fechaNacimiento: `${anio - 26}-09-03`, anioNacimiento: anio - 26,
+                sangre: "0+", peso: 78, altura: 176, pierna: "Derecha", brazo: "Derecho",
+                activo: true, pilares: null, puntosCategoria: null, motivoPuntos: "",
+                frecuenciaSemanal: 3, estadoMedico: "Óptimo", pagoEstado: "Al Día", montoCuota: 25000,
+                asistencias: [d4, d2, d0], clinico: [],
+                evaluaciones: [
+                    { id: 51, fecha: d25, ejercicio: "Press de Banca Plano", tipo: "fuerza_kg", valor: 88, unidad: "kg (1RM)", detalle: "78 kg × 4 reps (1RM: 88 kg)", nota: "" },
+                    { id: 52, fecha: d0, ejercicio: "Press de Banca Plano", tipo: "fuerza_kg", valor: 102, unidad: "kg (1RM)", detalle: "88 kg × 5 reps (1RM: 102 kg)", nota: "PR en Banca" }
+                ]
+            },
+            {
+                id: 302, deporte: "Gimnasio", categoria: "General", puesto: "Funcional, Core y Salud",
+                nombre: "Martín", apellido: "Cabrera", dni: "41222555", whatsapp: "5493584990011",
+                edad: 23, fechaNacimiento: `${anio - 23}-11-18`, anioNacimiento: anio - 23,
+                sangre: "A+", peso: 84, altura: 179, pierna: "Derecha", brazo: "Derecho",
+                activo: true, pilares: null, puntosCategoria: null, motivoPuntos: "",
+                frecuenciaSemanal: 4, estadoMedico: "Sobrecarga / Precaución", pagoEstado: "Pendiente", montoCuota: 25000,
+                asistencias: [d3, d1], clinico: [], evaluaciones: []
+            },
+            {
+                id: 303, deporte: "Gimnasio", categoria: "General", puesto: "Fuerza y Glúteos",
+                nombre: "Sofía", apellido: "Morales", dni: "42666777", whatsapp: "5493584667788",
+                edad: 25, fechaNacimiento: `${anio - 25}-03-22`, anioNacimiento: anio - 25,
+                sangre: "B+", peso: 61, altura: 165, pierna: "Derecha", brazo: "Derecho",
+                activo: true, pilares: null, puntosCategoria: null, motivoPuntos: "",
+                frecuenciaSemanal: 3, estadoMedico: "Óptimo", pagoEstado: "Al Día", montoCuota: 25000,
+                asistencias: [d4, d2, d0], clinico: [],
+                evaluaciones: [
+                    { id: 53, fecha: d12, ejercicio: "Hip Thrust con Barra", tipo: "fuerza_kg", valor: 95, unidad: "kg (1RM)", detalle: "80 kg × 6 reps (1RM: 95 kg)", nota: "" },
+                    { id: 54, fecha: d0, ejercicio: "Hip Thrust con Barra", tipo: "fuerza_kg", valor: 108, unidad: "kg (1RM)", detalle: "90 kg × 6 reps (1RM: 108 kg)", nota: "Excelente técnica" }
+                ]
+            },
+            {
+                id: 304, deporte: "Gimnasio", categoria: "General", puesto: "Aeróbico y Resistencia",
+                nombre: "Camila", apellido: "Ferreyra", dni: "37444888", whatsapp: "5493584778899",
+                edad: 30, fechaNacimiento: `${anio - 30}-07-11`, anioNacimiento: anio - 30,
+                sangre: "0+", peso: 59, altura: 163, pierna: "Derecha", brazo: "Derecho",
+                activo: true, pilares: null, puntosCategoria: null, motivoPuntos: "",
+                frecuenciaSemanal: 3, estadoMedico: "Óptimo", pagoEstado: "Al Día", montoCuota: 25000,
+                asistencias: [d2, d0], clinico: [], evaluaciones: []
+            }
+        ];
+        baseAlineaciones = {};
+        basePartidos = [];
+        basePersonas.forEach(p => asegurarPilaresPersona(p));
+        guardarDatosCDM();
+        mostrarToast("🏋️ Demo de Gimnasio cargada (4 socios).");
+        setTimeout(() => window.location.reload(), 500);
+        return;
+    }
 
     basePersonas = [
         {
@@ -1624,7 +1712,6 @@ document.addEventListener("DOMContentLoaded", () => {
 //     - Permite subir flyers/imágenes (PC/Celular o URL), editar, pausar y eliminar
 //     - Persiste en licenciaConfig.anunciosPortal (sincronizado con MongoDB)
 //     - Pop-up automático en mi-ficha.html (portal-socio) y jugador.html (rol usuario)
-// Reemplaza el Bloque 11 al final de js/app.js
 // =========================================================================
 (function () {
     if (window.__cdmNovedadesPortal11) return;
@@ -1893,6 +1980,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const lista = obtenerAnunciosPortal();
         const edit = idEditar ? lista.find(x => Number(x.id) === Number(idEditar)) : null;
         const imgIni = edit?.imagen || "";
+        const soloGym = typeof esComercioSoloGimnasioCDM === "function" && esComercioSoloGimnasioCDM();
         const modal = asegurarModalNovedades();
 
         modal.onclick = (e) => { if (e.target === modal) cerrarModalNovedadesPortalCDM(); };
@@ -1924,7 +2012,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
 
                     <div class="field" style="margin-bottom:0.6rem;">
-                        <label>Mensaje para los socios / deportistas (opcional si subís imagen)</label>
+                        <label>Mensaje para los ${soloGym ? "socios" : "socios / deportistas"} (opcional si subís imagen)</label>
                         <textarea id="novMensaje" rows="3" placeholder="Ej: El lunes feriado el gimnasio abrirá de 9:00 a 13:00 hs. Por la tarde permanecerá cerrado.">${escNov(edit?.mensaje || "")}</textarea>
                     </div>
 
@@ -1948,9 +2036,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="field">
                             <label>¿Quién lo ve?</label>
                             <select id="novDest">
-                                <option value="TODOS" ${(edit?.destinatario || "TODOS") === "TODOS" ? "selected" : ""}>🌐 Todos (Club + Gimnasio)</option>
-                                <option value="Gimnasio" ${edit?.destinatario === "Gimnasio" ? "selected" : ""}>🏋️ Solo Gimnasio</option>
-                                <option value="DEPORTES" ${edit?.destinatario === "DEPORTES" ? "selected" : ""}>⚽ Solo Deportes</option>
+                                ${soloGym
+                                    ? `<option value="TODOS" selected>🏋️ Todos los Socios del Gimnasio</option>`
+                                    : `<option value="TODOS" ${(edit?.destinatario || "TODOS") === "TODOS" ? "selected" : ""}>🌐 Todos (Club + Gimnasio)</option>
+                                       <option value="Gimnasio" ${edit?.destinatario === "Gimnasio" ? "selected" : ""}>🏋️ Solo Gimnasio</option>
+                                       <option value="DEPORTES" ${edit?.destinatario === "DEPORTES" ? "selected" : ""}>⚽ Solo Deportes</option>`}
                             </select>
                         </div>
                         <div class="field">
@@ -1978,7 +2068,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         const meta = TIPOS_NOVEDAD[a.tipo] || TIPOS_NOVEDAD.aviso;
                         const hoy = typeof obtenerHoyISO === "function" ? obtenerHoyISO() : new Date().toISOString().split("T")[0];
                         const vencida = Boolean(a.vence && a.vence < hoy);
-                        const destTxt = a.destinatario === "Gimnasio" ? "🏋️ Solo Gym" : (a.destinatario === "DEPORTES" ? "⚽ Solo Deportes" : "🌐 Todos");
+                        const destTxt = soloGym
+                            ? "🏋️ Socios Gym"
+                            : (a.destinatario === "Gimnasio" ? "🏋️ Solo Gym" : (a.destinatario === "DEPORTES" ? "⚽ Solo Deportes" : "🌐 Todos"));
                         return `
                             <div class="nov-card-item" style="border-left-color:${meta.color}; opacity:${a.activo === false || vencida ? "0.65" : "1"};">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.65rem; flex-wrap:wrap;">

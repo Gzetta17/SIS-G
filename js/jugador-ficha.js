@@ -1,8 +1,8 @@
 /**
  * js/jugador-ficha.js — Expediente Individual Rediseñado (Gimnasio + Deportes)
- * - Gimnasio: Cuaderno diario de cargas, última marca visible y tablero de PRs
- * - Deportes: Panel claro de avances (Pilares, Partidos, Tests/Tendencias) + permiso controlado por el profe
- * - 100% compatible con jugador.html, pro-evaluacion.js, portal-permisos.js y Modo Día/Noche
+ * - Gimnasio: Cuaderno diario de cargas, última marca visible y tablero de PRs responsive
+ * - Deportes: Panel claro de avances (Pilares, Partidos, Tests/Tendencias) + permiso del profe
+ * - Tarjetas KPI reales, títulos sin cortes, 100% compatible con Gabinete y Modo Día/Noche
  * G-SIS — Desarrollado por Gonzalo Adanchú
  */
 
@@ -14,37 +14,98 @@ let ejercicioSeleccionadoFicha = "";
 // =========================================================================
 
 function inyectarCSSJugadorFichaPro() {
-    if (document.getElementById("cdmCssJugadorFichaPro")) return;
+    document.getElementById("cdmCssJugadorFichaPro")?.remove();
     const st = document.createElement("style");
     st.id = "cdmCssJugadorFichaPro";
     st.textContent = `
-        /* Pulso ejecutivo y tablero de avances */
+        /* Contenedor del pulso ejecutivo */
         .jf-pulse-wrap {
             display: flex;
             flex-direction: column;
-            gap: 0.9rem;
-            margin-bottom: 1rem;
+            gap: 1rem;
+            margin-bottom: 1.1rem;
         }
         .jf-grid-3 {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.9rem;
+            gap: 0.95rem;
             align-items: stretch;
         }
         .jf-grid-2 {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.9rem;
+            gap: 0.95rem;
             align-items: start;
         }
-        .jf-card {
+
+        /* Tarjetas KPI reales (arregla los textos sueltos sin caja) */
+        .jf-kpi-grid {
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            gap: 0.85rem !important;
+            margin-bottom: 0 !important;
+        }
+        #kpisEvolucionEjercicio {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)) !important;
+            gap: 0.75rem !important;
+            margin-bottom: 1rem !important;
+        }
+        .jf-pulse-wrap .kpi-card,
+        #kpisEvolucionEjercicio .kpi-card {
             background: var(--surface-solid, #ffffff);
-            border: 1.5px solid var(--line-strong, #cbd5e1);
-            border-radius: 18px;
-            padding: 0.95rem 1.05rem;
+            border: 1.5px solid var(--line, #e2e8f0);
+            border-top: 3.5px solid var(--brand-p, #0284c7);
+            border-radius: 16px;
+            padding: 0.9rem 1rem;
             display: flex;
             flex-direction: column;
-            gap: 0.65rem;
+            gap: 0.28rem;
+            box-shadow: 0 6px 18px -12px rgba(15, 23, 42, 0.16);
+            min-width: 0;
+        }
+        .jf-pulse-wrap .kpi-card.kpi-emerald,
+        #kpisEvolucionEjercicio .kpi-card.kpi-emerald { border-top-color: #10b981; }
+        .jf-pulse-wrap .kpi-card.kpi-purple,
+        #kpisEvolucionEjercicio .kpi-card.kpi-purple { border-top-color: #6366f1; }
+        .jf-pulse-wrap .kpi-card.kpi-amber,
+        #kpisEvolucionEjercicio .kpi-card.kpi-amber { border-top-color: #f59e0b; }
+
+        .kpi-card .kpi-title {
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--ink-500, #64748b);
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .kpi-card .kpi-value {
+            font-size: 1.42rem;
+            font-weight: 900;
+            color: var(--ink-900, #0f172a);
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+            word-break: break-word;
+        }
+        .kpi-card .kpi-sub {
+            font-size: 0.74rem;
+            color: var(--ink-500, #64748b);
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        /* Tarjetas de sección */
+        .jf-card {
+            background: var(--surface-solid, #ffffff);
+            border: 1.5px solid var(--line, #e2e8f0);
+            border-radius: 18px;
+            padding: 1rem 1.15rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.72rem;
+            box-shadow: 0 6px 20px -12px rgba(15, 23, 42, 0.12);
         }
         .jf-card-head {
             display: flex;
@@ -52,25 +113,25 @@ function inyectarCSSJugadorFichaPro() {
             align-items: center;
             gap: 0.5rem;
             flex-wrap: wrap;
-            padding-bottom: 0.48rem;
+            padding-bottom: 0.55rem;
             border-bottom: 1px solid var(--line, #e2e8f0);
         }
         .jf-card-head h4 {
             margin: 0;
-            font-size: 0.9rem;
+            font-size: 0.94rem;
             font-weight: 800;
             color: var(--ink-900, #0f172a);
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.42rem;
         }
 
         /* Barras de pilares (Deportes) */
         .jf-pillar-row {
             display: flex;
             flex-direction: column;
-            gap: 3px;
-            font-size: 0.77rem;
+            gap: 4px;
+            font-size: 0.78rem;
         }
         .jf-pillar-top {
             display: flex;
@@ -101,7 +162,7 @@ function inyectarCSSJugadorFichaPro() {
             background: var(--surface-subtle, #f8fafc);
             border: 1px solid var(--line, #e2e8f0);
             border-radius: 12px;
-            padding: 0.5rem 0.35rem;
+            padding: 0.55rem 0.35rem;
             text-align: center;
         }
         .jf-mstat strong {
@@ -112,77 +173,121 @@ function inyectarCSSJugadorFichaPro() {
             line-height: 1.1;
         }
         .jf-mstat small {
-            font-size: 0.65rem;
+            font-size: 0.64rem;
             font-weight: 800;
             text-transform: uppercase;
             color: var(--ink-500, #64748b);
         }
 
-        /* Tablero de marcas / PRs clickeables */
+        /* Tablero de marcas / PRs clickeables (SIN CORTAR TÍTULOS) */
         .jf-pr-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-            gap: 0.65rem;
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 255px), 1fr));
+            gap: 0.75rem;
         }
         .jf-pr-card {
             background: var(--surface-subtle, #f8fafc);
             border: 1.5px solid var(--line, #e2e8f0);
             border-top: 3.5px solid var(--brand-p, #0284c7);
-            border-radius: 14px;
-            padding: 0.7rem 0.8rem;
+            border-radius: 15px;
+            padding: 0.82rem 0.92rem;
             cursor: pointer;
-            transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+            transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
             display: flex;
             flex-direction: column;
-            gap: 0.3rem;
+            gap: 0.38rem;
             text-align: left;
+            min-width: 0;
         }
         .jf-pr-card:hover {
             transform: translateY(-2px);
             border-color: var(--brand-p, #0284c7);
-            box-shadow: 0 8px 18px -10px rgba(2, 132, 199, 0.32);
+            box-shadow: 0 10px 22px -12px rgba(2, 132, 199, 0.35);
         }
         .jf-pr-card.is-selected {
             background: var(--cdm-50, #f0f9ff);
             border-color: var(--brand-p, #0284c7);
             box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.18);
         }
+        body[data-theme="dark"] .jf-pr-card.is-selected {
+            background: rgba(2, 132, 199, 0.16);
+        }
+        .jf-pr-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
         .jf-pr-title {
-            font-size: 0.81rem;
+            font-size: 0.86rem;
             font-weight: 800;
             color: var(--ink-900, #0f172a);
+            line-height: 1.28;
+            white-space: normal;
+            word-break: break-word;
+            flex: 1;
+        }
+        .jf-pr-head .badge {
+            flex-shrink: 0;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
         .jf-pr-val {
-            font-size: 1.12rem;
+            font-size: 1.32rem;
             font-weight: 900;
             color: var(--ink-900, #0f172a);
             line-height: 1.15;
+            margin-top: 2px;
         }
         .jf-pr-sub {
-            font-size: 0.71rem;
+            font-size: 0.74rem;
             color: var(--ink-500, #64748b);
+            line-height: 1.35;
         }
 
         /* Cuaderno rápido de Gimnasio */
         .jf-gym-notebook {
             background: linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(16, 185, 129, 0.06) 100%);
             border: 1.5px solid rgba(2, 132, 199, 0.32);
-            border-radius: 18px;
-            padding: 0.95rem 1.05rem;
+            border-radius: 20px;
+            padding: 1.05rem 1.2rem;
+            box-shadow: 0 10px 24px -14px rgba(2, 132, 199, 0.25);
         }
         .jf-gym-quick-form {
             display: grid;
-            grid-template-columns: minmax(170px, 1.5fr) 92px 84px minmax(120px, 1fr) auto;
-            gap: 0.45rem;
+            grid-template-columns: minmax(190px, 1.7fr) 104px 88px minmax(145px, 1.1fr) auto;
+            gap: 0.55rem;
             align-items: end;
-            margin-top: 0.55rem;
+            margin-top: 0.7rem;
+        }
+        .jf-routine-chips-wrap {
+            display: flex;
+            gap: 0.38rem;
+            flex-wrap: wrap;
+            margin-top: 0.65rem;
+            align-items: center;
+        }
+        .jf-routine-chip {
+            border: 1.5px solid var(--line-strong, #cbd5e1);
+            background: var(--surface-solid, #ffffff);
+            color: var(--ink-700, #334155);
+            border-radius: 999px;
+            padding: 0.25rem 0.72rem;
+            font-size: 0.73rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.14s ease;
+        }
+        .jf-routine-chip:hover {
+            border-color: #0284c7;
+            background: var(--cdm-50, #f0f9ff);
+            color: #0369a1;
         }
         .jf-gym-last-hint {
-            margin-top: 0.45rem;
-            font-size: 0.76rem;
+            margin-top: 0.6rem;
+            padding: 0.45rem 0.75rem;
+            border-radius: 10px;
+            background: rgba(2, 132, 199, 0.09);
+            font-size: 0.77rem;
             font-weight: 700;
             color: var(--brand-p-ink, #0369a1);
             display: flex;
@@ -190,28 +295,29 @@ function inyectarCSSJugadorFichaPro() {
             gap: 0.4rem;
             flex-wrap: wrap;
         }
+        body[data-theme="dark"] .jf-gym-last-hint { color: #7dd3fc; }
 
         /* Anotación inline dentro de rutinas */
         .jf-rut-ex-box {
-            padding: 0.62rem 0.75rem;
+            padding: 0.68rem 0.82rem;
             background: var(--surface-subtle, #f8fafc);
             border: 1px solid var(--line, #e2e8f0);
-            border-radius: 11px;
-            font-size: 0.81rem;
+            border-radius: 12px;
+            font-size: 0.82rem;
         }
         .jf-rut-inline-form {
             display: flex;
             gap: 0.35rem;
             flex-wrap: wrap;
-            margin-top: 0.45rem;
-            padding-top: 0.45rem;
+            margin-top: 0.48rem;
+            padding-top: 0.48rem;
             border-top: 1px dashed var(--line-strong, #cbd5e1);
             align-items: center;
         }
         .jf-rut-inline-form input {
-            min-height: 30px !important;
-            font-size: 0.75rem !important;
-            padding: 0.2rem 0.45rem !important;
+            min-height: 32px !important;
+            font-size: 0.76rem !important;
+            padding: 0.22rem 0.48rem !important;
         }
 
         /* Modo gráfico ancho completo en Gym */
@@ -219,10 +325,10 @@ function inyectarCSSJugadorFichaPro() {
             grid-template-columns: 1fr !important;
         }
         .jf-charts-single .chart-canvas-box {
-            min-height: 290px;
+            min-height: 295px;
         }
 
-        /* Impresión A4 limpia (compartida con pro-evaluacion.js) */
+        /* Impresión A4 limpia */
         #cdmPrintZoneJF { display: none; }
         .jf-pdf-sheet {
             background: #ffffff;
@@ -250,14 +356,22 @@ function inyectarCSSJugadorFichaPro() {
         }
 
         @media (max-width: 1024px) {
+            .jf-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
             .jf-grid-3 { grid-template-columns: 1fr; }
             .jf-gym-quick-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .jf-gym-quick-form .jf-qf-ej { grid-column: 1 / -1; }
+            .jf-gym-quick-form .jf-qf-nota { grid-column: 1 / -1; }
             .jf-gym-quick-form .jf-qf-btn { grid-column: 1 / -1; width: 100%; }
         }
         @media (max-width: 720px) {
             .jf-grid-2 { grid-template-columns: 1fr; }
             .jf-match-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .jf-gym-notebook, .jf-card { padding: 0.85rem 0.9rem; border-radius: 16px; }
+            .kpi-card .kpi-value { font-size: 1.22rem; }
+        }
+        @media (max-width: 480px) {
+            .jf-kpi-grid { gap: 0.55rem !important; }
+            .jf-pulse-wrap .kpi-card { padding: 0.72rem 0.78rem; }
         }
     `;
     document.head.appendChild(st);
@@ -274,6 +388,10 @@ function escJF(s) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+}
+
+function escJsJF(s) {
+    return escJF(String(s ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
 }
 
 function obtenerIdJugadorDesdeURL() {
@@ -454,7 +572,7 @@ function resumirEjerciciosPersona(p) {
         const vals = registros.map(r => Number(r.valor) || 0);
         const mejor = esMenorMejor ? Math.min(...vals) : Math.max(...vals);
 
-        let tendencia = "base"; // 'up' | 'same' | 'down' | 'base'
+        let tendencia = "base";
         let badgeCls = "badge-celeste";
         let deltaTxt = "Base";
 
@@ -573,14 +691,18 @@ function renderizarCabeceraFichaJugador(p) {
     const tituloSub = document.getElementById("subtituloHeaderJugador");
     if (tituloSub) tituloSub.textContent = `${p.apellido}, ${p.nombre}`;
 
-    // Ajustar etiquetas de pestañas según si es Gym o Deporte
+    // Etiquetas cortas en las pestañas para que nunca se recorten
     const tabGraf = document.querySelector(`.module-tabs .mod-tab[onclick*="'graficos'"] span`);
-    if (tabGraf) tabGraf.textContent = esGym ? "Mi Cuaderno y Progreso" : "Avances y Evolución 360°";
+    if (tabGraf) {
+        tabGraf.textContent = esUsuarioFinalEnFicha()
+            ? "Progreso"
+            : (esGym ? "Cuaderno y Progreso" : "Avances 360°");
+    }
 
     cab.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:1rem; min-width:0;">
-                ${renderAvatarPersonaCDM(p, 68, "1.35rem", true)}
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:0.95rem; min-width:0; flex:1;">
+                ${renderAvatarPersonaCDM(p, 64, "1.3rem", true)}
                 <div style="min-width:0;">
                     <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:0.3rem;">
                         <span class="badge badge-celeste">${escJF(p.deporte)} • ${esGym ? "Socio Gym" : escJF(p.categoria)}</span>
@@ -589,9 +711,9 @@ function renderizarCabeceraFichaJugador(p) {
                         <span class="badge ${badgeMed}">🩺 ${escJF(estadoMed)}</span>
                         <span class="badge ${alDia ? "badge-ok" : "badge-danger"}">${alDia ? "💳 Al Día" : "⚠️ Cuota Pend."}</span>
                     </div>
-                    <h2 style="margin:0; font-size:1.35rem; font-weight:900;">${escJF(p.apellido)}, ${escJF(p.nombre)}</h2>
-                    <small style="color:var(--ink-500); font-weight:600;">
-                        ${escJF(p.puesto || "General")} • ${edad ? `${edad} años • ` : ""}${p.peso || "-"} kg / ${p.altura || "-"} cm • Asistencia 30d: <b>${pred.pct}%</b> (${sem7}/${pact} sem.)
+                    <h2 style="margin:0; font-size:1.35rem; font-weight:900; line-height:1.2;">${escJF(p.apellido)}, ${escJF(p.nombre)}</h2>
+                    <small style="color:var(--ink-500); font-weight:600; display:block; margin-top:2px;">
+                        ${escJF(p.puesto || "General")} • ${edad ? `${edad} años • ` : ""}${p.peso || "-"} kg / ${p.altura || "-"} cm • Semana: <b>${sem7}/${pact}d</b>${!esGym ? ` (30d: ${pred.pct}%)` : ""}
                     </small>
                 </div>
             </div>
@@ -615,7 +737,7 @@ function renderizarCabeceraFichaJugador(p) {
 
 // =========================================================================
 // 4. PULSO EJECUTIVO DIFERENCIADO:
-//    A) GIMNASIO -> CUADERNO RÁPIDO DE CARGAS + TABLERO DE PRs
+//    A) GIMNASIO -> KPIs EN TARJETAS + CUADERNO RÁPIDO + TABLERO DE PRs
 //    B) DEPORTES -> RESUMEN CLARO DE AVANCES (PILARES + PARTIDOS + TESTS)
 // =========================================================================
 
@@ -645,7 +767,7 @@ function renderizarPulsoEjecutivoJugador(p) {
     }
 
     // -----------------------------------------------------------------
-    // A) VISTA GIMNASIO: CUADERNO DE ANOTACIÓN DIARIA + TABLERO DE PRs
+    // A) VISTA GIMNASIO: TARJETAS KPI + CUADERNO DIARIO + TABLERO DE PRs
     // -----------------------------------------------------------------
     if (esGym) {
         const rutinas = obtenerRutinasDePersona(p);
@@ -667,38 +789,38 @@ function renderizarPulsoEjecutivoJugador(p) {
             ? `<div class="empty-box" style="padding:1rem;">Anotá tu primer ejercicio arriba para empezar a ver tus récords y curvas de progreso.</div>`
             : `<div class="jf-pr-grid">${resumenEjs.map(item => `
                 <button type="button" class="jf-pr-card ${normalizarTextoEjercicioCDM(ejercicioSeleccionadoFicha) === normalizarTextoEjercicioCDM(item.nombre) ? "is-selected" : ""}"
-                    onclick="seleccionarEjercicioCurvaJF('${escJF(item.nombre)}')">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.35rem;">
+                    onclick="seleccionarEjercicioCurvaJF('${escJsJF(item.nombre)}')">
+                    <div class="jf-pr-head">
                         <span class="jf-pr-title">${escJF(item.nombre)}</span>
-                        <span class="badge ${item.badgeCls}" style="font-size:0.64rem;">${escJF(item.deltaTxt)}</span>
+                        <span class="badge ${item.badgeCls}" style="font-size:0.65rem;">${escJF(item.deltaTxt)}</span>
                     </div>
-                    <div class="jf-pr-val">${item.ultimo.valor} <small style="font-size:0.72rem; font-weight:700;">${escJF(item.unidad)}</small></div>
+                    <div class="jf-pr-val">${item.ultimo.valor} <small style="font-size:0.74rem; font-weight:700; color:var(--ink-500);">${escJF(item.unidad)}</small></div>
                     <div class="jf-pr-sub">Última (${item.ultimo.fecha}): <b>${escJF(item.ultimo.detalle || "-")}</b></div>
                     <div class="jf-pr-sub">🏆 Récord (PR): <b>${item.mejor} ${escJF(item.unidad)}</b> • ${item.cantidad} reg.</div>
                 </button>
             `).join("")}</div>`;
 
         box.innerHTML = `
-            <div class="bento-kpis" style="margin-bottom:0;">
+            <div class="jf-kpi-grid">
                 <div class="kpi-card">
-                    <div class="kpi-title">Asistencia Semanal</div>
+                    <div class="kpi-title">📅 Asistencia Semanal</div>
                     <div class="kpi-value">${sem7} / ${pact}</div>
                     <div class="kpi-sub">días en los últimos 7d</div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Ejercicios con Progreso</div>
+                <div class="kpi-card kpi-emerald">
+                    <div class="kpi-title">📈 Ejercicios con Progreso</div>
                     <div class="kpi-value">${resumenEjs.length}</div>
-                    <div class="kpi-sub">${(p.evaluaciones || []).length} marcas anotadas</div>
+                    <div class="kpi-sub">${(p.evaluaciones || []).length} marca(s) anotada(s)</div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Peso Corporal / IMC</div>
+                <div class="kpi-card kpi-purple">
+                    <div class="kpi-title">⚖️ Peso / IMC</div>
                     <div class="kpi-value">${p.peso || "-"} kg</div>
                     <div class="kpi-sub">Altura ${p.altura || "-"} cm • IMC ${imc}</div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Rutinas Activas</div>
+                <div class="kpi-card kpi-amber">
+                    <div class="kpi-title">🏋️ Rutinas Activas</div>
                     <div class="kpi-value">${rutinas.length}</div>
-                    <div class="kpi-sub"><a href="#" onclick="event.preventDefault(); cambiarTabFichaJugador('rutinas')" style="font-weight:800; color:var(--brand-p, #0284c7);">Ir a mis rutinas →</a></div>
+                    <div class="kpi-sub"><a href="#" onclick="event.preventDefault(); ${esUsuarioFinalEnFicha() ? "abrirSeccionUsuarioDesdeCard('rutinas')" : "cambiarTabFichaJugador('rutinas')"}" style="font-weight:800; color:var(--brand-p, #0284c7);">Ir a mis rutinas →</a></div>
                 </div>
             </div>
 
@@ -706,8 +828,8 @@ function renderizarPulsoEjecutivoJugador(p) {
                 <div class="jf-gym-notebook">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
                         <div>
-                            <strong style="font-size:0.95rem;">📓 Anotar Entrenamiento de Hoy (Cuaderno Rápido)</strong>
-                            <small style="display:block; color:var(--ink-500); font-size:0.75rem;">Elegí el ejercicio de tu rutina o escribí uno, cargá kilos y reps y tu curva se actualiza sola.</small>
+                            <strong style="font-size:0.98rem;">📓 Anotar Entrenamiento de Hoy</strong>
+                            <small style="display:block; color:var(--ink-500); font-size:0.76rem;">Elegí el ejercicio, cargá kilos y reps y tu curva se actualiza automáticamente.</small>
                         </div>
                         <span class="badge badge-ok">⚡ 1RM y PR automático</span>
                     </div>
@@ -728,7 +850,7 @@ function renderizarPulsoEjecutivoJugador(p) {
                             <label>Reps *</label>
                             <input type="number" min="1" id="jfGymReps" required value="8">
                         </div>
-                        <div class="field">
+                        <div class="field jf-qf-nota">
                             <label>Nota (opcional)</label>
                             <input type="text" id="jfGymNota" placeholder="Ej: Salió liviano, subir 2.5kg">
                         </div>
@@ -736,11 +858,10 @@ function renderizarPulsoEjecutivoJugador(p) {
                     </form>
 
                     ${ejsRutina.length ? `
-                        <div style="display:flex; gap:0.32rem; flex-wrap:wrap; margin-top:0.55rem; align-items:center;">
-                            <small style="font-size:0.69rem; font-weight:800; color:var(--ink-500);">DE TU RUTINA:</small>
+                        <div class="jf-routine-chips-wrap">
+                            <small style="font-size:0.69rem; font-weight:800; color:var(--ink-500); text-transform:uppercase;">De tu rutina:</small>
                             ${ejsRutina.slice(0, 8).map(n => `
-                                <button type="button" class="btn btn-ghost btn-sm" style="min-height:24px; font-size:0.71rem; padding:0.15rem 0.5rem;"
-                                    onclick="elegirEjercicioRapidoGym('${escJF(n)}')">${escJF(n)}</button>
+                                <button type="button" class="jf-routine-chip" onclick="elegirEjercicioRapidoGym('${escJsJF(n)}')">${escJF(n)}</button>
                             `).join("")}
                         </div>
                     ` : ""}
@@ -756,7 +877,7 @@ function renderizarPulsoEjecutivoJugador(p) {
             <div class="jf-card">
                 <div class="jf-card-head">
                     <h4>🏆 Mis Récords y Evolución por Ejercicio (${resumenEjs.length})</h4>
-                    <small style="color:var(--ink-500); font-size:0.74rem;">Tocá cualquier ejercicio para ver su curva abajo</small>
+                    <small style="color:var(--ink-500); font-size:0.74rem;">Tocá cualquier tarjeta para ver su curva abajo</small>
                 </div>
                 ${htmlPrCards}
             </div>
@@ -830,7 +951,7 @@ function renderizarPulsoEjecutivoJugador(p) {
                     ${stP.eventosRecientes.length === 0
                         ? `<small style="color:var(--ink-500); font-size:0.75rem;">Sin incidencias cargadas en partidos oficiales todavía.</small>`
                         : stP.eventosRecientes.slice(0, 4).map(ev => `
-                            <div style="font-size:0.74rem; padding:0.32rem 0.5rem; background:var(--surface-subtle); border-radius:8px; display:flex; justify-content:space-between; gap:0.4rem;">
+                            <div style="font-size:0.74rem; padding:0.34rem 0.55rem; background:var(--surface-subtle); border-radius:8px; display:flex; justify-content:space-between; gap:0.4rem;">
                                 <span><b>${escJF(ev.tipo)}</b> • ${escJF(ev.rival)}</span>
                                 <small style="color:var(--ink-500); white-space:nowrap;">${ev.fecha}</small>
                             </div>
@@ -844,26 +965,26 @@ function renderizarPulsoEjecutivoJugador(p) {
                     <h4>🩺 Pulso Físico y Salud</h4>
                     <span class="badge ${pulsoBadge}">${pulsoTxt}</span>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:0.42rem; font-size:0.78rem;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; flex-direction:column; gap:0.44rem; font-size:0.79rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem;">
                         <span>🔥 Predisposición (30 días)</span>
                         <span class="badge ${pred.pct >= 80 ? "badge-ok" : pred.pct >= 60 ? "badge-warn" : "badge-danger"}">${pred.pct}% (${pred.etiqueta})</span>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem;">
                         <span>📈 Tests en alza / a revisar</span>
                         <b>${subiendo} ↑ / ${bajando} ↓</b>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem;">
                         <span>🩹 Lesiones activas</span>
                         <b>${lesActivas.length > 0 ? `🔴 ${lesActivas.map(l => l.zona).join(", ")}` : "🟢 Ninguna"}</b>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem;">
                         <span>🔓 Auto-avance del jugador</span>
                         <b>${jugadorDeporteTienePermisoProgreso(p) ? "Habilitado" : "Solo profesor"}</b>
                     </div>
                 </div>
                 ${esAdmin && typeof window.abrirModalAnatomiaYLesiones === "function" ? `
-                    <div style="margin-top:auto; display:flex; gap:0.35rem; flex-wrap:wrap; padding-top:0.4rem; border-top:1px dashed var(--line);">
+                    <div style="margin-top:auto; display:flex; gap:0.35rem; flex-wrap:wrap; padding-top:0.45rem; border-top:1px dashed var(--line);">
                         <button type="button" class="btn btn-secondary btn-sm" style="flex:1; min-height:28px; font-size:0.72rem;" onclick="abrirModalAnatomiaYLesiones(${p.id}, 'lesiones')">🩹 Lesiones</button>
                         <button type="button" class="btn btn-ghost btn-sm" style="flex:1; min-height:28px; font-size:0.72rem;" onclick="abrirModalAnatomiaYLesiones(${p.id}, 'predisposicion')">🔥 Rúbrica</button>
                     </div>
@@ -882,12 +1003,12 @@ function renderizarPulsoEjecutivoJugador(p) {
                     ? `<div class="empty-box" style="padding:0.9rem;">Sin pruebas físicas cargadas todavía. Registrá el primer test abajo.</div>`
                     : `<div class="jf-pr-grid">${resumenEjs.map(item => `
                         <button type="button" class="jf-pr-card ${normalizarTextoEjercicioCDM(ejercicioSeleccionadoFicha) === normalizarTextoEjercicioCDM(item.nombre) ? "is-selected" : ""}"
-                            onclick="seleccionarEjercicioCurvaJF('${escJF(item.nombre)}')">
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.35rem;">
+                            onclick="seleccionarEjercicioCurvaJF('${escJsJF(item.nombre)}')">
+                            <div class="jf-pr-head">
                                 <span class="jf-pr-title">${escJF(item.nombre)}</span>
-                                <span class="badge ${item.badgeCls}" style="font-size:0.64rem;">${escJF(item.deltaTxt)}</span>
+                                <span class="badge ${item.badgeCls}" style="font-size:0.65rem;">${escJF(item.deltaTxt)}</span>
                             </div>
-                            <div class="jf-pr-val">${item.ultimo.valor} <small style="font-size:0.72rem; font-weight:700;">${escJF(item.unidad)}</small></div>
+                            <div class="jf-pr-val">${item.ultimo.valor} <small style="font-size:0.74rem; font-weight:700; color:var(--ink-500);">${escJF(item.unidad)}</small></div>
                             <div class="jf-pr-sub">${item.ultimo.fecha} • PR: <b>${item.mejor} ${escJF(item.unidad)}</b></div>
                         </button>
                     `).join("")}</div>`}
@@ -1153,6 +1274,14 @@ function dibujarGraficoEvolucion(pOpt = null) {
         splitCharts.classList.toggle("jf-charts-single", esGym);
     }
 
+    // Título limpio sin "Radar 360°" cuando es Gimnasio
+    const chartHead = cvLine?.closest(".app-panel")?.querySelector(".panel-head h3");
+    if (chartHead) {
+        chartHead.innerHTML = esGym
+            ? `<i class="ri-line-chart-line"></i> Curva de Progreso por Fecha`
+            : `<i class="ri-line-chart-line"></i> Curva de Progreso y Radar 360°`;
+    }
+
     const resumenEjs = resumirEjerciciosPersona(p);
     const ejerciciosUnicos = resumenEjs.map(r => r.nombre);
 
@@ -1183,18 +1312,18 @@ function dibujarGraficoEvolucion(pOpt = null) {
         } else {
             kpisDiv.innerHTML = `
                 <div class="kpi-card">
-                    <div class="kpi-title">Último Registro</div>
-                    <div class="kpi-value">${itemRes.ultimo.valor} <small style="font-size:0.74rem;">${escJF(itemRes.unidad)}</small></div>
+                    <div class="kpi-title">📌 Último Registro</div>
+                    <div class="kpi-value">${itemRes.ultimo.valor} <small style="font-size:0.74rem; font-weight:700; color:var(--ink-500);">${escJF(itemRes.unidad)}</small></div>
                     <div class="kpi-sub">${itemRes.ultimo.fecha}</div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-title">Mejor Marca (PR)</div>
-                    <div class="kpi-value">${itemRes.mejor} <small style="font-size:0.74rem;">${escJF(itemRes.unidad)}</small></div>
+                <div class="kpi-card kpi-amber">
+                    <div class="kpi-title">🏆 Mejor Marca (PR)</div>
+                    <div class="kpi-value">${itemRes.mejor} <small style="font-size:0.74rem; font-weight:700; color:var(--ink-500);">${escJF(itemRes.unidad)}</small></div>
                     <div class="kpi-sub">${itemRes.cantidad} registro(s)</div>
                 </div>
-                <div class="kpi-card" style="grid-column:span 2;">
-                    <div class="kpi-title">Tendencia Reciente</div>
-                    <div class="kpi-value"><span class="badge ${itemRes.badgeCls}">${escJF(itemRes.deltaTxt)}</span></div>
+                <div class="kpi-card kpi-emerald">
+                    <div class="kpi-title">📈 Tendencia Reciente</div>
+                    <div class="kpi-value" style="margin:2px 0;"><span class="badge ${itemRes.badgeCls}" style="font-size:0.82rem;">${escJF(itemRes.deltaTxt)}</span></div>
                     <div class="kpi-sub">${escJF(itemRes.ultimo.detalle || "")}</div>
                 </div>
             `;
@@ -1294,6 +1423,9 @@ function renderizarHistorialEvaluacionesJugador(p) {
         return;
     }
 
+    const tieneModalEdit = typeof window.abrirModalModificarProgresionEvalCDM === "function";
+    const tieneQuitarPro = typeof window.quitarProgresionEvalCDM === "function";
+
     cont.innerHTML = `
         <div class="table-wrap">
             <table class="app-table" style="font-size:0.8rem;">
@@ -1303,20 +1435,27 @@ function renderizarHistorialEvaluacionesJugador(p) {
                         <th>Ejercicio / Prueba</th>
                         <th>Marca</th>
                         <th>Nota</th>
-                        ${permitirEditar ? "<th></th>" : ""}
+                        ${permitirEditar ? `<th style="text-align:right;">Acciones</th>` : ""}
                     </tr>
                 </thead>
                 <tbody>
                     ${items.map(ev => `
                         <tr>
-                            <td><b>${escJF(ev.fecha || "-")}</b></td>
-                            <td>
+                            <td data-label="Fecha"><b>${escJF(ev.fecha || "-")}</b></td>
+                            <td data-label="Ejercicio">
                                 <button type="button" class="btn btn-ghost btn-sm" style="padding:0 6px; min-height:24px; font-weight:700;"
-                                    onclick="seleccionarEjercicioCurvaJF('${escJF(ev.ejercicio)}')">${escJF(ev.ejercicio)}</button>
+                                    onclick="seleccionarEjercicioCurvaJF('${escJsJF(ev.ejercicio)}')">${escJF(ev.ejercicio)}</button>
                             </td>
-                            <td><span class="badge badge-celeste">${escJF(ev.detalle || `${ev.valor} ${ev.unidad || ""}`)}</span></td>
-                            <td><small>${escJF(ev.nota || "-")}</small></td>
-                            ${permitirEditar ? `<td style="text-align:right;"><button type="button" class="btn btn-danger btn-sm" style="min-height:24px; padding:0 6px;" onclick="eliminarEvaluacionJugador(${ev.id})">✕</button></td>` : ""}
+                            <td data-label="Marca"><span class="badge badge-celeste">${escJF(ev.detalle || `${ev.valor} ${ev.unidad || ""}`)}</span></td>
+                            <td data-label="Nota"><small>${escJF(ev.nota || "-")}</small></td>
+                            ${permitirEditar ? `
+                                <td data-label="Acciones" style="text-align:right; white-space:nowrap;">
+                                    <div style="display:inline-flex; gap:0.28rem; justify-content:flex-end;">
+                                        ${tieneModalEdit ? `<button type="button" class="btn btn-secondary btn-sm usr-action-allow" style="min-height:26px; padding:0 8px; font-size:0.72rem;" onclick="abrirModalModificarProgresionEvalCDM(${p.id}, ${ev.id})" title="Modificar kilos, reps o fecha">✏️ Editar</button>` : ""}
+                                        <button type="button" class="btn btn-danger btn-sm usr-action-allow" style="min-height:26px; padding:0 7px; font-size:0.72rem;" onclick="${tieneQuitarPro ? `quitarProgresionEvalCDM(${p.id}, ${ev.id})` : `eliminarEvaluacionJugador(${ev.id})`}" title="Quitar registro">🗑️</button>
+                                    </div>
+                                </td>
+                            ` : ""}
                         </tr>
                     `).join("")}
                 </tbody>
@@ -1484,6 +1623,10 @@ function renderizarRutinasJugador(p) {
     const cont = document.getElementById("listaRutinasGuardadasJugador");
     if (!cont || !p) return;
 
+    if (typeof window.agregarBotonesVideoEnRutinasJugador === "function") {
+        window.agregarBotonesVideoEnRutinasJugador({ personaId: p.id });
+        return;
+    }
     const esAdmin = !esUsuarioFinalEnFicha();
     const permiteAnotar = puedeGestionarProgresoEnFicha(p);
     const lista = obtenerRutinasDePersona(p);
@@ -1492,6 +1635,7 @@ function renderizarRutinasJugador(p) {
         cont.innerHTML = `<div class="empty-box" style="grid-column:1/-1;">Sin rutinas asignadas todavía.</div>`;
         return;
     }
+
 
     cont.innerHTML = lista.map(r => `
         <div class="athlete-card" style="cursor:default;">
@@ -1705,11 +1849,9 @@ function inicializarPaginaJugadorIndividual() {
         document.getElementById("medFecha").value = obtenerHoyISO();
     }
 
-    // Mostrar/ocultar el panel del formulario avanzado según rol y deporte
     const formAvancePanel = document.getElementById("formNuevoAvance")?.closest(".app-panel");
     const splitAvance = formAvancePanel?.parentElement;
     if (formAvancePanel) {
-        // En Gym el cuaderno rápido superior ya resuelve el día a día; ocultamos el form técnico al usuario final
         const ocultarFormTecnico = !puedeProgreso || (esGym && !esAdmin);
         formAvancePanel.classList.toggle("hidden", ocultarFormTecnico);
         if (splitAvance && splitAvance.classList.contains("split-view")) {
@@ -1717,7 +1859,6 @@ function inicializarPaginaJugadorIndividual() {
         }
     }
 
-    // Ocultar formulario de crear rutina al usuario final
     const formRutPanel = document.getElementById("formRutinaIndividual")?.closest(".app-panel");
     const splitRut = formRutPanel?.parentElement;
     if (formRutPanel) {
@@ -1736,3 +1877,847 @@ function inicializarPaginaJugadorIndividual() {
     renderizarCabeceraFichaJugador(p);
     cambiarTabFichaJugador(tabActualFichaJugador || "graficos");
 }
+// =========================================================================
+// 10. CONEXIÓN DIRECTA DEL CUADERNO DE PROGRESO CON LA BASE DE EJERCICIOS DEL GIMNASIO
+//     - Reemplaza el input libre por un selector conectado a baseCatalogoEjercicios + baseVideoteca
+//     - Garantiza nombres idénticos en rutinas, PRs, curvas y base del gimnasio
+//     - Suma buscador visual "🔍 Base" con filtro por grupo muscular y última marca
+// Pegar al final de js/jugador-ficha.js
+// =========================================================================
+(function () {
+    if (window.__cdmCuadernoConectadoBase10) return;
+    window.__cdmCuadernoConectadoBase10 = true;
+
+    let busqBaseEj10 = "";
+    let grupoBaseEj10 = "TODOS";
+
+    function norm10(s) {
+        return typeof normalizarTextoEjercicioCDM === "function"
+            ? normalizarTextoEjercicioCDM(s)
+            : String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+    }
+
+    function esc10(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    // Unifica la Base Maestra de Ejercicios + Videoteca + ejercicios de la rutina actual
+    function obtenerBaseEjerciciosGimnasio10(p = null) {
+        if (typeof asegurarVideotecaCargada === "function") asegurarVideotecaCargada();
+
+        const mapa = new Map();
+        const registrar = (nombreRaw, grupoRaw = "General", tieneVideo = false) => {
+            const nombre = String(nombreRaw || "").replace(/\s+/g, " ").trim();
+            const clave = norm10(nombre);
+            if (!clave) return null;
+            if (!mapa.has(clave)) {
+                mapa.set(clave, {
+                    clave,
+                    nombre,
+                    grupo: String(grupoRaw || "General").trim() || "General",
+                    tieneVideo: Boolean(tieneVideo),
+                    enRutina: false
+                });
+            } else {
+                const ex = mapa.get(clave);
+                if (tieneVideo) ex.tieneVideo = true;
+                if (ex.grupo === "General" && grupoRaw && grupoRaw !== "General") ex.grupo = grupoRaw;
+            }
+            return mapa.get(clave);
+        };
+
+        // 1. Prioridad máxima: Base Maestra de Ejercicios del Gimnasio
+        (typeof baseCatalogoEjercicios !== "undefined" ? baseCatalogoEjercicios : []).forEach(e => {
+            registrar(e?.nombre, e?.grupo || "General", Boolean(e?.video));
+        });
+
+        // 2. Videoteca del Gimnasio
+        (typeof baseVideoteca !== "undefined" ? baseVideoteca : []).forEach(v => {
+            registrar(v?.nombre, v?.grupo || "General", Boolean(v?.videoUrl && v.videoUrl !== "biomech://simulador"));
+        });
+
+        // 3. Marcar los ejercicios de las rutinas asignadas a esta persona (resolviendo al nombre de la Base)
+        const deRutina = [];
+        if (p && typeof obtenerRutinasDePersona === "function") {
+            obtenerRutinasDePersona(p).forEach(r => {
+                (r.ejercicios || []).forEach(ex => {
+                    const item = registrar(ex?.nombre, "De tu Rutina", false);
+                    if (item && !item.enRutina) {
+                        item.enRutina = true;
+                        deRutina.push(item);
+                    }
+                });
+            });
+        }
+
+        // 4. Asegurar compatibilidad con ejercicios ya registrados en su historial previo
+        if (p && Array.isArray(p.evaluaciones)) {
+            p.evaluaciones.forEach(ev => {
+                registrar(ev?.ejercicio, "Historial", false);
+            });
+        }
+
+        const todos = Array.from(mapa.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+        const porGrupo = new Map();
+        todos.forEach(item => {
+            if (!porGrupo.has(item.grupo)) porGrupo.set(item.grupo, []);
+            porGrupo.get(item.grupo).push(item);
+        });
+
+        return { todos, deRutina, porGrupo };
+    }
+
+    // Resuelve cualquier texto al nombre exacto que figura en la Base del Gimnasio
+    window.resolverNombreCanonicoGym10 = function (nombreRaw, p = null) {
+        const limpio = String(nombreRaw || "").replace(/\s+/g, " ").trim();
+        if (!limpio) return "";
+        const clave = norm10(limpio);
+        const { todos } = obtenerBaseEjerciciosGimnasio10(p);
+        const exacto = todos.find(x => x.clave === clave);
+        return exacto ? exacto.nombre : limpio;
+    };
+
+    function inyectarCSSBaseCuaderno10() {
+        if (document.getElementById("cdmCssBaseCuaderno10")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssBaseCuaderno10";
+        st.textContent = `
+            .jf10-ej-combo {
+                display: flex;
+                gap: 0.4rem;
+                align-items: center;
+                width: 100%;
+            }
+            .jf10-ej-combo select {
+                flex: 1;
+                min-width: 0;
+                min-height: 40px;
+                font-weight: 700;
+            }
+            .jf10-btn-base {
+                min-height: 40px !important;
+                padding: 0 0.78rem !important;
+                flex-shrink: 0;
+                white-space: nowrap;
+            }
+            #modalBuscadorBaseEjJF10 {
+                z-index: 99999 !important;
+            }
+            .jf10-chips-bar {
+                display: flex;
+                gap: 0.35rem;
+                flex-wrap: wrap;
+                margin-bottom: 0.75rem;
+            }
+            .jf10-chip {
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-subtle, #f8fafc);
+                color: var(--ink-700, #334155);
+                font-size: 0.72rem;
+                font-weight: 800;
+                padding: 0.28rem 0.68rem;
+                border-radius: 999px;
+                cursor: pointer;
+            }
+            .jf10-chip.active {
+                background: #0284c7;
+                border-color: #0284c7;
+                color: #ffffff;
+            }
+            .jf10-list {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(min(100%, 245px), 1fr));
+                gap: 0.5rem;
+                max-height: 52vh;
+                overflow-y: auto;
+                padding: 2px;
+            }
+            .jf10-item {
+                text-align: left;
+                background: var(--surface-subtle, #f8fafc);
+                border: 1.5px solid var(--line, #e2e8f0);
+                border-left: 4px solid #0284c7;
+                border-radius: 13px;
+                padding: 0.65rem 0.78rem;
+                cursor: pointer;
+                display: flex;
+                flex-direction: column;
+                gap: 0.25rem;
+                transition: transform 0.14s ease, border-color 0.14s ease;
+            }
+            .jf10-item:hover {
+                transform: translateY(-2px);
+                border-color: #0284c7;
+            }
+            .jf10-item.is-active {
+                background: rgba(2, 132, 199, 0.1);
+                border-color: #0284c7;
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function convertirCampoEjercicioASelectorBase10(p) {
+        const inp = document.getElementById("jfGymEj");
+        if (!inp || !p) return;
+        inyectarCSSBaseCuaderno10();
+
+        const fieldWrap = inp.closest(".field");
+        const { todos, deRutina, porGrupo } = obtenerBaseEjerciciosGimnasio10(p);
+        const valorPrevio = resolverNombreCanonicoGym10(ejercicioSeleccionadoFicha || inp.value || deRutina[0]?.nombre || todos[0]?.nombre || "", p);
+
+        const lbl = fieldWrap?.querySelector("label");
+        if (lbl) {
+            lbl.textContent = `Ejercicio (Base del Gimnasio • ${todos.length}) *`;
+        }
+
+        const clavesRutina = new Set(deRutina.map(x => x.clave));
+        let optionsHTML = "";
+
+        if (deRutina.length > 0) {
+            optionsHTML += `<optgroup label="⭐ De tu Rutina Actual">`;
+            deRutina.forEach(item => {
+                optionsHTML += `<option value="${esc10(item.nombre)}" ${norm10(valorPrevio) === item.clave ? "selected" : ""}>${esc10(item.nombre)}</option>`;
+            });
+            optionsHTML += `</optgroup>`;
+        }
+
+        Array.from(porGrupo.keys()).sort((a, b) => a.localeCompare(b)).forEach(grupo => {
+            const items = porGrupo.get(grupo).filter(x => !clavesRutina.has(x.clave));
+            if (!items.length) return;
+            optionsHTML += `<optgroup label="🏋️ ${esc10(grupo)}">`;
+            items.forEach(item => {
+                optionsHTML += `<option value="${esc10(item.nombre)}" ${norm10(valorPrevio) === item.clave ? "selected" : ""}>${esc10(item.nombre)}${item.tieneVideo ? " ▶" : ""}</option>`;
+            });
+            optionsHTML += `</optgroup>`;
+        });
+
+        if (!optionsHTML) {
+            optionsHTML = `<option value="">-- Sin ejercicios cargados en la Base --</option>`;
+        }
+
+        const combo = document.createElement("div");
+        combo.className = "jf10-ej-combo";
+        combo.innerHTML = `
+            <select id="jfGymEj" required onchange="actualizarPistaUltimaMarcaGym(this.value)">
+                ${optionsHTML}
+            </select>
+            <button type="button" class="btn btn-secondary btn-sm jf10-btn-base" onclick="abrirBuscadorBaseEjerciciosCuadernoJF()" title="Buscar ejercicio en la Base de Datos del Gimnasio">
+                🔍 Base
+            </button>
+        `;
+
+        inp.replaceWith(combo);
+
+        const selNuevo = document.getElementById("jfGymEj");
+        if (selNuevo && valorPrevio) {
+            selNuevo.value = valorPrevio;
+            if (typeof actualizarPistaUltimaMarcaGym === "function") {
+                actualizarPistaUltimaMarcaGym(selNuevo.value);
+            }
+        }
+    }
+
+    function asegurarModalBuscadorBase10() {
+        inyectarCSSBaseCuaderno10();
+        let m = document.getElementById("modalBuscadorBaseEjJF10");
+        if (!m) {
+            m = document.createElement("div");
+            m.id = "modalBuscadorBaseEjJF10";
+            m.className = "modal-backdrop hidden";
+            m.onclick = (e) => { if (e.target === m) cerrarBuscadorBaseEjerciciosJF10(); };
+        }
+        m.style.zIndex = "99999";
+        document.body.appendChild(m);
+        return m;
+    }
+
+    window.cerrarBuscadorBaseEjerciciosJF10 = function () {
+        document.getElementById("modalBuscadorBaseEjJF10")?.classList.add("hidden");
+    };
+
+    window.abrirBuscadorBaseEjerciciosCuadernoJF = function () {
+        busqBaseEj10 = "";
+        grupoBaseEj10 = "TODOS";
+        renderizarModalBuscadorBase10();
+    };
+
+    function renderizarModalBuscadorBase10() {
+        const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+        if (!p) return;
+
+        const modal = asegurarModalBuscadorBase10();
+        const { todos, deRutina, porGrupo } = obtenerBaseEjerciciosGimnasio10(p);
+        const selActual = norm10(document.getElementById("jfGymEj")?.value || "");
+        const q = norm10(busqBaseEj10);
+
+        const gruposChips = ["TODOS"];
+        if (deRutina.length > 0) gruposChips.push("EN_RUTINA");
+        Array.from(porGrupo.keys()).sort((a, b) => a.localeCompare(b)).forEach(g => {
+            if (g !== "De tu Rutina" && !gruposChips.includes(g)) gruposChips.push(g);
+        });
+
+        const filtrados = todos.filter(item => {
+            if (grupoBaseEj10 === "EN_RUTINA" && !item.enRutina) return false;
+            else if (grupoBaseEj10 !== "TODOS" && grupoBaseEj10 !== "EN_RUTINA" && item.grupo !== grupoBaseEj10) return false;
+            if (q && !norm10(`${item.nombre} ${item.grupo}`).includes(q)) return false;
+            return true;
+        });
+
+        modal.innerHTML = `
+            <div class="modal-window" style="max-width:680px;">
+                <div class="modal-top">
+                    <div>
+                        <span class="badge badge-celeste">🏋️ BASE DE EJERCICIOS DEL GIMNASIO (${todos.length})</span>
+                        <h3 style="margin-top:4px;">Elegir Ejercicio para Anotar Progreso</h3>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarBuscadorBaseEjerciciosJF10()">✕</button>
+                </div>
+
+                <div style="margin-bottom:0.65rem;">
+                    <input type="text" id="jf10BusqInp" value="${esc10(busqBaseEj10)}" placeholder="🔍 Buscar por nombre o grupo muscular..."
+                        oninput="jf10SetFiltroBase('busq', this.value)">
+                </div>
+
+                <div class="jf10-chips-bar">
+                    ${gruposChips.map(g => {
+                        const lbl = g === "TODOS" ? "Todos" : (g === "EN_RUTINA" ? `⭐ Tu Rutina (${deRutina.length})` : g);
+                        return `<button type="button" class="jf10-chip ${grupoBaseEj10 === g ? "active" : ""}" data-grp="${esc10(g)}" onclick="jf10SetFiltroBase('grupo', this.dataset.grp)">${esc10(lbl)}</button>`;
+                    }).join("")}
+                </div>
+
+                <div class="jf10-list">
+                    ${filtrados.length === 0 ? `<div class="empty-box" style="grid-column:1/-1; padding:1rem;">No se encontraron ejercicios con ese filtro.</div>` :
+                    filtrados.map(item => {
+                        const ult = typeof obtenerUltimaMarcaPorNombre === "function" ? obtenerUltimaMarcaPorNombre(p, item.nombre) : null;
+                        return `
+                            <button type="button" class="jf10-item ${item.clave === selActual ? "is-active" : ""}"
+                                data-ej="${esc10(item.nombre)}" onclick="seleccionarEjercicioDesdeBuscadorJF10(this.dataset.ej)">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.35rem;">
+                                    <strong style="font-size:0.84rem; color:var(--ink-900); line-height:1.25;">${esc10(item.nombre)}</strong>
+                                    ${item.enRutina ? `<span class="badge badge-ok" style="font-size:0.62rem; flex-shrink:0;">⭐ Rutina</span>` : ""}
+                                </div>
+                                <small style="font-size:0.71rem; color:var(--ink-500);">
+                                    ${esc10(item.grupo)}${item.tieneVideo ? " • 🎥 Video" : ""}
+                                </small>
+                                ${ult ? `<small style="font-size:0.71rem; font-weight:700; color:#0369a1;">📌 Última: ${esc10(ult.detalle || `${ult.valor} ${ult.unidad}`)}</small>` : ""}
+                            </button>
+                        `;
+                    }).join("")}
+                </div>
+            </div>
+        `;
+        modal.classList.remove("hidden");
+    }
+
+    window.jf10SetFiltroBase = function (tipo, val) {
+        if (tipo === "grupo") grupoBaseEj10 = val;
+        else busqBaseEj10 = val;
+        renderizarModalBuscadorBase10();
+        if (tipo === "busq") {
+            const inp = document.getElementById("jf10BusqInp");
+            if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+        }
+    };
+
+    window.seleccionarEjercicioDesdeBuscadorJF10 = function (nombreEj) {
+        cerrarBuscadorBaseEjerciciosJF10();
+        elegirEjercicioRapidoGym(nombreEj);
+    };
+
+    // Sobrescribir selección rápida (chips y buscador) para trabajar con el <select> conectado a la Base
+    window.elegirEjercicioRapidoGym = function (nombreEj) {
+        const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+        const canonico = resolverNombreCanonicoGym10(nombreEj, p);
+        const sel = document.getElementById("jfGymEj");
+        if (sel) {
+            if (sel.tagName === "SELECT") {
+                const existe = Array.from(sel.options).some(o => o.value === canonico);
+                if (!existe && canonico) {
+                    const opt = document.createElement("option");
+                    opt.value = canonico;
+                    opt.textContent = canonico;
+                    sel.appendChild(opt);
+                }
+            }
+            sel.value = canonico;
+            if (typeof actualizarPistaUltimaMarcaGym === "function") {
+                actualizarPistaUltimaMarcaGym(canonico);
+            }
+            document.getElementById("jfGymKg")?.focus();
+        }
+    };
+
+    // Enganchar renderizarPulsoEjecutivoJugador para transformar el campo al instante
+    if (typeof window.renderizarPulsoEjecutivoJugador === "function") {
+        const _origPulso10 = window.renderizarPulsoEjecutivoJugador;
+        window.renderizarPulsoEjecutivoJugador = function (p) {
+            const res = _origPulso10.apply(this, arguments);
+            if (p && p.deporte === "Gimnasio") {
+                convertirCampoEjercicioASelectorBase10(p);
+            }
+            return res;
+        };
+    }
+
+    // Asegurar nombre canónico al guardar desde el Cuaderno Rápido
+    if (typeof window.registrarCargaRapidaGymFicha === "function") {
+        const _origRegRap10 = window.registrarCargaRapidaGymFicha;
+        window.registrarCargaRapidaGymFicha = function (e) {
+            const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+            const el = document.getElementById("jfGymEj");
+            if (el && el.value) {
+                el.value = resolverNombreCanonicoGym10(el.value, p);
+            }
+            return _origRegRap10.apply(this, arguments);
+        };
+    }
+
+    // Asegurar nombre canónico también al anotar desde dentro de las Rutinas
+    if (typeof window.registrarMarcaDesdeRutinaFicha === "function") {
+        const _origRegRut10 = window.registrarMarcaDesdeRutinaFicha;
+        window.registrarMarcaDesdeRutinaFicha = function (e) {
+            const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+            if (e?.target?.dataset?.ejercicio) {
+                e.target.dataset.ejercicio = resolverNombreCanonicoGym10(e.target.dataset.ejercicio, p);
+            }
+            return _origRegRut10.apply(this, arguments);
+        };
+    }
+})();
+// =========================================================================
+// 11. CALCULADORA Y TABLA INTERACTIVA DE PORCENTAJES % 1RM (BLINDADA)
+//     - Vence cualquier bloqueo CSS (display:none !important) sobre #jug-sec-calculadora
+//     - Independiente del orden de carga de login.js (listener global + MutationObserver)
+//     - Conectada a los PRs reales del socio/deportista + cálculo por Kilos × Reps
+// Reemplazar el Bloque 11 al final de js/jugador-ficha.js
+// =========================================================================
+(function () {
+    if (window.__cdmCalc1RM11) return;
+    window.__cdmCalc1RM11 = true;
+
+    const ZONAS_1RM = [
+        { pct: 100, reps: "1 rep",      zona: "Fuerza Máxima (PR)",     badge: "badge-danger" },
+        { pct: 95,  reps: "2 reps",     zona: "Fuerza Máxima",          badge: "badge-danger" },
+        { pct: 90,  reps: "3–4 reps",   zona: "Fuerza Submáxima",       badge: "badge-warn" },
+        { pct: 85,  reps: "5–6 reps",   zona: "Fuerza Base",            badge: "badge-warn" },
+        { pct: 80,  reps: "7–8 reps",   zona: "Fuerza / Hipertrofia",   badge: "badge-purple" },
+        { pct: 75,  reps: "9–10 reps",  zona: "Hipertrofia Clásica",    badge: "badge-celeste" },
+        { pct: 70,  reps: "11–12 reps", zona: "Hipertrofia / Volumen",  badge: "badge-celeste" },
+        { pct: 65,  reps: "13–15 reps", zona: "Resistencia Muscular",   badge: "badge-ok" },
+        { pct: 60,  reps: "15–18 reps", zona: "Potencia / Velocidad",   badge: "badge-ok" },
+        { pct: 55,  reps: "18–20 reps", zona: "Técnica / Descarga",     badge: "badge-ok" },
+        { pct: 50,  reps: "20+ reps",   zona: "Entrada en Calor",       badge: "badge-celeste" }
+    ];
+
+    const st11 = {
+        rm: 80,
+        pesoTest: 70,
+        repsTest: 5,
+        barraKg: 20,
+        pasoRedondeo: 2.5,
+        ejActivo: ""
+    };
+
+    function esc11(s) {
+        return String(s ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function fmtKg11(n) {
+        const v = Math.round(Number(n) * 10) / 10;
+        return Number.isInteger(v) ? String(v) : v.toFixed(1);
+    }
+
+    function inyectarCSS1RM11() {
+        if (document.getElementById("cdmCssCalc1RM11")) return;
+        const st = document.createElement("style");
+        st.id = "cdmCssCalc1RM11";
+        st.textContent = `
+            .rm11-wrap {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .rm11-top-grid {
+                display: grid;
+                grid-template-columns: minmax(290px, 1.15fr) minmax(260px, 0.85fr);
+                gap: 1rem;
+                align-items: stretch;
+            }
+            .rm11-card {
+                background: var(--surface-solid, #ffffff);
+                border: 1.5px solid var(--line, #e2e8f0);
+                border-radius: 18px;
+                padding: 1.05rem 1.2rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.75rem;
+                box-shadow: 0 6px 20px -12px rgba(15, 23, 42, 0.12);
+            }
+            .rm11-hero-num {
+                background: linear-gradient(135deg, #0b1829 0%, #0369a1 60%, #0284c7 100%);
+                color: #ffffff;
+                border-radius: 16px;
+                padding: 1rem 1.15rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.8rem;
+                flex-wrap: wrap;
+            }
+            .rm11-hero-num strong {
+                font-size: 2rem;
+                font-weight: 900;
+                line-height: 1;
+                color: #38bdf8;
+            }
+            .rm11-prs-row {
+                display: flex;
+                gap: 0.42rem;
+                flex-wrap: wrap;
+            }
+            .rm11-pr-chip {
+                border: 1.5px solid var(--line-strong, #cbd5e1);
+                background: var(--surface-subtle, #f8fafc);
+                color: var(--ink-800, #1e293b);
+                border-radius: 999px;
+                padding: 0.3rem 0.75rem;
+                font-size: 0.75rem;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+            .rm11-pr-chip:hover,
+            .rm11-pr-chip.active {
+                background: #0284c7;
+                border-color: #0284c7;
+                color: #ffffff;
+            }
+            .rm11-inputs-row {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0.6rem;
+            }
+            .rm11-pct-pill {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 52px;
+                padding: 0.22rem 0.55rem;
+                border-radius: 8px;
+                background: var(--cdm-50, #f0f9ff);
+                color: #0369a1;
+                font-weight: 900;
+                font-size: 0.82rem;
+            }
+            body[data-theme="dark"] .rm11-pct-pill {
+                background: rgba(56, 189, 248, 0.16);
+                color: #7dd3fc;
+            }
+            .rm11-kg-strong {
+                font-size: 1rem;
+                font-weight: 900;
+                color: var(--ink-900, #0f172a);
+            }
+            @media (max-width: 860px) {
+                .rm11-top-grid { grid-template-columns: 1fr; }
+            }
+            @media (max-width: 520px) {
+                .rm11-inputs-row { grid-template-columns: 1fr; }
+                .rm11-card { padding: 0.9rem; }
+            }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function obtenerPRsFuerza11(p) {
+        if (!p || !Array.isArray(p.evaluaciones)) return [];
+        const mapa = new Map();
+        p.evaluaciones.forEach(ev => {
+            if (!ev || ev.tipo !== "fuerza_kg" || !ev.ejercicio) return;
+            const k = typeof normalizarTextoEjercicioCDM === "function"
+                ? normalizarTextoEjercicioCDM(ev.ejercicio)
+                : String(ev.ejercicio).toLowerCase().trim();
+            const val = Number(ev.valor) || 0;
+            if (!k || val <= 0) return;
+            if (!mapa.has(k) || val > mapa.get(k).rm) {
+                mapa.set(k, { nombre: ev.ejercicio, rm: val, fecha: ev.fecha || "" });
+            }
+        });
+        return Array.from(mapa.values()).sort((a, b) => b.rm - a.rm);
+    }
+
+    function sincronizarVisibilidadCalc11(sec) {
+        if (!sec) return;
+        if (!sec.classList.contains("hidden")) {
+            if (!sec.querySelector(".rm11-wrap")) renderizarCalculadora1RM11();
+            sec.style.setProperty("display", "block", "important");
+            sec.style.setProperty("visibility", "visible", "important");
+            sec.style.setProperty("opacity", "1", "important");
+        } else {
+            sec.style.removeProperty("display");
+            sec.style.removeProperty("visibility");
+            sec.style.removeProperty("opacity");
+        }
+    }
+
+    function asegurarSeccionCalculadora11() {
+        let sec = document.getElementById("jug-sec-calculadora");
+        if (!sec) {
+            const main = document.querySelector(".app-content");
+            if (!main) return null;
+            sec = document.createElement("section");
+            sec.id = "jug-sec-calculadora";
+            sec.className = "jug-seccion hidden";
+            main.appendChild(sec);
+        }
+        if (sec.dataset.rm11Observed !== "1") {
+            sec.dataset.rm11Observed = "1";
+            const obs = new MutationObserver(() => sincronizarVisibilidadCalc11(sec));
+            obs.observe(sec, { attributes: true, attributeFilter: ["class"] });
+        }
+        return sec;
+    }
+
+    function construirFilasTabla1RM11() {
+        const rm = Math.max(1, Number(st11.rm) || 80);
+        const paso = Number(st11.pasoRedondeo) || 2.5;
+        const barra = Number(st11.barraKg) || 0;
+
+        return ZONAS_1RM.map(z => {
+            const exacto = rm * (z.pct / 100);
+            const redondeado = Math.max(paso, Math.round(exacto / paso) * paso);
+            let porLadoTxt = "—";
+            if (barra > 0) {
+                const lado = (redondeado - barra) / 2;
+                porLadoTxt = lado > 0 ? `${fmtKg11(lado)} kg / lado` : (redondeado <= barra ? "Solo barra" : "—");
+            } else {
+                porLadoTxt = "Peso total";
+            }
+
+            return `
+                <tr>
+                    <td data-label="% 1RM"><span class="rm11-pct-pill">${z.pct}%</span></td>
+                    <td data-label="Carga Total"><span class="rm11-kg-strong">${fmtKg11(redondeado)} kg</span></td>
+                    <td data-label="${barra > 0 ? `Por lado (barra ${barra}kg)` : "Referencia"}"><b>${porLadoTxt}</b></td>
+                    <td data-label="Reps Est.">${z.reps}</td>
+                    <td data-label="Zona / Objetivo"><span class="badge ${z.badge}" style="font-size:0.7rem;">${z.zona}</span></td>
+                </tr>
+            `;
+        }).join("");
+    }
+
+    window.renderizarCalculadora1RM11 = function () {
+        const sec = asegurarSeccionCalculadora11();
+        if (!sec) return;
+        inyectarCSS1RM11();
+
+        const p = typeof obtenerJugadorActualPorURL === "function" ? obtenerJugadorActualPorURL() : null;
+        const prs = obtenerPRsFuerza11(p);
+
+        if (!st11.ejActivo && prs.length > 0) {
+            st11.ejActivo = prs[0].nombre;
+            st11.rm = prs[0].rm;
+        }
+
+        sec.innerHTML = `
+            <div class="rm11-wrap">
+                <div class="rm11-top-grid">
+                    <div class="rm11-card">
+                        <div class="jf-card-head">
+                            <h4>🧮 Calculadora de 1RM y Cargas de Entrenamiento</h4>
+                            <span class="badge badge-celeste">Fórmula Epley</span>
+                        </div>
+
+                        ${prs.length > 0 ? `
+                            <div>
+                                <small style="display:block; font-size:0.71rem; font-weight:800; color:var(--ink-500); text-transform:uppercase; margin-bottom:0.4rem;">
+                                    🏆 Tus récords cargados (tocá uno para calcular):
+                                </small>
+                                <div class="rm11-prs-row">
+                                    ${prs.map(item => `
+                                        <button type="button" class="rm11-pr-chip ${st11.ejActivo === item.nombre ? "active" : ""}"
+                                            onclick="rm11UsarPR(${item.rm}, '${esc11(item.nombre.replace(/'/g, "\\'"))}')">
+                                            ${esc11(item.nombre)} • ${fmtKg11(item.rm)} kg
+                                        </button>
+                                    `).join("")}
+                                </div>
+                            </div>
+                        ` : `
+                            <small style="color:var(--ink-500); font-size:0.76rem;">
+                                Ingresá tu 1RM estimado o calculalo abajo con el peso y repeticiones que levantás hoy.
+                            </small>
+                        `}
+
+                        <div class="rm11-inputs-row">
+                            <div class="field">
+                                <label>Tu 1RM Base (kg) *</label>
+                                <input type="number" id="rm11InputDirecto" step="0.5" min="5" value="${fmtKg11(st11.rm)}" oninput="rm11ActualizarDirecto(this.value)">
+                            </div>
+                            <div class="field">
+                                <label>Tipo de Barra / Equipo</label>
+                                <select id="rm11Barra" onchange="rm11ActualizarOpciones()">
+                                    <option value="20" ${Number(st11.barraKg) === 20 ? "selected" : ""}>Barra Olímpica (20 kg)</option>
+                                    <option value="15" ${Number(st11.barraKg) === 15 ? "selected" : ""}>Barra Femenina (15 kg)</option>
+                                    <option value="10" ${Number(st11.barraKg) === 10 ? "selected" : ""}>Barra Estándar (10 kg)</option>
+                                    <option value="0" ${Number(st11.barraKg) === 0 ? "selected" : ""}>Máquina / Mancuernas (Sin barra)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="padding-top:0.55rem; border-top:1px dashed var(--line); display:grid; grid-template-columns:1fr 1fr auto; gap:0.5rem; align-items:end;">
+                            <div class="field">
+                                <label>¿No sabés tu 1RM? Peso (kg)</label>
+                                <input type="number" id="rm11PesoTest" step="0.5" min="1" value="${st11.pesoTest}" placeholder="Ej: 70">
+                            </div>
+                            <div class="field">
+                                <label>Repeticiones logradas</label>
+                                <input type="number" id="rm11RepsTest" min="1" max="30" value="${st11.repsTest}" placeholder="Ej: 5">
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm" style="min-height:40px;" onclick="rm11CalcularDesdeSerie()">Calcular</button>
+                        </div>
+                    </div>
+
+                    <div class="rm11-card">
+                        <div class="rm11-hero-num">
+                            <div>
+                                <small style="display:block; color:#bae6fd; font-size:0.7rem; font-weight:800; text-transform:uppercase;">
+                                    ${st11.ejActivo ? esc11(st11.ejActivo) : "1RM ESTIMADO"}
+                                </small>
+                                <strong id="rm11HeroValor">${fmtKg11(st11.rm)} kg</strong>
+                            </div>
+                            <div style="text-align:right; font-size:0.75rem; color:#e0f2fe;">
+                                <div>Fuerza (85%): <b id="rm11Quick85">${fmtKg11(Math.round((st11.rm * 0.85) / st11.pasoRedondeo) * st11.pasoRedondeo)} kg</b></div>
+                                <div>Hipertrofia (75%): <b id="rm11Quick75">${fmtKg11(Math.round((st11.rm * 0.75) / st11.pasoRedondeo) * st11.pasoRedondeo)} kg</b></div>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label>Redondeo de Discos</label>
+                            <select id="rm11Paso" onchange="rm11ActualizarOpciones()">
+                                <option value="2.5" ${Number(st11.pasoRedondeo) === 2.5 ? "selected" : ""}>Cada 2.5 kg (discos de 1.25 kg)</option>
+                                <option value="1" ${Number(st11.pasoRedondeo) === 1 ? "selected" : ""}>Cada 1 kg</option>
+                                <option value="0.5" ${Number(st11.pasoRedondeo) === 0.5 ? "selected" : ""}>Cada 0.5 kg (exacto)</option>
+                            </select>
+                        </div>
+
+                        <div style="background:var(--surface-subtle); border:1px solid var(--line); border-radius:12px; padding:0.7rem 0.85rem; font-size:0.76rem; color:var(--ink-600); line-height:1.45; margin-top:auto;">
+                            💡 <b>Tip práctico:</b> usá <b>70%–80%</b> para ganar masa muscular (8 a 12 reps exigentes) y <b>85%–90%</b> para bloques de fuerza (3 a 6 reps).
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rm11-card">
+                    <div class="jf-card-head">
+                        <h4>📊 Tabla de Cargas por Porcentaje (% del 1RM)</h4>
+                        <small style="color:var(--ink-500); font-size:0.74rem;">Valores redondeados listos para cargar</small>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="app-table" style="font-size:0.84rem;">
+                            <thead>
+                                <tr>
+                                    <th>% 1RM</th>
+                                    <th>Carga Total</th>
+                                    <th id="rm11ThLado">${Number(st11.barraKg) > 0 ? `Por lado (barra ${st11.barraKg}kg)` : "Referencia"}</th>
+                                    <th>Reps Estimadas</th>
+                                    <th>Zona / Objetivo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rm11TablaBody">
+                                ${construirFilasTabla1RM11()}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+
+    function refrescarNumerosTabla1RM11() {
+        const tbody = document.getElementById("rm11TablaBody");
+        const hero = document.getElementById("rm11HeroValor");
+        const q85 = document.getElementById("rm11Quick85");
+        const q75 = document.getElementById("rm11Quick75");
+        const thLado = document.getElementById("rm11ThLado");
+        const paso = Number(st11.pasoRedondeo) || 2.5;
+
+        if (hero) hero.textContent = `${fmtKg11(st11.rm)} kg`;
+        if (q85) q85.textContent = `${fmtKg11(Math.round((st11.rm * 0.85) / paso) * paso)} kg`;
+        if (q75) q75.textContent = `${fmtKg11(Math.round((st11.rm * 0.75) / paso) * paso)} kg`;
+        if (thLado) thLado.textContent = Number(st11.barraKg) > 0 ? `Por lado (barra ${st11.barraKg}kg)` : "Referencia";
+        if (tbody) tbody.innerHTML = construirFilasTabla1RM11();
+    }
+
+    window.rm11UsarPR = function (rmVal, nombreEj) {
+        st11.rm = Math.max(1, Number(rmVal) || 80);
+        st11.ejActivo = nombreEj || "";
+        renderizarCalculadora1RM11();
+    };
+
+    window.rm11ActualizarDirecto = function (val) {
+        const n = parseFloat(val);
+        if (isNaN(n) || n <= 0) return;
+        st11.rm = n;
+        refrescarNumerosTabla1RM11();
+    };
+
+    window.rm11ActualizarOpciones = function () {
+        st11.barraKg = parseFloat(document.getElementById("rm11Barra")?.value) || 0;
+        st11.pasoRedondeo = parseFloat(document.getElementById("rm11Paso")?.value) || 2.5;
+        refrescarNumerosTabla1RM11();
+    };
+
+    window.rm11CalcularDesdeSerie = function () {
+        const kg = parseFloat(document.getElementById("rm11PesoTest")?.value);
+        const reps = Math.max(1, parseInt(document.getElementById("rm11RepsTest")?.value, 10) || 1);
+        if (isNaN(kg) || kg <= 0) return;
+        st11.pesoTest = kg;
+        st11.repsTest = reps;
+        st11.rm = Math.round((reps === 1 ? kg : kg * (1 + reps / 30)) * 10) / 10;
+        st11.ejActivo = `Calculado (${kg} kg × ${reps})`;
+        renderizarCalculadora1RM11();
+    };
+
+    // Listener global inmune al orden de carga de login.js
+    document.addEventListener("click", (e) => {
+        if (document.body?.dataset?.page !== "perfil-individual") return;
+        const btnCalc = e.target.closest('[data-user-tab="calculadora"], [onclick*="calculadora"]');
+        if (btnCalc) {
+            setTimeout(() => {
+                const sec = asegurarSeccionCalculadora11();
+                if (!sec) return;
+                renderizarCalculadora1RM11();
+                sec.classList.remove("hidden");
+                sincronizarVisibilidadCalc11(sec);
+            }, 30);
+            return;
+        }
+        const otroTab = e.target.closest('.mod-tab, .user-quick-dock-btn, .user-mega-card, .user-sub-card');
+        if (otroTab && !otroTab.matches('[data-user-tab="calculadora"], [onclick*="calculadora"]')) {
+            const sec = document.getElementById("jug-sec-calculadora");
+            if (sec) {
+                sec.classList.add("hidden");
+                sincronizarVisibilidadCalc11(sec);
+            }
+        }
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+        if (document.body?.dataset?.page !== "perfil-individual") return;
+        const sec = asegurarSeccionCalculadora11();
+        if (sec) {
+            renderizarCalculadora1RM11();
+            sincronizarVisibilidadCalc11(sec);
+        }
+    });
+})();
